@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useChat } from "@/contexts/ChatContext";
 import { useSettings } from "@/contexts/SettingsContext";
 import { sendMessage, fetchModels } from "@/lib/openrouter";
@@ -9,7 +9,7 @@ import { MessageInput } from "./MessageInput";
 import { ModelSelector } from "./ModelSelector";
 import { ThinkingToggle } from "./ThinkingToggle";
 import { SearchToggle } from "./SearchToggle";
-import { Brain, Globe, RefreshCw } from "lucide-react";
+import { Brain, Globe, Terminal, Cpu } from "lucide-react";
 
 export function ChatWindow() {
   const { currentChat, messages, addMessage, updateChat, createChat } = useChat();
@@ -120,28 +120,51 @@ export function ChatWindow() {
 
   if (!currentChat) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-white">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-2">Welcome to OpenRouter Chat</h2>
-          <p className="text-gray-600 mb-4">
-            Select a chat from the sidebar or start a new one
-          </p>
-          <button
-            onClick={() => createChat()}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Start New Chat
-          </button>
+      <div className="flex-1 flex flex-col h-screen bg-background relative">
+        {/* Decorative background */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
+          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-secondary/5 rounded-full blur-3xl" />
+        </div>
+
+        <div className="flex-1 flex items-center justify-center relative z-10">
+          <div className="text-center max-w-md">
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-primary mb-6 shadow-brutal">
+              <Terminal size={40} className="text-primary-foreground" />
+            </div>
+            <h2 className="text-3xl font-bold mb-3">
+              Welcome to <span className="text-gradient">OpenRouter</span> Chat
+            </h2>
+            <p className="text-muted-foreground mono text-sm mb-6">
+              // Select a chat from the sidebar<br />or start a new conversation
+            </p>
+            <button
+              onClick={() => createChat()}
+              className="btn-brutal btn-brutal-primary"
+            >
+              <Cpu size={18} />
+              <span className="mono">START_NEW_CHAT</span>
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 flex flex-col h-screen bg-white">
+    <div className="flex-1 flex flex-col h-screen bg-background relative">
+      {/* Decorative background */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-full h-px bg-gradient-to-r from-transparent via-primary/10 to-transparent" />
+      </div>
+
       {/* Header */}
-      <header className="px-4 py-3 border-b border-gray-200 flex items-center justify-between gap-4">
+      <header className="px-6 py-4 border-b-2 border-border flex items-center justify-between gap-4 relative z-10">
         <div className="flex items-center gap-4 flex-1">
+          <div className="flex items-center gap-2 text-sm mono text-muted-foreground">
+            <span className="text-primary">_</span>
+            <span>MODEL</span>
+          </div>
           <ModelSelector
             models={models}
             selectedModel={currentChat.modelId}
@@ -166,18 +189,20 @@ export function ChatWindow() {
 
       {/* Error message */}
       {error && (
-        <div className="px-4 py-2 bg-red-50 text-red-600 text-sm">
-          {error}
+        <div className="px-6 py-3 bg-error/10 border-b border-error/30">
+          <p className="text-error mono text-sm">
+            <span className="font-bold">ERROR:</span> {error}
+          </p>
         </div>
       )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto">
-        <MessageList messages={messages} />
+      <div className="flex-1 overflow-y-auto relative z-10">
+        <MessageList messages={messages} sending={sending} />
       </div>
 
       {/* Input */}
-      <div className="border-t border-gray-200 p-4">
+      <div className="border-t-2 border-border p-4 relative z-10">
         <MessageInput onSend={handleSendMessage} disabled={sending} />
       </div>
     </div>

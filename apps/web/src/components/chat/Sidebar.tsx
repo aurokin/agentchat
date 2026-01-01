@@ -4,9 +4,10 @@ import React from "react";
 import { useChat } from "@/contexts/ChatContext";
 import { useSettings } from "@/contexts/SettingsContext";
 import { formatDistanceToNow } from "date-fns";
-import { Plus, Trash2, MessageSquare, Settings, LogOut } from "lucide-react";
+import { Plus, Trash2, MessageSquare, Settings, LogOut, Terminal } from "lucide-react";
 import { UserButton, useUser, useAuth } from "@clerk/nextjs";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 export function Sidebar() {
   const { chats, loading, createChat, deleteChat, selectChat, currentChat } = useChat();
@@ -19,39 +20,58 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="w-64 h-screen bg-gray-100 border-r border-gray-200 flex flex-col">
-      <div className="p-4 border-b border-gray-200">
+    <aside className="w-72 h-screen bg-muted/50 border-r-2 border-border flex flex-col relative">
+      {/* Sidebar accent line */}
+      <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary" />
+
+      {/* Header */}
+      <div className="p-4 border-b-2 border-border">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-8 h-8 bg-primary flex items-center justify-center shadow-brutal-sm">
+            <Terminal size={18} className="text-primary-foreground" />
+          </div>
+          <span className="font-bold text-lg">OpenRouter</span>
+        </div>
         <button
           onClick={handleNewChat}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          className="w-full btn-brutal btn-brutal-primary"
         >
           <Plus size={18} />
-          New Chat
+          <span className="mono text-sm">NEW_CHAT</span>
         </button>
       </div>
 
+      {/* Chat list */}
       <div className="flex-1 overflow-y-auto">
         {loading ? (
-          <div className="p-4 text-center text-gray-500">Loading chats...</div>
+          <div className="p-4 text-center text-muted-foreground mono text-sm">
+            // Loading chats...
+          </div>
         ) : chats.length === 0 ? (
-          <div className="p-4 text-center text-gray-500">
-            No chats yet. Start a new conversation!
+          <div className="p-4 text-center text-muted-foreground mono text-sm">
+            // No chats yet.<br />Start a conversation!
           </div>
         ) : (
-          <ul className="p-2">
-            {chats.map((chat) => (
-              <li key={chat.id}>
-                <button
+          <ul className="p-2 list-none">
+            {chats.map((chat, index) => (
+              <li key={chat.id} className="animate-slide-in" style={{ animationDelay: `${index * 50}ms` }}>
+                <div
                   onClick={() => selectChat(chat.id)}
-                  className={`w-full text-left p-3 rounded-lg flex items-start justify-between gap-2 hover:bg-gray-200 transition-colors ${
-                    currentChat?.id === chat.id ? "bg-blue-100" : ""
-                  }`}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === 'Enter' && selectChat(chat.id)}
+                  className={cn(
+                    "w-full text-left p-3 mb-1 border-2 border-transparent flex items-start justify-between gap-2 cursor-pointer transition-all duration-150 hover:translate-x-1",
+                    currentChat?.id === chat.id
+                      ? "bg-primary/10 border-primary/30"
+                      : "hover:bg-muted hover:border-border"
+                  )}
                 >
                   <div className="flex items-start gap-2 min-w-0">
-                    <MessageSquare size={16} className="mt-1 flex-shrink-0 text-gray-500" />
+                    <MessageSquare size={16} className="mt-1 flex-shrink-0 text-primary" />
                     <div className="min-w-0">
-                      <p className="font-medium truncate">{chat.title}</p>
-                      <p className="text-xs text-gray-500">
+                      <p className="font-medium truncate text-sm">{chat.title}</p>
+                      <p className="mono text-xs text-muted-foreground">
                         {formatDistanceToNow(chat.updatedAt, { addSuffix: true })}
                       </p>
                     </div>
@@ -61,28 +81,29 @@ export function Sidebar() {
                       e.stopPropagation();
                       deleteChat(chat.id);
                     }}
-                    className="text-gray-400 hover:text-red-500 p-1"
+                    className="text-muted-foreground hover:text-error p-1 transition-colors"
                   >
                     <Trash2 size={14} />
                   </button>
-                </button>
+                </div>
               </li>
             ))}
           </ul>
         )}
       </div>
 
-      <div className="p-4 border-t border-gray-200">
-        <div className="flex items-center justify-between mb-3">
+      {/* Footer */}
+      <div className="p-4 border-t-2 border-border">
+        <div className="flex items-center justify-between mb-3 p-2 bg-muted border border-border">
           <div className="flex items-center gap-2">
             <UserButton />
-            <span className="text-sm font-medium truncate max-w-24">
+            <span className="font-medium text-sm truncate max-w-28">
               {user?.firstName || "User"}
             </span>
           </div>
           <button
             onClick={() => signOut()}
-            className="text-gray-500 hover:text-gray-700"
+            className="text-muted-foreground hover:text-error transition-colors p-1"
             title="Sign out"
           >
             <LogOut size={16} />
@@ -92,15 +113,17 @@ export function Sidebar() {
         <div className="space-y-2">
           <Link
             href="/settings"
-            className="flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 p-2 rounded hover:bg-gray-200"
+            className="flex items-center gap-2 text-sm p-2 border border-border hover:bg-muted hover:border-primary/50 transition-all duration-150"
           >
             <Settings size={16} />
-            Settings
+            <span className="mono text-xs">SETTINGS</span>
           </Link>
           {!apiKey && (
-            <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
-              Please add your OpenRouter API key in Settings
-            </p>
+            <div className="p-2 bg-warning/10 border border-warning/30">
+              <p className="text-warning mono text-xs">
+                // Add your OpenRouter<br />API key in Settings
+              </p>
+            </div>
           )}
         </div>
       </div>

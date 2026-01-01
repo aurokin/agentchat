@@ -5,7 +5,19 @@ import { Sidebar } from "@/components/chat/Sidebar";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useUser } from "@clerk/nextjs";
 import { validateApiKey } from "@/lib/openrouter";
-import { Settings, Key, Moon, Sun, Monitor, Check, X, Loader2 } from "lucide-react";
+import {
+  Settings,
+  Key,
+  Moon,
+  Sun,
+  Monitor,
+  Check,
+  X,
+  Loader2,
+  Terminal,
+  Info,
+  ExternalLink,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function SettingsPage() {
@@ -55,28 +67,41 @@ export default function SettingsPage() {
   return (
     <div className="flex h-screen">
       <Sidebar />
-      <main className="flex-1 overflow-y-auto bg-gray-50">
-        <div className="max-w-2xl mx-auto p-8">
-          <h1 className="text-2xl font-bold mb-6 flex items-center gap-2">
-            <Settings size={24} />
-            Settings
-          </h1>
+      <main className="flex-1 overflow-y-auto bg-background relative">
+        {/* Decorative background */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
+        </div>
+
+        <div className="max-w-2xl mx-auto p-8 relative z-10">
+          {/* Header */}
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
+              <div className="w-10 h-10 bg-primary flex items-center justify-center shadow-brutal-sm">
+                <Settings size={22} className="text-primary-foreground" />
+              </div>
+              <span>Settings</span>
+            </h1>
+            <p className="text-muted-foreground mono text-sm">
+              // Configure your preferences
+            </p>
+          </div>
 
           {/* OpenRouter API Key */}
-          <section className="bg-white rounded-lg shadow p-6 mb-6">
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <Key size={20} />
-              OpenRouter API Key
-            </h2>
+          <section className="card-brutal mb-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Key size={20} className="text-primary" />
+              <h2 className="text-lg font-semibold">OpenRouter API Key</h2>
+            </div>
 
-            <p className="text-sm text-gray-600 mb-4">
-              Enter your OpenRouter API key to enable chatting with AI models.
-              Your key is stored locally and never sent to our servers.
+            <p className="text-sm text-muted-foreground mb-4 mono">
+              // Enter your OpenRouter API key to enable chatting with AI models.<br />
+              // Your key is stored locally and never sent to our servers.
             </p>
 
             <div className="space-y-4">
               <div>
-                <label htmlFor="apiKey" className="block text-sm font-medium mb-1">
+                <label htmlFor="apiKey" className="label-brutal">
                   API Key
                 </label>
                 <input
@@ -88,130 +113,149 @@ export default function SettingsPage() {
                     setValidationResult(null);
                   }}
                   placeholder="sk-..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="input-brutal font-mono"
                 />
               </div>
 
               {apiKey && (
-                <p className="text-sm text-green-600 flex items-center gap-1">
+                <div className="flex items-center gap-2 text-success">
                   <Check size={16} />
-                  API key is saved
-                </p>
+                  <span className="mono text-sm font-medium">
+                    API_KEY_SAVED
+                  </span>
+                </div>
               )}
 
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button
                   onClick={handleValidate}
                   disabled={validating || !newApiKey.trim()}
-                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 flex items-center gap-2"
+                  className="btn-brutal btn-brutal-secondary"
                 >
-                  {validating ? <Loader2 size={16} className="animate-spin" /> : null}
-                  Verify Key
+                  {validating ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <Terminal size={16} />
+                  )}
+                  <span className="mono text-sm">VALIDATE</span>
                 </button>
 
                 <button
                   onClick={handleSave}
                   disabled={saving}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                  className="btn-brutal btn-brutal-primary"
                 >
-                  {saving ? "Saving..." : "Save"}
+                  <span className="mono text-sm">
+                    {saving ? "SAVING..." : "SAVE_KEY"}
+                  </span>
                 </button>
 
                 {apiKey && (
                   <button
                     onClick={handleClear}
-                    className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg"
+                    className="px-4 py-2.5 text-error border-2 border-error hover:bg-error/10 transition-colors mono text-sm"
                   >
-                    Clear
+                    CLEAR
                   </button>
                 )}
               </div>
 
               {validationResult === true && (
-                <p className="text-sm text-green-600 flex items-center gap-1">
+                <div className="flex items-center gap-2 text-success">
                   <Check size={16} />
-                  Valid API key
-                </p>
+                  <span className="mono text-sm font-medium">
+                    // VALID_API_KEY
+                  </span>
+                </div>
               )}
 
               {validationResult === false && (
-                <p className="text-sm text-red-600 flex items-center gap-1">
+                <div className="flex items-center gap-2 text-error">
                   <X size={16} />
-                  Invalid API key
-                </p>
+                  <span className="mono text-sm font-medium">
+                    // INVALID_API_KEY
+                  </span>
+                </div>
               )}
 
-              <p className="text-xs text-gray-500">
-                Get your API key from{" "}
-                <a
-                  href="https://openrouter.ai/keys"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline"
-                >
-                  openrouter.ai/keys
-                </a>
-              </p>
+              <div className="flex items-center gap-2 text-muted-foreground text-sm p-3 bg-muted border border-border">
+                <ExternalLink size={14} />
+                <span>
+                  Get your API key from{" "}
+                  <a
+                    href="https://openrouter.ai/keys"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    openrouter.ai/keys
+                  </a>
+                </span>
+              </div>
             </div>
           </section>
 
           {/* Theme */}
-          <section className="bg-white rounded-lg shadow p-6 mb-6">
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              Theme
-            </h2>
+          <section className="card-brutal mb-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Sun size={20} className="text-warning" />
+              <h2 className="text-lg font-semibold">Theme</h2>
+            </div>
 
             <div className="grid grid-cols-3 gap-4">
               <button
                 onClick={() => setTheme("light")}
                 className={cn(
-                  "p-4 border rounded-lg flex flex-col items-center gap-2 transition-colors",
+                  "p-4 border-2 flex flex-col items-center gap-2 transition-all duration-150",
                   theme === "light"
-                    ? "border-blue-500 bg-blue-50"
-                    : "border-gray-200 hover:bg-gray-50"
+                    ? "border-primary bg-primary/10"
+                    : "border-border hover:border-primary/50"
                 )}
               >
-                <Sun size={24} />
-                <span className="text-sm">Light</span>
+                <Sun size={24} className={theme === "light" ? "text-primary" : "text-muted-foreground"} />
+                <span className="mono text-xs">LIGHT</span>
               </button>
 
               <button
                 onClick={() => setTheme("dark")}
                 className={cn(
-                  "p-4 border rounded-lg flex flex-col items-center gap-2 transition-colors",
+                  "p-4 border-2 flex flex-col items-center gap-2 transition-all duration-150",
                   theme === "dark"
-                    ? "border-blue-500 bg-blue-50"
-                    : "border-gray-200 hover:bg-gray-50"
+                    ? "border-primary bg-primary/10"
+                    : "border-border hover:border-primary/50"
                 )}
               >
-                <Moon size={24} />
-                <span className="text-sm">Dark</span>
+                <Moon size={24} className={theme === "dark" ? "text-primary" : "text-muted-foreground"} />
+                <span className="mono text-xs">DARK</span>
               </button>
 
               <button
                 onClick={() => setTheme("system")}
                 className={cn(
-                  "p-4 border rounded-lg flex flex-col items-center gap-2 transition-colors",
+                  "p-4 border-2 flex flex-col items-center gap-2 transition-all duration-150",
                   theme === "system"
-                    ? "border-blue-500 bg-blue-50"
-                    : "border-gray-200 hover:bg-gray-50"
+                    ? "border-primary bg-primary/10"
+                    : "border-border hover:border-primary/50"
                 )}
               >
-                <Monitor size={24} />
-                <span className="text-sm">System</span>
+                <Monitor size={24} className={theme === "system" ? "text-primary" : "text-muted-foreground"} />
+                <span className="mono text-xs">SYSTEM</span>
               </button>
             </div>
           </section>
 
           {/* About */}
-          <section className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold mb-4">About</h2>
-            <p className="text-sm text-gray-600">
-              OpenRouter Chat lets you chat with AI models through OpenRouter.
-              Your conversations are stored locally in your browser.
+          <section className="card-brutal">
+            <div className="flex items-center gap-2 mb-4">
+              <Info size={20} className="text-secondary" />
+              <h2 className="text-lg font-semibold">About</h2>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4 mono">
+              // OpenRouter Chat lets you chat with AI models through OpenRouter.<br />
+              // Your conversations are stored locally in your browser.
             </p>
-            <p className="text-sm text-gray-500 mt-2">
-              Version 0.1.0
+            <p className="mono text-xs text-muted-foreground">
+              VERSION 0.1.0
             </p>
           </section>
         </div>

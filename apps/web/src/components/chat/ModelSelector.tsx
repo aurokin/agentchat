@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { ChevronDown, Loader2 } from "lucide-react";
+import { ChevronDown, Loader2, Cpu } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ModelSelectorProps {
@@ -50,29 +50,36 @@ export function ModelSelector({
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         disabled={loading}
-        className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+        className={cn(
+          "flex items-center gap-2 px-3 py-2 bg-muted border-2 border-border transition-all duration-150",
+          "hover:border-primary hover:bg-muted/80",
+          loading && "opacity-50 cursor-not-allowed"
+        )}
       >
         {loading ? (
-          <Loader2 size={16} className="animate-spin" />
+          <Loader2 size={16} className="animate-spin text-primary" />
         ) : (
-          <ChevronDown size={16} />
+          <Cpu size={16} className="text-primary" />
         )}
         <span className="text-sm font-medium max-w-48 truncate">
           {selectedModel.split("/").pop() || selectedModel}
         </span>
+        <ChevronDown size={14} className="text-muted-foreground" />
       </button>
 
       {isOpen && (
         <>
           <div
-            className="fixed inset-0 z-10"
+            className="fixed inset-0 z-40"
             onClick={() => setIsOpen(false)}
           />
-          <div className="absolute top-full left-0 mt-1 w-72 max-h-80 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg z-20">
+          <div className="absolute top-full left-0 mt-1 w-80 max-h-72 overflow-y-auto bg-muted border-2 border-border shadow-brutal z-50">
             {Object.entries(displayModels).map(([provider, providerModels]) => (
               <div key={provider}>
-                <div className="px-3 py-2 bg-gray-50 text-xs font-semibold text-gray-500 uppercase">
-                  {provider}
+                <div className="px-3 py-2 bg-primary/10 border-b border-border">
+                  <span className="mono text-xs font-bold text-primary uppercase">
+                    {provider}
+                  </span>
                 </div>
                 {providerModels.map((model) => (
                   <button
@@ -80,8 +87,8 @@ export function ModelSelector({
                     type="button"
                     onClick={() => handleSelect(model.id)}
                     className={cn(
-                      "w-full text-left px-3 py-2 text-sm hover:bg-gray-100 focus:outline-none",
-                      model.id === selectedModel && "bg-blue-50 text-blue-600"
+                      "w-full text-left px-3 py-2 text-sm transition-colors hover:bg-primary/10 hover:text-primary",
+                      model.id === selectedModel && "bg-primary/20 text-primary"
                     )}
                   >
                     {model.name}
