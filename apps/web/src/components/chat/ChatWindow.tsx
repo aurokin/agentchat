@@ -7,6 +7,7 @@ import { sendMessage } from "@/lib/openrouter";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import { ModelSelector } from "./ModelSelector";
+import type { ThinkingLevel } from "@/lib/types";
 import { ThinkingToggle } from "./ThinkingToggle";
 import { SearchToggle } from "./SearchToggle";
 import { Terminal, Cpu } from "lucide-react";
@@ -87,9 +88,9 @@ export function ChatWindow() {
         await updateChat({ ...currentChat, modelId });
     };
 
-    const handleThinkingChange = async (enabled: boolean) => {
+    const handleThinkingChange = async (value: ThinkingLevel) => {
         if (!currentChat) return;
-        await updateChat({ ...currentChat, thinkingEnabled: enabled });
+        await updateChat({ ...currentChat, thinking: value });
     };
 
     const handleSearchChange = async (enabled: boolean) => {
@@ -152,7 +153,7 @@ export function ChatWindow() {
 
                 <div className="flex items-center gap-2">
                     <ThinkingToggle
-                        enabled={currentChat.thinkingEnabled}
+                        value={currentChat.thinking}
                         onChange={handleThinkingChange}
                         disabled={sending}
                     />

@@ -7,11 +7,13 @@ export interface Message {
   createdAt: number;
 }
 
+export type ThinkingLevel = "xhigh" | "high" | "medium" | "low" | "minimal" | "none";
+
 export interface ChatSession {
   id: string;
   title: string;
   modelId: string;
-  thinkingEnabled: boolean;
+  thinking: ThinkingLevel;
   searchEnabled: boolean;
   createdAt: number;
   updatedAt: number;
