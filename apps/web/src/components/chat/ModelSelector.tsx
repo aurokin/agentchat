@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useRef, useEffect } from "react";
 import { ChevronDown, Loader2, Cpu } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/contexts/SettingsContext";
@@ -16,6 +16,32 @@ export function ModelSelector({
 }: ModelSelectorProps) {
   const { models, loadingModels } = useSettings();
   const [isOpen, setIsOpen] = React.useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Close on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    };
+
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      // Also close on escape key
+      const handleEscape = (e: KeyboardEvent) => {
+        if (e.key === "Escape") setIsOpen(false);
+      };
+      document.addEventListener("keydown", handleEscape);
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+        document.removeEventListener("keydown", handleEscape);
+      };
+    }
+  }, [isOpen]);
 
   const handleSelect = (modelId: string) => {
     onModelChange(modelId);
@@ -33,7 +59,7 @@ export function ModelSelector({
   }, {} as Record<string, typeof models>);
 
   return (
-    <div className="relative">
+    <div className="relative" ref={containerRef}>
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
@@ -56,50 +82,37 @@ export function ModelSelector({
       </button>
 
       {isOpen && (
-        <>
-          <div
-            className="fixed inset-0 z-40 cursor-default"
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsOpen(false);
-            }}
-          />
-          <div
-            className="absolute top-full left-0 mt-1 w-80 max-h-72 overflow-y-auto bg-muted border-2 border-border shadow-brutal z-50 cursor-default"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {models.length === 0 && !loadingModels && (
-              <div className="px-3 py-4 text-center text-muted-foreground text-sm">
-                No models available. Add an API key to fetch models.
+        <div
+          className="absolute z-[100] w-80 max-h-72 overflow-y-auto bg-muted border-2 border-border shadow-brutal cursor-pointer mt-1"
+        >
+          {models.length === 0 && !loadingModels && (
+            <div className="px-3 py-4 text-center text-muted-foreground text-sm">
+              No models available. Add an API key to fetch models.
+            </div>
+          )}
+          {Object.entries(groupedModels).map(([provider, providerModels]) => (
+            <div key={provider}>
+              <div className="px-3 py-2 bg-primary/10 border-b border-border">
+                <span className="mono text-xs font-bold text-primary uppercase">
+                  {provider}
+                </span>
               </div>
-            )}
-            {Object.entries(groupedModels).map(([provider, providerModels]) => (
-              <div key={provider}>
-                <div className="px-3 py-2 bg-primary/10 border-b border-border">
-                  <span className="mono text-xs font-bold text-primary uppercase">
-                    {provider}
-                  </span>
-                </div>
-                {providerModels.map((model) => (
-                  <button
-                    key={model.id}
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleSelect(model.id);
-                    }}
-                    className={cn(
-                      "w-full text-left px-3 py-2 text-sm transition-colors hover:bg-primary/10 hover:text-primary cursor-pointer",
-                      model.id === selectedModel && "bg-primary/20 text-primary"
-                    )}
-                  >
-                    {model.name}
-                  </button>
-                ))}
-              </div>
-            ))}
-          </div>
-        </>
+              {providerModels.map((model) => (
+                <button
+                  key={model.id}
+                  type="button"
+                  onClick={() => handleSelect(model.id)}
+                  className={cn(
+                    "w-full text-left px-3 py-2 text-sm transition-colors hover:bg-primary/10 hover:text-primary cursor-pointer",
+                    model.id === selectedModel && "bg-primary/20 text-primary"
+                  )}
+                >
+                  {model.name}
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );

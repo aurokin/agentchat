@@ -139,7 +139,7 @@ export function ChatWindow() {
       </div>
 
       {/* Header */}
-      <header className="px-6 py-4 border-b-2 border-border flex items-center justify-between gap-4 relative z-10">
+      <header className="px-6 py-4 border-b-2 border-border flex items-center justify-between gap-4 relative z-50">
         <div className="flex items-center gap-4 flex-1">
           <div className="flex items-center gap-2 text-sm mono text-muted-foreground">
             <span className="text-primary">_</span>

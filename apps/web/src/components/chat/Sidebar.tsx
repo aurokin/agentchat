@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useRouter } from "next/navigation";
 import { useChat } from "@/contexts/ChatContext";
 import { useSettings } from "@/contexts/SettingsContext";
 import { formatDistanceToNow } from "date-fns";
@@ -10,6 +11,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 export function Sidebar() {
+  const router = useRouter();
   const { chats, loading, createChat, deleteChat, selectChat, currentChat } = useChat();
   const { setApiKey, apiKey } = useSettings();
   const { user } = useUser();
@@ -56,10 +58,18 @@ export function Sidebar() {
             {chats.map((chat, index) => (
               <li key={chat.id} className="animate-slide-in" style={{ animationDelay: `${index * 50}ms` }}>
                 <div
-                  onClick={() => selectChat(chat.id)}
+                  onClick={() => {
+                    selectChat(chat.id);
+                    router.push("/chat");
+                  }}
                   role="button"
                   tabIndex={0}
-                  onKeyDown={(e) => e.key === 'Enter' && selectChat(chat.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      selectChat(chat.id);
+                      router.push("/chat");
+                    }
+                  }}
                   className={cn(
                     "w-full text-left p-3 mb-1 border-2 border-transparent flex items-start justify-between gap-2 cursor-pointer transition-all duration-150 hover:translate-x-1",
                     currentChat?.id === chat.id
