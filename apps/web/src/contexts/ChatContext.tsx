@@ -16,6 +16,7 @@ interface ChatContextType {
   deleteChat: (chatId: string) => Promise<void>;
   updateChat: (chat: ChatSession) => Promise<void>;
   addMessage: (message: { role: string; content: string; thinking?: string }) => Promise<Message>;
+  updateMessage: (id: string, updates: Partial<Pick<Message, "content" | "thinking">>) => Promise<void>;
   clearCurrentChat: () => void;
 }
 
@@ -115,6 +116,18 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     return newMessage;
   }, [currentChat]);
 
+  const updateMessage = useCallback(async (id: string, updates: Partial<Pick<Message, "content" | "thinking">>) => {
+    setMessages((prev) => {
+      const message = prev.find((m) => m.id === id);
+      if (!message) return prev;
+
+      const updated = { ...message, ...updates };
+      db.updateMessage(updated);
+
+      return prev.map((m) => (m.id === id ? updated : m));
+    });
+  }, []);
+
   const clearCurrentChat = useCallback(() => {
     setCurrentChat(null);
     setMessages([]);
@@ -132,6 +145,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         deleteChat,
         updateChat,
         addMessage,
+        updateMessage,
         clearCurrentChat,
       }}
     >
