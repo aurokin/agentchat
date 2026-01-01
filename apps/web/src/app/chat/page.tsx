@@ -32,6 +32,19 @@ export default function ChatPage() {
     }
   }, [isLoaded, user]);
 
+  // Ctrl + Shift + O to create new chat
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "o") {
+        e.preventDefault();
+        createChat();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [createChat]);
+
   if (!isLoaded) {
     return (
       <div className="flex items-center justify-center h-screen">

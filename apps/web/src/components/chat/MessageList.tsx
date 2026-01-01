@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import type { Message } from "@/lib/types";
 import { format } from "date-fns";
-import { User, Bot, Brain, Terminal } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import { User, Bot, Brain, Terminal, Copy, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface MessageListProps {
@@ -70,6 +71,13 @@ export function MessageList({ messages, sending }: MessageListProps) {
 function MessageItem({ message, index }: { message: Message; index: number }) {
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
+  const [copied, setCopied] = useState(false);
+
+  const copyToClipboard = async () => {
+    await navigator.clipboard.writeText(message.content || "");
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
     <div
@@ -114,7 +122,22 @@ function MessageItem({ message, index }: { message: Message; index: number }) {
           </span>
         </div>
 
-        <div className="inline-block max-w-[85%]">
+        <div className="inline-block max-w-[85%] relative group">
+          {/* Copy button */}
+          {message.content && (
+            <button
+              onClick={copyToClipboard}
+              className="absolute top-2 right-2 p-1.5 rounded-md bg-background/80 border border-border opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted"
+              title="Copy to clipboard"
+            >
+              {copied ? (
+                <Check size={14} className="text-green-500" />
+              ) : (
+                <Copy size={14} className="text-muted-foreground" />
+              )}
+            </button>
+          )}
+
           {/* Thinking content */}
           {message.thinking && (
             <div className="mb-3 p-3 bg-warning/10 border-l-4 border-warning">
@@ -131,13 +154,15 @@ function MessageItem({ message, index }: { message: Message; index: number }) {
           {/* Main content */}
           <div
             className={cn(
-              "p-4 whitespace-pre-wrap border-2",
+              "p-4 border-2 prose prose-sm dark:prose-invert max-w-none",
               isUser
                 ? "bg-primary/10 border-primary/30 text-foreground"
-                : "bg-muted border-border text-foreground"
+                : "bg-muted border-border text-foreground prose-pre:bg-background prose-pre:border prose-pre:border-border"
             )}
           >
-            {message.content || (
+            {message.content ? (
+              <ReactMarkdown>{message.content}</ReactMarkdown>
+            ) : (
               <span className="text-muted-foreground mono italic">...</span>
             )}
           </div>
