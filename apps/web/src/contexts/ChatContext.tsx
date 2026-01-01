@@ -42,7 +42,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   };
 
   const createChat = useCallback(async (title?: string, modelId?: string): Promise<ChatSession> => {
-    const defaultModel = storage.getDefaultModel() || "openrouter/gpt-4o";
+    const defaultModel = storage.getDefaultModel() || "gpt-4o";
     const chat: ChatSession = {
       id: uuid(),
       title: title || "New Chat",

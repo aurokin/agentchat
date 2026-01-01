@@ -1,41 +1,21 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useChat } from "@/contexts/ChatContext";
 import { useSettings } from "@/contexts/SettingsContext";
-import { sendMessage, fetchModels } from "@/lib/openrouter";
+import { sendMessage } from "@/lib/openrouter";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import { ModelSelector } from "./ModelSelector";
 import { ThinkingToggle } from "./ThinkingToggle";
 import { SearchToggle } from "./SearchToggle";
-import { Brain, Globe, Terminal, Cpu } from "lucide-react";
+import { Terminal, Cpu } from "lucide-react";
 
 export function ChatWindow() {
   const { currentChat, messages, addMessage, updateChat, createChat } = useChat();
   const { apiKey } = useSettings();
-  const [models, setModels] = useState<Array<{ id: string; name: string }>>([]);
-  const [loadingModels, setLoadingModels] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Load models when chat is selected
-  useEffect(() => {
-    const loadModels = async () => {
-      if (!apiKey) return;
-      setLoadingModels(true);
-      try {
-        const fetchedModels = await fetchModels(apiKey);
-        setModels(fetchedModels);
-      } catch (err) {
-        console.error("Failed to load models:", err);
-      } finally {
-        setLoadingModels(false);
-      }
-    };
-
-    loadModels();
-  }, [apiKey]);
 
   const handleSendMessage = async (content: string) => {
     if (!apiKey) {
@@ -166,10 +146,8 @@ export function ChatWindow() {
             <span>MODEL</span>
           </div>
           <ModelSelector
-            models={models}
             selectedModel={currentChat.modelId}
             onModelChange={handleModelChange}
-            loading={loadingModels}
           />
         </div>
 

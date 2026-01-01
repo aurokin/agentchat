@@ -3,20 +3,18 @@
 import React from "react";
 import { ChevronDown, Loader2, Cpu } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useSettings } from "@/contexts/SettingsContext";
 
 interface ModelSelectorProps {
-  models: Array<{ id: string; name: string }>;
   selectedModel: string;
   onModelChange: (modelId: string) => void;
-  loading?: boolean;
 }
 
 export function ModelSelector({
-  models,
   selectedModel,
   onModelChange,
-  loading,
 }: ModelSelectorProps) {
+  const { models, loadingModels } = useSettings();
   const [isOpen, setIsOpen] = React.useState(false);
 
   const handleSelect = (modelId: string) => {
@@ -34,29 +32,19 @@ export function ModelSelector({
     return acc;
   }, {} as Record<string, typeof models>);
 
-  // Default models if none loaded
-  const displayModels = models.length > 0 ? groupedModels : {
-    default: [
-      { id: "openrouter/gpt-4o", name: "GPT-4o" },
-      { id: "openrouter/gpt-4o-mini", name: "GPT-4o-mini" },
-      { id: "anthropic/claude-3.5-sonnet", name: "Claude 3.5 Sonnet" },
-      { id: "anthropic/claude-3-haiku", name: "Claude 3 Haiku" },
-    ],
-  };
-
   return (
     <div className="relative">
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        disabled={loading}
+        disabled={loadingModels}
         className={cn(
           "flex items-center gap-2 px-3 py-2 bg-muted border-2 border-border transition-all duration-150",
           "hover:border-primary hover:bg-muted/80",
-          loading && "opacity-50 cursor-not-allowed"
+          loadingModels && "opacity-50 cursor-not-allowed"
         )}
       >
-        {loading ? (
+        {loadingModels ? (
           <Loader2 size={16} className="animate-spin text-primary" />
         ) : (
           <Cpu size={16} className="text-primary" />
@@ -70,11 +58,22 @@ export function ModelSelector({
       {isOpen && (
         <>
           <div
-            className="fixed inset-0 z-40"
-            onClick={() => setIsOpen(false)}
+            className="fixed inset-0 z-40 cursor-default"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsOpen(false);
+            }}
           />
-          <div className="absolute top-full left-0 mt-1 w-80 max-h-72 overflow-y-auto bg-muted border-2 border-border shadow-brutal z-50">
-            {Object.entries(displayModels).map(([provider, providerModels]) => (
+          <div
+            className="absolute top-full left-0 mt-1 w-80 max-h-72 overflow-y-auto bg-muted border-2 border-border shadow-brutal z-50 cursor-default"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {models.length === 0 && !loadingModels && (
+              <div className="px-3 py-4 text-center text-muted-foreground text-sm">
+                No models available. Add an API key to fetch models.
+              </div>
+            )}
+            {Object.entries(groupedModels).map(([provider, providerModels]) => (
               <div key={provider}>
                 <div className="px-3 py-2 bg-primary/10 border-b border-border">
                   <span className="mono text-xs font-bold text-primary uppercase">
@@ -85,9 +84,12 @@ export function ModelSelector({
                   <button
                     key={model.id}
                     type="button"
-                    onClick={() => handleSelect(model.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSelect(model.id);
+                    }}
                     className={cn(
-                      "w-full text-left px-3 py-2 text-sm transition-colors hover:bg-primary/10 hover:text-primary",
+                      "w-full text-left px-3 py-2 text-sm transition-colors hover:bg-primary/10 hover:text-primary cursor-pointer",
                       model.id === selectedModel && "bg-primary/20 text-primary"
                     )}
                   >
