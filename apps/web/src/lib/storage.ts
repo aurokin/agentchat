@@ -2,6 +2,7 @@ const STORAGE_KEYS = {
   API_KEY: "openrouter-api-key",
   THEME: "openrouter-theme",
   DEFAULT_MODEL: "openrouter-default-model",
+  FAVORITE_MODELS: "openrouter-favorite-models",
 } as const;
 
 export function getApiKey(): string | null {
@@ -37,4 +38,19 @@ export function getDefaultModel(): string {
 export function setDefaultModel(modelId: string): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEYS.DEFAULT_MODEL, modelId);
+}
+
+export function getFavoriteModels(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const stored = localStorage.getItem(STORAGE_KEYS.FAVORITE_MODELS);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function setFavoriteModels(modelIds: string[]): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(STORAGE_KEYS.FAVORITE_MODELS, JSON.stringify(modelIds));
 }

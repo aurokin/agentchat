@@ -10,6 +10,7 @@ interface SettingsContextType extends UserSettings {
   clearApiKey: () => void;
   setDefaultModel: (modelId: string) => void;
   setTheme: (theme: UserSettings["theme"]) => void;
+  toggleFavoriteModel: (modelId: string) => void;
   models: OpenRouterModel[];
   loadingModels: boolean;
   refreshModels: () => Promise<void>;
@@ -19,6 +20,7 @@ const defaultSettings: UserSettings = {
   apiKey: null,
   defaultModel: "",
   theme: "system",
+  favoriteModels: [],
 };
 
 const SettingsContext = createContext<SettingsContextType | null>(null);
@@ -59,6 +61,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       apiKey: storage.getApiKey(),
       defaultModel: storage.getDefaultModel(),
       theme: storage.getTheme(),
+      favoriteModels: storage.getFavoriteModels(),
     });
     setMounted(true);
   }, []);
@@ -109,6 +112,17 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const toggleFavoriteModel = (modelId: string) => {
+    setSettings((prev) => {
+      const isFavorite = prev.favoriteModels.includes(modelId);
+      const newFavorites = isFavorite
+        ? prev.favoriteModels.filter((id) => id !== modelId)
+        : [...prev.favoriteModels, modelId];
+      storage.setFavoriteModels(newFavorites);
+      return { ...prev, favoriteModels: newFavorites };
+    });
+  };
+
   useEffect(() => {
     if (mounted) {
       setTheme(settings.theme);
@@ -123,6 +137,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         clearApiKey,
         setDefaultModel,
         setTheme,
+        toggleFavoriteModel,
         models,
         loadingModels,
         refreshModels,
