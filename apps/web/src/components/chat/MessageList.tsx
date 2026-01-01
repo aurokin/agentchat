@@ -37,30 +37,8 @@ export function MessageList({ messages, sending }: MessageListProps) {
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
       {messages.map((message, index) => (
-        <MessageItem key={message.id} message={message} index={index} />
+        <MessageItem key={message.id} message={message} index={index} sending={sending && index === messages.length} />
       ))}
-
-      {/* Typing indicator */}
-      {sending && (
-        <div className="flex gap-4 animate-slide-in">
-          <div className="w-10 h-10 rounded-none flex items-center justify-center flex-shrink-0 bg-secondary border-2 border-border">
-            <Bot size={20} className="text-secondary-foreground" />
-          </div>
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="font-medium text-sm">Assistant</span>
-              <span className="mono text-xs text-muted-foreground">
-                // thinking
-              </span>
-            </div>
-            <div className="flex gap-1">
-              <span className="typing-dot w-2 h-2 bg-secondary rounded-sm" />
-              <span className="typing-dot w-2 h-2 bg-secondary rounded-sm" />
-              <span className="typing-dot w-2 h-2 bg-secondary rounded-sm" />
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Auto-scroll anchor */}
       <div ref={bottomRef} />
@@ -68,7 +46,7 @@ export function MessageList({ messages, sending }: MessageListProps) {
   );
 }
 
-function MessageItem({ message, index }: { message: Message; index: number }) {
+function MessageItem({ message, index, sending }: { message: Message; index: number; sending?: boolean }) {
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
   const [copied, setCopied] = useState(false);
@@ -110,7 +88,7 @@ function MessageItem({ message, index }: { message: Message; index: number }) {
         )}
       >
         {/* Role label */}
-        <div className="flex items-center gap-2 mb-2">
+        <div className={cn("flex items-center gap-2 mb-2", isUser ? "justify-end" : "justify-start")}>
           <span className={cn(
             "font-medium text-sm",
             isUser ? "text-primary" : "text-secondary"
@@ -160,7 +138,16 @@ function MessageItem({ message, index }: { message: Message; index: number }) {
                 : "bg-muted border-border text-foreground prose-pre:bg-background prose-pre:border prose-pre:border-border"
             )}
           >
-            {message.content ? (
+            {sending ? (
+              <div className="flex items-center justify-end gap-2 text-muted-foreground">
+                <div className="flex gap-1">
+                  <span className="typing-dot w-2 h-2 bg-muted-foreground rounded-sm animate-bounce" style={{ animationDelay: "0ms" }} />
+                  <span className="typing-dot w-2 h-2 bg-muted-foreground rounded-sm animate-bounce" style={{ animationDelay: "150ms" }} />
+                  <span className="typing-dot w-2 h-2 bg-muted-foreground rounded-sm animate-bounce" style={{ animationDelay: "300ms" }} />
+                </div>
+                <span className="mono text-sm">// thinking</span>
+              </div>
+            ) : message.content ? (
               <ReactMarkdown>{message.content}</ReactMarkdown>
             ) : (
               <span className="text-muted-foreground mono italic">...</span>
