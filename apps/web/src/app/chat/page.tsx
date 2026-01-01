@@ -9,15 +9,21 @@ import { useUser } from "@clerk/nextjs";
 
 export default function ChatPage() {
   const { user, isLoaded } = useUser();
-  const { createChat, selectChat, currentChat } = useChat();
+  const { chats, loading, createChat, selectChat, currentChat } = useChat();
   const { apiKey } = useSettings();
 
   // Create or select a chat on first load
   useEffect(() => {
-    if (isLoaded && user && !currentChat) {
-      createChat();
+    if (isLoaded && user && !currentChat && !loading) {
+      if (chats.length > 0) {
+        // Select the latest chat
+        selectChat(chats[0].id);
+      } else {
+        // Create a new chat if none exist
+        createChat();
+      }
     }
-  }, [isLoaded, user, currentChat, createChat]);
+  }, [isLoaded, user, currentChat, loading, chats, createChat, selectChat]);
 
   // Redirect if not authenticated
   useEffect(() => {

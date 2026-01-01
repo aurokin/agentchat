@@ -43,7 +43,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
   };
 
   const createChat = useCallback(async (title?: string, modelId?: string): Promise<ChatSession> => {
-    const defaultModel = storage.getDefaultModel() || "gpt-4o";
+    const defaultModel = storage.getDefaultModel() || "minimax-m2.1";
     const chat: ChatSession = {
       id: uuid(),
       title: title || "New Chat",

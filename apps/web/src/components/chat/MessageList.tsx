@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useRef, useEffect } from "react";
 import type { Message } from "@/lib/types";
 import { format } from "date-fns";
 import { User, Bot, Brain, Terminal } from "lucide-react";
@@ -12,6 +12,12 @@ interface MessageListProps {
 }
 
 export function MessageList({ messages, sending }: MessageListProps) {
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, sending]);
+
   if (messages.length === 0) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -54,6 +60,9 @@ export function MessageList({ messages, sending }: MessageListProps) {
           </div>
         </div>
       )}
+
+      {/* Auto-scroll anchor */}
+      <div ref={bottomRef} />
     </div>
   );
 }
