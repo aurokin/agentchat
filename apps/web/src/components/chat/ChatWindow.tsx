@@ -125,7 +125,7 @@ export function ChatWindow() {
                             <Terminal size={40} className="text-primary-foreground" />
                         </div>
                         <h2 className="text-3xl font-bold mb-3">
-                            Welcome to <span className="text-gradient">OpenChat</span>
+                            Welcome to <span className="text-gradient">RouterChat</span>
                         </h2>
                         <p className="text-muted-foreground mono text-sm mb-6">
               // Select a chat from the sidebar<br />or start a new conversation
