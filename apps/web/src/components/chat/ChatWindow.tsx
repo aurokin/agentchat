@@ -34,19 +34,19 @@ export function ChatWindow() {
         setError(null);
 
         try {
-            // Prepend skill prompt if skill is selected
+            // Prepend skill prompt if skill is selected (for API only)
             const fullContent = selectedSkill
                 ? `${selectedSkill.prompt}\n\nUser: ${content}`
                 : content;
 
-            // Add user message
+            // Add user message with original content (skill prompt shown in collapsible above)
             await addMessage({
                 role: "user",
-                content: fullContent,
+                content: content,
                 skillId: selectedSkill?.id,
             });
 
-            // Get current messages for API
+            // Get current messages for API (with skill prompt)
             const currentMessages = [...messages, { role: "user", content: fullContent }];
 
             // Create assistant message placeholder
