@@ -35,6 +35,36 @@
   --shadow-sharp-hover: 6px 6px 0px 0px rgba(193, 230, 40, 0.25);
 }
 
+.light {
+  /* Light theme - clean terminal white */
+  --background: #FFFFFF;
+  --foreground: #0D1117;
+
+  /* Phosphor-inspired palette */
+  --primary: #C1E628;
+  --primary-foreground: #0D1117;
+  --secondary: #B694E8;
+  --secondary-foreground: #0D1117;
+  --accent: #FF6B6B;
+  --accent-foreground: #0D1117;
+
+  /* UI colors */
+  --muted: #F0F0F0;
+  --muted-foreground: #6B7280;
+  --border: #E5E7EB;
+  --input: #FFFFFF;
+  --ring: #C1E628;
+
+  /* Status colors */
+  --success: #3FB950;
+  --warning: #D29922;
+  --error: #F85149;
+
+  /* Design tokens */
+  --shadow-sharp: 4px 4px 0px 0px rgba(0, 0, 0, 0.1);
+  --shadow-sharp-hover: 6px 6px 0px 0px rgba(0, 0, 0, 0.15);
+}
+
 * {
   border-radius: var(--radius);
 }
