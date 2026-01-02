@@ -156,10 +156,12 @@ export function ModelSelector({
                     model.id === selectedModel && "bg-primary/20 text-primary"
                   )}
                 >
-                  <button
-                    type="button"
+                  <div
+                    role="button"
+                    tabIndex={0}
                     onClick={(e) => handleToggleFavorite(e, model.id)}
-                    className="p-0.5 hover:bg-muted rounded transition-colors"
+                    onKeyDown={(e) => e.key === 'Enter' && handleToggleFavorite(e as unknown as React.MouseEvent, model.id)}
+                    className="p-0.5 hover:bg-muted rounded transition-colors cursor-pointer"
                     title={favoriteModels.includes(model.id) ? "Remove from favorites" : "Add to favorites"}
                   >
                     <Star
@@ -171,7 +173,7 @@ export function ModelSelector({
                           : "text-muted-foreground"
                       )}
                     />
-                  </button>
+                  </div>
                   <span className="truncate">{model.name}</span>
                 </button>
               ))}
