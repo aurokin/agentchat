@@ -22,6 +22,8 @@ export interface ChatSession {
 export interface UserSettings {
   apiKey: string | null;
   defaultModel: string;
+  defaultThinking: ThinkingLevel;
+  defaultSearchEnabled: boolean;
   theme: "light" | "dark" | "system";
   favoriteModels: string[];
 }

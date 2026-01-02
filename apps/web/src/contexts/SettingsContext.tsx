@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
-import type { UserSettings, OpenRouterModel } from "@/lib/types";
+import type { UserSettings, OpenRouterModel, ThinkingLevel } from "@/lib/types";
 import * as storage from "@/lib/storage";
 import { fetchModels } from "@/lib/openrouter";
 
@@ -9,6 +9,8 @@ interface SettingsContextType extends UserSettings {
   setApiKey: (key: string) => void;
   clearApiKey: () => void;
   setDefaultModel: (modelId: string) => void;
+  setDefaultThinking: (value: ThinkingLevel) => void;
+  setDefaultSearchEnabled: (enabled: boolean) => void;
   setTheme: (theme: UserSettings["theme"]) => void;
   toggleFavoriteModel: (modelId: string) => void;
   models: OpenRouterModel[];
@@ -19,6 +21,8 @@ interface SettingsContextType extends UserSettings {
 const defaultSettings: UserSettings = {
   apiKey: null,
   defaultModel: "",
+  defaultThinking: "none",
+  defaultSearchEnabled: false,
   theme: "system",
   favoriteModels: [],
 };
@@ -60,6 +64,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     setSettings({
       apiKey: storage.getApiKey(),
       defaultModel: storage.getDefaultModel(),
+      defaultThinking: storage.getDefaultThinking(),
+      defaultSearchEnabled: storage.getDefaultSearchEnabled(),
       theme: storage.getTheme(),
       favoriteModels: storage.getFavoriteModels(),
     });
@@ -91,6 +97,16 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const setDefaultModel = (modelId: string) => {
     storage.setDefaultModel(modelId);
     setSettings((prev) => ({ ...prev, defaultModel: modelId }));
+  };
+
+  const setDefaultThinking = (value: ThinkingLevel) => {
+    storage.setDefaultThinking(value);
+    setSettings((prev) => ({ ...prev, defaultThinking: value }));
+  };
+
+  const setDefaultSearchEnabled = (enabled: boolean) => {
+    storage.setDefaultSearchEnabled(enabled);
+    setSettings((prev) => ({ ...prev, defaultSearchEnabled: enabled }));
   };
 
   const setTheme = (theme: UserSettings["theme"]) => {
@@ -136,6 +152,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         setApiKey,
         clearApiKey,
         setDefaultModel,
+        setDefaultThinking,
+        setDefaultSearchEnabled,
         setTheme,
         toggleFavoriteModel,
         models,

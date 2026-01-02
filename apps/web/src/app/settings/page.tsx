@@ -5,6 +5,9 @@ import { Sidebar } from "@/components/chat/Sidebar";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useUser } from "@clerk/nextjs";
 import { validateApiKey } from "@/lib/openrouter";
+import type { ThinkingLevel } from "@/lib/types";
+import { ThinkingToggle } from "@/components/chat/ThinkingToggle";
+import { SearchToggle } from "@/components/chat/SearchToggle";
 import {
   Settings,
   Key,
@@ -17,12 +20,26 @@ import {
   Terminal,
   Info,
   ExternalLink,
+  Brain,
+  Globe,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function SettingsPage() {
   const { user, isLoaded } = useUser();
-  const { apiKey, setApiKey, clearApiKey, theme, setTheme } = useSettings();
+  const {
+    apiKey,
+    setApiKey,
+    clearApiKey,
+    defaultModel,
+    setDefaultModel,
+    defaultThinking,
+    setDefaultThinking,
+    defaultSearchEnabled,
+    setDefaultSearchEnabled,
+    theme,
+    setTheme,
+  } = useSettings();
   const [newApiKey, setNewApiKey] = useState(apiKey || "");
   const [validating, setValidating] = useState(false);
   const [validationResult, setValidationResult] = useState<boolean | null>(null);
@@ -241,6 +258,80 @@ export default function SettingsPage() {
                 <Monitor size={24} className={theme === "system" ? "text-primary" : "text-muted-foreground"} />
                 <span className="mono text-xs">SYSTEM</span>
               </button>
+            </div>
+          </section>
+
+          {/* Default Model */}
+          <section className="card-brutal mb-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Settings size={20} className="text-primary" />
+              <h2 className="text-lg font-semibold">Default Model</h2>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4 mono">
+              // Set the default model for new chats<br />
+              // This can be changed per-chat in the chat window
+            </p>
+            <div>
+              <label htmlFor="defaultModel" className="label-brutal">
+                Default Model ID
+              </label>
+              <input
+                id="defaultModel"
+                type="text"
+                value={defaultModel}
+                onChange={(e) => setDefaultModel(e.target.value)}
+                placeholder="minimax/minimax-m2.1"
+                className="input-brutal font-mono"
+              />
+            </div>
+          </section>
+
+          {/* Default Thinking Level */}
+          <section className="card-brutal mb-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Brain size={20} className="text-warning" />
+              <h2 className="text-lg font-semibold">Default Thinking Level</h2>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4 mono">
+              // Set the default thinking level for new chats<br />
+              // This can be changed per-chat in the chat window
+            </p>
+            <div className="flex items-center gap-4">
+              <ThinkingToggle
+                value={defaultThinking}
+                onChange={(value) => setDefaultThinking(value as ThinkingLevel)}
+              />
+              <span className="mono text-sm text-muted-foreground">
+                {defaultThinking === "none" && "// Thinking disabled by default"}
+                {defaultThinking === "minimal" && "// Minimal thinking effort"}
+                {defaultThinking === "low" && "// Low thinking effort"}
+                {defaultThinking === "medium" && "// Medium thinking effort"}
+                {defaultThinking === "high" && "// High thinking effort"}
+                {defaultThinking === "xhigh" && "// Maximum thinking effort"}
+              </span>
+            </div>
+          </section>
+
+          {/* Default Search */}
+          <section className="card-brutal mb-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Globe size={20} className="text-secondary" />
+              <h2 className="text-lg font-semibold">Default Search</h2>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4 mono">
+              // Enable web search by default for new chats<br />
+              // This can be changed per-chat in the chat window
+            </p>
+            <div className="flex items-center gap-4">
+              <SearchToggle
+                enabled={defaultSearchEnabled}
+                onChange={(enabled) => setDefaultSearchEnabled(enabled)}
+              />
+              <span className="mono text-sm text-muted-foreground">
+                {defaultSearchEnabled
+                  ? "// Search enabled by default"
+                  : "// Search disabled by default"}
+              </span>
             </div>
           </section>
 

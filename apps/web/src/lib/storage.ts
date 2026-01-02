@@ -2,6 +2,8 @@ const STORAGE_KEYS = {
   API_KEY: "openrouter-api-key",
   THEME: "openrouter-theme",
   DEFAULT_MODEL: "openrouter-default-model",
+  DEFAULT_THINKING: "openrouter-default-thinking",
+  DEFAULT_SEARCH: "openrouter-default-search",
   FAVORITE_MODELS: "openrouter-favorite-models",
 } as const;
 
@@ -53,4 +55,24 @@ export function getFavoriteModels(): string[] {
 export function setFavoriteModels(modelIds: string[]): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEYS.FAVORITE_MODELS, JSON.stringify(modelIds));
+}
+
+export function getDefaultThinking(): "xhigh" | "high" | "medium" | "low" | "minimal" | "none" {
+  if (typeof window === "undefined") return "none";
+  return (localStorage.getItem(STORAGE_KEYS.DEFAULT_THINKING) as "xhigh" | "high" | "medium" | "low" | "minimal" | "none") || "none";
+}
+
+export function setDefaultThinking(value: "xhigh" | "high" | "medium" | "low" | "minimal" | "none"): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(STORAGE_KEYS.DEFAULT_THINKING, value);
+}
+
+export function getDefaultSearchEnabled(): boolean {
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem(STORAGE_KEYS.DEFAULT_SEARCH) === "true";
+}
+
+export function setDefaultSearchEnabled(enabled: boolean): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(STORAGE_KEYS.DEFAULT_SEARCH, String(enabled));
 }

@@ -4,6 +4,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import type { ChatSession, Message } from "@/lib/types";
 import * as db from "@/lib/db";
 import * as storage from "@/lib/storage";
+import { useSettings } from "./SettingsContext";
 import { v4 as uuid } from "uuid";
 
 interface ChatContextType {
@@ -44,12 +45,14 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
     const createChat = useCallback(async (title?: string, modelId?: string): Promise<ChatSession> => {
         const defaultModel = storage.getDefaultModel() || "minimax/minimax-m2.1";
+        const defaultThinking = storage.getDefaultThinking();
+        const defaultSearch = storage.getDefaultSearchEnabled();
         const chat: ChatSession = {
             id: uuid(),
             title: title || "New Chat",
             modelId: modelId || defaultModel,
-            thinkingEnabled: false,
-            searchEnabled: false,
+            thinking: defaultThinking,
+            searchEnabled: defaultSearch,
             createdAt: Date.now(),
             updatedAt: Date.now(),
         };
