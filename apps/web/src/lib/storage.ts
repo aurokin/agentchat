@@ -1,14 +1,14 @@
 import type { Skill } from "./types";
 
 const STORAGE_KEYS = {
-  API_KEY: "openrouter-api-key",
-  THEME: "openrouter-theme",
-  DEFAULT_MODEL: "openrouter-default-model",
-  DEFAULT_THINKING: "openrouter-default-thinking",
-  DEFAULT_SEARCH: "openrouter-default-search",
-  FAVORITE_MODELS: "openrouter-favorite-models",
-  SKILLS: "openrouter-skills",
-  SELECTED_SKILL: "openrouter-selected-skill",
+  API_KEY: "router-chat-api-key",
+  THEME: "router-chat-theme",
+  DEFAULT_MODEL: "router-chat-default-model",
+  DEFAULT_THINKING: "router-chat-default-thinking",
+  DEFAULT_SEARCH: "router-chat-default-search",
+  FAVORITE_MODELS: "router-chat-favorite-models",
+  SKILLS: "router-chat-skills",
+  SELECTED_SKILL: "router-chat-selected-skill",
 } as const;
 
 export function getApiKey(): string | null {

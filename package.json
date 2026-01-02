@@ -1,5 +1,5 @@
 {
-  "name": "openrouter-chat",
+  "name": "router-chat",
   "version": "0.1.0",
   "private": true,
   "workspaces": [

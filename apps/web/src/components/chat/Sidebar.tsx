@@ -32,7 +32,7 @@ export function Sidebar() {
                     <div className="w-8 h-8 bg-primary flex items-center justify-center shadow-brutal-sm">
                         <Terminal size={18} className="text-primary-foreground" />
                     </div>
-                    <span className="font-bold text-lg">OpenChat</span>
+                    <span className="font-bold text-lg">RouterChat</span>
                 </div>
                 <button
                     onClick={handleNewChat}
