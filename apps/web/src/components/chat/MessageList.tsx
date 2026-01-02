@@ -52,6 +52,9 @@ function MessageItem({ message, index, sending }: { message: Message; index: num
   const [copied, setCopied] = useState(false);
 
   const copyToClipboard = async () => {
+    if (!navigator.clipboard) {
+      return;
+    }
     await navigator.clipboard.writeText(message.content || "");
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -102,7 +105,7 @@ function MessageItem({ message, index, sending }: { message: Message; index: num
 
         <div className="inline-block max-w-[85%] relative group">
           {/* Copy button */}
-          {message.content && (
+          {message.content && navigator.clipboard && (
             <button
               onClick={copyToClipboard}
               className="absolute top-2 right-2 p-1.5 rounded-md bg-background/80 border border-border opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted"
