@@ -7,6 +7,7 @@ import { sendMessage } from "@/lib/openrouter";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import { ModelSelector } from "./ModelSelector";
+import { SkillSelector } from "./SkillSelector";
 import type { ThinkingLevel } from "@/lib/types";
 import { ThinkingToggle } from "./ThinkingToggle";
 import { SearchToggle } from "./SearchToggle";
@@ -14,7 +15,7 @@ import { Terminal, Cpu } from "lucide-react";
 
 export function ChatWindow() {
     const { currentChat, messages, addMessage, updateMessage, updateChat, createChat } = useChat();
-    const { apiKey } = useSettings();
+    const { apiKey, selectedSkill, setSelectedSkill } = useSettings();
     const [sending, setSending] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -33,14 +34,20 @@ export function ChatWindow() {
         setError(null);
 
         try {
+            // Prepend skill prompt if skill is selected
+            const fullContent = selectedSkill
+                ? `${selectedSkill.prompt}\n\nUser: ${content}`
+                : content;
+
             // Add user message
             await addMessage({
                 role: "user",
-                content,
+                content: fullContent,
+                skillId: selectedSkill?.id,
             });
 
             // Get current messages for API
-            const currentMessages = [...messages, { role: "user", content }];
+            const currentMessages = [...messages, { role: "user", content: fullContent }];
 
             // Create assistant message placeholder
             const assistantMessage = await addMessage({
@@ -75,6 +82,11 @@ export function ChatWindow() {
             if (currentChat.title === "New Chat" && messages.length === 0) {
                 const title = content.slice(0, 50) + (content.length > 50 ? "..." : "");
                 updateChat({ ...currentChat, title });
+            }
+
+            // Reset skill selection after sending
+            if (selectedSkill) {
+                setSelectedSkill(null);
             }
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to send message");
@@ -152,6 +164,11 @@ export function ChatWindow() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 text-sm mono text-muted-foreground mr-2">
+                        <span className="text-primary">_</span>
+                        <span className="hidden sm:inline">SKILL</span>
+                    </div>
+                    <SkillSelector disabled={sending} />
                     <ThinkingToggle
                         value={currentChat.thinking}
                         onChange={handleThinkingChange}

@@ -16,7 +16,7 @@ interface ChatContextType {
     selectChat: (chatId: string) => Promise<void>;
     deleteChat: (chatId: string) => Promise<void>;
     updateChat: (chat: ChatSession) => Promise<void>;
-    addMessage: (message: { role: string; content: string; thinking?: string }) => Promise<Message>;
+    addMessage: (message: { role: string; content: string; thinking?: string; skillId?: string }) => Promise<Message>;
     updateMessage: (id: string, updates: Partial<Pick<Message, "content" | "thinking">>) => Promise<void>;
     clearCurrentChat: () => void;
 }
@@ -93,7 +93,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         }
     }, [currentChat]);
 
-    const addMessage = useCallback(async (message: { role: string; content: string; thinking?: string }): Promise<Message> => {
+    const addMessage = useCallback(async (message: { role: string; content: string; thinking?: string; skillId?: string }): Promise<Message> => {
         if (!currentChat) {
             throw new Error("No current chat selected");
         }
@@ -102,6 +102,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             role: message.role as Message["role"],
             content: message.content,
             thinking: message.thinking,
+            skillId: message.skillId,
             sessionId: currentChat.id,
             id: uuid(),
             createdAt: Date.now(),

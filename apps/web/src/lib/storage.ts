@@ -1,3 +1,5 @@
+import type { Skill } from "./types";
+
 const STORAGE_KEYS = {
   API_KEY: "openrouter-api-key",
   THEME: "openrouter-theme",
@@ -5,6 +7,8 @@ const STORAGE_KEYS = {
   DEFAULT_THINKING: "openrouter-default-thinking",
   DEFAULT_SEARCH: "openrouter-default-search",
   FAVORITE_MODELS: "openrouter-favorite-models",
+  SKILLS: "openrouter-skills",
+  SELECTED_SKILL: "openrouter-selected-skill",
 } as const;
 
 export function getApiKey(): string | null {
@@ -75,4 +79,33 @@ export function getDefaultSearchEnabled(): boolean {
 export function setDefaultSearchEnabled(enabled: boolean): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEYS.DEFAULT_SEARCH, String(enabled));
+}
+
+export function getSkills(): Skill[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const stored = localStorage.getItem(STORAGE_KEYS.SKILLS);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function setSkills(skills: Skill[]): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(STORAGE_KEYS.SKILLS, JSON.stringify(skills));
+}
+
+export function getSelectedSkillId(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(STORAGE_KEYS.SELECTED_SKILL);
+}
+
+export function setSelectedSkillId(skillId: string | null): void {
+  if (typeof window === "undefined") return;
+  if (skillId) {
+    localStorage.setItem(STORAGE_KEYS.SELECTED_SKILL, skillId);
+  } else {
+    localStorage.removeItem(STORAGE_KEYS.SELECTED_SKILL);
+  }
 }

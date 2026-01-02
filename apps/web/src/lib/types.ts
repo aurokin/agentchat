@@ -4,6 +4,7 @@ export interface Message {
   role: "user" | "assistant" | "system";
   content: string;
   thinking?: string;
+  skillId?: string;
   createdAt: number;
 }
 
@@ -34,4 +35,12 @@ export interface OpenRouterModel {
   provider: string;
   thinking?: boolean;
   search?: boolean;
+}
+
+export interface Skill {
+  id: string;
+  name: string;
+  description: string;
+  prompt: string;
+  createdAt: number;
 }

@@ -4,8 +4,9 @@ import React, { useRef, useEffect, useState } from "react";
 import type { Message } from "@/lib/types";
 import { format } from "date-fns";
 import ReactMarkdown from "react-markdown";
-import { User, Bot, Brain, Terminal, Copy, Check } from "lucide-react";
+import { User, Bot, Brain, Terminal, Copy, Check, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useSettings } from "@/contexts/SettingsContext";
 
 interface MessageListProps {
   messages: Message[];
@@ -50,6 +51,8 @@ function MessageItem({ message, index, sending }: { message: Message; index: num
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
   const [copied, setCopied] = useState(false);
+  const [showSkill, setShowSkill] = useState(false);
+  const { skills } = useSettings();
 
   const copyToClipboard = async () => {
     if (!navigator.clipboard) {
@@ -59,6 +62,12 @@ function MessageItem({ message, index, sending }: { message: Message; index: num
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  // Find the skill if this message has a skillId
+  const skill = message.skillId ? skills.find((s) => s.id === message.skillId) : null;
+
+  // Check if this is the first user message with a skill
+  const isFirstSkillMessage = isUser && skill && index === 0;
 
   return (
     <div
@@ -108,7 +117,7 @@ function MessageItem({ message, index, sending }: { message: Message; index: num
           {message.content && navigator.clipboard && (
             <button
               onClick={copyToClipboard}
-              className="absolute top-2 right-2 p-1.5 rounded-md bg-background/80 border border-border opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted"
+              className="absolute top-2 right-2 p-1.5 rounded-md bg-background/80 border border-border opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted z-10"
               title="Copy to clipboard"
             >
               {copied ? (
@@ -117,6 +126,31 @@ function MessageItem({ message, index, sending }: { message: Message; index: num
                 <Copy size={14} className="text-muted-foreground" />
               )}
             </button>
+          )}
+
+          {/* Skill collapsible for first user message */}
+          {isFirstSkillMessage && skill && (
+            <details
+              className="mb-3 border-2 border-primary/30 bg-primary/5 rounded-md"
+            >
+              <summary className="flex items-center gap-2 px-3 py-2 cursor-pointer select-none text-primary">
+                <Sparkles size={14} className="mono" />
+                <span className="font-medium text-sm mono">{skill.name}</span>
+                {showSkill ? (
+                  <ChevronUp size={14} className="ml-auto" />
+                ) : (
+                  <ChevronDown size={14} className="ml-auto" />
+                )}
+              </summary>
+              <div className="px-3 pb-3 text-sm">
+                {skill.description && (
+                  <p className="text-muted-foreground mb-2">{skill.description}</p>
+                )}
+                <div className="p-2 bg-muted/50 border border-border rounded font-mono text-xs whitespace-pre-wrap text-muted-foreground">
+                  {skill.prompt}
+                </div>
+              </div>
+            </details>
           )}
 
           {/* Thinking content */}

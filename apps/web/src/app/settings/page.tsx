@@ -5,7 +5,7 @@ import { Sidebar } from "@/components/chat/Sidebar";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useUser } from "@clerk/nextjs";
 import { validateApiKey } from "@/lib/openrouter";
-import type { ThinkingLevel } from "@/lib/types";
+import type { ThinkingLevel, Skill } from "@/lib/types";
 import { ThinkingToggle } from "@/components/chat/ThinkingToggle";
 import { SearchToggle } from "@/components/chat/SearchToggle";
 import {
@@ -22,6 +22,12 @@ import {
   ExternalLink,
   Brain,
   Globe,
+  Book,
+  Plus,
+  Edit2,
+  Trash2,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -39,11 +45,22 @@ export default function SettingsPage() {
     setDefaultSearchEnabled,
     theme,
     setTheme,
+    skills,
+    addSkill,
+    updateSkill,
+    deleteSkill,
   } = useSettings();
   const [newApiKey, setNewApiKey] = useState(apiKey || "");
   const [validating, setValidating] = useState(false);
   const [validationResult, setValidationResult] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Skill management state
+  const [showSkillForm, setShowSkillForm] = useState(false);
+  const [editingSkillId, setEditingSkillId] = useState<string | null>(null);
+  const [skillName, setSkillName] = useState("");
+  const [skillDescription, setSkillDescription] = useState("");
+  const [skillPrompt, setSkillPrompt] = useState("");
 
   // Redirect if not authenticated
   React.useEffect(() => {
@@ -75,6 +92,57 @@ export default function SettingsPage() {
     setNewApiKey("");
     clearApiKey();
     setValidationResult(null);
+  };
+
+  // Skill management handlers
+  const openNewSkillForm = () => {
+    setEditingSkillId(null);
+    setSkillName("");
+    setSkillDescription("");
+    setSkillPrompt("");
+    setShowSkillForm(true);
+  };
+
+  const openEditSkillForm = (skill: Skill) => {
+    setEditingSkillId(skill.id);
+    setSkillName(skill.name);
+    setSkillDescription(skill.description);
+    setSkillPrompt(skill.prompt);
+    setShowSkillForm(true);
+  };
+
+  const closeSkillForm = () => {
+    setShowSkillForm(false);
+    setEditingSkillId(null);
+    setSkillName("");
+    setSkillDescription("");
+    setSkillPrompt("");
+  };
+
+  const handleSaveSkill = () => {
+    if (!skillName.trim() || !skillPrompt.trim()) return;
+
+    if (editingSkillId) {
+      updateSkill(editingSkillId, {
+        name: skillName.trim(),
+        description: skillDescription.trim(),
+        prompt: skillPrompt.trim(),
+      });
+    } else {
+      addSkill({
+        name: skillName.trim(),
+        description: skillDescription.trim(),
+        prompt: skillPrompt.trim(),
+      });
+    }
+
+    closeSkillForm();
+  };
+
+  const handleDeleteSkill = (id: string) => {
+    if (confirm("Are you sure you want to delete this skill?")) {
+      deleteSkill(id);
+    }
   };
 
   if (!isLoaded || !user) {
@@ -333,6 +401,143 @@ export default function SettingsPage() {
                   : "// Search disabled by default"}
               </span>
             </div>
+          </section>
+
+          {/* Skills */}
+          <section className="card-brutal mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Book size={20} className="text-primary" />
+                <h2 className="text-lg font-semibold">Skills</h2>
+              </div>
+              <button
+                onClick={openNewSkillForm}
+                className="btn-brutal btn-brutal-primary flex items-center gap-2"
+              >
+                <Plus size={16} />
+                <span className="mono text-sm">NEW_SKILL</span>
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4 mono">
+              // Create reusable prompt templates<br />
+              // Skills are prepended to your messages when selected
+            </p>
+
+            {/* Skill Form */}
+            {showSkillForm && (
+              <div className="mb-6 p-4 border-2 border-primary bg-primary/5">
+                <h3 className="font-semibold mb-4 mono text-sm">
+                  {editingSkillId ? "// EDIT_SKILL" : "// NEW_SKILL"}
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <label htmlFor="skillName" className="label-brutal">
+                      Name
+                    </label>
+                    <input
+                      id="skillName"
+                      type="text"
+                      value={skillName}
+                      onChange={(e) => setSkillName(e.target.value)}
+                      placeholder="e.g., Code Reviewer"
+                      className="input-brutal"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="skillDescription" className="label-brutal">
+                      Description
+                    </label>
+                    <input
+                      id="skillDescription"
+                      type="text"
+                      value={skillDescription}
+                      onChange={(e) => setSkillDescription(e.target.value)}
+                      placeholder="e.g., Expert at reviewing code for bugs"
+                      className="input-brutal"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="skillPrompt" className="label-brutal">
+                      Prompt
+                    </label>
+                    <textarea
+                      id="skillPrompt"
+                      value={skillPrompt}
+                      onChange={(e) => setSkillPrompt(e.target.value)}
+                      placeholder="You are an expert code reviewer..."
+                      className="input-brutal min-h-[120px] resize-y"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleSaveSkill}
+                      disabled={!skillName.trim() || !skillPrompt.trim()}
+                      className="btn-brutal btn-brutal-primary"
+                    >
+                      <span className="mono text-sm">
+                        {editingSkillId ? "UPDATE" : "CREATE"}
+                      </span>
+                    </button>
+                    <button
+                      onClick={closeSkillForm}
+                      className="btn-brutal btn-brutal-secondary"
+                    >
+                      <span className="mono text-sm">CANCEL</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Skills List */}
+            {skills.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Book size={40} className="mx-auto mb-3 opacity-50" />
+                <p className="mono text-sm">// No skills created yet</p>
+                <p className="mono text-xs mt-1">
+                  Click "NEW_SKILL" to create your first skill
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {skills.map((skill) => (
+                  <div
+                    key={skill.id}
+                    className="p-4 border-2 border-border bg-muted/50 hover:border-primary/50 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold truncate">{skill.name}</h4>
+                        {skill.description && (
+                          <p className="text-sm text-muted-foreground truncate mt-1">
+                            {skill.description}
+                          </p>
+                        )}
+                        <p className="text-xs text-muted-foreground mono mt-2 line-clamp-2">
+                          {skill.prompt}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <button
+                          onClick={() => openEditSkillForm(skill)}
+                          className="p-2 hover:bg-muted border-2 border-transparent hover:border-border transition-colors"
+                          title="Edit"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteSkill(skill.id)}
+                          className="p-2 hover:bg-error/10 border-2 border-transparent hover:border-error transition-colors text-error"
+                          title="Delete"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </section>
 
           {/* About */}

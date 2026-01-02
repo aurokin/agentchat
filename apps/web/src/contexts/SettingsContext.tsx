@@ -1,7 +1,8 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
-import type { UserSettings, OpenRouterModel, ThinkingLevel } from "@/lib/types";
+import type { UserSettings, OpenRouterModel, ThinkingLevel, Skill } from "@/lib/types";
+import { v4 as uuid } from "uuid";
 import * as storage from "@/lib/storage";
 import { fetchModels } from "@/lib/openrouter";
 
@@ -16,6 +17,12 @@ interface SettingsContextType extends UserSettings {
   models: OpenRouterModel[];
   loadingModels: boolean;
   refreshModels: () => Promise<void>;
+  skills: Skill[];
+  addSkill: (skill: Omit<Skill, "id" | "createdAt">) => void;
+  updateSkill: (id: string, updates: Partial<Skill>) => void;
+  deleteSkill: (id: string) => void;
+  selectedSkill: Skill | null;
+  setSelectedSkill: (skill: Skill | null) => void;
 }
 
 const defaultSettings: UserSettings = {
@@ -34,6 +41,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [models, setModels] = useState<OpenRouterModel[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [skills, setSkills] = useState<Skill[]>([]);
+  const [selectedSkill, setSelectedSkillState] = useState<Skill | null>(null);
   const refreshPromiseRef = useRef<Promise<void> | null>(null);
 
   const refreshModels = useCallback(async () => {
@@ -69,6 +78,12 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       theme: storage.getTheme(),
       favoriteModels: storage.getFavoriteModels(),
     });
+    setSkills(storage.getSkills());
+    const selectedId = storage.getSelectedSkillId();
+    if (selectedId) {
+      const allSkills = storage.getSkills();
+      setSelectedSkillState(allSkills.find((s) => s.id === selectedId) || null);
+    }
     setMounted(true);
   }, []);
 
@@ -139,6 +154,42 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
+  const addSkill = (skill: Omit<Skill, "id" | "createdAt">) => {
+    const newSkill: Skill = {
+      ...skill,
+      id: uuid(),
+      createdAt: Date.now(),
+    };
+    const newSkills = [...skills, newSkill];
+    setSkills(newSkills);
+    storage.setSkills(newSkills);
+    return newSkill;
+  };
+
+  const updateSkill = (id: string, updates: Partial<Skill>) => {
+    const newSkills = skills.map((s) => (s.id === id ? { ...s, ...updates } : s));
+    setSkills(newSkills);
+    storage.setSkills(newSkills);
+    if (selectedSkill?.id === id) {
+      setSelectedSkillState({ ...selectedSkill, ...updates });
+    }
+  };
+
+  const deleteSkill = (id: string) => {
+    const newSkills = skills.filter((s) => s.id !== id);
+    setSkills(newSkills);
+    storage.setSkills(newSkills);
+    if (selectedSkill?.id === id) {
+      setSelectedSkillState(null);
+      storage.setSelectedSkillId(null);
+    }
+  };
+
+  const setSelectedSkill = (skill: Skill | null) => {
+    setSelectedSkillState(skill);
+    storage.setSelectedSkillId(skill?.id || null);
+  };
+
   useEffect(() => {
     if (mounted) {
       setTheme(settings.theme);
@@ -159,6 +210,12 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         models,
         loadingModels,
         refreshModels,
+        skills,
+        addSkill,
+        updateSkill,
+        deleteSkill,
+        selectedSkill,
+        setSelectedSkill,
       }}
     >
       {children}
