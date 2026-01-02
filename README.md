@@ -59,12 +59,12 @@ A web application for chatting with AI models through OpenRouter. Users provide 
 - [ ] **Add error handling** - Better error messages for API failures
 - [ ] **Loading states** - Add skeletons while loading models/chats
 
-#### Personas (System Prompt Customization)
-- [ ] **Persona selector** - Dropdown to select persona at chat creation
-- [ ] **Preset personas** - Pre-defined system prompts (e.g., "Helpful Assistant", "Code Expert", "Creative Writer")
-- [ ] **Custom persona input** - User can create their own system prompt
-- [ ] **Persona persistence** - Save selected persona with chat session
-- [ ] **System message injection** - Append persona prompt to API messages
+#### Skills (System Prompt Customization)
+- [ ] **Skill selector** - Dropdown to select skill at chat creation
+- [ ] **Preset skills** - Pre-defined system prompts (e.g., "Helpful Assistant", "Code Expert", "Creative Writer")
+- [ ] **Custom skill input** - User can create their own system prompt
+- [ ] **Skill persistence** - Save selected skill with chat session
+- [ ] **System message injection** - Append skill prompt to API messages
 
 #### Polish & UX
 - [ ] **Mobile responsive design** - Improve sidebar for mobile
