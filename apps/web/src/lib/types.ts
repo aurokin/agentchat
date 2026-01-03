@@ -2,9 +2,10 @@ export interface Message {
   id: string;
   sessionId: string;
   role: "user" | "assistant" | "system";
-  content: string;
+  content: string;           // What the user typed (displayed in UI)
+  contextContent: string;    // What is sent to API (includes skill prompt if applicable)
   thinking?: string;
-  skillId?: string;
+  skill?: Skill | null;      // Cloned skill object (not just ID reference)
   createdAt: number;
 }
 

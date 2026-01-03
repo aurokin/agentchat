@@ -34,25 +34,36 @@ export function ChatWindow() {
         setError(null);
 
         try {
-            // Prepend skill prompt if skill is selected (for API only)
-            const fullContent = selectedSkill
+            // Build context content with skill prompt if applicable
+            const contextContent = selectedSkill
                 ? `${selectedSkill.prompt}\n\nUser: ${content}`
                 : content;
 
-            // Add user message with original content (skill prompt shown in collapsible above)
+            // Clone skill object (deep copy to prevent mutations)
+            const clonedSkill = selectedSkill
+                ? JSON.parse(JSON.stringify(selectedSkill))
+                : null;
+
+            // Add user message with both content types
             await addMessage({
                 role: "user",
-                content: content,
-                skillId: selectedSkill?.id,
+                content: content,           // Display content
+                contextContent: contextContent,  // API context content
+                skill: clonedSkill,         // Cloned skill object
             });
 
-            // Get current messages for API (with skill prompt)
-            const currentMessages = [...messages, { role: "user", content: fullContent }];
+            // Build API context using contextContent from all messages
+            const currentMessages = [
+                ...messages.map(m => ({ role: m.role, content: m.contextContent })),
+                { role: "user", content: contextContent }
+            ];
 
             // Create assistant message placeholder
             const assistantMessage = await addMessage({
                 role: "assistant",
                 content: "",
+                contextContent: "",
+                skill: null,
             });
 
             let fullResponse = "";
@@ -70,9 +81,10 @@ export function ChatWindow() {
                         fullResponse += chunk;
                     }
 
-                    // Update message with streaming content
+                    // Update message with streaming content (content = contextContent for assistant)
                     updateMessage(assistantMessage.id, {
                         content: fullResponse,
+                        contextContent: fullResponse,
                         thinking: fullThinking || undefined,
                     });
                 }

@@ -6,7 +6,6 @@ import { format } from "date-fns";
 import ReactMarkdown from "react-markdown";
 import { User, Bot, Brain, Terminal, Copy, Check, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useSettings } from "@/contexts/SettingsContext";
 
 interface MessageListProps {
   messages: Message[];
@@ -52,7 +51,6 @@ function MessageItem({ message, index, sending }: { message: Message; index: num
   const isAssistant = message.role === "assistant";
   const [copied, setCopied] = useState(false);
   const [showSkill, setShowSkill] = useState(false);
-  const { skills } = useSettings();
 
   const copyToClipboard = async () => {
     if (!navigator.clipboard) {
@@ -63,8 +61,8 @@ function MessageItem({ message, index, sending }: { message: Message; index: num
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Find the skill if this message has a skillId
-  const skill = message.skillId ? skills.find((s) => s.id === message.skillId) : null;
+  // Use skill directly from message (already cloned)
+  const skill = message.skill;
 
   // Check if this is the first user message with a skill
   const isFirstSkillMessage = isUser && skill && index === 0;

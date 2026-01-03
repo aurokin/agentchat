@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
-import type { ChatSession, Message } from "@/lib/types";
+import type { ChatSession, Message, Skill } from "@/lib/types";
 import * as db from "@/lib/db";
 import * as storage from "@/lib/storage";
 import { useSettings } from "./SettingsContext";
@@ -16,8 +16,8 @@ interface ChatContextType {
     selectChat: (chatId: string) => Promise<void>;
     deleteChat: (chatId: string) => Promise<void>;
     updateChat: (chat: ChatSession) => Promise<void>;
-    addMessage: (message: { role: string; content: string; thinking?: string; skillId?: string }) => Promise<Message>;
-    updateMessage: (id: string, updates: Partial<Pick<Message, "content" | "thinking">>) => Promise<void>;
+    addMessage: (message: { role: string; content: string; contextContent: string; thinking?: string; skill?: Skill | null }) => Promise<Message>;
+    updateMessage: (id: string, updates: Partial<Pick<Message, "content" | "contextContent" | "thinking">>) => Promise<void>;
     clearCurrentChat: () => void;
 }
 
@@ -93,7 +93,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         }
     }, [currentChat]);
 
-    const addMessage = useCallback(async (message: { role: string; content: string; thinking?: string; skillId?: string }): Promise<Message> => {
+    const addMessage = useCallback(async (message: { role: string; content: string; contextContent: string; thinking?: string; skill?: Skill | null }): Promise<Message> => {
         if (!currentChat) {
             throw new Error("No current chat selected");
         }
@@ -101,8 +101,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         const newMessage: Message = {
             role: message.role as Message["role"],
             content: message.content,
+            contextContent: message.contextContent,
             thinking: message.thinking,
-            skillId: message.skillId,
+            skill: message.skill,
             sessionId: currentChat.id,
             id: uuid(),
             createdAt: Date.now(),
@@ -120,7 +121,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         return newMessage;
     }, [currentChat]);
 
-    const updateMessage = useCallback(async (id: string, updates: Partial<Pick<Message, "content" | "thinking">>) => {
+    const updateMessage = useCallback(async (id: string, updates: Partial<Pick<Message, "content" | "contextContent" | "thinking">>) => {
         setMessages((prev) => {
             const message = prev.find((m) => m.id === id);
             if (!message) return prev;
