@@ -123,6 +123,8 @@ openrouter-chat/
 | State     | React Context + Hooks          |
 | Storage   | IndexedDB (idb) + localStorage |
 | API       | OpenRouter API                 |
+| Linting   | ESLint                         |
+| Testing   | Bun Test                       |
 
 ## Getting Started
 
