@@ -2,116 +2,6 @@
 
 A web application for chatting with AI models through OpenRouter. Users provide their own OpenRouter API key, and all data is stored locally in the browser.
 
-## Current Status
-
-### ✅ Completed Work
-
-#### Project Setup
-
-- [x] Bun workspace initialized with monorepo structure
-- [x] Next.js 15 application created in `apps/web`
-- [x] TypeScript configured with path aliases
-- [x] Tailwind CSS configured
-
-#### Local Data Storage
-
-- [x] IndexedDB (via `idb`) for chat sessions and messages
-- [x] localStorage helpers for settings (API key, theme)
-- [x] ChatContext for managing chat state
-- [x] SettingsContext for managing user preferences
-
-#### OpenRouter Integration
-
-- [x] API client for fetching available models
-- [x] API client for sending chat messages with streaming
-- [x] Thinking mode support (toggle in UI)
-- [x] Web search tool support (toggle in UI)
-
-#### UI Components
-
-- [x] Sidebar with chat list, new chat button, settings link
-- [x] ChatWindow with message display and input
-- [x] MessageList component with user/assistant distinction
-- [x] MessageInput with auto-resize and Enter-to-send
-- [x] ModelSelector dropdown
-- [x] ThinkingToggle component
-- [x] SearchToggle component
-
-#### Pages
-
-- [x] Home page (redirects to sign-in or chat)
-- [x] Chat page with sidebar and chat window
-- [x] Settings page (API key, theme selection)
-
-#### Skills (System Prompt Customization)
-
-- [x] **Skill selector** - Dropdown to select skill at chat creation
-- [x] **Preset skills** - Pre-defined system prompts (e.g., "Helpful Assistant", "Code Expert", "Creative Writer")
-- [x] **Custom skill input** - User can create their own system prompt
-- [x] **Skill persistence** - Save selected skill with chat session
-- [x] **System message injection** - Append skill prompt to API messages
-
----
-
-### ⏳ To Do / Future Work
-
-#### Immediate (Before Production)
-
-- [x] **Test with real OpenRouter API** - Verify model fetching and chat completion
-- [ ] **Add error handling** - Better error messages for API failures
-- [ ] **Loading states** - Add skeletons while loading models/chats
-
-#### Polish & UX
-
-- [ ] **Mobile responsive design** - Improve sidebar for mobile
-- [x] **Markdown rendering** - Support code blocks, lists in messages
-- [x] **Copy message** - Button to copy message content
-- [ ] **Export chat** - Download conversation as JSON/Markdown
-- [ ] **Image input** - Support image uploads for vision-capable models
-- [ ] **Show reasoning** - Display reasoning preview for models that support it ([OpenRouter docs](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens#example-1-streaming-mode-with-reasoning-tokens))
-
-#### Testing
-
-- [x] **Unit tests** - Vitest for utility functions
-- [ ] **E2E tests** - Playwright for critical user flows
-- [x] **Type checking** - Ensure all types are correct
-
-#### Future: Mobile App (Phase 2)
-
-The architecture is designed for future mobile expansion:
-
-- [ ] **Create React Native app** in `apps/mobile` using Expo
-- [ ] **Share types** from `packages/shared` between web and mobile
-- [ ] **Implement mobile UI** with React Native components
-- [ ] **Use AsyncStorage** instead of IndexedDB for mobile
-
-**Note**: Mobile app will store data independently (no cloud sync as requested)
-
----
-
-## Project Structure
-
-```
-openrouter-chat/
-├── apps/
-│   └── web/                 # Next.js 15 web application
-│       ├── src/
-│       │   ├── app/         # Next.js App Router pages
-│       │   │   ├── chat/    # Main chat page
-│       │   │   ├── settings/# Settings page
-│       │   ├── components/  # React components
-│       │   │   └── chat/    # Chat-related components
-│       │   ├── contexts/    # React Context providers
-│       │   └── lib/         # Utilities and API clients
-│       └── package.json
-├── packages/
-│   └── shared/              # Shared types (for future mobile)
-│       ├── src/types/       # TypeScript types
-│       └── package.json
-├── package.json             # Bun workspace root
-└── bun.lockb
-```
-
 ## Tech Stack
 
 | Category  | Technology                     |
@@ -125,6 +15,19 @@ openrouter-chat/
 | API       | OpenRouter API                 |
 | Linting   | ESLint                         |
 | Testing   | Bun Test                       |
+
+## Features
+
+- **Chat Interface** - Clean, responsive chat UI with message history
+- **Model Selection** - Browse and select from available OpenRouter models
+- **Thinking Mode** - Toggle reasoning mode for supported models
+- **Web Search** - Enable web search for online-capable models
+- **System Skills** - Choose from preset prompts or create custom system messages
+- **Markdown Support** - Rich text rendering for code blocks, lists, and formatting
+- **Copy Messages** - One-click copy for any message
+- **Local Storage** - API key, settings, and chat history stored in browser
+- **IndexedDB Persistence** - Full chat history stored locally
+- **Theme Support** - Light, dark, and system theme options
 
 ## Getting Started
 
