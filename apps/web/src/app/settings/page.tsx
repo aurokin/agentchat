@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Sidebar } from "@/components/chat/Sidebar";
 import { useSettings } from "@/contexts/SettingsContext";
+import { useChat } from "@/contexts/ChatContext";
 import { validateApiKey } from "@/lib/openrouter";
 import type { ThinkingLevel, Skill } from "@/lib/types";
 import { ThinkingToggle } from "@/components/chat/ThinkingToggle";
@@ -31,6 +33,7 @@ import {
 import { cn } from "@/lib/utils";
 
 export default function SettingsPage() {
+    const router = useRouter();
     const {
         apiKey,
         setApiKey,
@@ -48,12 +51,32 @@ export default function SettingsPage() {
         updateSkill,
         deleteSkill,
     } = useSettings();
+    const { createChat } = useChat();
     const [newApiKey, setNewApiKey] = useState(apiKey || "");
     const [validating, setValidating] = useState(false);
     const [validationResult, setValidationResult] = useState<boolean | null>(
         null,
     );
     const [saving, setSaving] = useState(false);
+
+    // Ctrl + Shift + O to create new chat
+    useEffect(() => {
+        const handleKeyDown = async (e: KeyboardEvent) => {
+            if (
+                (e.ctrlKey || e.metaKey) &&
+                e.shiftKey &&
+                e.key.toLowerCase() === "o"
+            ) {
+                e.preventDefault();
+                e.stopPropagation();
+                await createChat();
+                router.push("/chat");
+            }
+        };
+
+        window.addEventListener("keydown", handleKeyDown, true);
+        return () => window.removeEventListener("keydown", handleKeyDown, true);
+    }, [createChat, router]);
 
     // Skill management state
     const [showSkillForm, setShowSkillForm] = useState(false);

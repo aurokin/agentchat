@@ -34,12 +34,13 @@ export default function ChatPage() {
                 e.key.toLowerCase() === "o"
             ) {
                 e.preventDefault();
+                e.stopPropagation();
                 createChat();
             }
         };
 
-        window.addEventListener("keydown", handleKeyDown);
-        return () => window.removeEventListener("keydown", handleKeyDown);
+        window.addEventListener("keydown", handleKeyDown, true);
+        return () => window.removeEventListener("keydown", handleKeyDown, true);
     }, [createChat]);
 
     return (
