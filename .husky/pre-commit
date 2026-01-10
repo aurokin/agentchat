@@ -1,0 +1,14 @@
+#!/bin/sh
+
+# Ensure PATH includes common locations
+export PATH="$HOME/.bun/bin:$PATH"
+
+# Format staged files with prettier
+FILES=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(js|jsx|ts|tsx|json|css|md)$' || true)
+if [ -n "$FILES" ]; then
+    echo "$FILES" | xargs prettierd
+    echo "$FILES" | xargs git add
+fi
+
+# Run tests
+# bun test

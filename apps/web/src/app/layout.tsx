@@ -61,7 +61,9 @@ export default function RootLayout({
             }}
         >
             <html lang="en">
-                <body className={`antialiased ${spaceGrotesk.variable} ${jetbrainsMono.variable}`}>
+                <body
+                    className={`antialiased ${spaceGrotesk.variable} ${jetbrainsMono.variable}`}
+                >
                     <SettingsProvider>
                         <ChatProvider>{children}</ChatProvider>
                     </SettingsProvider>

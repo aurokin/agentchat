@@ -1,6 +1,12 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+import React, {
+    createContext,
+    useContext,
+    useEffect,
+    useState,
+    useCallback,
+} from "react";
 import type { ChatSession, Message, Skill } from "@/lib/types";
 import * as db from "@/lib/db";
 import * as storage from "@/lib/storage";
@@ -16,8 +22,19 @@ interface ChatContextType {
     selectChat: (chatId: string) => Promise<void>;
     deleteChat: (chatId: string) => Promise<void>;
     updateChat: (chat: ChatSession) => Promise<void>;
-    addMessage: (message: { role: string; content: string; contextContent: string; thinking?: string; skill?: Skill | null }) => Promise<Message>;
-    updateMessage: (id: string, updates: Partial<Pick<Message, "content" | "contextContent" | "thinking">>) => Promise<void>;
+    addMessage: (message: {
+        role: string;
+        content: string;
+        contextContent: string;
+        thinking?: string;
+        skill?: Skill | null;
+    }) => Promise<Message>;
+    updateMessage: (
+        id: string,
+        updates: Partial<
+            Pick<Message, "content" | "contextContent" | "thinking">
+        >,
+    ) => Promise<void>;
     clearCurrentChat: () => void;
 }
 
@@ -43,27 +60,31 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
-    const createChat = useCallback(async (title?: string, modelId?: string): Promise<ChatSession> => {
-        const defaultModel = storage.getDefaultModel() || "minimax/minimax-m2.1";
-        const defaultThinking = storage.getDefaultThinking();
-        const defaultSearch = storage.getDefaultSearchEnabled();
-        const chat: ChatSession = {
-            id: uuid(),
-            title: title || "New Chat",
-            modelId: modelId || defaultModel,
-            thinking: defaultThinking,
-            searchEnabled: defaultSearch,
-            createdAt: Date.now(),
-            updatedAt: Date.now(),
-        };
+    const createChat = useCallback(
+        async (title?: string, modelId?: string): Promise<ChatSession> => {
+            const defaultModel =
+                storage.getDefaultModel() || "minimax/minimax-m2.1";
+            const defaultThinking = storage.getDefaultThinking();
+            const defaultSearch = storage.getDefaultSearchEnabled();
+            const chat: ChatSession = {
+                id: uuid(),
+                title: title || "New Chat",
+                modelId: modelId || defaultModel,
+                thinking: defaultThinking,
+                searchEnabled: defaultSearch,
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+            };
 
-        await db.createChat(chat);
-        setChats((prev) => [chat, ...prev]);
-        setCurrentChat(chat);
-        setMessages([]);
+            await db.createChat(chat);
+            setChats((prev) => [chat, ...prev]);
+            setCurrentChat(chat);
+            setMessages([]);
 
-        return chat;
-    }, []);
+            return chat;
+        },
+        [],
+    );
 
     const selectChat = useCallback(async (chatId: string) => {
         const chat = await db.getChat(chatId);
@@ -74,64 +95,91 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         }
     }, []);
 
-    const deleteChat = useCallback(async (chatId: string) => {
-        await db.deleteChat(chatId);
-        setChats((prev) => prev.filter((c) => c.id !== chatId));
+    const deleteChat = useCallback(
+        async (chatId: string) => {
+            await db.deleteChat(chatId);
+            setChats((prev) => prev.filter((c) => c.id !== chatId));
 
-        if (currentChat?.id === chatId) {
-            setCurrentChat(null);
-            setMessages([]);
-        }
-    }, [currentChat]);
+            if (currentChat?.id === chatId) {
+                setCurrentChat(null);
+                setMessages([]);
+            }
+        },
+        [currentChat],
+    );
 
-    const updateChat = useCallback(async (chat: ChatSession) => {
-        const updated = { ...chat, updatedAt: Date.now() };
-        await db.updateChat(updated);
-        setChats((prev) => prev.map((c) => (c.id === chat.id ? updated : c)));
-        if (currentChat?.id === chat.id) {
-            setCurrentChat(updated);
-        }
-    }, [currentChat]);
-
-    const addMessage = useCallback(async (message: { role: string; content: string; contextContent: string; thinking?: string; skill?: Skill | null }): Promise<Message> => {
-        if (!currentChat) {
-            throw new Error("No current chat selected");
-        }
-
-        const newMessage: Message = {
-            role: message.role as Message["role"],
-            content: message.content,
-            contextContent: message.contextContent,
-            thinking: message.thinking,
-            skill: message.skill,
-            sessionId: currentChat.id,
-            id: uuid(),
-            createdAt: Date.now(),
-        };
-
-        await db.createMessage(newMessage);
-        setMessages((prev) => [...prev, newMessage]);
-
-        if (currentChat) {
-            const updated = { ...currentChat, updatedAt: Date.now() };
+    const updateChat = useCallback(
+        async (chat: ChatSession) => {
+            const updated = { ...chat, updatedAt: Date.now() };
             await db.updateChat(updated);
-            setChats((prev) => prev.map((c) => (c.id === currentChat.id ? updated : c)));
-        }
+            setChats((prev) =>
+                prev.map((c) => (c.id === chat.id ? updated : c)),
+            );
+            if (currentChat?.id === chat.id) {
+                setCurrentChat(updated);
+            }
+        },
+        [currentChat],
+    );
 
-        return newMessage;
-    }, [currentChat]);
+    const addMessage = useCallback(
+        async (message: {
+            role: string;
+            content: string;
+            contextContent: string;
+            thinking?: string;
+            skill?: Skill | null;
+        }): Promise<Message> => {
+            if (!currentChat) {
+                throw new Error("No current chat selected");
+            }
 
-    const updateMessage = useCallback(async (id: string, updates: Partial<Pick<Message, "content" | "contextContent" | "thinking">>) => {
-        setMessages((prev) => {
-            const message = prev.find((m) => m.id === id);
-            if (!message) return prev;
+            const newMessage: Message = {
+                role: message.role as Message["role"],
+                content: message.content,
+                contextContent: message.contextContent,
+                thinking: message.thinking,
+                skill: message.skill,
+                sessionId: currentChat.id,
+                id: uuid(),
+                createdAt: Date.now(),
+            };
 
-            const updated = { ...message, ...updates };
-            db.updateMessage(updated);
+            await db.createMessage(newMessage);
+            setMessages((prev) => [...prev, newMessage]);
 
-            return prev.map((m) => (m.id === id ? updated : m));
-        });
-    }, []);
+            if (currentChat) {
+                const updated = { ...currentChat, updatedAt: Date.now() };
+                await db.updateChat(updated);
+                setChats((prev) =>
+                    prev.map((c) => (c.id === currentChat.id ? updated : c)),
+                );
+            }
+
+            return newMessage;
+        },
+        [currentChat],
+    );
+
+    const updateMessage = useCallback(
+        async (
+            id: string,
+            updates: Partial<
+                Pick<Message, "content" | "contextContent" | "thinking">
+            >,
+        ) => {
+            setMessages((prev) => {
+                const message = prev.find((m) => m.id === id);
+                if (!message) return prev;
+
+                const updated = { ...message, ...updates };
+                db.updateMessage(updated);
+
+                return prev.map((m) => (m.id === id ? updated : m));
+            });
+        },
+        [],
+    );
 
     const clearCurrentChat = useCallback(() => {
         setCurrentChat(null);

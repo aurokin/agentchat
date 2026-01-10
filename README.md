@@ -49,22 +49,20 @@ A web application for chatting with AI models through OpenRouter. Users provide 
 - [x] Sign-in page
 - [x] Sign-up page
 
+#### Skills (System Prompt Customization)
+- [x] **Skill selector** - Dropdown to select skill at chat creation
+- [x] **Preset skills** - Pre-defined system prompts (e.g., "Helpful Assistant", "Code Expert", "Creative Writer")
+- [x] **Custom skill input** - User can create their own system prompt
+- [x] **Skill persistence** - Save selected skill with chat session
+- [x] **System message injection** - Append skill prompt to API messages
 ---
 
 ### ⏳ To Do / Future Work
 
 #### Immediate (Before Production)
-- [ ] **Add valid Clerk API keys** - Current keys are placeholders
 - [ ] **Test with real OpenRouter API** - Verify model fetching and chat completion
 - [ ] **Add error handling** - Better error messages for API failures
 - [ ] **Loading states** - Add skeletons while loading models/chats
-
-#### Skills (System Prompt Customization)
-- [ ] **Skill selector** - Dropdown to select skill at chat creation
-- [ ] **Preset skills** - Pre-defined system prompts (e.g., "Helpful Assistant", "Code Expert", "Creative Writer")
-- [ ] **Custom skill input** - User can create their own system prompt
-- [ ] **Skill persistence** - Save selected skill with chat session
-- [ ] **System message injection** - Append skill prompt to API messages
 
 #### Polish & UX
 - [ ] **Mobile responsive design** - Improve sidebar for mobile

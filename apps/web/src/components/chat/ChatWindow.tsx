@@ -14,7 +14,14 @@ import { SearchToggle } from "./SearchToggle";
 import { Terminal, Cpu } from "lucide-react";
 
 export function ChatWindow() {
-    const { currentChat, messages, addMessage, updateMessage, updateChat, createChat } = useChat();
+    const {
+        currentChat,
+        messages,
+        addMessage,
+        updateMessage,
+        updateChat,
+        createChat,
+    } = useChat();
     const { apiKey, selectedSkill, setSelectedSkill } = useSettings();
     const [sending, setSending] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -47,15 +54,18 @@ export function ChatWindow() {
             // Add user message with both content types
             await addMessage({
                 role: "user",
-                content: content,           // Display content
-                contextContent: contextContent,  // API context content
-                skill: clonedSkill,         // Cloned skill object
+                content: content, // Display content
+                contextContent: contextContent, // API context content
+                skill: clonedSkill, // Cloned skill object
             });
 
             // Build API context using contextContent from all messages
             const currentMessages = [
-                ...messages.map(m => ({ role: m.role, content: m.contextContent })),
-                { role: "user", content: contextContent }
+                ...messages.map((m) => ({
+                    role: m.role,
+                    content: m.contextContent,
+                })),
+                { role: "user", content: contextContent },
             ];
 
             // Create assistant message placeholder
@@ -87,12 +97,13 @@ export function ChatWindow() {
                         contextContent: fullResponse,
                         thinking: fullThinking || undefined,
                     });
-                }
+                },
             );
 
             // Update chat title if it's a new chat
             if (currentChat.title === "New Chat" && messages.length === 0) {
-                const title = content.slice(0, 50) + (content.length > 50 ? "..." : "");
+                const title =
+                    content.slice(0, 50) + (content.length > 50 ? "..." : "");
                 updateChat({ ...currentChat, title });
             }
 
@@ -101,7 +112,9 @@ export function ChatWindow() {
                 setSelectedSkill(null);
             }
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Failed to send message");
+            setError(
+                err instanceof Error ? err.message : "Failed to send message",
+            );
         } finally {
             setSending(false);
         }
@@ -134,13 +147,19 @@ export function ChatWindow() {
                 <div className="flex-1 flex items-center justify-center relative z-10">
                     <div className="text-center max-w-md">
                         <div className="inline-flex items-center justify-center w-20 h-20 bg-primary mb-6 shadow-brutal">
-                            <Terminal size={40} className="text-primary-foreground" />
+                            <Terminal
+                                size={40}
+                                className="text-primary-foreground"
+                            />
                         </div>
                         <h2 className="text-3xl font-bold mb-3">
-                            Welcome to <span className="text-gradient">RouterChat</span>
+                            Welcome to{" "}
+                            <span className="text-gradient">RouterChat</span>
                         </h2>
                         <p className="text-muted-foreground mono text-sm mb-6">
-              // Select a chat from the sidebar<br />or start a new conversation
+                            // Select a chat from the sidebar
+                            <br />
+                            or start a new conversation
                         </p>
                         <button
                             onClick={() => createChat()}

@@ -1,111 +1,135 @@
 import type { Skill } from "./types";
 
 const STORAGE_KEYS = {
-  API_KEY: "router-chat-api-key",
-  THEME: "router-chat-theme",
-  DEFAULT_MODEL: "router-chat-default-model",
-  DEFAULT_THINKING: "router-chat-default-thinking",
-  DEFAULT_SEARCH: "router-chat-default-search",
-  FAVORITE_MODELS: "router-chat-favorite-models",
-  SKILLS: "router-chat-skills",
-  SELECTED_SKILL: "router-chat-selected-skill",
+    API_KEY: "router-chat-api-key",
+    THEME: "router-chat-theme",
+    DEFAULT_MODEL: "router-chat-default-model",
+    DEFAULT_THINKING: "router-chat-default-thinking",
+    DEFAULT_SEARCH: "router-chat-default-search",
+    FAVORITE_MODELS: "router-chat-favorite-models",
+    SKILLS: "router-chat-skills",
+    SELECTED_SKILL: "router-chat-selected-skill",
 } as const;
 
 export function getApiKey(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(STORAGE_KEYS.API_KEY);
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem(STORAGE_KEYS.API_KEY);
 }
 
 export function setApiKey(key: string): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEYS.API_KEY, key);
+    if (typeof window === "undefined") return;
+    localStorage.setItem(STORAGE_KEYS.API_KEY, key);
 }
 
 export function clearApiKey(): void {
-  if (typeof window === "undefined") return;
-  localStorage.removeItem(STORAGE_KEYS.API_KEY);
+    if (typeof window === "undefined") return;
+    localStorage.removeItem(STORAGE_KEYS.API_KEY);
 }
 
 export function getTheme(): "light" | "dark" | "system" {
-  if (typeof window === "undefined") return "system";
-  return (localStorage.getItem(STORAGE_KEYS.THEME) as "light" | "dark" | "system") || "system";
+    if (typeof window === "undefined") return "system";
+    return (
+        (localStorage.getItem(STORAGE_KEYS.THEME) as
+            | "light"
+            | "dark"
+            | "system") || "system"
+    );
 }
 
 export function setTheme(theme: "light" | "dark" | "system"): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEYS.THEME, theme);
+    if (typeof window === "undefined") return;
+    localStorage.setItem(STORAGE_KEYS.THEME, theme);
 }
 
 export function getDefaultModel(): string {
-  if (typeof window === "undefined") return "";
-  return localStorage.getItem(STORAGE_KEYS.DEFAULT_MODEL) || "";
+    if (typeof window === "undefined") return "";
+    return localStorage.getItem(STORAGE_KEYS.DEFAULT_MODEL) || "";
 }
 
 export function setDefaultModel(modelId: string): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEYS.DEFAULT_MODEL, modelId);
+    if (typeof window === "undefined") return;
+    localStorage.setItem(STORAGE_KEYS.DEFAULT_MODEL, modelId);
 }
 
 export function getFavoriteModels(): string[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const stored = localStorage.getItem(STORAGE_KEYS.FAVORITE_MODELS);
-    return stored ? JSON.parse(stored) : [];
-  } catch {
-    return [];
-  }
+    if (typeof window === "undefined") return [];
+    try {
+        const stored = localStorage.getItem(STORAGE_KEYS.FAVORITE_MODELS);
+        return stored ? JSON.parse(stored) : [];
+    } catch {
+        return [];
+    }
 }
 
 export function setFavoriteModels(modelIds: string[]): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEYS.FAVORITE_MODELS, JSON.stringify(modelIds));
+    if (typeof window === "undefined") return;
+    localStorage.setItem(
+        STORAGE_KEYS.FAVORITE_MODELS,
+        JSON.stringify(modelIds),
+    );
 }
 
-export function getDefaultThinking(): "xhigh" | "high" | "medium" | "low" | "minimal" | "none" {
-  if (typeof window === "undefined") return "none";
-  return (localStorage.getItem(STORAGE_KEYS.DEFAULT_THINKING) as "xhigh" | "high" | "medium" | "low" | "minimal" | "none") || "none";
+export function getDefaultThinking():
+    | "xhigh"
+    | "high"
+    | "medium"
+    | "low"
+    | "minimal"
+    | "none" {
+    if (typeof window === "undefined") return "none";
+    return (
+        (localStorage.getItem(STORAGE_KEYS.DEFAULT_THINKING) as
+            | "xhigh"
+            | "high"
+            | "medium"
+            | "low"
+            | "minimal"
+            | "none") || "none"
+    );
 }
 
-export function setDefaultThinking(value: "xhigh" | "high" | "medium" | "low" | "minimal" | "none"): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEYS.DEFAULT_THINKING, value);
+export function setDefaultThinking(
+    value: "xhigh" | "high" | "medium" | "low" | "minimal" | "none",
+): void {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(STORAGE_KEYS.DEFAULT_THINKING, value);
 }
 
 export function getDefaultSearchEnabled(): boolean {
-  if (typeof window === "undefined") return false;
-  return localStorage.getItem(STORAGE_KEYS.DEFAULT_SEARCH) === "true";
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem(STORAGE_KEYS.DEFAULT_SEARCH) === "true";
 }
 
 export function setDefaultSearchEnabled(enabled: boolean): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEYS.DEFAULT_SEARCH, String(enabled));
+    if (typeof window === "undefined") return;
+    localStorage.setItem(STORAGE_KEYS.DEFAULT_SEARCH, String(enabled));
 }
 
 export function getSkills(): Skill[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const stored = localStorage.getItem(STORAGE_KEYS.SKILLS);
-    return stored ? JSON.parse(stored) : [];
-  } catch {
-    return [];
-  }
+    if (typeof window === "undefined") return [];
+    try {
+        const stored = localStorage.getItem(STORAGE_KEYS.SKILLS);
+        return stored ? JSON.parse(stored) : [];
+    } catch {
+        return [];
+    }
 }
 
 export function setSkills(skills: Skill[]): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEYS.SKILLS, JSON.stringify(skills));
+    if (typeof window === "undefined") return;
+    localStorage.setItem(STORAGE_KEYS.SKILLS, JSON.stringify(skills));
 }
 
 export function getSelectedSkillId(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(STORAGE_KEYS.SELECTED_SKILL);
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem(STORAGE_KEYS.SELECTED_SKILL);
 }
 
 export function setSelectedSkillId(skillId: string | null): void {
-  if (typeof window === "undefined") return;
-  if (skillId) {
-    localStorage.setItem(STORAGE_KEYS.SELECTED_SKILL, skillId);
-  } else {
-    localStorage.removeItem(STORAGE_KEYS.SELECTED_SKILL);
-  }
+    if (typeof window === "undefined") return;
+    if (skillId) {
+        localStorage.setItem(STORAGE_KEYS.SELECTED_SKILL, skillId);
+    } else {
+        localStorage.removeItem(STORAGE_KEYS.SELECTED_SKILL);
+    }
 }
