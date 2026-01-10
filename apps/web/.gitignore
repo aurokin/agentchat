@@ -1,6 +1,4 @@
 
-# clerk configuration (can include secrets)
-/.clerk/
 
 # Next.js auto-generated types
 next-env.d.ts
