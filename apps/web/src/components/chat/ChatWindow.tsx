@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useChat } from "@/contexts/ChatContext";
 import { useSettings } from "@/contexts/SettingsContext";
-import { sendMessage } from "@/lib/openrouter";
+import { sendMessage, OpenRouterApiError } from "@/lib/openrouter";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import {
@@ -11,7 +11,12 @@ import {
     modelSupportsReasoning,
     type ThinkingLevel,
 } from "@/lib/types";
-import { Hexagon, Sparkles, AlertCircle } from "lucide-react";
+import { Hexagon, Sparkles, AlertCircle, RefreshCw } from "lucide-react";
+
+interface ErrorState {
+    message: string;
+    isRetryable: boolean;
+}
 
 export function ChatWindow() {
     const {
@@ -24,58 +29,60 @@ export function ChatWindow() {
     } = useChat();
     const { apiKey, selectedSkill, setSelectedSkill, models } = useSettings();
     const [sending, setSending] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [error, setError] = useState<ErrorState | null>(null);
+    const [retryChat, setRetryChat] = useState<{
+        content: string;
+        contextContent: string;
+    } | null>(null);
 
     const handleSendMessage = async (content: string) => {
         if (!apiKey) {
-            setError("Please add your OpenRouter API key in Settings");
+            setError({
+                message: "Please add your OpenRouter API key in Settings",
+                isRetryable: false,
+            });
             return;
         }
 
         if (!currentChat) {
-            setError("No chat selected");
+            setError({ message: "No chat selected", isRetryable: false });
             return;
         }
 
         setSending(true);
         setError(null);
+        setRetryChat(null);
 
         try {
-            // Get current model and check capabilities
             const currentModel = models.find(
                 (m) => m.id === currentChat.modelId,
             );
             const supportsReasoning = modelSupportsReasoning(currentModel);
             const supportsSearch = modelSupportsSearch(currentModel);
 
-            // Only use features the model actually supports
             const effectiveThinking = supportsReasoning
                 ? currentChat.thinking
                 : "none";
             const effectiveSearch = supportsSearch && currentChat.searchEnabled;
 
-            // Build context content with skill prompt if applicable
             const contextContent = selectedSkill
                 ? `${selectedSkill.prompt}\n\nUser: ${content}`
                 : content;
 
-            // Clone skill object (deep copy to prevent mutations)
             const clonedSkill = selectedSkill
                 ? JSON.parse(JSON.stringify(selectedSkill))
                 : null;
 
-            // Add user message with both content types and settings snapshot (only save supported features)
             await addMessage({
                 role: "user",
-                content: content, // Display content
-                contextContent: contextContent, // API context content
-                skill: clonedSkill, // Cloned skill object
+                content: content,
+                contextContent: contextContent,
+                skill: clonedSkill,
                 modelId: currentChat.modelId,
                 thinkingLevel: effectiveThinking,
                 searchEnabled: effectiveSearch,
             });
 
-            // Build API context using contextContent from all messages
             const currentMessages = [
                 ...messages.map((m) => ({
                     role: m.role,
@@ -84,7 +91,6 @@ export function ChatWindow() {
                 { role: "user", content: contextContent },
             ];
 
-            // Create assistant message placeholder with same settings (only save supported features)
             const assistantMessage = await addMessage({
                 role: "assistant",
                 content: "",
@@ -98,7 +104,6 @@ export function ChatWindow() {
             let fullResponse = "";
             let fullThinking = "";
 
-            // Send to API with streaming
             await sendMessage(
                 apiKey,
                 currentMessages,
@@ -111,7 +116,6 @@ export function ChatWindow() {
                         fullResponse += chunk;
                     }
 
-                    // Update message with streaming content (content = contextContent for assistant)
                     updateMessage(assistantMessage.id, {
                         content: fullResponse,
                         contextContent: fullResponse,
@@ -120,24 +124,49 @@ export function ChatWindow() {
                 },
             );
 
-            // Update chat title if it's a new chat
             if (currentChat.title === "New Chat" && messages.length === 0) {
                 const title =
                     content.slice(0, 50) + (content.length > 50 ? "..." : "");
                 updateChat({ ...currentChat, title });
             }
 
-            // Reset skill selection after sending
             if (selectedSkill) {
                 setSelectedSkill(null);
             }
         } catch (err) {
-            setError(
-                err instanceof Error ? err.message : "Failed to send message",
-            );
+            if (err instanceof OpenRouterApiError) {
+                setError({
+                    message: err.message,
+                    isRetryable: err.isRetryable,
+                });
+                if (err.isRetryable) {
+                    setRetryChat({
+                        content: content,
+                        contextContent: selectedSkill
+                            ? `${selectedSkill.prompt}\n\nUser: ${content}`
+                            : content,
+                    });
+                }
+            } else {
+                setError({
+                    message:
+                        err instanceof Error
+                            ? err.message
+                            : "Failed to send message",
+                    isRetryable: true,
+                });
+            }
         } finally {
             setSending(false);
         }
+    };
+
+    const handleRetry = async () => {
+        if (!retryChat || !currentChat) return;
+        const { content } = retryChat;
+        setRetryChat(null);
+        setError(null);
+        await handleSendMessage(content);
     };
 
     const handleModelChange = async (modelId: string) => {
@@ -229,7 +258,20 @@ export function ChatWindow() {
                         size={16}
                         className="text-error flex-shrink-0"
                     />
-                    <p className="text-error text-sm">{error}</p>
+                    <p className="text-error text-sm flex-1">{error.message}</p>
+                    {error.isRetryable && (
+                        <button
+                            onClick={handleRetry}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-error/10 hover:bg-error/20 text-error rounded-md transition-colors"
+                            disabled={sending}
+                        >
+                            <RefreshCw
+                                size={12}
+                                className={sending ? "animate-spin" : ""}
+                            />
+                            Retry
+                        </button>
+                    )}
                 </div>
             )}
 
