@@ -24,5 +24,8 @@
     "prettier": {
         "tabWidth": 4,
         "useTabs": false
+    },
+    "dependencies": {
+        "tailwind-merge": "^3.4.0"
     }
 }
