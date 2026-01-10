@@ -37,6 +37,15 @@ export function ChatWindow() {
         setError(null);
 
         try {
+            // Get current model and check capabilities
+            const currentModel = models.find(m => m.id === currentChat.modelId);
+            const supportsReasoning = modelSupportsReasoning(currentModel);
+            const supportsSearch = modelSupportsSearch(currentModel);
+
+            // Only use features the model actually supports
+            const effectiveThinking = supportsReasoning ? currentChat.thinking : "none";
+            const effectiveSearch = supportsSearch && currentChat.searchEnabled;
+
             // Build context content with skill prompt if applicable
             const contextContent = selectedSkill
                 ? `${selectedSkill.prompt}\n\nUser: ${content}`
@@ -47,15 +56,15 @@ export function ChatWindow() {
                 ? JSON.parse(JSON.stringify(selectedSkill))
                 : null;
 
-            // Add user message with both content types and settings snapshot
+            // Add user message with both content types and settings snapshot (only save supported features)
             await addMessage({
                 role: "user",
                 content: content, // Display content
                 contextContent: contextContent, // API context content
                 skill: clonedSkill, // Cloned skill object
                 modelId: currentChat.modelId,
-                thinkingLevel: currentChat.thinking,
-                searchEnabled: currentChat.searchEnabled,
+                thinkingLevel: effectiveThinking,
+                searchEnabled: effectiveSearch,
             });
 
             // Build API context using contextContent from all messages
@@ -67,15 +76,15 @@ export function ChatWindow() {
                 { role: "user", content: contextContent },
             ];
 
-            // Create assistant message placeholder with same settings
+            // Create assistant message placeholder with same settings (only save supported features)
             const assistantMessage = await addMessage({
                 role: "assistant",
                 content: "",
                 contextContent: "",
                 skill: null,
                 modelId: currentChat.modelId,
-                thinkingLevel: currentChat.thinking,
-                searchEnabled: currentChat.searchEnabled,
+                thinkingLevel: effectiveThinking,
+                searchEnabled: effectiveSearch,
             });
 
             let fullResponse = "";
@@ -86,6 +95,7 @@ export function ChatWindow() {
                 apiKey,
                 currentMessages,
                 currentChat,
+                currentModel,
                 (chunk, thinking) => {
                     if (thinking !== undefined) {
                         fullThinking += thinking;
