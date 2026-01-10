@@ -13,7 +13,7 @@
         "test": "cd apps/web && npx next lint",
         "format": "prettier --write \"apps/**/*.{js,jsx,ts,tsx,json,css,md}\" \"packages/**/*.{js,jsx,ts,tsx,json,css,md}\"",
         "format:check": "prettier --check \"apps/**/*.{js,jsx,ts,tsx,json,css,md}\" \"packages/**/*.{js,jsx,ts,tsx,json,css,md}\"",
-        "health": "bun run format:check && bun run typecheck && cd apps/web && bun run lint && bun test",
+        "health": "bun run format && bun run typecheck && cd apps/web && bun run lint && bun test",
         "prepare": "husky"
     },
     "devDependencies": {
