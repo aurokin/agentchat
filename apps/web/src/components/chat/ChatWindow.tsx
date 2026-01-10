@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useChat } from "@/contexts/ChatContext";
 import { useSettings } from "@/contexts/SettingsContext";
 import { sendMessage, OpenRouterApiError } from "@/lib/openrouter";
@@ -34,6 +34,14 @@ export function ChatWindow() {
         content: string;
         contextContent: string;
     } | null>(null);
+    const inputRef = useRef<HTMLTextAreaElement>(null);
+
+    useEffect(() => {
+        if (currentChat && inputRef.current) {
+            inputRef.current.focus();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentChat?.id]);
 
     const handleSendMessage = async (content: string) => {
         if (!apiKey) {
@@ -283,6 +291,7 @@ export function ChatWindow() {
             {/* Unified input bar with all controls */}
             <div className="border-t border-border p-4 bg-background-elevated/30 relative z-10">
                 <MessageInput
+                    ref={inputRef}
                     onSend={handleSendMessage}
                     disabled={false}
                     canSend={!sending}
