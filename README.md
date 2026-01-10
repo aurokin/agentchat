@@ -12,13 +12,6 @@ A web application for chatting with AI models through OpenRouter. Users provide 
 - [x] TypeScript configured with path aliases
 - [x] Tailwind CSS configured
 
-#### Authentication (Clerk)
-- [x] Clerk OAuth integration configured
-- [x] Sign-in page at `/sign-in`
-- [x] Sign-up page at `/sign-up`
-- [x] Protected route middleware
-- [x] UserButton component in sidebar
-
 #### Local Data Storage
 - [x] IndexedDB (via `idb`) for chat sessions and messages
 - [x] localStorage helpers for settings (API key, theme)
@@ -44,10 +37,6 @@ A web application for chatting with AI models through OpenRouter. Users provide 
 - [x] Home page (redirects to sign-in or chat)
 - [x] Chat page with sidebar and chat window
 - [x] Settings page (API key, theme selection)
-
-#### Pages (Auth)
-- [x] Sign-in page
-- [x] Sign-up page
 
 #### Skills (System Prompt Customization)
 - [x] **Skill selector** - Dropdown to select skill at chat creation
@@ -84,7 +73,6 @@ The architecture is designed for future mobile expansion:
 - [ ] **Share types** from `packages/shared` between web and mobile
 - [ ] **Implement mobile UI** with React Native components
 - [ ] **Use AsyncStorage** instead of IndexedDB for mobile
-- [ ] **Clerk React Native SDK** for authentication
 
 **Note**: Mobile app will store data independently (no cloud sync as requested)
 
@@ -100,8 +88,6 @@ openrouter-chat/
 │       │   ├── app/         # Next.js App Router pages
 │       │   │   ├── chat/    # Main chat page
 │       │   │   ├── settings/# Settings page
-│       │   │   ├── sign-in/ # Clerk sign-in
-│       │   │   └── sign-up/ # Clerk sign-up
 │       │   ├── components/  # React components
 │       │   │   └── chat/    # Chat-related components
 │       │   ├── contexts/    # React Context providers
@@ -122,7 +108,6 @@ openrouter-chat/
 | Runtime | Bun 1.x |
 | Framework | Next.js 15 (App Router) |
 | Language | TypeScript 5.x |
-| Authentication | Clerk (OAuth) |
 | UI | Tailwind CSS |
 | State | React Context + Hooks |
 | Storage | IndexedDB (idb) + localStorage |
@@ -132,7 +117,6 @@ openrouter-chat/
 
 ### Prerequisites
 - Bun 1.x
-- Clerk account (for authentication)
 - OpenRouter account (for API access)
 
 ### Installation
@@ -147,16 +131,10 @@ cd apps/web && bun dev
 
 ### Configuration
 
-1. Create a Clerk account at https://clerk.com/
-2. Create an application and get your API keys
-3. Add keys to `apps/web/.env.local`:
-   ```env
-   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
-   CLERK_SECRET_KEY=sk_test_...
-   ```
-4. Create an OpenRouter account at https://openrouter.ai/
-5. Generate an API key from https://openrouter.ai/keys
-6. Enter the key in the app's Settings page
+1. Create an application and get your API keys
+2. Create an OpenRouter account at https://openrouter.ai/
+3. Generate an API key from https://openrouter.ai/keys
+4. Enter the key in the app's Settings page
 
 ## Development
 
