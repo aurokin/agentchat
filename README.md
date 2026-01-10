@@ -59,6 +59,7 @@ A web application for chatting with AI models through OpenRouter. Users provide 
 - [x] **Markdown rendering** - Support code blocks, lists in messages
 - [x] **Copy message** - Button to copy message content
 - [ ] **Export chat** - Download conversation as JSON/Markdown
+- [ ] **Image input** - Support image uploads for vision-capable models
 
 #### Testing
 - [ ] **Unit tests** - Vitest for utility functions
