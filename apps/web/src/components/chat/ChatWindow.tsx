@@ -6,7 +6,11 @@ import { useSettings } from "@/contexts/SettingsContext";
 import { sendMessage } from "@/lib/openrouter";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
-import { modelSupportsSearch, modelSupportsReasoning, type ThinkingLevel } from "@/lib/types";
+import {
+    modelSupportsSearch,
+    modelSupportsReasoning,
+    type ThinkingLevel,
+} from "@/lib/types";
 import { Hexagon, Sparkles, AlertCircle } from "lucide-react";
 
 export function ChatWindow() {
@@ -38,12 +42,16 @@ export function ChatWindow() {
 
         try {
             // Get current model and check capabilities
-            const currentModel = models.find(m => m.id === currentChat.modelId);
+            const currentModel = models.find(
+                (m) => m.id === currentChat.modelId,
+            );
             const supportsReasoning = modelSupportsReasoning(currentModel);
             const supportsSearch = modelSupportsSearch(currentModel);
 
             // Only use features the model actually supports
-            const effectiveThinking = supportsReasoning ? currentChat.thinking : "none";
+            const effectiveThinking = supportsReasoning
+                ? currentChat.thinking
+                : "none";
             const effectiveSearch = supportsSearch && currentChat.searchEnabled;
 
             // Build context content with skill prompt if applicable
@@ -158,10 +166,14 @@ export function ChatWindow() {
                     <div className="absolute top-8 left-8 w-24 h-24 border-l border-t border-primary/20" />
                     <div className="absolute bottom-8 right-8 w-24 h-24 border-r border-b border-primary/20" />
                     {/* Grid pattern */}
-                    <div className="absolute inset-0 opacity-[0.02]" style={{
-                        backgroundImage: 'linear-gradient(var(--primary) 1px, transparent 1px), linear-gradient(90deg, var(--primary) 1px, transparent 1px)',
-                        backgroundSize: '60px 60px'
-                    }} />
+                    <div
+                        className="absolute inset-0 opacity-[0.02]"
+                        style={{
+                            backgroundImage:
+                                "linear-gradient(var(--primary) 1px, transparent 1px), linear-gradient(90deg, var(--primary) 1px, transparent 1px)",
+                            backgroundSize: "60px 60px",
+                        }}
+                    />
                 </div>
 
                 <div className="flex-1 flex items-center justify-center relative z-10">
@@ -213,7 +225,10 @@ export function ChatWindow() {
             {/* Error message - floats at top if present */}
             {error && (
                 <div className="px-6 py-3 bg-error/5 border-b border-error/20 flex items-center gap-3 relative z-20">
-                    <AlertCircle size={16} className="text-error flex-shrink-0" />
+                    <AlertCircle
+                        size={16}
+                        className="text-error flex-shrink-0"
+                    />
                     <p className="text-error text-sm">{error}</p>
                 </div>
             )}
@@ -232,10 +247,14 @@ export function ChatWindow() {
                     onModelChange={handleModelChange}
                     thinkingLevel={currentChat.thinking}
                     onThinkingChange={handleThinkingChange}
-                    reasoningSupported={modelSupportsReasoning(models.find(m => m.id === currentChat.modelId))}
+                    reasoningSupported={modelSupportsReasoning(
+                        models.find((m) => m.id === currentChat.modelId),
+                    )}
                     searchEnabled={currentChat.searchEnabled}
                     onSearchChange={handleSearchChange}
-                    searchSupported={modelSupportsSearch(models.find(m => m.id === currentChat.modelId))}
+                    searchSupported={modelSupportsSearch(
+                        models.find((m) => m.id === currentChat.modelId),
+                    )}
                 />
             </div>
         </div>

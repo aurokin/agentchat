@@ -120,10 +120,7 @@ function MessageItem({
                         {copied ? (
                             <Check size={12} className="text-success" />
                         ) : (
-                            <Copy
-                                size={12}
-                                className="text-muted-foreground"
-                            />
+                            <Copy size={12} className="text-muted-foreground" />
                         )}
                     </button>
                 )}
@@ -142,10 +139,7 @@ function MessageItem({
                             {showSkill ? (
                                 <ChevronUp size={14} className="ml-auto" />
                             ) : (
-                                <ChevronDown
-                                    size={14}
-                                    className="ml-auto"
-                                />
+                                <ChevronDown size={14} className="ml-auto" />
                             )}
                         </summary>
                         <div className="px-4 pb-3 text-sm border-t border-primary/10">

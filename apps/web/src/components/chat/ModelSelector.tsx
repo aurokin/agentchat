@@ -75,7 +75,7 @@ export function ModelSelector({
             (model) =>
                 model.id.toLowerCase().includes(query) ||
                 model.name.toLowerCase().includes(query) ||
-                model.provider?.toLowerCase().includes(query)
+                model.provider?.toLowerCase().includes(query),
         );
     }, [models, searchQuery]);
 
@@ -156,7 +156,7 @@ export function ModelSelector({
                                     "w-full pl-9 pr-3 py-2 text-sm bg-muted border border-border",
                                     "placeholder:text-muted-foreground text-foreground",
                                     "focus:outline-none focus:border-primary/50 focus:bg-background",
-                                    "transition-all duration-200"
+                                    "transition-all duration-200",
                                 )}
                             />
                             {searchQuery && (
@@ -187,116 +187,123 @@ export function ModelSelector({
                         )}
 
                         {/* No search results */}
-                        {models.length > 0 && filteredModels.length === 0 && searchQuery && (
-                            <div className="px-4 py-6 text-center text-muted-foreground text-sm">
-                                <Search
-                                    size={24}
-                                    className="mx-auto mb-2 opacity-50"
-                                />
-                                <p>No models found</p>
-                                <p className="text-xs mt-1">
-                                    Try a different search term
-                                </p>
-                            </div>
-                        )}
+                        {models.length > 0 &&
+                            filteredModels.length === 0 &&
+                            searchQuery && (
+                                <div className="px-4 py-6 text-center text-muted-foreground text-sm">
+                                    <Search
+                                        size={24}
+                                        className="mx-auto mb-2 opacity-50"
+                                    />
+                                    <p>No models found</p>
+                                    <p className="text-xs mt-1">
+                                        Try a different search term
+                                    </p>
+                                </div>
+                            )}
 
                         {/* Favorites section */}
-                    {favoriteModelList.length > 0 && (
-                        <div>
-                            <div className="px-4 py-2 bg-primary/5 border-b border-border">
-                                <span className="text-xs font-medium text-primary uppercase tracking-wider flex items-center gap-1.5">
-                                    <Star size={10} className="fill-primary" />
-                                    Favorites
-                                </span>
-                            </div>
-                            {favoriteModelList.map((model) => (
-                                <button
-                                    key={model.id}
-                                    type="button"
-                                    onClick={() => handleSelect(model.id)}
-                                    className={cn(
-                                        "w-full text-left px-4 py-2.5 text-sm transition-all duration-150 hover:bg-primary/5 cursor-pointer flex items-center gap-2.5",
-                                        model.id === selectedModel &&
-                                            "bg-primary/10 border-l-2 border-primary",
-                                    )}
-                                >
-                                    <Star
-                                        size={12}
-                                        className="text-primary fill-primary flex-shrink-0"
-                                    />
-                                    <span className="truncate text-foreground">
-                                        {model.name}
-                                    </span>
-                                </button>
-                            ))}
-                        </div>
-                    )}
-
-                    {/* Provider groups */}
-                    {Object.entries(groupedModels).map(
-                        ([provider, providerModels]) => (
-                            <div key={provider}>
-                                <div className="px-4 py-2 bg-muted/50 border-b border-border">
-                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                        {provider}
+                        {favoriteModelList.length > 0 && (
+                            <div>
+                                <div className="px-4 py-2 bg-primary/5 border-b border-border">
+                                    <span className="text-xs font-medium text-primary uppercase tracking-wider flex items-center gap-1.5">
+                                        <Star
+                                            size={10}
+                                            className="fill-primary"
+                                        />
+                                        Favorites
                                     </span>
                                 </div>
-                                {providerModels.map((model) => (
+                                {favoriteModelList.map((model) => (
                                     <button
                                         key={model.id}
                                         type="button"
                                         onClick={() => handleSelect(model.id)}
                                         className={cn(
-                                            "w-full text-left px-4 py-2.5 text-sm transition-all duration-150 hover:bg-primary/5 cursor-pointer flex items-center gap-2.5 group",
+                                            "w-full text-left px-4 py-2.5 text-sm transition-all duration-150 hover:bg-primary/5 cursor-pointer flex items-center gap-2.5",
                                             model.id === selectedModel &&
                                                 "bg-primary/10 border-l-2 border-primary",
                                         )}
                                     >
-                                        <div
-                                            role="button"
-                                            tabIndex={0}
-                                            onClick={(e) =>
-                                                handleToggleFavorite(
-                                                    e,
-                                                    model.id,
-                                                )
-                                            }
-                                            onKeyDown={(e) =>
-                                                e.key === "Enter" &&
-                                                handleToggleFavorite(
-                                                    e as unknown as React.MouseEvent,
-                                                    model.id,
-                                                )
-                                            }
-                                            className="p-1 hover:bg-muted rounded-sm transition-colors cursor-pointer"
-                                            title={
-                                                favoriteModels.includes(
-                                                    model.id,
-                                                )
-                                                    ? "Remove from favorites"
-                                                    : "Add to favorites"
-                                            }
-                                        >
-                                            <Star
-                                                size={12}
-                                                className={cn(
-                                                    "flex-shrink-0 transition-colors",
-                                                    favoriteModels.includes(
-                                                        model.id,
-                                                    )
-                                                        ? "text-primary fill-primary"
-                                                        : "text-muted-foreground group-hover:text-primary/50",
-                                                )}
-                                            />
-                                        </div>
+                                        <Star
+                                            size={12}
+                                            className="text-primary fill-primary flex-shrink-0"
+                                        />
                                         <span className="truncate text-foreground">
                                             {model.name}
                                         </span>
                                     </button>
                                 ))}
                             </div>
-                        ),
-                    )}
+                        )}
+
+                        {/* Provider groups */}
+                        {Object.entries(groupedModels).map(
+                            ([provider, providerModels]) => (
+                                <div key={provider}>
+                                    <div className="px-4 py-2 bg-muted/50 border-b border-border">
+                                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                                            {provider}
+                                        </span>
+                                    </div>
+                                    {providerModels.map((model) => (
+                                        <button
+                                            key={model.id}
+                                            type="button"
+                                            onClick={() =>
+                                                handleSelect(model.id)
+                                            }
+                                            className={cn(
+                                                "w-full text-left px-4 py-2.5 text-sm transition-all duration-150 hover:bg-primary/5 cursor-pointer flex items-center gap-2.5 group",
+                                                model.id === selectedModel &&
+                                                    "bg-primary/10 border-l-2 border-primary",
+                                            )}
+                                        >
+                                            <div
+                                                role="button"
+                                                tabIndex={0}
+                                                onClick={(e) =>
+                                                    handleToggleFavorite(
+                                                        e,
+                                                        model.id,
+                                                    )
+                                                }
+                                                onKeyDown={(e) =>
+                                                    e.key === "Enter" &&
+                                                    handleToggleFavorite(
+                                                        e as unknown as React.MouseEvent,
+                                                        model.id,
+                                                    )
+                                                }
+                                                className="p-1 hover:bg-muted rounded-sm transition-colors cursor-pointer"
+                                                title={
+                                                    favoriteModels.includes(
+                                                        model.id,
+                                                    )
+                                                        ? "Remove from favorites"
+                                                        : "Add to favorites"
+                                                }
+                                            >
+                                                <Star
+                                                    size={12}
+                                                    className={cn(
+                                                        "flex-shrink-0 transition-colors",
+                                                        favoriteModels.includes(
+                                                            model.id,
+                                                        )
+                                                            ? "text-primary fill-primary"
+                                                            : "text-muted-foreground group-hover:text-primary/50",
+                                                    )}
+                                                />
+                                            </div>
+                                            <span className="truncate text-foreground">
+                                                {model.name}
+                                            </span>
+                                        </button>
+                                    ))}
+                                </div>
+                            ),
+                        )}
                     </div>
                 </div>
             )}

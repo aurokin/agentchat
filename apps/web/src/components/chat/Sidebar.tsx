@@ -5,13 +5,7 @@ import { useRouter } from "next/navigation";
 import { useChat } from "@/contexts/ChatContext";
 import { useSettings } from "@/contexts/SettingsContext";
 import { formatDistanceToNow } from "date-fns";
-import {
-    Plus,
-    Trash2,
-    MessageSquare,
-    Settings,
-    Hexagon,
-} from "lucide-react";
+import { Plus, Trash2, MessageSquare, Settings, Hexagon } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
@@ -54,9 +48,6 @@ export function Sidebar() {
                         <h1 className="font-semibold text-lg tracking-tight text-foreground">
                             RouterChat
                         </h1>
-                        <p className="text-xs text-foreground-muted tracking-wider uppercase">
-                            AI Interface
-                        </p>
                     </div>
                 </div>
                 <button

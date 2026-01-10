@@ -1,27 +1,29 @@
 {
-  "name": "router-chat",
-  "version": "0.1.0",
-  "private": true,
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
-  "scripts": {
-    "dev": "cd apps/web && npx next dev --turbopack --hostname 0.0.0.0 --port 4040",
-    "build": "cd apps/web && npx next build",
-    "typecheck": "cd apps/web && npx tsc --noEmit",
-    "test": "cd apps/web && npx next lint",
-    "format": "prettier --write \"apps/**/*.{js,jsx,ts,tsx,json,css,md}\" \"packages/**/*.{js,jsx,ts,tsx,json,css,md}\"",
-    "prepare": "husky"
-  },
-  "devDependencies": {
-    "@types/bun": "latest",
-    "husky": "^9.0.0",
-    "@fsouza/prettierd": "^0.25.0",
-    "prettier": "^3.4.0"
-  },
-  "prettier": {
-    "tabWidth": 4,
-    "useTabs": false
-  }
+    "name": "router-chat",
+    "version": "0.1.0",
+    "private": true,
+    "workspaces": [
+        "apps/*",
+        "packages/*"
+    ],
+    "scripts": {
+        "dev": "cd apps/web && npx next dev --turbopack --hostname 0.0.0.0 --port 4040",
+        "build": "cd apps/web && npx next build",
+        "typecheck": "cd apps/web && npx tsc --noEmit",
+        "test": "cd apps/web && npx next lint",
+        "format": "prettier --write \"apps/**/*.{js,jsx,ts,tsx,json,css,md}\" \"packages/**/*.{js,jsx,ts,tsx,json,css,md}\"",
+        "format:check": "prettier --check \"apps/**/*.{js,jsx,ts,tsx,json,css,md}\" \"packages/**/*.{js,jsx,ts,tsx,json,css,md}\"",
+        "health": "bun run format:check && bun run typecheck && cd apps/web && bun run lint && bun test",
+        "prepare": "husky"
+    },
+    "devDependencies": {
+        "@types/bun": "latest",
+        "husky": "^9.0.0",
+        "@fsouza/prettierd": "^0.25.0",
+        "prettier": "^3.4.0"
+    },
+    "prettier": {
+        "tabWidth": 4,
+        "useTabs": false
+    }
 }

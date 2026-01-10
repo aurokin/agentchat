@@ -52,12 +52,21 @@ export interface OpenRouterModel {
     supportedParameters?: SupportedParameter[];
 }
 
-export function modelSupportsSearch(model: OpenRouterModel | undefined): boolean {
-    return model?.supportedParameters?.includes(SupportedParameter.Tools) ?? false;
+export function modelSupportsSearch(
+    model: OpenRouterModel | undefined,
+): boolean {
+    return (
+        model?.supportedParameters?.includes(SupportedParameter.Tools) ?? false
+    );
 }
 
-export function modelSupportsReasoning(model: OpenRouterModel | undefined): boolean {
-    return model?.supportedParameters?.includes(SupportedParameter.Reasoning) ?? false;
+export function modelSupportsReasoning(
+    model: OpenRouterModel | undefined,
+): boolean {
+    return (
+        model?.supportedParameters?.includes(SupportedParameter.Reasoning) ??
+        false
+    );
 }
 
 export interface Skill {

@@ -80,7 +80,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
                 let selectedModelId: string | null = null;
 
                 // 1. Try user's preferred model
-                if (userPreferredModel && modelIds.includes(userPreferredModel)) {
+                if (
+                    userPreferredModel &&
+                    modelIds.includes(userPreferredModel)
+                ) {
                     selectedModelId = userPreferredModel;
                 }
                 // 2. Try app default model
@@ -95,7 +98,10 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
                 // Update default model if we found one
                 if (selectedModelId) {
                     storage.setDefaultModel(selectedModelId);
-                    setSettings((prev) => ({ ...prev, defaultModel: selectedModelId }));
+                    setSettings((prev) => ({
+                        ...prev,
+                        defaultModel: selectedModelId,
+                    }));
                 }
             });
             refreshPromiseRef.current = promise;

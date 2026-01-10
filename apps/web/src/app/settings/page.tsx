@@ -62,7 +62,6 @@ export default function SettingsPage() {
     const [skillDescription, setSkillDescription] = useState("");
     const [skillPrompt, setSkillPrompt] = useState("");
 
-
     const handleValidate = async () => {
         if (!newApiKey.trim()) return;
         setValidating(true);
@@ -191,16 +190,14 @@ export default function SettingsPage() {
                         </div>
 
                         <p className="text-sm text-muted-foreground mb-5 leading-relaxed">
-                            Enter your OpenRouter API key to enable AI model access.
-                            Your key is stored locally and never sent to our servers.
+                            Enter your OpenRouter API key to enable AI model
+                            access. Your key is stored locally and never sent to
+                            our servers.
                         </p>
 
                         <div className="space-y-4">
                             <div>
-                                <label
-                                    htmlFor="apiKey"
-                                    className="label-deco"
-                                >
+                                <label htmlFor="apiKey" className="label-deco">
                                     API Key
                                 </label>
                                 <input
@@ -281,7 +278,10 @@ export default function SettingsPage() {
                             )}
 
                             <div className="flex items-center gap-2 text-muted-foreground text-sm p-3 bg-muted/30 border border-border">
-                                <ExternalLink size={14} className="flex-shrink-0" />
+                                <ExternalLink
+                                    size={14}
+                                    className="flex-shrink-0"
+                                />
                                 <span>
                                     Get your API key from{" "}
                                     <a
@@ -324,7 +324,9 @@ export default function SettingsPage() {
                                             : "text-muted-foreground"
                                     }
                                 />
-                                <span className="text-xs font-medium">Light</span>
+                                <span className="text-xs font-medium">
+                                    Light
+                                </span>
                             </button>
 
                             <button
@@ -344,7 +346,9 @@ export default function SettingsPage() {
                                             : "text-muted-foreground"
                                     }
                                 />
-                                <span className="text-xs font-medium">Dark</span>
+                                <span className="text-xs font-medium">
+                                    Dark
+                                </span>
                             </button>
 
                             <button
@@ -364,7 +368,9 @@ export default function SettingsPage() {
                                             : "text-muted-foreground"
                                     }
                                 />
-                                <span className="text-xs font-medium">System</span>
+                                <span className="text-xs font-medium">
+                                    System
+                                </span>
                             </button>
                         </div>
                     </section>
@@ -380,7 +386,8 @@ export default function SettingsPage() {
                             </h2>
                         </div>
                         <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
-                            Set the default model for new conversations. This can be changed per-chat.
+                            Set the default model for new conversations. This
+                            can be changed per-chat.
                         </p>
                         <div>
                             <label
@@ -413,7 +420,8 @@ export default function SettingsPage() {
                             </h2>
                         </div>
                         <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
-                            Set the default thinking level for new conversations.
+                            Set the default thinking level for new
+                            conversations.
                         </p>
                         <div className="flex items-center gap-4">
                             <ThinkingToggle
@@ -474,9 +482,7 @@ export default function SettingsPage() {
                                 <div className="w-8 h-8 bg-primary/10 flex items-center justify-center">
                                     <Book size={16} className="text-primary" />
                                 </div>
-                                <h2 className="text-lg font-medium">
-                                    Skills
-                                </h2>
+                                <h2 className="text-lg font-medium">Skills</h2>
                             </div>
                             <button
                                 onClick={openNewSkillForm}
@@ -487,7 +493,8 @@ export default function SettingsPage() {
                             </button>
                         </div>
                         <p className="text-sm text-muted-foreground mb-5 leading-relaxed">
-                            Create reusable prompt templates that are prepended to your messages when selected.
+                            Create reusable prompt templates that are prepended
+                            to your messages when selected.
                         </p>
 
                         {/* Skill Form */}
@@ -589,9 +596,7 @@ export default function SettingsPage() {
                                     size={36}
                                     className="mx-auto mb-3 opacity-40"
                                 />
-                                <p className="text-sm">
-                                    No skills created yet
-                                </p>
+                                <p className="text-sm">No skills created yet</p>
                                 <p className="text-xs mt-1 opacity-70">
                                     Click "New Skill" to create your first skill
                                 </p>
@@ -625,7 +630,10 @@ export default function SettingsPage() {
                                                     className="p-2 hover:bg-muted border border-transparent hover:border-border transition-colors"
                                                     title="Edit"
                                                 >
-                                                    <Edit2 size={14} className="text-muted-foreground hover:text-foreground" />
+                                                    <Edit2
+                                                        size={14}
+                                                        className="text-muted-foreground hover:text-foreground"
+                                                    />
                                                 </button>
                                                 <button
                                                     onClick={() =>
@@ -636,7 +644,10 @@ export default function SettingsPage() {
                                                     className="p-2 hover:bg-error/10 border border-transparent hover:border-error/30 transition-colors"
                                                     title="Delete"
                                                 >
-                                                    <Trash2 size={14} className="text-error" />
+                                                    <Trash2
+                                                        size={14}
+                                                        className="text-error"
+                                                    />
                                                 </button>
                                             </div>
                                         </div>
@@ -655,8 +666,9 @@ export default function SettingsPage() {
                             <h2 className="text-lg font-medium">About</h2>
                         </div>
                         <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
-                            RouterChat provides a unified interface for AI conversations through OpenRouter.
-                            Your data is stored locally in your browser.
+                            RouterChat provides a unified interface for AI
+                            conversations through OpenRouter. Your data is
+                            stored locally in your browser.
                         </p>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground/70">
                             <div className="w-1.5 h-1.5 bg-primary rounded-full" />

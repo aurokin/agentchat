@@ -60,6 +60,7 @@ A web application for chatting with AI models through OpenRouter. Users provide 
 - [x] **Copy message** - Button to copy message content
 - [ ] **Export chat** - Download conversation as JSON/Markdown
 - [ ] **Image input** - Support image uploads for vision-capable models
+- [ ] **Show reasoning** - Display reasoning preview for models that support it ([OpenRouter docs](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens#example-1-streaming-mode-with-reasoning-tokens))
 
 #### Testing
 - [ ] **Unit tests** - Vitest for utility functions

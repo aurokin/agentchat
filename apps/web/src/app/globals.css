@@ -42,8 +42,10 @@
 
     /* Design tokens */
     --radius: 2px;
-    --shadow-deco: 0 4px 24px -4px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(212, 175, 55, 0.1);
-    --shadow-elevated: 0 8px 32px -8px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(212, 175, 55, 0.15);
+    --shadow-deco:
+        0 4px 24px -4px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(212, 175, 55, 0.1);
+    --shadow-elevated:
+        0 8px 32px -8px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(212, 175, 55, 0.15);
     --shadow-glow: 0 0 20px rgba(212, 175, 55, 0.2);
 }
 
@@ -71,8 +73,10 @@
     --input: #ffffff;
     --ring: #b8860b;
 
-    --shadow-deco: 0 4px 24px -4px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(184, 134, 11, 0.1);
-    --shadow-elevated: 0 8px 32px -8px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(184, 134, 11, 0.15);
+    --shadow-deco:
+        0 4px 24px -4px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(184, 134, 11, 0.1);
+    --shadow-elevated:
+        0 8px 32px -8px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(184, 134, 11, 0.15);
     --shadow-glow: 0 0 20px rgba(184, 134, 11, 0.15);
 }
 
@@ -105,14 +109,62 @@ body::before {
     z-index: 9999;
     opacity: 0.015;
     background-image:
-        linear-gradient(30deg, var(--primary) 12%, transparent 12.5%, transparent 87%, var(--primary) 87.5%, var(--primary)),
-        linear-gradient(150deg, var(--primary) 12%, transparent 12.5%, transparent 87%, var(--primary) 87.5%, var(--primary)),
-        linear-gradient(30deg, var(--primary) 12%, transparent 12.5%, transparent 87%, var(--primary) 87.5%, var(--primary)),
-        linear-gradient(150deg, var(--primary) 12%, transparent 12.5%, transparent 87%, var(--primary) 87.5%, var(--primary)),
-        linear-gradient(60deg, rgba(212, 175, 55, 0.3) 25%, transparent 25.5%, transparent 75%, rgba(212, 175, 55, 0.3) 75%, rgba(212, 175, 55, 0.3)),
-        linear-gradient(60deg, rgba(212, 175, 55, 0.3) 25%, transparent 25.5%, transparent 75%, rgba(212, 175, 55, 0.3) 75%, rgba(212, 175, 55, 0.3));
+        linear-gradient(
+            30deg,
+            var(--primary) 12%,
+            transparent 12.5%,
+            transparent 87%,
+            var(--primary) 87.5%,
+            var(--primary)
+        ),
+        linear-gradient(
+            150deg,
+            var(--primary) 12%,
+            transparent 12.5%,
+            transparent 87%,
+            var(--primary) 87.5%,
+            var(--primary)
+        ),
+        linear-gradient(
+            30deg,
+            var(--primary) 12%,
+            transparent 12.5%,
+            transparent 87%,
+            var(--primary) 87.5%,
+            var(--primary)
+        ),
+        linear-gradient(
+            150deg,
+            var(--primary) 12%,
+            transparent 12.5%,
+            transparent 87%,
+            var(--primary) 87.5%,
+            var(--primary)
+        ),
+        linear-gradient(
+            60deg,
+            rgba(212, 175, 55, 0.3) 25%,
+            transparent 25.5%,
+            transparent 75%,
+            rgba(212, 175, 55, 0.3) 75%,
+            rgba(212, 175, 55, 0.3)
+        ),
+        linear-gradient(
+            60deg,
+            rgba(212, 175, 55, 0.3) 25%,
+            transparent 25.5%,
+            transparent 75%,
+            rgba(212, 175, 55, 0.3) 75%,
+            rgba(212, 175, 55, 0.3)
+        );
     background-size: 80px 140px;
-    background-position: 0 0, 0 0, 40px 70px, 40px 70px, 0 0, 40px 70px;
+    background-position:
+        0 0,
+        0 0,
+        40px 70px,
+        40px 70px,
+        0 0,
+        40px 70px;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -153,7 +205,12 @@ body::before {
     left: 0;
     right: 0;
     height: 1px;
-    background: linear-gradient(90deg, transparent, var(--primary), transparent);
+    background: linear-gradient(
+        90deg,
+        transparent,
+        var(--primary),
+        transparent
+    );
     opacity: 0;
     transition: opacity 0.3s ease;
 }
@@ -220,7 +277,9 @@ body::before {
 .input-deco:focus {
     outline: none;
     border-color: var(--primary);
-    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2), 0 0 0 3px var(--primary-glow);
+    box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.2),
+        0 0 0 3px var(--primary-glow);
 }
 
 .input-deco::placeholder {
@@ -297,23 +356,43 @@ body::before {
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
 }
 
 @keyframes shimmer {
-    0% { background-position: -200% 0; }
-    100% { background-position: 200% 0; }
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
 }
 
 @keyframes pulse-soft {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.6; }
+    0%,
+    100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.6;
+    }
 }
 
 @keyframes typing-dot {
-    0%, 100% { transform: translateY(0); opacity: 0.4; }
-    50% { transform: translateY(-6px); opacity: 1; }
+    0%,
+    100% {
+        transform: translateY(0);
+        opacity: 0.4;
+    }
+    50% {
+        transform: translateY(-6px);
+        opacity: 1;
+    }
 }
 
 .animate-fade-slide-in {
@@ -325,7 +404,12 @@ body::before {
 }
 
 .animate-shimmer {
-    background: linear-gradient(90deg, transparent, var(--primary-glow), transparent);
+    background: linear-gradient(
+        90deg,
+        transparent,
+        var(--primary-glow),
+        transparent
+    );
     background-size: 200% 100%;
     animation: shimmer 2s infinite;
 }
@@ -344,8 +428,12 @@ body::before {
     animation: typing-dot 1.2s ease-in-out infinite;
 }
 
-.typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
-.typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+.typing-indicator span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+.typing-indicator span:nth-child(3) {
+    animation-delay: 0.4s;
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    SCROLLBAR
@@ -396,7 +484,12 @@ body::before {
 }
 
 .text-gradient-gold {
-    background: linear-gradient(135deg, var(--primary) 0%, #f5d76e 50%, var(--primary) 100%);
+    background: linear-gradient(
+        135deg,
+        var(--primary) 0%,
+        #f5d76e 50%,
+        var(--primary) 100%
+    );
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -408,7 +501,12 @@ body::before {
 
 .divider-deco {
     height: 1px;
-    background: linear-gradient(90deg, transparent, var(--border-accent), transparent);
+    background: linear-gradient(
+        90deg,
+        transparent,
+        var(--border-accent),
+        transparent
+    );
 }
 
 /* Geometric accent line */
