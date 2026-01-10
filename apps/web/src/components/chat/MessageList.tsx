@@ -4,6 +4,9 @@ import React, { useRef, useEffect, useState } from "react";
 import type { Message } from "@/lib/types";
 import { format } from "date-fns";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeHighlight from "rehype-highlight";
+import rehypeRaw from "rehype-raw";
 import {
     Brain,
     MessageCircle,
@@ -195,7 +198,12 @@ function MessageItem({
                             <span className="text-sm">Generating...</span>
                         </div>
                     ) : message.content ? (
-                        <ReactMarkdown>{message.content}</ReactMarkdown>
+                        <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            rehypePlugins={[rehypeHighlight, rehypeRaw]}
+                        >
+                            {message.content}
+                        </ReactMarkdown>
                     ) : (
                         <span className="text-muted-foreground italic">
                             ...
