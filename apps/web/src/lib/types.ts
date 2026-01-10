@@ -6,6 +6,10 @@ export interface Message {
     contextContent: string; // What is sent to API (includes skill prompt if applicable)
     thinking?: string;
     skill?: Skill | null; // Cloned skill object (not just ID reference)
+    // Settings snapshot when message was created
+    modelId?: string;
+    thinkingLevel?: ThinkingLevel;
+    searchEnabled?: boolean;
     createdAt: number;
 }
 

@@ -7,7 +7,7 @@ import React, {
     useState,
     useCallback,
 } from "react";
-import type { ChatSession, Message, Skill } from "@/lib/types";
+import type { ChatSession, Message, Skill, ThinkingLevel } from "@/lib/types";
 import * as db from "@/lib/db";
 import * as storage from "@/lib/storage";
 import { useSettings } from "./SettingsContext";
@@ -28,6 +28,9 @@ interface ChatContextType {
         contextContent: string;
         thinking?: string;
         skill?: Skill | null;
+        modelId?: string;
+        thinkingLevel?: ThinkingLevel;
+        searchEnabled?: boolean;
     }) => Promise<Message>;
     updateMessage: (
         id: string,
@@ -129,6 +132,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             contextContent: string;
             thinking?: string;
             skill?: Skill | null;
+            modelId?: string;
+            thinkingLevel?: ThinkingLevel;
+            searchEnabled?: boolean;
         }): Promise<Message> => {
             if (!currentChat) {
                 throw new Error("No current chat selected");
@@ -140,6 +146,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 contextContent: message.contextContent,
                 thinking: message.thinking,
                 skill: message.skill,
+                modelId: message.modelId,
+                thinkingLevel: message.thinkingLevel,
+                searchEnabled: message.searchEnabled,
                 sessionId: currentChat.id,
                 id: uuid(),
                 createdAt: Date.now(),

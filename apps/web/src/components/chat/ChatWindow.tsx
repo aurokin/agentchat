@@ -51,12 +51,15 @@ export function ChatWindow() {
                 ? JSON.parse(JSON.stringify(selectedSkill))
                 : null;
 
-            // Add user message with both content types
+            // Add user message with both content types and settings snapshot
             await addMessage({
                 role: "user",
                 content: content, // Display content
                 contextContent: contextContent, // API context content
                 skill: clonedSkill, // Cloned skill object
+                modelId: currentChat.modelId,
+                thinkingLevel: currentChat.thinking,
+                searchEnabled: currentChat.searchEnabled,
             });
 
             // Build API context using contextContent from all messages
@@ -68,12 +71,15 @@ export function ChatWindow() {
                 { role: "user", content: contextContent },
             ];
 
-            // Create assistant message placeholder
+            // Create assistant message placeholder with same settings
             const assistantMessage = await addMessage({
                 role: "assistant",
                 content: "",
                 contextContent: "",
                 skill: null,
+                modelId: currentChat.modelId,
+                thinkingLevel: currentChat.thinking,
+                searchEnabled: currentChat.searchEnabled,
             });
 
             let fullResponse = "";
