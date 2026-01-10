@@ -194,7 +194,7 @@ export function ChatWindow() {
 
     if (!currentChat) {
         return (
-            <div className="flex-1 flex flex-col h-screen bg-background relative overflow-hidden">
+            <div className="flex-1 flex flex-col h-full bg-background relative overflow-hidden">
                 {/* Decorative elements */}
                 <div className="absolute inset-0 pointer-events-none">
                     {/* Subtle radial gradient */}
@@ -255,7 +255,7 @@ export function ChatWindow() {
     }
 
     return (
-        <div className="flex-1 flex flex-col h-screen bg-background relative overflow-hidden">
+        <div className="flex-1 flex flex-col h-full bg-background relative overflow-hidden">
             {/* Decorative top line */}
             <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
 

@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Sidebar } from "@/components/chat/Sidebar";
-import { ChatWindow } from "@/components/chat/ChatWindow";
+import { ChatLayout } from "@/components/chat/ChatLayout";
 import { useChat } from "@/contexts/ChatContext";
 
 export default function ChatPage() {
@@ -43,10 +42,5 @@ export default function ChatPage() {
         return () => window.removeEventListener("keydown", handleKeyDown, true);
     }, [createChat]);
 
-    return (
-        <div className="flex h-screen">
-            <Sidebar />
-            <ChatWindow />
-        </div>
-    );
+    return <ChatLayout />;
 }
