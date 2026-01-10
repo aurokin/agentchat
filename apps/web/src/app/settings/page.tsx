@@ -169,9 +169,6 @@ export default function SettingsPage() {
                 <div className="absolute inset-0 overflow-hidden pointer-events-none">
                     <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-gradient-radial from-primary/8 via-primary/3 to-transparent" />
                     <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-gradient-radial from-accent/5 via-transparent to-transparent" />
-                    {/* Geometric corner accents */}
-                    <div className="absolute top-8 left-8 w-20 h-20 border-l border-t border-primary/20" />
-                    <div className="absolute bottom-8 right-8 w-20 h-20 border-r border-b border-primary/20" />
                 </div>
 
                 <div className="max-w-2xl mx-auto p-8 relative z-10">
