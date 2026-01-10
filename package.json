@@ -26,6 +26,7 @@
         "useTabs": false
     },
     "dependencies": {
-        "tailwind-merge": "^3.4.0"
+        "tailwind-merge": "^3.4.0",
+        "zod": "^4.3.5"
     }
 }
