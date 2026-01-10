@@ -63,7 +63,7 @@ A web application for chatting with AI models through OpenRouter. Users provide 
 - [ ] **Show reasoning** - Display reasoning preview for models that support it ([OpenRouter docs](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens#example-1-streaming-mode-with-reasoning-tokens))
 
 #### Testing
-- [ ] **Unit tests** - Vitest for utility functions
+- [x] **Unit tests** - Vitest for utility functions
 - [ ] **E2E tests** - Playwright for critical user flows
 - [ ] **Type checking** - Ensure all types are correct
 
