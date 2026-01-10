@@ -12,6 +12,7 @@ import type { ThinkingLevel } from "@/lib/types";
 interface MessageInputProps {
     onSend: (content: string) => void;
     disabled?: boolean;
+    canSend?: boolean;
     // Model controls
     selectedModel: string;
     onModelChange: (modelId: string) => void;
@@ -28,6 +29,7 @@ interface MessageInputProps {
 export function MessageInput({
     onSend,
     disabled,
+    canSend = true,
     selectedModel,
     onModelChange,
     thinkingLevel,
@@ -42,7 +44,7 @@ export function MessageInput({
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (content.trim() && !disabled) {
+        if (content.trim() && canSend) {
             onSend(content.trim());
             setContent("");
         }
@@ -51,7 +53,7 @@ export function MessageInput({
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
-            if (content.trim() && !disabled) {
+            if (content.trim() && canSend) {
                 onSend(content.trim());
                 setContent("");
             }
@@ -113,21 +115,19 @@ export function MessageInput({
                         onChange={(e) => setContent(e.target.value)}
                         onKeyDown={handleKeyDown}
                         placeholder="Send a message..."
-                        disabled={disabled}
                         className={cn(
                             "w-full px-4 py-3.5 pr-14 bg-transparent text-foreground resize-none focus:outline-none",
                             "placeholder:text-muted-foreground",
-                            disabled && "opacity-50 cursor-not-allowed",
                         )}
                         rows={1}
                     />
 
                     <button
                         type="submit"
-                        disabled={!content.trim() || disabled}
+                        disabled={!content.trim() || !canSend}
                         className={cn(
                             "absolute right-3 bottom-3 p-2.5 transition-all duration-200",
-                            content.trim() && !disabled
+                            content.trim() && canSend
                                 ? "bg-primary text-primary-foreground hover:shadow-deco-glow"
                                 : "bg-muted text-muted-foreground cursor-not-allowed",
                         )}
@@ -137,7 +137,7 @@ export function MessageInput({
                             className={cn(
                                 "transition-transform",
                                 content.trim() &&
-                                    !disabled &&
+                                    canSend &&
                                     "group-hover/input:translate-x-0.5",
                             )}
                         />
@@ -148,7 +148,9 @@ export function MessageInput({
             {/* Keyboard hints */}
             <div className="flex items-center justify-between mt-2 px-1 text-xs text-muted-foreground opacity-60">
                 <span>Shift + Enter for new line</span>
-                <span>Enter to send</span>
+                <span className={!canSend ? "text-amber-600/70" : ""}>
+                    {!canSend ? "Sending... (Enter disabled)" : "Enter to send"}
+                </span>
             </div>
         </form>
     );

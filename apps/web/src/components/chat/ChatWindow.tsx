@@ -284,7 +284,8 @@ export function ChatWindow() {
             <div className="border-t border-border p-4 bg-background-elevated/30 relative z-10">
                 <MessageInput
                     onSend={handleSendMessage}
-                    disabled={sending}
+                    disabled={false}
+                    canSend={!sending}
                     selectedModel={currentChat.modelId}
                     onModelChange={handleModelChange}
                     thinkingLevel={currentChat.thinking}
