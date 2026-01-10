@@ -598,7 +598,8 @@ export default function SettingsPage() {
                                 />
                                 <p className="text-sm">No skills created yet</p>
                                 <p className="text-xs mt-1 opacity-70">
-                                    Click "New Skill" to create your first skill
+                                    Click &quot;New Skill&quot; to create your
+                                    first skill
                                 </p>
                             </div>
                         ) : (

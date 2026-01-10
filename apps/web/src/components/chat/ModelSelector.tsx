@@ -28,7 +28,9 @@ export function ModelSelector({
             setTimeout(() => searchInputRef.current?.focus(), 50);
         }
         if (!isOpen) {
-            setSearchQuery("");
+            requestAnimationFrame(() => {
+                setSearchQuery("");
+            });
         }
     }, [isOpen]);
 

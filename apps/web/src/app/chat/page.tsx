@@ -12,14 +12,16 @@ export default function ChatPage() {
     // Create or select a chat on first load
     useEffect(() => {
         if (!initialized && !loading) {
-            setInitialized(true);
-            if (!currentChat) {
-                if (chats.length > 0) {
-                    selectChat(chats[0].id);
-                } else {
-                    createChat();
+            requestAnimationFrame(() => {
+                setInitialized(true);
+                if (!currentChat) {
+                    if (chats.length > 0) {
+                        selectChat(chats[0].id);
+                    } else {
+                        createChat();
+                    }
                 }
-            }
+            });
         }
     }, [initialized, currentChat, loading, chats, createChat, selectChat]);
 
