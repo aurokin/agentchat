@@ -64,7 +64,7 @@ export function MessageList({ messages, sending, loading }: MessageListProps) {
                     key={message.id}
                     message={message}
                     index={index}
-                    sending={sending && index === messages.length}
+                    sending={sending && index === messages.length - 1}
                 />
             ))}
 
