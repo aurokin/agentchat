@@ -11,7 +11,7 @@ import { SkillSelector } from "./SkillSelector";
 import type { ThinkingLevel } from "@/lib/types";
 import { ThinkingToggle } from "./ThinkingToggle";
 import { SearchToggle } from "./SearchToggle";
-import { Terminal, Cpu } from "lucide-react";
+import { Hexagon, Sparkles, AlertCircle } from "lucide-react";
 
 export function ChatWindow() {
     const {
@@ -137,37 +137,56 @@ export function ChatWindow() {
 
     if (!currentChat) {
         return (
-            <div className="flex-1 flex flex-col h-screen bg-background relative">
-                {/* Decorative background */}
-                <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                    <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
-                    <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-secondary/5 rounded-full blur-3xl" />
+            <div className="flex-1 flex flex-col h-screen bg-background relative overflow-hidden">
+                {/* Decorative elements */}
+                <div className="absolute inset-0 pointer-events-none">
+                    {/* Subtle radial gradient */}
+                    <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-radial from-primary/5 via-transparent to-transparent" />
+                    {/* Corner decorations */}
+                    <div className="absolute top-8 left-8 w-24 h-24 border-l border-t border-primary/20" />
+                    <div className="absolute bottom-8 right-8 w-24 h-24 border-r border-b border-primary/20" />
+                    {/* Grid pattern */}
+                    <div className="absolute inset-0 opacity-[0.02]" style={{
+                        backgroundImage: 'linear-gradient(var(--primary) 1px, transparent 1px), linear-gradient(90deg, var(--primary) 1px, transparent 1px)',
+                        backgroundSize: '60px 60px'
+                    }} />
                 </div>
 
                 <div className="flex-1 flex items-center justify-center relative z-10">
-                    <div className="text-center max-w-md">
-                        <div className="inline-flex items-center justify-center w-20 h-20 bg-primary mb-6 shadow-brutal">
-                            <Terminal
-                                size={40}
-                                className="text-primary-foreground"
+                    <div className="text-center max-w-lg px-6">
+                        {/* Logo */}
+                        <div className="relative inline-block mb-8">
+                            <Hexagon
+                                size={80}
+                                className="text-primary"
+                                strokeWidth={1}
                             />
+                            <span className="absolute inset-0 flex items-center justify-center text-2xl font-semibold text-primary">
+                                R
+                            </span>
                         </div>
-                        <h2 className="text-3xl font-bold mb-3">
+
+                        <h2 className="text-4xl font-light mb-3 tracking-tight">
                             Welcome to{" "}
-                            <span className="text-gradient">RouterChat</span>
+                            <span className="font-semibold text-gradient-gold">
+                                RouterChat
+                            </span>
                         </h2>
-                        <p className="text-muted-foreground mono text-sm mb-6">
-                            // Select a chat from the sidebar
-                            <br />
-                            or start a new conversation
+                        <p className="text-foreground-muted text-lg mb-8">
+                            Your gateway to AI-powered conversations
                         </p>
+
                         <button
                             onClick={() => createChat()}
-                            className="btn-brutal btn-brutal-primary"
+                            className="btn-deco btn-deco-primary text-base px-8 py-3"
                         >
-                            <Cpu size={18} />
-                            <span className="mono">START_NEW_CHAT</span>
+                            <Sparkles size={18} />
+                            <span>Start New Conversation</span>
                         </button>
+
+                        <p className="mt-6 text-sm text-muted-foreground">
+                            Or select an existing conversation from the sidebar
+                        </p>
                     </div>
                 </div>
             </div>
@@ -175,18 +194,18 @@ export function ChatWindow() {
     }
 
     return (
-        <div className="flex-1 flex flex-col h-screen bg-background relative">
-            {/* Decorative background */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute top-0 left-1/4 w-full h-px bg-gradient-to-r from-transparent via-primary/10 to-transparent" />
-            </div>
+        <div className="flex-1 flex flex-col h-screen bg-background relative overflow-hidden">
+            {/* Decorative top line */}
+            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
 
             {/* Header */}
-            <header className="px-6 py-4 border-b-2 border-border flex items-center justify-between gap-4 relative z-50">
+            <header className="px-6 py-4 border-b border-border bg-background-elevated/50 backdrop-blur-sm flex items-center justify-between gap-4 relative z-50">
                 <div className="flex items-center gap-4 flex-1">
-                    <div className="flex items-center gap-2 text-sm mono text-muted-foreground">
-                        <span className="text-primary">_</span>
-                        <span>MODEL</span>
+                    <div className="flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 bg-primary rounded-full" />
+                        <span className="text-xs uppercase tracking-widest text-muted-foreground font-medium">
+                            Model
+                        </span>
                     </div>
                     <ModelSelector
                         selectedModel={currentChat.modelId}
@@ -194,12 +213,9 @@ export function ChatWindow() {
                     />
                 </div>
 
-                <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-2 text-sm mono text-muted-foreground mr-2">
-                        <span className="text-primary">_</span>
-                        <span className="hidden sm:inline">SKILL</span>
-                    </div>
+                <div className="flex items-center gap-3">
                     <SkillSelector disabled={sending} />
+                    <div className="w-px h-6 bg-border" />
                     <ThinkingToggle
                         value={currentChat.thinking}
                         onChange={handleThinkingChange}
@@ -215,9 +231,10 @@ export function ChatWindow() {
 
             {/* Error message */}
             {error && (
-                <div className="px-6 py-3 bg-error/10 border-b border-error/30">
-                    <p className="text-error mono text-sm">
-                        <span className="font-bold">ERROR:</span> {error}
+                <div className="px-6 py-3 bg-error/5 border-b border-error/20 flex items-center gap-3">
+                    <AlertCircle size={16} className="text-error flex-shrink-0" />
+                    <p className="text-error text-sm">
+                        {error}
                     </p>
                 </div>
             )}
@@ -228,7 +245,7 @@ export function ChatWindow() {
             </div>
 
             {/* Input */}
-            <div className="border-t-2 border-border p-4 relative z-10">
+            <div className="border-t border-border p-4 bg-background-elevated/30 relative z-10">
                 <MessageInput onSend={handleSendMessage} disabled={sending} />
             </div>
         </div>

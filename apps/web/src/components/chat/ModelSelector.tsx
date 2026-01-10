@@ -89,39 +89,50 @@ export function ModelSelector({
                 onClick={() => setIsOpen(!isOpen)}
                 disabled={loadingModels}
                 className={cn(
-                    "flex items-center gap-2 px-3 py-2 bg-muted border-2 border-border transition-all duration-150",
-                    "hover:border-primary hover:bg-muted/80",
+                    "flex items-center gap-2.5 px-4 py-2.5 bg-background-elevated border border-border transition-all duration-200",
+                    "hover:border-primary/30 hover:bg-muted/50",
+                    isOpen && "border-primary/50",
                     loadingModels && "opacity-50 cursor-not-allowed",
                 )}
             >
                 {loadingModels ? (
-                    <Loader2 size={16} className="animate-spin text-primary" />
+                    <Loader2 size={14} className="animate-spin text-primary" />
                 ) : (
-                    <Cpu size={16} className="text-primary" />
+                    <Cpu size={14} className="text-primary" />
                 )}
                 <span className="text-sm font-medium max-w-48 truncate">
                     {selectedModel.split("/").pop() || selectedModel}
                 </span>
-                <ChevronDown size={14} className="text-muted-foreground" />
+                <ChevronDown
+                    size={14}
+                    className={cn(
+                        "text-muted-foreground transition-transform",
+                        isOpen && "rotate-180",
+                    )}
+                />
             </button>
 
             {isOpen && (
-                <div className="absolute z-[100] w-80 max-h-72 overflow-y-auto bg-muted border-2 border-border shadow-brutal cursor-pointer mt-1">
+                <div className="absolute z-[100] w-80 max-h-80 overflow-y-auto bg-background-elevated border border-border shadow-deco-elevated mt-2 animate-fade-in">
                     {models.length === 0 && !loadingModels && (
-                        <div className="px-3 py-4 text-center text-muted-foreground text-sm">
-                            No models available. Add an API key to fetch models.
+                        <div className="px-4 py-6 text-center text-muted-foreground text-sm">
+                            <Cpu
+                                size={24}
+                                className="mx-auto mb-2 opacity-50"
+                            />
+                            <p>No models available</p>
+                            <p className="text-xs mt-1">
+                                Add an API key to fetch models
+                            </p>
                         </div>
                     )}
 
                     {/* Favorites section */}
                     {favoriteModelList.length > 0 && (
                         <div>
-                            <div className="px-3 py-2 bg-yellow-500/10 border-b border-border">
-                                <span className="mono text-xs font-bold text-yellow-600 uppercase flex items-center gap-1">
-                                    <Star
-                                        size={12}
-                                        className="fill-yellow-500"
-                                    />
+                            <div className="px-4 py-2 bg-primary/5 border-b border-border">
+                                <span className="text-xs font-medium text-primary uppercase tracking-wider flex items-center gap-1.5">
+                                    <Star size={10} className="fill-primary" />
                                     Favorites
                                 </span>
                             </div>
@@ -131,16 +142,16 @@ export function ModelSelector({
                                     type="button"
                                     onClick={() => handleSelect(model.id)}
                                     className={cn(
-                                        "w-full text-left px-3 py-2 text-sm transition-colors hover:bg-primary/10 hover:text-primary cursor-pointer flex items-center gap-2",
+                                        "w-full text-left px-4 py-2.5 text-sm transition-all duration-150 hover:bg-primary/5 cursor-pointer flex items-center gap-2.5",
                                         model.id === selectedModel &&
-                                            "bg-primary/20 text-primary",
+                                            "bg-primary/10 border-l-2 border-primary",
                                     )}
                                 >
                                     <Star
-                                        size={14}
-                                        className="text-yellow-500 fill-yellow-500 flex-shrink-0"
+                                        size={12}
+                                        className="text-primary fill-primary flex-shrink-0"
                                     />
-                                    <span className="truncate">
+                                    <span className="truncate text-foreground">
                                         {model.name}
                                     </span>
                                 </button>
@@ -152,8 +163,8 @@ export function ModelSelector({
                     {Object.entries(groupedModels).map(
                         ([provider, providerModels]) => (
                             <div key={provider}>
-                                <div className="px-3 py-2 bg-primary/5 border-b border-border">
-                                    <span className="mono text-xs font-bold text-primary uppercase">
+                                <div className="px-4 py-2 bg-muted/50 border-b border-border">
+                                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                                         {provider}
                                     </span>
                                 </div>
@@ -163,9 +174,9 @@ export function ModelSelector({
                                         type="button"
                                         onClick={() => handleSelect(model.id)}
                                         className={cn(
-                                            "w-full text-left px-3 py-2 text-sm transition-colors hover:bg-primary/10 hover:text-primary cursor-pointer flex items-center gap-2",
+                                            "w-full text-left px-4 py-2.5 text-sm transition-all duration-150 hover:bg-primary/5 cursor-pointer flex items-center gap-2.5 group",
                                             model.id === selectedModel &&
-                                                "bg-primary/20 text-primary",
+                                                "bg-primary/10 border-l-2 border-primary",
                                         )}
                                     >
                                         <div
@@ -184,7 +195,7 @@ export function ModelSelector({
                                                     model.id,
                                                 )
                                             }
-                                            className="p-0.5 hover:bg-muted rounded transition-colors cursor-pointer"
+                                            className="p-1 hover:bg-muted rounded-sm transition-colors cursor-pointer"
                                             title={
                                                 favoriteModels.includes(
                                                     model.id,
@@ -194,18 +205,18 @@ export function ModelSelector({
                                             }
                                         >
                                             <Star
-                                                size={14}
+                                                size={12}
                                                 className={cn(
-                                                    "flex-shrink-0",
+                                                    "flex-shrink-0 transition-colors",
                                                     favoriteModels.includes(
                                                         model.id,
                                                     )
-                                                        ? "text-yellow-500 fill-yellow-500"
-                                                        : "text-muted-foreground",
+                                                        ? "text-primary fill-primary"
+                                                        : "text-muted-foreground group-hover:text-primary/50",
                                                 )}
                                             />
                                         </div>
-                                        <span className="truncate">
+                                        <span className="truncate text-foreground">
                                             {model.name}
                                         </span>
                                     </button>

@@ -8,7 +8,7 @@ import {
     User,
     Bot,
     Brain,
-    Terminal,
+    MessageCircle,
     Copy,
     Check,
     Sparkles,
@@ -33,13 +33,15 @@ export function MessageList({ messages, sending }: MessageListProps) {
         return (
             <div className="flex items-center justify-center h-full">
                 <div className="text-center">
-                    <div className="inline-flex items-center justify-center w-16 h-16 bg-muted mb-4 border-2 border-border">
-                        <Terminal size={28} className="text-muted-foreground" />
+                    <div className="inline-flex items-center justify-center w-16 h-16 mb-4 border border-border-accent rounded-full">
+                        <MessageCircle
+                            size={28}
+                            className="text-primary opacity-50"
+                        />
                     </div>
-                    <p className="text-muted-foreground mono text-sm">
-                        // No messages yet.
-                        <br />
-                        Start a conversation!
+                    <p className="text-foreground-muted">No messages yet</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                        Start the conversation below
                     </p>
                 </div>
             </div>
@@ -47,7 +49,7 @@ export function MessageList({ messages, sending }: MessageListProps) {
     }
 
     return (
-        <div className="max-w-4xl mx-auto p-6 space-y-6">
+        <div className="max-w-4xl mx-auto p-6 space-y-8">
             {messages.map((message, index) => (
                 <MessageItem
                     key={message.id}
@@ -73,7 +75,6 @@ function MessageItem({
     sending?: boolean;
 }) {
     const isUser = message.role === "user";
-    const isAssistant = message.role === "assistant";
     const [copied, setCopied] = useState(false);
     const [showSkill, setShowSkill] = useState(false);
 
@@ -95,25 +96,32 @@ function MessageItem({
     return (
         <div
             className={cn(
-                "flex gap-4 animate-slide-in",
+                "flex gap-4 animate-fade-slide-in",
                 isUser ? "flex-row-reverse" : "flex-row",
             )}
-            style={{ animationDelay: `${index * 50}ms` }}
+            style={{ animationDelay: `${index * 30}ms` }}
         >
             {/* Avatar */}
             <div
                 className={cn(
-                    "w-10 h-10 rounded-none flex items-center justify-center flex-shrink-0 border-2",
+                    "w-10 h-10 flex items-center justify-center flex-shrink-0 relative",
                     isUser
-                        ? "bg-primary border-primary"
-                        : "bg-secondary border-border",
+                        ? "bg-gradient-to-br from-primary to-primary/70"
+                        : "bg-background-elevated border border-border",
                 )}
             >
                 {isUser ? (
-                    <User size={20} className="text-primary-foreground" />
+                    <User size={18} className="text-primary-foreground" />
                 ) : (
-                    <Bot size={20} className="text-secondary-foreground" />
+                    <Bot size={18} className="text-accent" />
                 )}
+                {/* Decorative corner */}
+                <div
+                    className={cn(
+                        "absolute -bottom-px -right-px w-2 h-2",
+                        isUser ? "bg-primary/50" : "bg-border",
+                    )}
+                />
             </div>
 
             <div
@@ -132,29 +140,29 @@ function MessageItem({
                     <span
                         className={cn(
                             "font-medium text-sm",
-                            isUser ? "text-primary" : "text-secondary",
+                            isUser ? "text-primary" : "text-accent",
                         )}
                     >
                         {isUser ? "You" : "Assistant"}
                     </span>
-                    <span className="mono text-xs text-muted-foreground">
-                        // {isUser ? "USER" : "AI"}
+                    <span className="text-xs text-muted-foreground">
+                        {format(message.createdAt, "h:mm a")}
                     </span>
                 </div>
 
-                <div className="inline-block max-w-[85%] relative group">
+                <div className="inline-block max-w-[90%] relative group">
                     {/* Copy button */}
                     {message.content && navigator.clipboard && (
                         <button
                             onClick={copyToClipboard}
-                            className="absolute top-2 right-2 p-1.5 rounded-md bg-background/80 border border-border opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted z-10"
+                            className="absolute top-3 right-3 p-1.5 bg-background/90 border border-border opacity-0 group-hover:opacity-100 transition-all duration-200 hover:border-primary/30 z-10"
                             title="Copy to clipboard"
                         >
                             {copied ? (
-                                <Check size={14} className="text-green-500" />
+                                <Check size={12} className="text-success" />
                             ) : (
                                 <Copy
-                                    size={14}
+                                    size={12}
                                     className="text-muted-foreground"
                                 />
                             )}
@@ -163,10 +171,13 @@ function MessageItem({
 
                     {/* Skill collapsible for first user message */}
                     {isFirstSkillMessage && skill && (
-                        <details className="mb-3 border-2 border-primary/30 bg-primary/5 rounded-md">
-                            <summary className="flex items-center gap-2 px-3 py-2 cursor-pointer select-none text-primary">
-                                <Sparkles size={14} className="mono" />
-                                <span className="font-medium text-sm mono">
+                        <details className="mb-3 border border-primary/20 bg-primary/5">
+                            <summary
+                                className="flex items-center gap-2 px-4 py-2.5 cursor-pointer select-none text-primary"
+                                onClick={() => setShowSkill(!showSkill)}
+                            >
+                                <Sparkles size={14} />
+                                <span className="font-medium text-sm">
                                     {skill.name}
                                 </span>
                                 {showSkill ? (
@@ -178,13 +189,13 @@ function MessageItem({
                                     />
                                 )}
                             </summary>
-                            <div className="px-3 pb-3 text-sm">
+                            <div className="px-4 pb-3 text-sm border-t border-primary/10">
                                 {skill.description && (
-                                    <p className="text-muted-foreground mb-2">
+                                    <p className="text-muted-foreground py-2">
                                         {skill.description}
                                     </p>
                                 )}
-                                <div className="p-2 bg-muted/50 border border-border rounded font-mono text-xs whitespace-pre-wrap text-muted-foreground">
+                                <div className="p-3 bg-muted/50 border border-border mono text-xs whitespace-pre-wrap text-muted-foreground max-h-40 overflow-y-auto">
                                     {skill.prompt}
                                 </div>
                             </div>
@@ -193,14 +204,14 @@ function MessageItem({
 
                     {/* Thinking content */}
                     {message.thinking && (
-                        <div className="mb-3 p-3 bg-warning/10 border-l-4 border-warning">
-                            <div className="flex items-center gap-2 text-warning mb-1">
-                                <Brain size={14} className="mono" />
-                                <span className="mono text-xs font-bold">
-                                    THINKING
+                        <div className="mb-3 p-4 bg-warning/5 border-l-2 border-warning">
+                            <div className="flex items-center gap-2 text-warning mb-2">
+                                <Brain size={14} />
+                                <span className="text-xs font-medium uppercase tracking-wider">
+                                    Thinking
                                 </span>
                             </div>
-                            <p className="text-warning/80 text-sm whitespace-pre-wrap font-mono">
+                            <p className="text-warning/80 text-sm whitespace-pre-wrap mono leading-relaxed">
                                 {message.thinking}
                             </p>
                         </div>
@@ -209,45 +220,29 @@ function MessageItem({
                     {/* Main content */}
                     <div
                         className={cn(
-                            "p-4 border-2 prose prose-sm dark:prose-invert max-w-none",
+                            "p-5 prose prose-sm dark:prose-invert max-w-none",
                             isUser
-                                ? "bg-primary/10 border-primary/30 text-foreground"
-                                : "bg-muted border-border text-foreground prose-pre:bg-background prose-pre:border prose-pre:border-border",
+                                ? "bg-primary/10 border border-primary/20"
+                                : "bg-background-elevated border border-border prose-headings:text-foreground prose-p:text-foreground prose-pre:bg-muted prose-pre:border prose-pre:border-border prose-code:text-primary",
                         )}
                     >
                         {sending ? (
-                            <div className="flex items-center justify-end gap-2 text-muted-foreground">
-                                <div className="flex gap-1">
-                                    <span
-                                        className="typing-dot w-2 h-2 bg-muted-foreground rounded-sm animate-bounce"
-                                        style={{ animationDelay: "0ms" }}
-                                    />
-                                    <span
-                                        className="typing-dot w-2 h-2 bg-muted-foreground rounded-sm animate-bounce"
-                                        style={{ animationDelay: "150ms" }}
-                                    />
-                                    <span
-                                        className="typing-dot w-2 h-2 bg-muted-foreground rounded-sm animate-bounce"
-                                        style={{ animationDelay: "300ms" }}
-                                    />
+                            <div className="flex items-center gap-3 text-muted-foreground">
+                                <div className="typing-indicator flex gap-1">
+                                    <span />
+                                    <span />
+                                    <span />
                                 </div>
-                                <span className="mono text-sm">
-                                    // thinking
-                                </span>
+                                <span className="text-sm">Generating...</span>
                             </div>
                         ) : message.content ? (
                             <ReactMarkdown>{message.content}</ReactMarkdown>
                         ) : (
-                            <span className="text-muted-foreground mono italic">
+                            <span className="text-muted-foreground italic">
                                 ...
                             </span>
                         )}
                     </div>
-
-                    {/* Timestamp */}
-                    <p className="mono text-xs text-muted-foreground mt-2">
-                        {format(message.createdAt, "HH:mm:ss")}
-                    </p>
                 </div>
             </div>
         </div>

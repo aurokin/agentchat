@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Send, CornerDownLeft } from "lucide-react";
+import { Send, Command } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface MessageInputProps {
@@ -42,42 +42,53 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
 
     return (
         <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
-            <div className="relative">
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">
-                    <CornerDownLeft size={16} />
-                </div>
+            <div className="relative group">
+                {/* Decorative accent line */}
+                <div className="absolute -top-px left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent opacity-0 group-focus-within:opacity-100 transition-opacity" />
+
                 <textarea
                     ref={textareaRef}
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder="Type a message... (Enter to send, Shift+Enter for new line)"
+                    placeholder="Send a message..."
                     disabled={disabled}
                     className={cn(
-                        "w-full pl-12 pr-14 py-4 bg-muted border-2 border-border text-foreground transition-all duration-150 resize-none focus:outline-none disabled:bg-muted/50 disabled:cursor-not-allowed",
-                        "focus:border-primary focus:shadow-brutal-sm",
+                        "w-full px-5 py-4 pr-14 bg-background-elevated border border-border text-foreground transition-all duration-200 resize-none focus:outline-none",
+                        "focus:border-primary/50 focus:shadow-deco",
+                        "placeholder:text-muted-foreground",
+                        disabled && "opacity-50 cursor-not-allowed",
                     )}
                     rows={1}
                 />
+
                 <button
                     type="submit"
                     disabled={!content.trim() || disabled}
                     className={cn(
-                        "absolute right-3 top-1/2 -translate-y-1/2 p-2 transition-all duration-150",
+                        "absolute right-3 top-1/2 -translate-y-1/2 p-2.5 transition-all duration-200",
                         content.trim() && !disabled
-                            ? "bg-primary text-primary-foreground hover:bg-primary/90 hover:translate-x-0.5"
-                            : "bg-border text-muted-foreground cursor-not-allowed",
+                            ? "bg-primary text-primary-foreground hover:shadow-deco-glow"
+                            : "bg-muted text-muted-foreground cursor-not-allowed",
                     )}
                 >
-                    <Send size={18} />
+                    <Send
+                        size={16}
+                        className={cn(
+                            "transition-transform",
+                            content.trim() && !disabled && "group-hover:translate-x-0.5",
+                        )}
+                    />
                 </button>
             </div>
-            <div className="flex items-center justify-between mt-2 px-2">
-                <span className="mono text-xs text-muted-foreground">
-                    // Shift+Enter for new line
-                </span>
-                <span className="mono text-xs text-muted-foreground">
-                    Enter to send
+
+            <div className="flex items-center justify-between mt-2 px-1">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Command size={12} />
+                    <span>+ Shift + Enter for new line</span>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                    Press Enter to send
                 </span>
             </div>
         </form>

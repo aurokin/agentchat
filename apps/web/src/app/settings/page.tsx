@@ -17,8 +17,7 @@ import {
     Check,
     X,
     Loader2,
-    Terminal,
-    Info,
+    Shield,
     ExternalLink,
     Brain,
     Globe,
@@ -26,8 +25,9 @@ import {
     Plus,
     Edit2,
     Trash2,
-    ChevronDown,
-    ChevronUp,
+    Cpu,
+    Info,
+    Hexagon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -157,48 +157,61 @@ export default function SettingsPage() {
             <main className="flex-1 overflow-y-auto bg-background relative">
                 {/* Decorative background */}
                 <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                    <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
+                    <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-gradient-radial from-primary/8 via-primary/3 to-transparent" />
+                    <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-gradient-radial from-accent/5 via-transparent to-transparent" />
+                    {/* Geometric corner accents */}
+                    <div className="absolute top-8 left-8 w-20 h-20 border-l border-t border-primary/20" />
+                    <div className="absolute bottom-8 right-8 w-20 h-20 border-r border-b border-primary/20" />
                 </div>
 
                 <div className="max-w-2xl mx-auto p-8 relative z-10">
                     {/* Header */}
-                    <div className="mb-8">
-                        <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
-                            <div className="w-10 h-10 bg-primary flex items-center justify-center shadow-brutal-sm">
+                    <div className="mb-10">
+                        <div className="flex items-center gap-4 mb-3">
+                            <div className="relative">
+                                <Hexagon
+                                    size={48}
+                                    className="text-primary"
+                                    strokeWidth={1}
+                                />
                                 <Settings
-                                    size={22}
-                                    className="text-primary-foreground"
+                                    size={20}
+                                    className="absolute inset-0 m-auto text-primary"
                                 />
                             </div>
-                            <span>Settings</span>
-                        </h1>
-                        <p className="text-muted-foreground mono text-sm">
-                            // Configure your preferences
-                        </p>
+                            <div>
+                                <h1 className="text-3xl font-light tracking-tight">
+                                    Settings
+                                </h1>
+                                <p className="text-muted-foreground text-sm">
+                                    Configure your preferences
+                                </p>
+                            </div>
+                        </div>
+                        <div className="h-px bg-gradient-to-r from-primary/30 via-primary/10 to-transparent" />
                     </div>
 
                     {/* OpenRouter API Key */}
-                    <section className="card-brutal mb-6">
-                        <div className="flex items-center gap-2 mb-4">
-                            <Key size={20} className="text-primary" />
-                            <h2 className="text-lg font-semibold">
+                    <section className="card-deco mb-6">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-8 h-8 bg-primary/10 flex items-center justify-center">
+                                <Key size={16} className="text-primary" />
+                            </div>
+                            <h2 className="text-lg font-medium">
                                 OpenRouter API Key
                             </h2>
                         </div>
 
-                        <p className="text-sm text-muted-foreground mb-4 mono">
-                            // Enter your OpenRouter API key to enable chatting
-                            with AI models.
-                            <br />
-                            // Your key is stored locally and never sent to our
-                            servers.
+                        <p className="text-sm text-muted-foreground mb-5 leading-relaxed">
+                            Enter your OpenRouter API key to enable AI model access.
+                            Your key is stored locally and never sent to our servers.
                         </p>
 
                         <div className="space-y-4">
                             <div>
                                 <label
                                     htmlFor="apiKey"
-                                    className="label-brutal"
+                                    className="label-deco"
                                 >
                                     API Key
                                 </label>
@@ -210,79 +223,77 @@ export default function SettingsPage() {
                                         setNewApiKey(e.target.value);
                                         setValidationResult(null);
                                     }}
-                                    placeholder="sk-..."
-                                    className="input-brutal font-mono"
+                                    placeholder="sk-or-..."
+                                    className="input-deco font-mono"
                                 />
                             </div>
 
                             {apiKey && (
-                                <div className="flex items-center gap-2 text-success">
-                                    <Check size={16} />
-                                    <span className="mono text-sm font-medium">
-                                        API_KEY_SAVED
+                                <div className="flex items-center gap-2 text-success px-3 py-2 bg-success/5 border border-success/20">
+                                    <Check size={14} />
+                                    <span className="text-sm font-medium">
+                                        API key saved
                                     </span>
                                 </div>
                             )}
 
-                            <div className="flex flex-wrap gap-2">
+                            <div className="flex flex-wrap gap-3">
                                 <button
                                     onClick={handleValidate}
                                     disabled={validating || !newApiKey.trim()}
-                                    className="btn-brutal btn-brutal-secondary"
+                                    className="btn-deco btn-deco-secondary"
                                 >
                                     {validating ? (
                                         <Loader2
-                                            size={16}
+                                            size={14}
                                             className="animate-spin"
                                         />
                                     ) : (
-                                        <Terminal size={16} />
+                                        <Shield size={14} />
                                     )}
-                                    <span className="mono text-sm">
-                                        VALIDATE
-                                    </span>
+                                    <span className="text-sm">Validate</span>
                                 </button>
 
                                 <button
                                     onClick={handleSave}
                                     disabled={saving}
-                                    className="btn-brutal btn-brutal-primary"
+                                    className="btn-deco btn-deco-primary"
                                 >
-                                    <span className="mono text-sm">
-                                        {saving ? "SAVING..." : "SAVE_KEY"}
+                                    <span className="text-sm">
+                                        {saving ? "Saving..." : "Save Key"}
                                     </span>
                                 </button>
 
                                 {apiKey && (
                                     <button
                                         onClick={handleClear}
-                                        className="px-4 py-2.5 text-error border-2 border-error hover:bg-error/10 transition-colors mono text-sm"
+                                        className="px-4 py-2 text-error border border-error/30 hover:bg-error/10 transition-colors text-sm"
                                     >
-                                        CLEAR
+                                        Clear
                                     </button>
                                 )}
                             </div>
 
                             {validationResult === true && (
-                                <div className="flex items-center gap-2 text-success">
-                                    <Check size={16} />
-                                    <span className="mono text-sm font-medium">
-                                        // VALID_API_KEY
+                                <div className="flex items-center gap-2 text-success px-3 py-2 bg-success/5 border border-success/20">
+                                    <Check size={14} />
+                                    <span className="text-sm font-medium">
+                                        Valid API key
                                     </span>
                                 </div>
                             )}
 
                             {validationResult === false && (
-                                <div className="flex items-center gap-2 text-error">
-                                    <X size={16} />
-                                    <span className="mono text-sm font-medium">
-                                        // INVALID_API_KEY
+                                <div className="flex items-center gap-2 text-error px-3 py-2 bg-error/5 border border-error/20">
+                                    <X size={14} />
+                                    <span className="text-sm font-medium">
+                                        Invalid API key
                                     </span>
                                 </div>
                             )}
 
-                            <div className="flex items-center gap-2 text-muted-foreground text-sm p-3 bg-muted border border-border">
-                                <ExternalLink size={14} />
+                            <div className="flex items-center gap-2 text-muted-foreground text-sm p-3 bg-muted/30 border border-border">
+                                <ExternalLink size={14} className="flex-shrink-0" />
                                 <span>
                                     Get your API key from{" "}
                                     <a
@@ -299,94 +310,96 @@ export default function SettingsPage() {
                     </section>
 
                     {/* Theme */}
-                    <section className="card-brutal mb-6">
-                        <div className="flex items-center gap-2 mb-4">
-                            <Sun size={20} className="text-warning" />
-                            <h2 className="text-lg font-semibold">Theme</h2>
+                    <section className="card-deco mb-6">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-8 h-8 bg-warning/10 flex items-center justify-center">
+                                <Sun size={16} className="text-warning" />
+                            </div>
+                            <h2 className="text-lg font-medium">Theme</h2>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-3 gap-3">
                             <button
                                 onClick={() => setTheme("light")}
                                 className={cn(
-                                    "p-4 border-2 flex flex-col items-center gap-2 transition-all duration-150",
+                                    "p-4 border flex flex-col items-center gap-2 transition-all duration-200",
                                     theme === "light"
-                                        ? "border-primary bg-primary/10"
-                                        : "border-border hover:border-primary/50",
+                                        ? "border-primary bg-primary/10 shadow-deco"
+                                        : "border-border hover:border-primary/40 bg-background-elevated",
                                 )}
                             >
                                 <Sun
-                                    size={24}
+                                    size={22}
                                     className={
                                         theme === "light"
                                             ? "text-primary"
                                             : "text-muted-foreground"
                                     }
                                 />
-                                <span className="mono text-xs">LIGHT</span>
+                                <span className="text-xs font-medium">Light</span>
                             </button>
 
                             <button
                                 onClick={() => setTheme("dark")}
                                 className={cn(
-                                    "p-4 border-2 flex flex-col items-center gap-2 transition-all duration-150",
+                                    "p-4 border flex flex-col items-center gap-2 transition-all duration-200",
                                     theme === "dark"
-                                        ? "border-primary bg-primary/10"
-                                        : "border-border hover:border-primary/50",
+                                        ? "border-primary bg-primary/10 shadow-deco"
+                                        : "border-border hover:border-primary/40 bg-background-elevated",
                                 )}
                             >
                                 <Moon
-                                    size={24}
+                                    size={22}
                                     className={
                                         theme === "dark"
                                             ? "text-primary"
                                             : "text-muted-foreground"
                                     }
                                 />
-                                <span className="mono text-xs">DARK</span>
+                                <span className="text-xs font-medium">Dark</span>
                             </button>
 
                             <button
                                 onClick={() => setTheme("system")}
                                 className={cn(
-                                    "p-4 border-2 flex flex-col items-center gap-2 transition-all duration-150",
+                                    "p-4 border flex flex-col items-center gap-2 transition-all duration-200",
                                     theme === "system"
-                                        ? "border-primary bg-primary/10"
-                                        : "border-border hover:border-primary/50",
+                                        ? "border-primary bg-primary/10 shadow-deco"
+                                        : "border-border hover:border-primary/40 bg-background-elevated",
                                 )}
                             >
                                 <Monitor
-                                    size={24}
+                                    size={22}
                                     className={
                                         theme === "system"
                                             ? "text-primary"
                                             : "text-muted-foreground"
                                     }
                                 />
-                                <span className="mono text-xs">SYSTEM</span>
+                                <span className="text-xs font-medium">System</span>
                             </button>
                         </div>
                     </section>
 
                     {/* Default Model */}
-                    <section className="card-brutal mb-6">
-                        <div className="flex items-center gap-2 mb-4">
-                            <Settings size={20} className="text-primary" />
-                            <h2 className="text-lg font-semibold">
+                    <section className="card-deco mb-6">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-8 h-8 bg-primary/10 flex items-center justify-center">
+                                <Cpu size={16} className="text-primary" />
+                            </div>
+                            <h2 className="text-lg font-medium">
                                 Default Model
                             </h2>
                         </div>
-                        <p className="text-sm text-muted-foreground mb-4 mono">
-                            // Set the default model for new chats
-                            <br />
-                            // This can be changed per-chat in the chat window
+                        <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
+                            Set the default model for new conversations. This can be changed per-chat.
                         </p>
                         <div>
                             <label
                                 htmlFor="defaultModel"
-                                className="label-brutal"
+                                className="label-deco"
                             >
-                                Default Model ID
+                                Model ID
                             </label>
                             <input
                                 id="defaultModel"
@@ -395,24 +408,24 @@ export default function SettingsPage() {
                                 onChange={(e) =>
                                     setDefaultModel(e.target.value)
                                 }
-                                placeholder="minimax/minimax-m2.1"
-                                className="input-brutal font-mono"
+                                placeholder="e.g., anthropic/claude-3.5-sonnet"
+                                className="input-deco font-mono"
                             />
                         </div>
                     </section>
 
                     {/* Default Thinking Level */}
-                    <section className="card-brutal mb-6">
-                        <div className="flex items-center gap-2 mb-4">
-                            <Brain size={20} className="text-warning" />
-                            <h2 className="text-lg font-semibold">
+                    <section className="card-deco mb-6">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-8 h-8 bg-warning/10 flex items-center justify-center">
+                                <Brain size={16} className="text-warning" />
+                            </div>
+                            <h2 className="text-lg font-medium">
                                 Default Thinking Level
                             </h2>
                         </div>
-                        <p className="text-sm text-muted-foreground mb-4 mono">
-                            // Set the default thinking level for new chats
-                            <br />
-                            // This can be changed per-chat in the chat window
+                        <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
+                            Set the default thinking level for new conversations.
                         </p>
                         <div className="flex items-center gap-4">
                             <ThinkingToggle
@@ -421,35 +434,35 @@ export default function SettingsPage() {
                                     setDefaultThinking(value as ThinkingLevel)
                                 }
                             />
-                            <span className="mono text-sm text-muted-foreground">
+                            <span className="text-sm text-muted-foreground">
                                 {defaultThinking === "none" &&
-                                    "// Thinking disabled by default"}
+                                    "Thinking disabled"}
                                 {defaultThinking === "minimal" &&
-                                    "// Minimal thinking effort"}
+                                    "Minimal thinking"}
                                 {defaultThinking === "low" &&
-                                    "// Low thinking effort"}
+                                    "Low thinking effort"}
                                 {defaultThinking === "medium" &&
-                                    "// Medium thinking effort"}
+                                    "Medium thinking effort"}
                                 {defaultThinking === "high" &&
-                                    "// High thinking effort"}
+                                    "High thinking effort"}
                                 {defaultThinking === "xhigh" &&
-                                    "// Maximum thinking effort"}
+                                    "Extended thinking"}
                             </span>
                         </div>
                     </section>
 
                     {/* Default Search */}
-                    <section className="card-brutal mb-6">
-                        <div className="flex items-center gap-2 mb-4">
-                            <Globe size={20} className="text-secondary" />
-                            <h2 className="text-lg font-semibold">
-                                Default Search
+                    <section className="card-deco mb-6">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-8 h-8 bg-accent/10 flex items-center justify-center">
+                                <Globe size={16} className="text-accent" />
+                            </div>
+                            <h2 className="text-lg font-medium">
+                                Default Web Search
                             </h2>
                         </div>
-                        <p className="text-sm text-muted-foreground mb-4 mono">
-                            // Enable web search by default for new chats
-                            <br />
-                            // This can be changed per-chat in the chat window
+                        <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
+                            Enable web search by default for new conversations.
                         </p>
                         <div className="flex items-center gap-4">
                             <SearchToggle
@@ -458,51 +471,50 @@ export default function SettingsPage() {
                                     setDefaultSearchEnabled(enabled)
                                 }
                             />
-                            <span className="mono text-sm text-muted-foreground">
+                            <span className="text-sm text-muted-foreground">
                                 {defaultSearchEnabled
-                                    ? "// Search enabled by default"
-                                    : "// Search disabled by default"}
+                                    ? "Search enabled by default"
+                                    : "Search disabled by default"}
                             </span>
                         </div>
                     </section>
 
                     {/* Skills */}
-                    <section className="card-brutal mb-6">
+                    <section className="card-deco mb-6">
                         <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-2">
-                                <Book size={20} className="text-primary" />
-                                <h2 className="text-lg font-semibold">
+                            <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 bg-primary/10 flex items-center justify-center">
+                                    <Book size={16} className="text-primary" />
+                                </div>
+                                <h2 className="text-lg font-medium">
                                     Skills
                                 </h2>
                             </div>
                             <button
                                 onClick={openNewSkillForm}
-                                className="btn-brutal btn-brutal-primary flex items-center gap-2"
+                                className="btn-deco btn-deco-primary flex items-center gap-2"
                             >
-                                <Plus size={16} />
-                                <span className="mono text-sm">NEW_SKILL</span>
+                                <Plus size={14} />
+                                <span className="text-sm">New Skill</span>
                             </button>
                         </div>
-                        <p className="text-sm text-muted-foreground mb-4 mono">
-                            // Create reusable prompt templates
-                            <br />
-                            // Skills are prepended to your messages when
-                            selected
+                        <p className="text-sm text-muted-foreground mb-5 leading-relaxed">
+                            Create reusable prompt templates that are prepended to your messages when selected.
                         </p>
 
                         {/* Skill Form */}
                         {showSkillForm && (
-                            <div className="mb-6 p-4 border-2 border-primary bg-primary/5">
-                                <h3 className="font-semibold mb-4 mono text-sm">
+                            <div className="mb-6 p-5 border border-primary/30 bg-primary/5">
+                                <h3 className="font-medium mb-4 text-primary">
                                     {editingSkillId
-                                        ? "// EDIT_SKILL"
-                                        : "// NEW_SKILL"}
+                                        ? "Edit Skill"
+                                        : "New Skill"}
                                 </h3>
                                 <div className="space-y-4">
                                     <div>
                                         <label
                                             htmlFor="skillName"
-                                            className="label-brutal"
+                                            className="label-deco"
                                         >
                                             Name
                                         </label>
@@ -514,15 +526,15 @@ export default function SettingsPage() {
                                                 setSkillName(e.target.value)
                                             }
                                             placeholder="e.g., Code Reviewer"
-                                            className="input-brutal"
+                                            className="input-deco"
                                         />
                                     </div>
                                     <div>
                                         <label
                                             htmlFor="skillDescription"
-                                            className="label-brutal"
+                                            className="label-deco"
                                         >
-                                            Description
+                                            Description (optional)
                                         </label>
                                         <input
                                             id="skillDescription"
@@ -534,13 +546,13 @@ export default function SettingsPage() {
                                                 )
                                             }
                                             placeholder="e.g., Expert at reviewing code for bugs"
-                                            className="input-brutal"
+                                            className="input-deco"
                                         />
                                     </div>
                                     <div>
                                         <label
                                             htmlFor="skillPrompt"
-                                            className="label-brutal"
+                                            className="label-deco"
                                         >
                                             Prompt
                                         </label>
@@ -551,30 +563,30 @@ export default function SettingsPage() {
                                                 setSkillPrompt(e.target.value)
                                             }
                                             placeholder="You are an expert code reviewer..."
-                                            className="input-brutal min-h-[120px] resize-y"
+                                            className="input-deco min-h-[120px] resize-y"
                                         />
                                     </div>
-                                    <div className="flex gap-2">
+                                    <div className="flex gap-3">
                                         <button
                                             onClick={handleSaveSkill}
                                             disabled={
                                                 !skillName.trim() ||
                                                 !skillPrompt.trim()
                                             }
-                                            className="btn-brutal btn-brutal-primary"
+                                            className="btn-deco btn-deco-primary"
                                         >
-                                            <span className="mono text-sm">
+                                            <span className="text-sm">
                                                 {editingSkillId
-                                                    ? "UPDATE"
-                                                    : "CREATE"}
+                                                    ? "Update"
+                                                    : "Create"}
                                             </span>
                                         </button>
                                         <button
                                             onClick={closeSkillForm}
-                                            className="btn-brutal btn-brutal-secondary"
+                                            className="btn-deco btn-deco-secondary"
                                         >
-                                            <span className="mono text-sm">
-                                                CANCEL
+                                            <span className="text-sm">
+                                                Cancel
                                             </span>
                                         </button>
                                     </div>
@@ -584,16 +596,16 @@ export default function SettingsPage() {
 
                         {/* Skills List */}
                         {skills.length === 0 ? (
-                            <div className="text-center py-8 text-muted-foreground">
+                            <div className="text-center py-10 text-muted-foreground border border-dashed border-border bg-muted/20">
                                 <Book
-                                    size={40}
-                                    className="mx-auto mb-3 opacity-50"
+                                    size={36}
+                                    className="mx-auto mb-3 opacity-40"
                                 />
-                                <p className="mono text-sm">
-                                    // No skills created yet
+                                <p className="text-sm">
+                                    No skills created yet
                                 </p>
-                                <p className="mono text-xs mt-1">
-                                    Click "NEW_SKILL" to create your first skill
+                                <p className="text-xs mt-1 opacity-70">
+                                    Click "New Skill" to create your first skill
                                 </p>
                             </div>
                         ) : (
@@ -601,11 +613,11 @@ export default function SettingsPage() {
                                 {skills.map((skill) => (
                                     <div
                                         key={skill.id}
-                                        className="p-4 border-2 border-border bg-muted/50 hover:border-primary/50 transition-colors"
+                                        className="p-4 border border-border bg-background-elevated hover:border-primary/30 transition-all duration-200 group"
                                     >
                                         <div className="flex items-start justify-between gap-4">
                                             <div className="flex-1 min-w-0">
-                                                <h4 className="font-semibold truncate">
+                                                <h4 className="font-medium truncate text-foreground">
                                                     {skill.name}
                                                 </h4>
                                                 {skill.description && (
@@ -613,19 +625,19 @@ export default function SettingsPage() {
                                                         {skill.description}
                                                     </p>
                                                 )}
-                                                <p className="text-xs text-muted-foreground mono mt-2 line-clamp-2">
+                                                <p className="text-xs text-muted-foreground/70 mt-2 line-clamp-2 font-mono">
                                                     {skill.prompt}
                                                 </p>
                                             </div>
-                                            <div className="flex items-center gap-2 flex-shrink-0">
+                                            <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <button
                                                     onClick={() =>
                                                         openEditSkillForm(skill)
                                                     }
-                                                    className="p-2 hover:bg-muted border-2 border-transparent hover:border-border transition-colors"
+                                                    className="p-2 hover:bg-muted border border-transparent hover:border-border transition-colors"
                                                     title="Edit"
                                                 >
-                                                    <Edit2 size={14} />
+                                                    <Edit2 size={14} className="text-muted-foreground hover:text-foreground" />
                                                 </button>
                                                 <button
                                                     onClick={() =>
@@ -633,10 +645,10 @@ export default function SettingsPage() {
                                                             skill.id,
                                                         )
                                                     }
-                                                    className="p-2 hover:bg-error/10 border-2 border-transparent hover:border-error transition-colors text-error"
+                                                    className="p-2 hover:bg-error/10 border border-transparent hover:border-error/30 transition-colors"
                                                     title="Delete"
                                                 >
-                                                    <Trash2 size={14} />
+                                                    <Trash2 size={14} className="text-error" />
                                                 </button>
                                             </div>
                                         </div>
@@ -647,21 +659,21 @@ export default function SettingsPage() {
                     </section>
 
                     {/* About */}
-                    <section className="card-brutal">
-                        <div className="flex items-center gap-2 mb-4">
-                            <Info size={20} className="text-secondary" />
-                            <h2 className="text-lg font-semibold">About</h2>
+                    <section className="card-deco">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-8 h-8 bg-accent/10 flex items-center justify-center">
+                                <Info size={16} className="text-accent" />
+                            </div>
+                            <h2 className="text-lg font-medium">About</h2>
                         </div>
-                        <p className="text-sm text-muted-foreground mb-4 mono">
-                            // OpenRouter Chat lets you chat with AI models
-                            through OpenRouter.
-                            <br />
-                            // Your conversations are stored locally in your
-                            browser.
+                        <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
+                            RouterChat provides a unified interface for AI conversations through OpenRouter.
+                            Your data is stored locally in your browser.
                         </p>
-                        <p className="mono text-xs text-muted-foreground">
-                            VERSION 0.1.0
-                        </p>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground/70">
+                            <div className="w-1.5 h-1.5 bg-primary rounded-full" />
+                            <span>Version 0.1.0</span>
+                        </div>
                     </section>
                 </div>
             </main>
