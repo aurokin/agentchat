@@ -110,12 +110,8 @@ export function Sidebar() {
                     </div>
                 ) : (
                     <ul className="p-3 space-y-1 list-none">
-                        {chats.map((chat, index) => (
-                            <li
-                                key={chat.id}
-                                className="animate-fade-slide-in"
-                                style={{ animationDelay: `${index * 40}ms` }}
-                            >
+                        {chats.map((chat) => (
+                            <li key={chat.id}>
                                 <div
                                     onClick={() => {
                                         selectChat(chat.id);
