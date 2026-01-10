@@ -6,7 +6,7 @@ import { useSettings } from "@/contexts/SettingsContext";
 import { sendMessage } from "@/lib/openrouter";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
-import { modelSupportsSearch, type ThinkingLevel } from "@/lib/types";
+import { modelSupportsSearch, modelSupportsReasoning, type ThinkingLevel } from "@/lib/types";
 import { Hexagon, Sparkles, AlertCircle } from "lucide-react";
 
 export function ChatWindow() {
@@ -222,6 +222,7 @@ export function ChatWindow() {
                     onModelChange={handleModelChange}
                     thinkingLevel={currentChat.thinking}
                     onThinkingChange={handleThinkingChange}
+                    reasoningSupported={modelSupportsReasoning(models.find(m => m.id === currentChat.modelId))}
                     searchEnabled={currentChat.searchEnabled}
                     onSearchChange={handleSearchChange}
                     searchSupported={modelSupportsSearch(models.find(m => m.id === currentChat.modelId))}

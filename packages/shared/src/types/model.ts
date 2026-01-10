@@ -1,9 +1,13 @@
+export enum SupportedParameter {
+    Tools = "tools",
+    Reasoning = "reasoning",
+}
+
 export interface OpenRouterModel {
     id: string;
     name: string;
     provider: string;
-    thinking?: boolean;
-    search?: boolean;
+    supportedParameters?: SupportedParameter[];
 }
 
 export interface ModelResponse {

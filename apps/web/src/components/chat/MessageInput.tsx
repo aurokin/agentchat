@@ -18,6 +18,7 @@ interface MessageInputProps {
     // Thinking controls
     thinkingLevel: ThinkingLevel;
     onThinkingChange: (value: ThinkingLevel) => void;
+    reasoningSupported?: boolean;
     // Search controls
     searchEnabled: boolean;
     onSearchChange: (enabled: boolean) => void;
@@ -31,6 +32,7 @@ export function MessageInput({
     onModelChange,
     thinkingLevel,
     onThinkingChange,
+    reasoningSupported = true,
     searchEnabled,
     onSearchChange,
     searchSupported = true,
@@ -86,12 +88,14 @@ export function MessageInput({
                     {/* Spacer */}
                     <div className="flex-1" />
 
-                    {/* Thinking toggle */}
-                    <ThinkingToggle
-                        value={thinkingLevel}
-                        onChange={onThinkingChange}
-                        disabled={disabled}
-                    />
+                    {/* Thinking toggle - only show if model supports reasoning */}
+                    {reasoningSupported && (
+                        <ThinkingToggle
+                            value={thinkingLevel}
+                            onChange={onThinkingChange}
+                            disabled={disabled}
+                        />
+                    )}
 
                     {/* Search toggle */}
                     <SearchToggle

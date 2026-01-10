@@ -40,17 +40,24 @@ export interface UserSettings {
     favoriteModels: string[];
 }
 
+export enum SupportedParameter {
+    Tools = "tools",
+    Reasoning = "reasoning",
+}
+
 export interface OpenRouterModel {
     id: string;
     name: string;
     provider: string;
-    thinking?: boolean;
-    search?: boolean;
-    supportedParameters?: string[];
+    supportedParameters?: SupportedParameter[];
 }
 
 export function modelSupportsSearch(model: OpenRouterModel | undefined): boolean {
-    return model?.supportedParameters?.includes("tools") ?? false;
+    return model?.supportedParameters?.includes(SupportedParameter.Tools) ?? false;
+}
+
+export function modelSupportsReasoning(model: OpenRouterModel | undefined): boolean {
+    return model?.supportedParameters?.includes(SupportedParameter.Reasoning) ?? false;
 }
 
 export interface Skill {
