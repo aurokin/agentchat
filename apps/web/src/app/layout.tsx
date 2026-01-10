@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Outfit, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
+import "highlight.js/styles/github-dark.css";
 import { SettingsProvider } from "@/contexts/SettingsContext";
 import { ChatProvider } from "@/contexts/ChatContext";
 
