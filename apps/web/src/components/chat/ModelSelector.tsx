@@ -4,6 +4,7 @@ import React, { useRef, useEffect, useMemo, useState } from "react";
 import { ChevronDown, Loader2, Cpu, Star, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/contexts/SettingsContext";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 interface ModelSelectorProps {
     selectedModel: string;
@@ -113,7 +114,7 @@ export function ModelSelector({
         <div className="relative" ref={containerRef}>
             <button
                 type="button"
-                onClick={() => setIsOpen(!isOpen)}
+                onClick={() => !loadingModels && setIsOpen(!isOpen)}
                 disabled={loadingModels}
                 className={cn(
                     "flex items-center gap-2.5 px-4 py-2.5 bg-background-elevated border border-border transition-all duration-200",
@@ -123,20 +124,27 @@ export function ModelSelector({
                 )}
             >
                 {loadingModels ? (
-                    <Loader2 size={14} className="animate-spin text-primary" />
+                    <>
+                        <Skeleton className="w-3.5 h-3.5" />
+                        <Skeleton className="h-4 w-24" />
+                    </>
                 ) : (
-                    <Cpu size={14} className="text-primary" />
+                    <>
+                        <Cpu size={14} className="text-primary" />
+                        <span className="text-sm font-medium max-w-48 truncate">
+                            {selectedModel.split("/").pop() || selectedModel}
+                        </span>
+                    </>
                 )}
-                <span className="text-sm font-medium max-w-48 truncate">
-                    {selectedModel.split("/").pop() || selectedModel}
-                </span>
-                <ChevronDown
-                    size={14}
-                    className={cn(
-                        "text-muted-foreground transition-transform",
-                        isOpen && "rotate-180",
-                    )}
-                />
+                {!loadingModels && (
+                    <ChevronDown
+                        size={14}
+                        className={cn(
+                            "text-muted-foreground transition-transform",
+                            isOpen && "rotate-180",
+                        )}
+                    />
+                )}
             </button>
 
             {isOpen && (

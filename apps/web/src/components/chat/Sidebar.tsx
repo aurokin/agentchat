@@ -8,6 +8,7 @@ import { formatDistanceToNow } from "date-fns";
 import { Plus, Trash2, MessageSquare, Settings, Hexagon } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { ChatListSkeleton } from "./ChatListSkeleton";
 
 export function Sidebar() {
     const router = useRouter();
@@ -68,22 +69,7 @@ export function Sidebar() {
             {/* Chat list */}
             <div className="flex-1 overflow-y-auto">
                 {loading ? (
-                    <div className="p-6 text-center">
-                        <div className="inline-flex gap-1.5">
-                            <span className="w-2 h-2 bg-primary rounded-full animate-pulse-soft" />
-                            <span
-                                className="w-2 h-2 bg-primary rounded-full animate-pulse-soft"
-                                style={{ animationDelay: "0.2s" }}
-                            />
-                            <span
-                                className="w-2 h-2 bg-primary rounded-full animate-pulse-soft"
-                                style={{ animationDelay: "0.4s" }}
-                            />
-                        </div>
-                        <p className="mt-3 text-sm text-foreground-muted">
-                            Loading conversations...
-                        </p>
-                    </div>
+                    <ChatListSkeleton />
                 ) : chats.length === 0 ? (
                     <div className="p-6 text-center">
                         <div className="w-12 h-12 mx-auto mb-3 border border-border-accent rounded-full flex items-center justify-center">

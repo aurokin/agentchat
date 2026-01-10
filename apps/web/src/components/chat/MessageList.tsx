@@ -16,18 +16,24 @@ import {
     Cpu,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { MessageListSkeleton } from "./MessageListSkeleton";
 
 interface MessageListProps {
     messages: Message[];
     sending?: boolean;
+    loading?: boolean;
 }
 
-export function MessageList({ messages, sending }: MessageListProps) {
+export function MessageList({ messages, sending, loading }: MessageListProps) {
     const bottomRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages, sending]);
+
+    if (loading) {
+        return <MessageListSkeleton count={3} />;
+    }
 
     if (messages.length === 0) {
         return (
