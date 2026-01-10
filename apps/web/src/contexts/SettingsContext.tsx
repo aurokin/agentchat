@@ -48,6 +48,8 @@ const defaultSettings: UserSettings = {
 
 const SettingsContext = createContext<SettingsContextType | null>(null);
 
+const APP_DEFAULT_MODEL = "minimax/minimax-m2.1";
+
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
     const [settings, setSettings] = useState<UserSettings>(defaultSettings);
     const [models, setModels] = useState<OpenRouterModel[]>([]);
@@ -70,6 +72,31 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         try {
             const promise = fetchModels(apiKey).then((fetchedModels) => {
                 setModels(fetchedModels);
+
+                // Select appropriate default model
+                const userPreferredModel = storage.getDefaultModel();
+                const modelIds = fetchedModels.map((m) => m.id);
+
+                let selectedModelId: string | null = null;
+
+                // 1. Try user's preferred model
+                if (userPreferredModel && modelIds.includes(userPreferredModel)) {
+                    selectedModelId = userPreferredModel;
+                }
+                // 2. Try app default model
+                else if (modelIds.includes(APP_DEFAULT_MODEL)) {
+                    selectedModelId = APP_DEFAULT_MODEL;
+                }
+                // 3. Fall back to first model from API
+                else if (fetchedModels.length > 0) {
+                    selectedModelId = fetchedModels[0].id;
+                }
+
+                // Update default model if we found one
+                if (selectedModelId) {
+                    storage.setDefaultModel(selectedModelId);
+                    setSettings((prev) => ({ ...prev, defaultModel: selectedModelId }));
+                }
             });
             refreshPromiseRef.current = promise;
             await promise;

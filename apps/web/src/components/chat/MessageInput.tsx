@@ -21,6 +21,7 @@ interface MessageInputProps {
     // Search controls
     searchEnabled: boolean;
     onSearchChange: (enabled: boolean) => void;
+    searchSupported?: boolean;
 }
 
 export function MessageInput({
@@ -32,6 +33,7 @@ export function MessageInput({
     onThinkingChange,
     searchEnabled,
     onSearchChange,
+    searchSupported = true,
 }: MessageInputProps) {
     const [content, setContent] = useState("");
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -95,7 +97,7 @@ export function MessageInput({
                     <SearchToggle
                         enabled={searchEnabled}
                         onChange={onSearchChange}
-                        disabled={disabled}
+                        disabled={disabled || !searchSupported}
                     />
                 </div>
 

@@ -6,7 +6,7 @@ import { useSettings } from "@/contexts/SettingsContext";
 import { sendMessage } from "@/lib/openrouter";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
-import type { ThinkingLevel } from "@/lib/types";
+import { modelSupportsSearch, type ThinkingLevel } from "@/lib/types";
 import { Hexagon, Sparkles, AlertCircle } from "lucide-react";
 
 export function ChatWindow() {
@@ -18,7 +18,7 @@ export function ChatWindow() {
         updateChat,
         createChat,
     } = useChat();
-    const { apiKey, selectedSkill, setSelectedSkill } = useSettings();
+    const { apiKey, selectedSkill, setSelectedSkill, models } = useSettings();
     const [sending, setSending] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -224,6 +224,7 @@ export function ChatWindow() {
                     onThinkingChange={handleThinkingChange}
                     searchEnabled={currentChat.searchEnabled}
                     onSearchChange={handleSearchChange}
+                    searchSupported={modelSupportsSearch(models.find(m => m.id === currentChat.modelId))}
                 />
             </div>
         </div>

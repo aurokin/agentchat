@@ -56,10 +56,9 @@ A web application for chatting with AI models through OpenRouter. Users provide 
 #### Polish & UX
 - [ ] **Mobile responsive design** - Improve sidebar for mobile
 - [ ] **Keyboard shortcuts** - Ctrl+Enter for new line, etc.
-- [ ] **Markdown rendering** - Support code blocks, lists in messages
-- [ ] **Copy message** - Button to copy message content
+- [x] **Markdown rendering** - Support code blocks, lists in messages
+- [x] **Copy message** - Button to copy message content
 - [ ] **Export chat** - Download conversation as JSON/Markdown
-- [ ] **Edit message** - Allow editing user messages
 
 #### Testing
 - [ ] **Unit tests** - Vitest for utility functions

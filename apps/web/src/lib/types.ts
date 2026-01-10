@@ -46,6 +46,11 @@ export interface OpenRouterModel {
     provider: string;
     thinking?: boolean;
     search?: boolean;
+    supportedParameters?: string[];
+}
+
+export function modelSupportsSearch(model: OpenRouterModel | undefined): boolean {
+    return model?.supportedParameters?.includes("tools") ?? false;
 }
 
 export interface Skill {
