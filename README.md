@@ -57,7 +57,7 @@ A web application for chatting with AI models through OpenRouter. Users provide 
 
 #### Immediate (Before Production)
 
-- [ ] **Test with real OpenRouter API** - Verify model fetching and chat completion
+- [x] **Test with real OpenRouter API** - Verify model fetching and chat completion
 - [ ] **Add error handling** - Better error messages for API failures
 - [ ] **Loading states** - Add skeletons while loading models/chats
 
