@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import { Sidebar } from "@/components/chat/Sidebar";
 import { useSettings } from "@/contexts/SettingsContext";
-import { useUser } from "@clerk/nextjs";
 import { validateApiKey } from "@/lib/openrouter";
 import type { ThinkingLevel, Skill } from "@/lib/types";
 import { ThinkingToggle } from "@/components/chat/ThinkingToggle";
@@ -32,7 +31,6 @@ import {
 import { cn } from "@/lib/utils";
 
 export default function SettingsPage() {
-    const { user, isLoaded } = useUser();
     const {
         apiKey,
         setApiKey,
@@ -64,12 +62,6 @@ export default function SettingsPage() {
     const [skillDescription, setSkillDescription] = useState("");
     const [skillPrompt, setSkillPrompt] = useState("");
 
-    // Redirect if not authenticated
-    React.useEffect(() => {
-        if (isLoaded && !user) {
-            window.location.href = "/sign-in";
-        }
-    }, [isLoaded, user]);
 
     const handleValidate = async () => {
         if (!newApiKey.trim()) return;
@@ -146,10 +138,6 @@ export default function SettingsPage() {
             deleteSkill(id);
         }
     };
-
-    if (!isLoaded || !user) {
-        return null;
-    }
 
     return (
         <div className="flex h-screen">

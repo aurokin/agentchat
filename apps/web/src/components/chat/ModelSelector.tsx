@@ -113,7 +113,7 @@ export function ModelSelector({
             </button>
 
             {isOpen && (
-                <div className="absolute z-[100] w-80 max-h-80 overflow-y-auto bg-background-elevated border border-border shadow-deco-elevated mt-2 animate-fade-in">
+                <div className="absolute z-[100] w-80 max-h-80 overflow-y-auto bg-background-elevated border border-border shadow-deco-elevated bottom-full mb-2 animate-fade-in">
                     {models.length === 0 && !loadingModels && (
                         <div className="px-4 py-6 text-center text-muted-foreground text-sm">
                             <Cpu

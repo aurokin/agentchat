@@ -1,15 +1,38 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Send, Command } from "lucide-react";
+import { Send } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ModelSelector } from "./ModelSelector";
+import { SkillSelector } from "./SkillSelector";
+import { ThinkingToggle } from "./ThinkingToggle";
+import { SearchToggle } from "./SearchToggle";
+import type { ThinkingLevel } from "@/lib/types";
 
 interface MessageInputProps {
     onSend: (content: string) => void;
     disabled?: boolean;
+    // Model controls
+    selectedModel: string;
+    onModelChange: (modelId: string) => void;
+    // Thinking controls
+    thinkingLevel: ThinkingLevel;
+    onThinkingChange: (value: ThinkingLevel) => void;
+    // Search controls
+    searchEnabled: boolean;
+    onSearchChange: (enabled: boolean) => void;
 }
 
-export function MessageInput({ onSend, disabled }: MessageInputProps) {
+export function MessageInput({
+    onSend,
+    disabled,
+    selectedModel,
+    onModelChange,
+    thinkingLevel,
+    onThinkingChange,
+    searchEnabled,
+    onSearchChange,
+}: MessageInputProps) {
     const [content, setContent] = useState("");
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -42,54 +65,84 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
 
     return (
         <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
-            <div className="relative group">
-                {/* Decorative accent line */}
-                <div className="absolute -top-px left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent opacity-0 group-focus-within:opacity-100 transition-opacity" />
-
-                <textarea
-                    ref={textareaRef}
-                    value={content}
-                    onChange={(e) => setContent(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Send a message..."
-                    disabled={disabled}
-                    className={cn(
-                        "w-full px-5 py-4 pr-14 bg-background-elevated border border-border text-foreground transition-all duration-200 resize-none focus:outline-none",
-                        "focus:border-primary/50 focus:shadow-deco",
-                        "placeholder:text-muted-foreground",
-                        disabled && "opacity-50 cursor-not-allowed",
-                    )}
-                    rows={1}
-                />
-
-                <button
-                    type="submit"
-                    disabled={!content.trim() || disabled}
-                    className={cn(
-                        "absolute right-3 top-1/2 -translate-y-1/2 p-2.5 transition-all duration-200",
-                        content.trim() && !disabled
-                            ? "bg-primary text-primary-foreground hover:shadow-deco-glow"
-                            : "bg-muted text-muted-foreground cursor-not-allowed",
-                    )}
-                >
-                    <Send
-                        size={16}
-                        className={cn(
-                            "transition-transform",
-                            content.trim() && !disabled && "group-hover:translate-x-0.5",
-                        )}
+            {/* Unified input container */}
+            <div className="relative border border-border bg-background-elevated transition-all duration-200 focus-within:border-primary/40 focus-within:shadow-deco group/input">
+                {/* Controls row */}
+                <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 bg-muted/20">
+                    {/* Model selector - compact variant */}
+                    <ModelSelector
+                        selectedModel={selectedModel}
+                        onModelChange={onModelChange}
                     />
-                </button>
+
+                    {/* Vertical divider */}
+                    <div className="w-px h-5 bg-border/60" />
+
+                    {/* Skill selector */}
+                    <SkillSelector disabled={disabled} />
+
+                    {/* Spacer */}
+                    <div className="flex-1" />
+
+                    {/* Thinking toggle */}
+                    <ThinkingToggle
+                        value={thinkingLevel}
+                        onChange={onThinkingChange}
+                        disabled={disabled}
+                    />
+
+                    {/* Search toggle */}
+                    <SearchToggle
+                        enabled={searchEnabled}
+                        onChange={onSearchChange}
+                        disabled={disabled}
+                    />
+                </div>
+
+                {/* Input row */}
+                <div className="relative">
+                    <textarea
+                        ref={textareaRef}
+                        value={content}
+                        onChange={(e) => setContent(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        placeholder="Send a message..."
+                        disabled={disabled}
+                        className={cn(
+                            "w-full px-4 py-3.5 pr-14 bg-transparent text-foreground resize-none focus:outline-none",
+                            "placeholder:text-muted-foreground",
+                            disabled && "opacity-50 cursor-not-allowed",
+                        )}
+                        rows={1}
+                    />
+
+                    <button
+                        type="submit"
+                        disabled={!content.trim() || disabled}
+                        className={cn(
+                            "absolute right-3 bottom-3 p-2.5 transition-all duration-200",
+                            content.trim() && !disabled
+                                ? "bg-primary text-primary-foreground hover:shadow-deco-glow"
+                                : "bg-muted text-muted-foreground cursor-not-allowed",
+                        )}
+                    >
+                        <Send
+                            size={16}
+                            className={cn(
+                                "transition-transform",
+                                content.trim() &&
+                                    !disabled &&
+                                    "group-hover/input:translate-x-0.5",
+                            )}
+                        />
+                    </button>
+                </div>
             </div>
 
-            <div className="flex items-center justify-between mt-2 px-1">
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Command size={12} />
-                    <span>+ Shift + Enter for new line</span>
-                </div>
-                <span className="text-xs text-muted-foreground">
-                    Press Enter to send
-                </span>
+            {/* Keyboard hints */}
+            <div className="flex items-center justify-between mt-2 px-1 text-xs text-muted-foreground opacity-60">
+                <span>Shift + Enter for new line</span>
+                <span>Enter to send</span>
             </div>
         </form>
     );

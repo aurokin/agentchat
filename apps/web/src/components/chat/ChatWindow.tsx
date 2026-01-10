@@ -6,11 +6,7 @@ import { useSettings } from "@/contexts/SettingsContext";
 import { sendMessage } from "@/lib/openrouter";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
-import { ModelSelector } from "./ModelSelector";
-import { SkillSelector } from "./SkillSelector";
 import type { ThinkingLevel } from "@/lib/types";
-import { ThinkingToggle } from "./ThinkingToggle";
-import { SearchToggle } from "./SearchToggle";
 import { Hexagon, Sparkles, AlertCircle } from "lucide-react";
 
 export function ChatWindow() {
@@ -204,44 +200,11 @@ export function ChatWindow() {
             {/* Decorative top line */}
             <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
 
-            {/* Header */}
-            <header className="px-6 py-4 border-b border-border bg-background-elevated/50 backdrop-blur-sm flex items-center justify-between gap-4 relative z-50">
-                <div className="flex items-center gap-4 flex-1">
-                    <div className="flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 bg-primary rounded-full" />
-                        <span className="text-xs uppercase tracking-widest text-muted-foreground font-medium">
-                            Model
-                        </span>
-                    </div>
-                    <ModelSelector
-                        selectedModel={currentChat.modelId}
-                        onModelChange={handleModelChange}
-                    />
-                </div>
-
-                <div className="flex items-center gap-3">
-                    <SkillSelector disabled={sending} />
-                    <div className="w-px h-6 bg-border" />
-                    <ThinkingToggle
-                        value={currentChat.thinking}
-                        onChange={handleThinkingChange}
-                        disabled={sending}
-                    />
-                    <SearchToggle
-                        enabled={currentChat.searchEnabled}
-                        onChange={handleSearchChange}
-                        disabled={sending}
-                    />
-                </div>
-            </header>
-
-            {/* Error message */}
+            {/* Error message - floats at top if present */}
             {error && (
-                <div className="px-6 py-3 bg-error/5 border-b border-error/20 flex items-center gap-3">
+                <div className="px-6 py-3 bg-error/5 border-b border-error/20 flex items-center gap-3 relative z-20">
                     <AlertCircle size={16} className="text-error flex-shrink-0" />
-                    <p className="text-error text-sm">
-                        {error}
-                    </p>
+                    <p className="text-error text-sm">{error}</p>
                 </div>
             )}
 
@@ -250,9 +213,18 @@ export function ChatWindow() {
                 <MessageList messages={messages} sending={sending} />
             </div>
 
-            {/* Input */}
+            {/* Unified input bar with all controls */}
             <div className="border-t border-border p-4 bg-background-elevated/30 relative z-10">
-                <MessageInput onSend={handleSendMessage} disabled={sending} />
+                <MessageInput
+                    onSend={handleSendMessage}
+                    disabled={sending}
+                    selectedModel={currentChat.modelId}
+                    onModelChange={handleModelChange}
+                    thinkingLevel={currentChat.thinking}
+                    onThinkingChange={handleThinkingChange}
+                    searchEnabled={currentChat.searchEnabled}
+                    onSearchChange={handleSearchChange}
+                />
             </div>
         </div>
     );

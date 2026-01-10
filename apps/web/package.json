@@ -10,7 +10,6 @@
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
-        "@clerk/nextjs": "^6.0.0",
         "clsx": "^2.1.0",
         "date-fns": "^4.1.0",
         "idb": "^8.0.0",

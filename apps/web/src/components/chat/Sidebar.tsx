@@ -10,10 +10,8 @@ import {
     Trash2,
     MessageSquare,
     Settings,
-    LogOut,
     Hexagon,
 } from "lucide-react";
-import { UserButton, useUser, useAuth } from "@clerk/nextjs";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
@@ -21,9 +19,11 @@ export function Sidebar() {
     const router = useRouter();
     const { chats, loading, createChat, deleteChat, selectChat, currentChat } =
         useChat();
-    const { setApiKey, apiKey } = useSettings();
-    const { user } = useUser();
-    const { signOut } = useAuth();
+    const { apiKey } = useSettings();
+
+    const isMac =
+        typeof navigator !== "undefined" &&
+        navigator.platform.toUpperCase().indexOf("MAC") >= 0;
 
     const handleNewChat = async () => {
         await createChat();
@@ -62,6 +62,7 @@ export function Sidebar() {
                 <button
                     onClick={handleNewChat}
                     className="w-full btn-deco btn-deco-primary group"
+                    title={isMac ? "Cmd+Shift+O" : "Ctrl+Shift+O"}
                 >
                     <Plus
                         size={16}
@@ -175,58 +176,30 @@ export function Sidebar() {
             </div>
 
             {/* Footer */}
-            <div className="p-4 border-t border-border bg-muted/30">
-                <div className="flex items-center justify-between mb-3 p-3 bg-background border border-border rounded-sm">
-                    <div className="flex items-center gap-3">
-                        <UserButton
-                            appearance={{
-                                elements: {
-                                    avatarBox: "w-8 h-8 border border-primary/30",
-                                },
-                            }}
-                        />
-                        <div className="min-w-0">
-                            <span className="font-medium text-sm truncate block max-w-24 text-foreground">
-                                {user?.firstName || "User"}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                                Online
-                            </span>
-                        </div>
+            <div className="p-4 bg-muted/30 relative">
+                <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
+                <Link
+                    href="/settings"
+                    className="flex items-center gap-3 text-sm p-3 border border-border hover:border-primary/30 hover:bg-muted/50 transition-all duration-200 group"
+                >
+                    <Settings
+                        size={16}
+                        className="text-muted-foreground group-hover:text-primary transition-colors"
+                    />
+                    <span className="text-foreground-muted group-hover:text-foreground transition-colors">
+                        Settings
+                    </span>
+                </Link>
+                {!apiKey && (
+                    <div className="mt-3 p-3 bg-warning/5 border border-warning/20">
+                        <p className="text-warning text-xs font-medium">
+                            API Key Required
+                        </p>
+                        <p className="text-warning/70 text-xs mt-0.5">
+                            Add your OpenRouter API key in Settings
+                        </p>
                     </div>
-                    <button
-                        onClick={() => signOut()}
-                        className="text-muted-foreground hover:text-error transition-colors p-2 hover:bg-error/10 rounded-sm"
-                        title="Sign out"
-                    >
-                        <LogOut size={16} />
-                    </button>
-                </div>
-
-                <div className="space-y-2">
-                    <Link
-                        href="/settings"
-                        className="flex items-center gap-3 text-sm p-3 border border-border hover:border-primary/30 hover:bg-muted/50 transition-all duration-200 group"
-                    >
-                        <Settings
-                            size={16}
-                            className="text-muted-foreground group-hover:text-primary transition-colors"
-                        />
-                        <span className="text-foreground-muted group-hover:text-foreground transition-colors">
-                            Settings
-                        </span>
-                    </Link>
-                    {!apiKey && (
-                        <div className="p-3 bg-warning/5 border border-warning/20 rounded-sm">
-                            <p className="text-warning text-xs font-medium">
-                                API Key Required
-                            </p>
-                            <p className="text-warning/70 text-xs mt-0.5">
-                                Add your OpenRouter API key in Settings
-                            </p>
-                        </div>
-                    )}
-                </div>
+                )}
             </div>
 
             {/* Bottom decorative corner */}
