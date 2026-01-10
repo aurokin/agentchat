@@ -165,7 +165,7 @@ export function ModelSelector({
                                 className={cn(
                                     "w-full pl-9 pr-3 py-2 text-sm bg-muted border border-border",
                                     "placeholder:text-muted-foreground text-foreground",
-                                    "focus:outline-none focus:border-primary/50 focus:bg-background",
+                                    "focus:outline-hidden focus:border-primary/50 focus:bg-background",
                                     "transition-all duration-200",
                                 )}
                             />
@@ -285,7 +285,7 @@ export function ModelSelector({
                                                         model.id,
                                                     )
                                                 }
-                                                className="p-1 hover:bg-muted rounded-sm transition-colors cursor-pointer"
+                                                className="p-1 hover:bg-muted rounded-xs transition-colors cursor-pointer"
                                                 title={
                                                     favoriteModels.includes(
                                                         model.id,

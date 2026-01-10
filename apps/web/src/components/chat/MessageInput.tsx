@@ -111,9 +111,10 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
                             onKeyDown={handleKeyDown}
                             placeholder="Send a message..."
                             className={cn(
-                                "w-full px-4 py-3.5 pr-14 bg-transparent text-foreground resize-none focus:outline-none",
+                                "w-full px-4 py-3.5 pr-14 bg-transparent text-foreground resize-none",
                                 "placeholder:text-muted-foreground",
                             )}
+                            style={{ outline: "none", boxShadow: "none" }}
                             rows={1}
                         />
                         <button

@@ -1,6 +1,135 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+    --color-background: var(--background);
+    --color-background-elevated: var(--background-elevated);
+    --color-foreground: var(--foreground);
+    --color-foreground-muted: var(--foreground-muted);
+
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary-glow: var(--primary-glow);
+
+    --color-secondary: var(--secondary);
+    --color-secondary-foreground: var(--secondary-foreground);
+
+    --color-accent: var(--accent);
+    --color-accent-foreground: var(--accent-foreground);
+
+    --color-muted: var(--muted);
+    --color-muted-foreground: var(--muted-foreground);
+
+    --color-border: var(--border);
+    --color-border-accent: var(--border-accent);
+    --color-input: var(--input);
+    --color-ring: var(--ring);
+
+    --color-card: var(--background-elevated);
+    --color-card-foreground: var(--foreground);
+
+    --color-success: var(--success);
+    --color-warning: var(--warning);
+    --color-error: var(--error);
+
+    --font-display: var(--font-display), Outfit, sans-serif;
+    --font-mono: var(--font-mono), IBM Plex Mono, monospace;
+    --font-sans: var(--font-display), Outfit, sans-serif;
+
+    --shadow-deco: var(--shadow-deco);
+    --shadow-deco-elevated: var(--shadow-elevated);
+    --shadow-deco-glow: var(--shadow-glow);
+    --shadow-brutal: var(--shadow-deco);
+    --shadow-brutal-hover: var(--shadow-elevated);
+    --shadow-brutal-sm: var(--shadow-deco);
+
+    --animate-slide-in: slideIn 0.3s ease-out forwards;
+    --animate-fade-slide-in: fadeSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1)
+        forwards;
+    --animate-fade-in: fadeIn 0.3s ease forwards;
+    --animate-shimmer: shimmer 2s infinite;
+    --animate-pulse-soft: pulseSoft 2s ease-in-out infinite;
+    --animate-typing: typingDot 1.2s ease-in-out infinite;
+
+    --radius-deco: 2px;
+
+    @keyframes slideIn {
+        0% {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        100% {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    @keyframes fadeSlideIn {
+        0% {
+            opacity: 0;
+            transform: translateY(12px);
+        }
+        100% {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    @keyframes fadeIn {
+        0% {
+            opacity: 0;
+        }
+        100% {
+            opacity: 1;
+        }
+    }
+    @keyframes shimmer {
+        0% {
+            background-position: -200% 0;
+        }
+        100% {
+            background-position: 200% 0;
+        }
+    }
+    @keyframes pulseSoft {
+        0%,
+        100% {
+            opacity: 1;
+        }
+        50% {
+            opacity: 0.6;
+        }
+    }
+    @keyframes typingDot {
+        0%,
+        100% {
+            transform: translateY(0);
+            opacity: 0.4;
+        }
+        50% {
+            transform: translateY(-6px);
+            opacity: 1;
+        }
+    }
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+    *,
+    ::after,
+    ::before,
+    ::backdrop,
+    ::file-selector-button {
+        border-color: var(--color-gray-200, currentcolor);
+    }
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    NOIR DECO DESIGN SYSTEM
@@ -183,9 +312,13 @@ body::before {
 }
 
 .label-deco {
-    @apply block text-xs font-medium mb-2 uppercase tracking-widest;
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
     color: var(--muted-foreground);
-    letter-spacing: 0.15em;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -193,7 +326,17 @@ body::before {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 .btn-deco {
-    @apply inline-flex items-center justify-center gap-2.5 px-5 py-2.5 font-medium transition-all duration-200 relative overflow-hidden;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.625rem;
+    padding: 0.625rem 1.25rem;
+    font-weight: 500;
+    transition-property: all;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 200ms;
+    position: relative;
+    overflow: hidden;
     border: 1px solid transparent;
     box-shadow: var(--shadow-deco);
 }
@@ -269,7 +412,13 @@ body::before {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 .input-deco {
-    @apply w-full px-4 py-3.5 bg-input text-foreground transition-all duration-200;
+    width: 100%;
+    padding: 0.875rem 1rem;
+    background-color: var(--input);
+    color: var(--foreground);
+    transition-property: all;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 200ms;
     border: 1px solid var(--border);
     box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
 }
@@ -291,7 +440,8 @@ body::before {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 .card-deco {
-    @apply relative p-6;
+    position: relative;
+    padding: 1.5rem;
     background: var(--background-elevated);
     border: 1px solid var(--border);
     box-shadow: var(--shadow-deco);
@@ -330,7 +480,8 @@ body::before {
 
 /* Minimalist card variant */
 .card-minimal {
-    @apply relative p-5;
+    position: relative;
+    padding: 1.25rem;
     background: var(--muted);
     border: 1px solid var(--border);
     transition: all 0.2s ease;
@@ -529,25 +680,73 @@ body::before {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 .btn-brutal {
-    @apply btn-deco;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.625rem;
+    padding: 0.625rem 1.25rem;
+    font-weight: 500;
+    transition-property: all;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 200ms;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid transparent;
+    box-shadow: var(--shadow-deco);
 }
 
 .btn-brutal-primary {
-    @apply btn-deco-primary;
+    background: linear-gradient(135deg, var(--primary) 0%, #c9a227 100%);
+    color: var(--primary-foreground);
+    border-color: var(--primary);
+    font-weight: 500;
 }
 
 .btn-brutal-secondary {
-    @apply btn-deco-secondary;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.625rem;
+    padding: 0.625rem 1.25rem;
+    font-weight: 500;
+    transition-property: all;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 200ms;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid transparent;
+    box-shadow: var(--shadow-deco);
+    background: var(--background-elevated);
+    color: var(--foreground);
+    border-color: var(--border);
 }
 
 .input-brutal {
-    @apply input-deco;
+    width: 100%;
+    padding: 0.875rem 1rem;
+    background-color: var(--input);
+    color: var(--foreground);
+    transition-property: all;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 200ms;
+    border: 1px solid var(--border);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .card-brutal {
-    @apply card-deco;
+    position: relative;
+    padding: 1.5rem;
+    background: var(--background-elevated);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-deco);
 }
 
 .label-brutal {
-    @apply label-deco;
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted-foreground);
 }
