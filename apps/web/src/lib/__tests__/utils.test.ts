@@ -1,5 +1,5 @@
 import { test, expect, describe } from "bun:test";
-import { cn } from "../utils";
+import { cn, generateUUID } from "../utils";
 
 describe("utils.ts", () => {
     describe("cn", () => {
@@ -88,6 +88,40 @@ describe("utils.ts", () => {
             const result = cn("class", 0, 1, "another");
             expect(result).toContain("class");
             expect(result).toContain("another");
+        });
+    });
+
+    describe("generateUUID", () => {
+        test("returns a valid UUID v4 format", () => {
+            const uuid = generateUUID();
+            // UUID v4 format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+            const uuidRegex =
+                /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+            expect(uuid).toMatch(uuidRegex);
+        });
+
+        test("generates unique UUIDs", () => {
+            const uuids = new Set<string>();
+            for (let i = 0; i < 100; i++) {
+                uuids.add(generateUUID());
+            }
+            expect(uuids.size).toBe(100);
+        });
+
+        test("returns string of correct length", () => {
+            const uuid = generateUUID();
+            expect(uuid.length).toBe(36); // 32 hex chars + 4 hyphens
+        });
+
+        test("has correct structure with hyphens", () => {
+            const uuid = generateUUID();
+            const parts = uuid.split("-");
+            expect(parts.length).toBe(5);
+            expect(parts[0].length).toBe(8);
+            expect(parts[1].length).toBe(4);
+            expect(parts[2].length).toBe(4);
+            expect(parts[3].length).toBe(4);
+            expect(parts[4].length).toBe(12);
         });
     });
 });

@@ -1,16 +1,27 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useChat } from "@/contexts/ChatContext";
 import { useSettings } from "@/contexts/SettingsContext";
-import { sendMessage, OpenRouterApiError } from "@/lib/openrouter";
+import {
+    sendMessage,
+    OpenRouterApiError,
+    buildMessageContent,
+    type MessageContent,
+} from "@/lib/openrouter";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import {
     modelSupportsSearch,
     modelSupportsReasoning,
+    modelSupportsVision,
     type ThinkingLevel,
+    type PendingAttachment,
+    type Attachment,
+    type ImageMimeType,
 } from "@/lib/types";
+import { saveAttachments, getAttachmentsByMessage } from "@/lib/db";
+import { generateUUID } from "@/lib/utils";
 import { Hexagon, Sparkles, AlertCircle, RefreshCw } from "lucide-react";
 
 interface ErrorState {
@@ -43,7 +54,10 @@ export function ChatWindow() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentChat?.id]);
 
-    const handleSendMessage = async (content: string) => {
+    const handleSendMessage = async (
+        content: string,
+        pendingAttachments?: PendingAttachment[],
+    ) => {
         if (!apiKey) {
             setError({
                 message: "Please add your OpenRouter API key in Settings",
@@ -81,6 +95,30 @@ export function ChatWindow() {
                 ? JSON.parse(JSON.stringify(selectedSkill))
                 : null;
 
+            // Generate a temporary message ID for attachments
+            const messageId = generateUUID();
+
+            // Convert pending attachments to stored attachments
+            let attachmentIds: string[] | undefined;
+            if (pendingAttachments && pendingAttachments.length > 0) {
+                const attachments: Attachment[] = pendingAttachments.map(
+                    (pa) => ({
+                        id: generateUUID(),
+                        messageId,
+                        type: "image" as const,
+                        mimeType: pa.mimeType as ImageMimeType,
+                        data: pa.data,
+                        width: pa.width,
+                        height: pa.height,
+                        size: pa.size,
+                        createdAt: Date.now(),
+                    }),
+                );
+
+                await saveAttachments(attachments);
+                attachmentIds = attachments.map((a) => a.id);
+            }
+
             await addMessage({
                 role: "user",
                 content: content,
@@ -89,15 +127,57 @@ export function ChatWindow() {
                 modelId: currentChat.modelId,
                 thinkingLevel: effectiveThinking,
                 searchEnabled: effectiveSearch,
+                attachmentIds,
             });
 
-            const currentMessages = [
-                ...messages.map((m) => ({
+            // Build messages array with attachments for API
+            const currentMessages: Array<{
+                role: string;
+                content: MessageContent;
+            }> = [];
+
+            // Add past messages with their attachments
+            for (const m of messages) {
+                let messageContent: MessageContent = m.contextContent;
+
+                // Load attachments if present
+                if (m.attachmentIds && m.attachmentIds.length > 0) {
+                    const msgAttachments = await getAttachmentsByMessage(m.id);
+                    if (msgAttachments.length > 0) {
+                        messageContent = buildMessageContent(
+                            m.contextContent,
+                            msgAttachments,
+                        );
+                    }
+                }
+
+                currentMessages.push({
                     role: m.role,
-                    content: m.contextContent,
-                })),
-                { role: "user", content: contextContent },
-            ];
+                    content: messageContent,
+                });
+            }
+
+            // Add the new user message with its attachments
+            const newUserAttachments: Attachment[] | undefined =
+                pendingAttachments?.map((pa) => ({
+                    id: generateUUID(),
+                    messageId: "",
+                    type: "image" as const,
+                    mimeType: pa.mimeType as ImageMimeType,
+                    data: pa.data,
+                    width: pa.width,
+                    height: pa.height,
+                    size: pa.size,
+                    createdAt: Date.now(),
+                }));
+
+            currentMessages.push({
+                role: "user",
+                content: buildMessageContent(
+                    contextContent,
+                    newUserAttachments,
+                ),
+            });
 
             const assistantMessage = await addMessage({
                 role: "assistant",
@@ -307,6 +387,10 @@ export function ChatWindow() {
                     searchSupported={modelSupportsSearch(
                         models.find((m) => m.id === currentChat.modelId),
                     )}
+                    visionSupported={modelSupportsVision(
+                        models.find((m) => m.id === currentChat.modelId),
+                    )}
+                    sessionId={currentChat.id}
                 />
             </div>
         </div>

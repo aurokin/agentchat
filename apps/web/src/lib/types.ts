@@ -10,6 +10,7 @@ export interface Message {
     modelId?: string;
     thinkingLevel?: ThinkingLevel;
     searchEnabled?: boolean;
+    attachmentIds?: string[]; // References to attachments store
     createdAt: number;
 }
 
@@ -43,6 +44,7 @@ export interface UserSettings {
 export enum SupportedParameter {
     Tools = "tools",
     Reasoning = "reasoning",
+    Vision = "vision",
 }
 
 export interface OpenRouterModel {
@@ -69,10 +71,48 @@ export function modelSupportsReasoning(
     );
 }
 
+export function modelSupportsVision(
+    model: OpenRouterModel | undefined,
+): boolean {
+    return (
+        model?.supportedParameters?.includes(SupportedParameter.Vision) ?? false
+    );
+}
+
 export interface Skill {
     id: string;
     name: string;
     description: string;
     prompt: string;
     createdAt: number;
+}
+
+// Image attachment types
+export type ImageMimeType =
+    | "image/jpeg"
+    | "image/png"
+    | "image/gif"
+    | "image/webp";
+
+export interface Attachment {
+    id: string;
+    messageId: string;
+    type: "image";
+    mimeType: ImageMimeType;
+    data: string; // base64-encoded image data (without data URL prefix)
+    width: number;
+    height: number;
+    size: number; // bytes
+    createdAt: number;
+}
+
+export interface PendingAttachment {
+    id: string;
+    type: "image";
+    mimeType: string;
+    data: string; // base64-encoded image data (without data URL prefix)
+    width: number;
+    height: number;
+    size: number; // bytes
+    preview: string; // data URL for thumbnail preview
 }

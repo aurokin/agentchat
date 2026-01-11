@@ -1,16 +1,40 @@
 "use client";
 
-import React, { useState, useRef, useEffect, forwardRef } from "react";
+import React, {
+    useState,
+    useRef,
+    useEffect,
+    forwardRef,
+    useCallback,
+} from "react";
 import { Send } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, generateUUID } from "@/lib/utils";
 import { ModelSelector } from "./ModelSelector";
 import { SkillSelector } from "./SkillSelector";
 import { ThinkingToggle } from "./ThinkingToggle";
 import { SearchToggle } from "./SearchToggle";
-import type { ThinkingLevel } from "@/lib/types";
+import { AttachmentButton } from "./AttachmentButton";
+import { AttachmentPreview } from "./AttachmentPreview";
+import { StorageErrorModal } from "./StorageErrorModal";
+import type { ThinkingLevel, PendingAttachment } from "@/lib/types";
+import {
+    processImage,
+    generateThumbnail,
+    createDataUrl,
+} from "@/lib/imageProcessing";
+import {
+    hasImageInClipboardEvent,
+    readImageFromClipboardEvent,
+} from "@/lib/clipboard";
+import {
+    getStorageUsage,
+    getAttachmentStorageBySession,
+    MAX_SESSION_STORAGE,
+    MAX_TOTAL_STORAGE,
+} from "@/lib/db";
 
 interface MessageInputProps {
-    onSend: (content: string) => void;
+    onSend: (content: string, attachments?: PendingAttachment[]) => void;
     disabled?: boolean;
     canSend?: boolean;
     selectedModel: string;
@@ -21,6 +45,8 @@ interface MessageInputProps {
     searchEnabled: boolean;
     onSearchChange: (enabled: boolean) => void;
     searchSupported?: boolean;
+    visionSupported?: boolean;
+    sessionId?: string;
 }
 
 export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
@@ -37,30 +63,158 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
             searchEnabled,
             onSearchChange,
             searchSupported = true,
+            visionSupported = false,
+            sessionId,
         } = props;
 
         const [content, setContent] = useState("");
+        const [pendingAttachments, setPendingAttachments] = useState<
+            PendingAttachment[]
+        >([]);
+        const [processingCount, setProcessingCount] = useState(0);
+        const [storageError, setStorageError] = useState<string | null>(null);
+
         const textareaRef = useRef<HTMLTextAreaElement>(null);
         const actualRef =
             (ref as React.RefObject<HTMLTextAreaElement>) || textareaRef;
 
+        const canSubmit =
+            (content.trim() || pendingAttachments.length > 0) && canSend;
+
         const handleSubmit = (e: React.FormEvent) => {
             e.preventDefault();
-            if (content.trim() && canSend) {
-                onSend(content.trim());
+            if (canSubmit) {
+                onSend(
+                    content.trim(),
+                    pendingAttachments.length > 0
+                        ? pendingAttachments
+                        : undefined,
+                );
                 setContent("");
+                setPendingAttachments([]);
             }
         };
 
         const handleKeyDown = (e: React.KeyboardEvent) => {
             if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
-                if (content.trim() && canSend) {
-                    onSend(content.trim());
+                if (canSubmit) {
+                    onSend(
+                        content.trim(),
+                        pendingAttachments.length > 0
+                            ? pendingAttachments
+                            : undefined,
+                    );
                     setContent("");
+                    setPendingAttachments([]);
                 }
             }
         };
+
+        // Check storage limits before allowing attachment
+        const checkStorageLimits = useCallback(async (): Promise<{
+            allowed: boolean;
+            error?: string;
+        }> => {
+            try {
+                const usage = await getStorageUsage();
+                if (usage.attachments >= MAX_TOTAL_STORAGE) {
+                    return {
+                        allowed: false,
+                        error: "Storage limit reached. Delete old conversations to free up space.",
+                    };
+                }
+
+                if (sessionId) {
+                    const sessionUsage =
+                        await getAttachmentStorageBySession(sessionId);
+                    if (sessionUsage >= MAX_SESSION_STORAGE) {
+                        return {
+                            allowed: false,
+                            error: "This conversation has reached its image limit. Start a new conversation to add more images.",
+                        };
+                    }
+                }
+
+                return { allowed: true };
+            } catch {
+                // If storage check fails, allow the attachment attempt
+                return { allowed: true };
+            }
+        }, [sessionId]);
+
+        // Process files and add as pending attachments
+        const processFiles = useCallback(
+            async (files: File[]) => {
+                const { allowed, error } = await checkStorageLimits();
+                if (!allowed) {
+                    setStorageError(error || "Storage limit reached");
+                    return;
+                }
+
+                setProcessingCount((prev) => prev + files.length);
+
+                for (const file of files) {
+                    try {
+                        const processed = await processImage(file);
+                        const dataUrl = createDataUrl(
+                            processed.data,
+                            processed.mimeType,
+                        );
+                        const thumbnail = await generateThumbnail(dataUrl);
+
+                        const attachment: PendingAttachment = {
+                            id: generateUUID(),
+                            type: "image",
+                            mimeType: processed.mimeType,
+                            data: processed.data,
+                            width: processed.width,
+                            height: processed.height,
+                            size: processed.size,
+                            preview: thumbnail,
+                        };
+
+                        setPendingAttachments((prev) => [...prev, attachment]);
+                    } catch (err) {
+                        console.error("Failed to process image:", err);
+                    } finally {
+                        setProcessingCount((prev) => prev - 1);
+                    }
+                }
+            },
+            [checkStorageLimits],
+        );
+
+        const handleFileSelect = useCallback(
+            (files: File[]) => {
+                processFiles(files);
+            },
+            [processFiles],
+        );
+
+        const handleRemoveAttachment = useCallback((id: string) => {
+            setPendingAttachments((prev) => prev.filter((a) => a.id !== id));
+        }, []);
+
+        const handlePaste = useCallback(
+            (e: React.ClipboardEvent) => {
+                if (!visionSupported) return;
+
+                const clipboardEvent = e.nativeEvent;
+                if (hasImageInClipboardEvent(clipboardEvent)) {
+                    e.preventDefault();
+                    const image = readImageFromClipboardEvent(clipboardEvent);
+                    if (image) {
+                        processFiles([
+                            new File([image.blob], "pasted-image", {
+                                type: image.mimeType,
+                            }),
+                        ]);
+                    }
+                }
+            },
+            [visionSupported, processFiles],
+        );
 
         useEffect(() => {
             const textarea = actualRef.current;
@@ -80,74 +234,95 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
         }, []);
 
         return (
-            <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
-                <div className="relative border border-border bg-background-elevated transition-all duration-200 focus-within:border-primary/40 focus-within:shadow-deco group/input">
-                    <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 bg-muted/20">
-                        <ModelSelector
-                            selectedModel={selectedModel}
-                            onModelChange={onModelChange}
-                        />
-                        <div className="w-px h-5 bg-border/60" />
-                        <SkillSelector disabled={disabled} />
-                        <div className="flex-1" />
-                        {reasoningSupported && (
-                            <ThinkingToggle
-                                value={thinkingLevel}
-                                onChange={onThinkingChange}
-                                disabled={disabled}
+            <>
+                <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
+                    <div className="relative border border-border bg-background-elevated transition-all duration-200 focus-within:border-primary/40 focus-within:shadow-deco group/input">
+                        <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 bg-muted/20">
+                            <ModelSelector
+                                selectedModel={selectedModel}
+                                onModelChange={onModelChange}
                             />
-                        )}
-                        <SearchToggle
-                            enabled={searchEnabled}
-                            onChange={onSearchChange}
-                            disabled={disabled || !searchSupported}
-                        />
-                    </div>
-                    <div className="relative">
-                        <textarea
-                            ref={actualRef}
-                            value={content}
-                            onChange={(e) => setContent(e.target.value)}
-                            onKeyDown={handleKeyDown}
-                            placeholder="Send a message..."
-                            className={cn(
-                                "w-full px-4 py-3.5 pr-14 bg-transparent text-foreground resize-none",
-                                "placeholder:text-muted-foreground",
+                            <div className="w-px h-5 bg-border/60" />
+                            <SkillSelector disabled={disabled} />
+                            <div className="flex-1" />
+                            {reasoningSupported && (
+                                <ThinkingToggle
+                                    value={thinkingLevel}
+                                    onChange={onThinkingChange}
+                                    disabled={disabled}
+                                />
                             )}
-                            style={{ outline: "none", boxShadow: "none" }}
-                            rows={1}
+                            <SearchToggle
+                                enabled={searchEnabled}
+                                onChange={onSearchChange}
+                                disabled={disabled || !searchSupported}
+                            />
+                        </div>
+                        <AttachmentPreview
+                            attachments={pendingAttachments}
+                            processingCount={processingCount}
+                            onRemove={handleRemoveAttachment}
+                            disabled={disabled}
                         />
-                        <button
-                            type="submit"
-                            disabled={!content.trim() || !canSend}
-                            className={cn(
-                                "absolute right-3 bottom-3 p-2.5 transition-all duration-200",
-                                content.trim() && canSend
-                                    ? "bg-primary text-primary-foreground hover:shadow-deco-glow"
-                                    : "bg-muted text-muted-foreground cursor-not-allowed",
-                            )}
-                        >
-                            <Send
-                                size={16}
+                        <div className="relative">
+                            <textarea
+                                ref={actualRef}
+                                value={content}
+                                onChange={(e) => setContent(e.target.value)}
+                                onKeyDown={handleKeyDown}
+                                onPaste={handlePaste}
+                                placeholder="Send a message..."
                                 className={cn(
-                                    "transition-transform",
-                                    content.trim() &&
-                                        canSend &&
-                                        "group-hover/input:translate-x-0.5",
+                                    "w-full px-4 py-3.5 bg-transparent text-foreground resize-none",
+                                    "placeholder:text-muted-foreground",
+                                    visionSupported ? "pr-24" : "pr-14",
                                 )}
+                                style={{ outline: "none", boxShadow: "none" }}
+                                rows={1}
                             />
-                        </button>
+                            <div className="absolute right-3 bottom-3 flex items-center gap-1">
+                                {visionSupported && (
+                                    <AttachmentButton
+                                        onAttach={handleFileSelect}
+                                        disabled={disabled}
+                                    />
+                                )}
+                                <button
+                                    type="submit"
+                                    disabled={!canSubmit}
+                                    className={cn(
+                                        "p-2.5 transition-all duration-200",
+                                        canSubmit
+                                            ? "bg-primary text-primary-foreground hover:shadow-deco-glow"
+                                            : "bg-muted text-muted-foreground cursor-not-allowed",
+                                    )}
+                                >
+                                    <Send
+                                        size={16}
+                                        className={cn(
+                                            "transition-transform",
+                                            canSubmit &&
+                                                "group-hover/input:translate-x-0.5",
+                                        )}
+                                    />
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                </div>
-                <div className="flex items-center justify-between mt-2 px-1 text-xs text-muted-foreground opacity-60">
-                    <span>Shift + Enter for new line</span>
-                    <span className={!canSend ? "text-amber-600/70" : ""}>
-                        {!canSend
-                            ? "Sending... (Enter disabled)"
-                            : "Enter to send"}
-                    </span>
-                </div>
-            </form>
+                    <div className="flex items-center justify-between mt-2 px-1 text-xs text-muted-foreground opacity-60">
+                        <span>Shift + Enter for new line</span>
+                        <span className={!canSend ? "text-amber-600/70" : ""}>
+                            {!canSend
+                                ? "Sending... (Enter disabled)"
+                                : "Enter to send"}
+                        </span>
+                    </div>
+                </form>
+                <StorageErrorModal
+                    message={storageError}
+                    onDismiss={() => setStorageError(null)}
+                />
+            </>
         );
     },
 );

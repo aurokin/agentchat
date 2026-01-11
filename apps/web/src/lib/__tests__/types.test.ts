@@ -1,9 +1,10 @@
-import { test, expect, describe, beforeEach } from "bun:test";
+import { test, expect, describe } from "bun:test";
 import {
     SupportedParameter,
     OpenRouterModel,
     modelSupportsSearch,
     modelSupportsReasoning,
+    modelSupportsVision,
 } from "../types";
 
 describe("types.ts", () => {
@@ -122,6 +123,69 @@ describe("types.ts", () => {
                 supportedParameters: [SupportedParameter.Tools],
             };
             expect(modelSupportsReasoning(model)).toBe(false);
+        });
+    });
+
+    describe("modelSupportsVision", () => {
+        test("returns false for undefined", () => {
+            expect(modelSupportsVision(undefined)).toBe(false);
+        });
+
+        test("returns false for model without vision parameter", () => {
+            const model: OpenRouterModel = {
+                id: "test/model",
+                name: "test",
+                provider: "test",
+                supportedParameters: undefined,
+            };
+            expect(modelSupportsVision(model)).toBe(false);
+        });
+
+        test("returns false for model with empty supportedParameters", () => {
+            const model: OpenRouterModel = {
+                id: "test/model",
+                name: "test",
+                provider: "test",
+                supportedParameters: [],
+            };
+            expect(modelSupportsVision(model)).toBe(false);
+        });
+
+        test("returns true for model with vision parameter", () => {
+            const model: OpenRouterModel = {
+                id: "test/model",
+                name: "test",
+                provider: "test",
+                supportedParameters: [SupportedParameter.Vision],
+            };
+            expect(modelSupportsVision(model)).toBe(true);
+        });
+
+        test("returns true for model with vision and other parameters", () => {
+            const model: OpenRouterModel = {
+                id: "test/model",
+                name: "test",
+                provider: "test",
+                supportedParameters: [
+                    SupportedParameter.Vision,
+                    SupportedParameter.Tools,
+                    SupportedParameter.Reasoning,
+                ],
+            };
+            expect(modelSupportsVision(model)).toBe(true);
+        });
+
+        test("returns false for model with only tools and reasoning", () => {
+            const model: OpenRouterModel = {
+                id: "test/model",
+                name: "test",
+                provider: "test",
+                supportedParameters: [
+                    SupportedParameter.Tools,
+                    SupportedParameter.Reasoning,
+                ],
+            };
+            expect(modelSupportsVision(model)).toBe(false);
         });
     });
 

@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useRef, useEffect, useState } from "react";
-import type { Message } from "@/lib/types";
+import React, { useRef, useEffect, useState, useCallback } from "react";
+import type { Message, Attachment } from "@/lib/types";
 import { format } from "date-fns";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -18,9 +18,13 @@ import {
     ChevronRight,
     Search,
     Cpu,
+    Image as ImageIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MessageListSkeleton } from "./MessageListSkeleton";
+import { ImageGalleryDialog, type GalleryImage } from "./ImageGalleryDialog";
+import { getAttachment } from "@/lib/db";
+import { createDataUrl } from "@/lib/imageProcessing";
 
 interface MessageListProps {
     messages: Message[];
@@ -30,10 +34,53 @@ interface MessageListProps {
 
 export function MessageList({ messages, sending, loading }: MessageListProps) {
     const bottomRef = useRef<HTMLDivElement>(null);
+    const [galleryOpen, setGalleryOpen] = useState(false);
+    const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
+    const [allImages, setAllImages] = useState<GalleryImage[]>([]);
 
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages, sending]);
+
+    // Collect all images from all messages
+    useEffect(() => {
+        async function collectImages() {
+            const images: GalleryImage[] = [];
+
+            for (const message of messages) {
+                if (message.attachmentIds && message.attachmentIds.length > 0) {
+                    for (const attachmentId of message.attachmentIds) {
+                        const attachment = await getAttachment(attachmentId);
+                        if (attachment) {
+                            images.push({
+                                id: attachment.id,
+                                src: createDataUrl(
+                                    attachment.data,
+                                    attachment.mimeType,
+                                ),
+                                alt: `Image ${attachment.width}x${attachment.height}`,
+                                timestamp: attachment.createdAt,
+                            });
+                        }
+                    }
+                }
+            }
+
+            setAllImages(images);
+        }
+
+        collectImages();
+    }, [messages]);
+
+    const handleImageClick = useCallback((imageId: string) => {
+        setSelectedImageId(imageId);
+        setGalleryOpen(true);
+    }, []);
+
+    const handleGalleryClose = useCallback(() => {
+        setGalleryOpen(false);
+        setSelectedImageId(null);
+    }, []);
 
     if (loading) {
         return <MessageListSkeleton count={3} />;
@@ -59,19 +106,29 @@ export function MessageList({ messages, sending, loading }: MessageListProps) {
     }
 
     return (
-        <div className="max-w-4xl mx-auto p-6 space-y-8">
-            {messages.map((message, index) => (
-                <MessageItem
-                    key={message.id}
-                    message={message}
-                    index={index}
-                    sending={sending && index === messages.length - 1}
-                />
-            ))}
+        <>
+            <div className="max-w-4xl mx-auto p-6 space-y-8">
+                {messages.map((message, index) => (
+                    <MessageItem
+                        key={message.id}
+                        message={message}
+                        index={index}
+                        sending={sending && index === messages.length - 1}
+                        onImageClick={handleImageClick}
+                    />
+                ))}
 
-            {/* Auto-scroll anchor */}
-            <div ref={bottomRef} />
-        </div>
+                {/* Auto-scroll anchor */}
+                <div ref={bottomRef} />
+            </div>
+
+            <ImageGalleryDialog
+                open={galleryOpen}
+                images={allImages}
+                initialImageId={selectedImageId ?? undefined}
+                onClose={handleGalleryClose}
+            />
+        </>
     );
 }
 
@@ -143,14 +200,87 @@ function ReasoningSection({ thinking, isStreaming }: ReasoningSectionProps) {
     );
 }
 
+// Component to display message attachments
+function MessageAttachments({
+    attachmentIds,
+    onImageClick,
+}: {
+    attachmentIds: string[];
+    onImageClick: (imageId: string) => void;
+}) {
+    const [attachments, setAttachments] = useState<Attachment[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        async function loadAttachments() {
+            const loaded: Attachment[] = [];
+            for (const id of attachmentIds) {
+                const attachment = await getAttachment(id);
+                if (attachment) {
+                    loaded.push(attachment);
+                }
+            }
+            setAttachments(loaded);
+            setLoading(false);
+        }
+        loadAttachments();
+    }, [attachmentIds]);
+
+    if (loading) {
+        return (
+            <div className="flex gap-2 mb-3">
+                {attachmentIds.map((id) => (
+                    <div
+                        key={id}
+                        className="w-20 h-20 bg-muted/30 border border-border/50 animate-pulse flex items-center justify-center"
+                    >
+                        <ImageIcon
+                            size={20}
+                            className="text-muted-foreground/50"
+                        />
+                    </div>
+                ))}
+            </div>
+        );
+    }
+
+    if (attachments.length === 0) {
+        return null;
+    }
+
+    return (
+        <div className="flex flex-wrap gap-2 mb-3">
+            {attachments.map((attachment, index) => (
+                <button
+                    key={attachment.id}
+                    onClick={() => onImageClick(attachment.id)}
+                    className="relative w-20 h-20 bg-muted/30 border border-border/50 overflow-hidden hover:border-primary/50 transition-colors"
+                >
+                    <img
+                        src={createDataUrl(
+                            attachment.data,
+                            attachment.mimeType,
+                        )}
+                        alt={`Attachment ${index + 1}`}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                    />
+                </button>
+            ))}
+        </div>
+    );
+}
+
 function MessageItem({
     message,
     index,
     sending,
+    onImageClick,
 }: {
     message: Message;
     index: number;
     sending?: boolean;
+    onImageClick: (imageId: string) => void;
 }) {
     const isUser = message.role === "user";
     const [copied, setCopied] = useState(false);
@@ -232,6 +362,16 @@ function MessageItem({
                         </div>
                     </details>
                 )}
+
+                {/* Attachments - displayed before content for user messages */}
+                {isUser &&
+                    message.attachmentIds &&
+                    message.attachmentIds.length > 0 && (
+                        <MessageAttachments
+                            attachmentIds={message.attachmentIds}
+                            onImageClick={onImageClick}
+                        />
+                    )}
 
                 {/* Reasoning section - collapsible, above message */}
                 {message.thinking && (

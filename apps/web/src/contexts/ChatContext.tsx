@@ -31,6 +31,7 @@ interface ChatContextType {
         modelId?: string;
         thinkingLevel?: ThinkingLevel;
         searchEnabled?: boolean;
+        attachmentIds?: string[];
     }) => Promise<Message>;
     updateMessage: (
         id: string,
@@ -135,6 +136,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             modelId?: string;
             thinkingLevel?: ThinkingLevel;
             searchEnabled?: boolean;
+            attachmentIds?: string[];
         }): Promise<Message> => {
             if (!currentChat) {
                 throw new Error("No current chat selected");
@@ -149,6 +151,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 modelId: message.modelId,
                 thinkingLevel: message.thinkingLevel,
                 searchEnabled: message.searchEnabled,
+                attachmentIds: message.attachmentIds,
                 sessionId: currentChat.id,
                 id: uuid(),
                 createdAt: Date.now(),
