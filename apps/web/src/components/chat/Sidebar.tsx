@@ -1,22 +1,20 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useChat } from "@/contexts/ChatContext";
 import { useSettings } from "@/contexts/SettingsContext";
 import { formatDistanceToNow } from "date-fns";
-import {
-    Plus,
-    Trash2,
-    MessageSquare,
-    Settings,
-    Hexagon,
-    Menu,
-} from "lucide-react";
+import { Plus, Trash2, Settings, Hexagon } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { ChatListSkeleton } from "./ChatListSkeleton";
-import { useIsMobile } from "@/hooks/useMediaQuery";
+import {
+    useIsMobile,
+    useIsTablet,
+    useTouchDevice,
+} from "@/hooks/useMediaQuery";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 interface SidebarProps {
     isOpen?: boolean;
@@ -29,9 +27,20 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
         useChat();
     const { apiKey } = useSettings();
     const isMobile = useIsMobile();
+    const isTablet = useIsTablet();
+    const isTouchDevice = useTouchDevice();
 
-    const [localIsOpen, setLocalIsOpen] = useState(false);
     const [isMac, setIsMac] = useState(false);
+    const [pendingDeleteChatId, setPendingDeleteChatId] = useState<
+        string | null
+    >(null);
+
+    const pendingChat = useMemo(
+        () => chats.find((chat) => chat.id === pendingDeleteChatId) ?? null,
+        [chats, pendingDeleteChatId],
+    );
+
+    const isMobileActionMode = isMobile || isTablet || isTouchDevice;
 
     useEffect(() => {
         /* eslint-disable react-hooks/set-state-in-effect */
@@ -42,45 +51,38 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
         /* eslint-enable react-hooks/set-state-in-effect */
     }, []);
 
-    /* eslint-disable react-hooks/set-state-in-effect */
-    useEffect(() => {
-        if (isMobile) {
-            setLocalIsOpen(false);
-        }
-    }, [isMobile]);
-    /* eslint-enable react-hooks/set-state-in-effect */
-
-    const handleToggle = () => {
-        if (isMobile) {
-            setLocalIsOpen(!localIsOpen);
-        }
-    };
-
     const handleNewChat = async () => {
         await createChat();
         if (isMobile) {
-            setLocalIsOpen(false);
+            onClose?.();
         }
     };
 
-    const showSidebar = isMobile ? propsIsOpen && localIsOpen : propsIsOpen;
+    const handleSelectChat = (chatId: string) => {
+        selectChat(chatId);
+        router.push("/chat");
+        if (isMobile) {
+            onClose?.();
+        }
+    };
 
-    if (!showSidebar && isMobile) {
-        return (
-            <button
-                type="button"
-                onClick={handleToggle}
-                className="mobile-sidebar-trigger fixed top-4 left-4 z-40 w-10 h-10 flex items-center justify-center bg-background-elevated border border-border rounded-md shadow-lg"
-                aria-label="Open sidebar"
-            >
-                <Menu size={20} />
-            </button>
-        );
+    const requestDeleteChat = (chatId: string) => {
+        setPendingDeleteChatId(chatId);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (!pendingDeleteChatId) return;
+        await deleteChat(pendingDeleteChatId);
+        setPendingDeleteChatId(null);
+    };
+
+    if (!propsIsOpen && isMobile) {
+        return null;
     }
 
     return (
         <>
-            {isMobile && (
+            {isMobile && propsIsOpen && (
                 <div
                     className="fixed inset-0 bg-black/50 z-40 lg:hidden"
                     onClick={onClose}
@@ -92,10 +94,10 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                     "h-full bg-background-elevated border-r border-border flex flex-col relative overflow-hidden",
                     isMobile &&
                         "fixed left-0 top-0 bottom-0 z-50 w-72 transition-transform duration-300",
-                    isMobile && !localIsOpen && "-translate-x-full",
+                    isMobile && !propsIsOpen && "-translate-x-full",
                 )}
                 aria-label="Chat sidebar"
-                aria-expanded={showSidebar}
+                aria-expanded={propsIsOpen}
             >
                 <div className="absolute left-0 top-0 bottom-0 w-px bg-gradient-to-b from-primary via-primary/20 to-transparent" />
                 <div className="absolute top-0 left-0 w-16 h-16 opacity-10">
@@ -142,12 +144,6 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                         <ChatListSkeleton />
                     ) : chats.length === 0 ? (
                         <div className="p-6 text-center">
-                            <div className="w-12 h-12 mx-auto mb-3 border border-border-accent rounded-full flex items-center justify-center">
-                                <MessageSquare
-                                    size={20}
-                                    className="text-primary opacity-60"
-                                />
-                            </div>
                             <p className="text-sm text-foreground-muted">
                                 No conversations yet
                             </p>
@@ -157,72 +153,75 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                         </div>
                     ) : (
                         <ul className="p-3 space-y-1 list-none">
-                            {chats.map((chat) => (
-                                <li key={chat.id}>
-                                    <div
-                                        onClick={() => {
-                                            selectChat(chat.id);
-                                            if (isMobile && onClose) {
-                                                onClose();
-                                            } else {
-                                                router.push("/chat");
-                                            }
-                                        }}
-                                        role="button"
-                                        tabIndex={0}
-                                        onKeyDown={(e) => {
-                                            if (e.key === "Enter") {
-                                                selectChat(chat.id);
-                                                if (isMobile && onClose) {
-                                                    onClose();
-                                                } else {
-                                                    router.push("/chat");
+                            {chats.map((chat) => {
+                                const isActive = currentChat?.id === chat.id;
+
+                                return (
+                                    <li key={chat.id}>
+                                        <div className="relative overflow-hidden">
+                                            <div
+                                                onClick={() =>
+                                                    handleSelectChat(chat.id)
                                                 }
-                                            }
-                                        }}
-                                        className={cn(
-                                            "w-full text-left p-3 flex items-start justify-between gap-2 cursor-pointer transition-all duration-200 group relative",
-                                            currentChat?.id === chat.id
-                                                ? "bg-primary/10 border-l-2 border-primary"
-                                                : "hover:bg-muted/50 border-l-2 border-transparent hover:border-primary/30",
-                                        )}
-                                    >
-                                        <div className="flex items-start gap-3 min-w-0">
-                                            <MessageSquare
-                                                size={14}
+                                                role="button"
+                                                tabIndex={0}
+                                                onKeyDown={(event) => {
+                                                    if (event.key === "Enter") {
+                                                        handleSelectChat(
+                                                            chat.id,
+                                                        );
+                                                    }
+                                                }}
                                                 className={cn(
-                                                    "mt-1 flex-shrink-0 transition-colors",
-                                                    currentChat?.id === chat.id
-                                                        ? "text-primary"
-                                                        : "text-muted-foreground group-hover:text-primary",
+                                                    "w-full text-left p-3 flex items-start gap-2 cursor-pointer transition-all duration-200 group relative",
+                                                    isActive
+                                                        ? "bg-primary/10 border-l-2 border-primary"
+                                                        : "hover:bg-muted/50 border-l-2 border-transparent hover:border-primary/30",
                                                 )}
-                                            />
-                                            <div className="min-w-0">
-                                                <p className="font-medium truncate text-sm text-foreground">
-                                                    {chat.title}
-                                                </p>
-                                                <p className="mono text-xs text-muted-foreground mt-0.5">
-                                                    {formatDistanceToNow(
-                                                        chat.updatedAt,
-                                                        { addSuffix: true },
+                                            >
+                                                <div
+                                                    className={cn(
+                                                        "min-w-0 flex-1",
+                                                        isMobileActionMode &&
+                                                            "pr-8",
                                                     )}
-                                                </p>
+                                                >
+                                                    <p className="font-medium truncate text-sm text-foreground">
+                                                        {chat.title}
+                                                    </p>
+                                                    <p className="mono text-xs text-muted-foreground mt-0.5">
+                                                        {formatDistanceToNow(
+                                                            chat.updatedAt,
+                                                            {
+                                                                addSuffix: true,
+                                                            },
+                                                        )}
+                                                    </p>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={(event) => {
+                                                        event.stopPropagation();
+                                                        requestDeleteChat(
+                                                            chat.id,
+                                                        );
+                                                    }}
+                                                    className={cn(
+                                                        "flex items-center justify-center text-muted-foreground hover:text-error transition-all duration-200",
+                                                        isMobileActionMode
+                                                            ? "absolute right-0 top-1/2 h-6 w-6 -translate-y-1/2 opacity-100"
+                                                            : "ml-auto h-7 w-7 opacity-0 group-hover:opacity-100",
+                                                    )}
+                                                    title="Delete conversation"
+                                                    aria-label="Delete conversation"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
                                             </div>
                                         </div>
-                                        <button
-                                            type="button"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                deleteChat(chat.id);
-                                            }}
-                                            className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-error p-1 transition-all duration-200"
-                                            title="Delete conversation"
-                                        >
-                                            <Trash2 size={14} />
-                                        </button>
-                                    </div>
-                                </li>
-                            ))}
+                                    </li>
+                                );
+                            })}
                         </ul>
                     )}
                 </div>
@@ -257,6 +256,19 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                     <div className="absolute inset-0 border-r-2 border-b-2 border-primary" />
                 </div>
             </aside>
+            <ConfirmDialog
+                open={pendingDeleteChatId !== null}
+                title="Delete conversation?"
+                description={
+                    pendingChat
+                        ? `This will permanently delete "${pendingChat.title}".`
+                        : "This will permanently delete this conversation."
+                }
+                confirmLabel="Delete"
+                cancelLabel="Cancel"
+                onConfirm={handleConfirmDelete}
+                onCancel={() => setPendingDeleteChatId(null)}
+            />
         </>
     );
 }

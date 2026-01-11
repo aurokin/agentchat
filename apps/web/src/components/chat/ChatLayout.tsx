@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useCallback } from "react";
-import { useChat } from "@/contexts/ChatContext";
 import { Sidebar } from "./Sidebar";
 import { ChatWindow } from "./ChatWindow";
 import { MobileNav } from "./MobileNav";
@@ -10,17 +9,17 @@ import { useIsMobile } from "@/hooks/useMediaQuery";
 export function ChatLayout() {
     const [sidebarOpen, setSidebarOpen] = useState(() => true);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-    const { createChat } = useChat();
     const isMobile = useIsMobile();
 
-    const handleNewChat = useCallback(async () => {
-        await createChat();
-        setMobileMenuOpen(false);
-    }, [createChat]);
+    const handleMobileToggle = useCallback(() => {
+        setMobileMenuOpen((open) => !open);
+    }, []);
 
-    const handleSidebarToggle = useCallback(() => {
+    const handleSidebarClose = useCallback(() => {
         if (isMobile) {
-            setMobileMenuOpen(true);
+            setMobileMenuOpen(false);
+        } else {
+            setSidebarOpen(false);
         }
     }, [isMobile]);
 
@@ -29,8 +28,7 @@ export function ChatLayout() {
             {isMobile && (
                 <MobileNav
                     isOpen={mobileMenuOpen}
-                    onToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
-                    onNewChat={handleNewChat}
+                    onToggle={handleMobileToggle}
                 />
             )}
             <div
@@ -41,8 +39,8 @@ export function ChatLayout() {
                 }
             >
                 <Sidebar
-                    isOpen={sidebarOpen}
-                    onClose={() => setSidebarOpen(false)}
+                    isOpen={isMobile ? mobileMenuOpen : sidebarOpen}
+                    onClose={handleSidebarClose}
                 />
                 <ChatWindow />
             </div>
