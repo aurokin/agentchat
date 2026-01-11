@@ -241,43 +241,40 @@ function MessageItem({
                     />
                 )}
 
-                {/* Main content */}
-                <div
-                    className={cn(
-                        "p-5 prose prose-sm dark:prose-invert max-w-none",
-                        isUser
-                            ? "bg-primary/10 border border-primary/20"
-                            : "bg-background-elevated border border-border prose-headings:text-foreground prose-p:text-foreground prose-pre:bg-muted prose-pre:border prose-pre:border-border prose-code:text-primary",
-                    )}
-                >
-                    {sending && !message.thinking ? (
-                        // No reasoning yet - show "Generating..." indicator
-                        <div className="flex items-center gap-3 text-muted-foreground">
-                            <div className="typing-indicator flex gap-1">
-                                <span />
-                                <span />
-                                <span />
+                {/* Main content - hidden while reasoning is streaming */}
+                {!(sending && message.thinking && !message.content) && (
+                    <div
+                        className={cn(
+                            "p-5 prose prose-sm dark:prose-invert max-w-none",
+                            isUser
+                                ? "bg-primary/10 border border-primary/20"
+                                : "bg-background-elevated border border-border prose-headings:text-foreground prose-p:text-foreground prose-pre:bg-muted prose-pre:border prose-pre:border-border prose-code:text-primary",
+                        )}
+                    >
+                        {sending && !message.content ? (
+                            // Show "Generating..." when waiting for content
+                            <div className="flex items-center gap-3 text-muted-foreground">
+                                <div className="typing-indicator flex gap-1">
+                                    <span />
+                                    <span />
+                                    <span />
+                                </div>
+                                <span className="text-sm">Generating...</span>
                             </div>
-                            <span className="text-sm">Generating...</span>
-                        </div>
-                    ) : sending && message.thinking && !message.content ? (
-                        // Reasoning is streaming, waiting for content
-                        <span className="text-muted-foreground italic">
-                            ...
-                        </span>
-                    ) : message.content ? (
-                        <ReactMarkdown
-                            remarkPlugins={[remarkGfm]}
-                            rehypePlugins={[rehypeHighlight, rehypeRaw]}
-                        >
-                            {message.content}
-                        </ReactMarkdown>
-                    ) : (
-                        <span className="text-muted-foreground italic">
-                            ...
-                        </span>
-                    )}
-                </div>
+                        ) : message.content ? (
+                            <ReactMarkdown
+                                remarkPlugins={[remarkGfm]}
+                                rehypePlugins={[rehypeHighlight, rehypeRaw]}
+                            >
+                                {message.content}
+                            </ReactMarkdown>
+                        ) : (
+                            <span className="text-muted-foreground italic">
+                                ...
+                            </span>
+                        )}
+                    </div>
+                )}
 
                 {/* Message metadata badges */}
                 <div
