@@ -75,6 +75,11 @@ export function ChatWindow() {
         setError(null);
         setRetryChat(null);
 
+        const skillForMessage = selectedSkill;
+        if (skillForMessage) {
+            setSelectedSkill(null);
+        }
+
         try {
             const currentModel = models.find(
                 (m) => m.id === currentChat.modelId,
@@ -87,12 +92,12 @@ export function ChatWindow() {
                 : "none";
             const effectiveSearch = supportsSearch && currentChat.searchEnabled;
 
-            const contextContent = selectedSkill
-                ? `${selectedSkill.prompt}\n\nUser: ${content}`
+            const contextContent = skillForMessage
+                ? `${skillForMessage.prompt}\n\nUser: ${content}`
                 : content;
 
-            const clonedSkill = selectedSkill
-                ? JSON.parse(JSON.stringify(selectedSkill))
+            const clonedSkill = skillForMessage
+                ? JSON.parse(JSON.stringify(skillForMessage))
                 : null;
 
             // Generate a temporary message ID for attachments
@@ -217,10 +222,6 @@ export function ChatWindow() {
                     content.slice(0, 50) + (content.length > 50 ? "..." : "");
                 updateChat({ ...currentChat, title });
             }
-
-            if (selectedSkill) {
-                setSelectedSkill(null);
-            }
         } catch (err) {
             if (err instanceof OpenRouterApiError) {
                 setError({
@@ -230,8 +231,8 @@ export function ChatWindow() {
                 if (err.isRetryable) {
                     setRetryChat({
                         content: content,
-                        contextContent: selectedSkill
-                            ? `${selectedSkill.prompt}\n\nUser: ${content}`
+                        contextContent: skillForMessage
+                            ? `${skillForMessage.prompt}\n\nUser: ${content}`
                             : content,
                     });
                 }

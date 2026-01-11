@@ -298,8 +298,8 @@ function MessageItem({
     // Use skill directly from message (already cloned)
     const skill = message.skill;
 
-    // Check if this is the first user message with a skill
-    const isFirstSkillMessage = isUser && skill && index === 0;
+    // Check if this user message has a skill
+    const isSkillMessage = isUser && skill;
 
     // Get display-friendly model name
     const getModelDisplayName = (modelId?: string) => {
@@ -333,8 +333,8 @@ function MessageItem({
                     </button>
                 )}
 
-                {/* Skill collapsible for first user message */}
-                {isFirstSkillMessage && skill && (
+                {/* Skill collapsible for user message with skill */}
+                {isSkillMessage && skill && (
                     <details className="mb-3 border border-primary/20 bg-primary/5">
                         <summary
                             className="flex items-center gap-2 px-4 py-2.5 cursor-pointer select-none text-primary"
