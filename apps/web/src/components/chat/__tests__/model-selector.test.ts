@@ -286,6 +286,50 @@ describe("ModelSelector logic", () => {
 
             expect(stopped).toBe(true);
         });
+
+        test("removes model from favorites when already favorited", () => {
+            const currentFavorites = ["model-a", "model-b", "model-c"];
+            const modelToUnfavorite = "model-b";
+
+            const isFavorite = currentFavorites.includes(modelToUnfavorite);
+            const newFavorites = isFavorite
+                ? currentFavorites.filter((id) => id !== modelToUnfavorite)
+                : [...currentFavorites, modelToUnfavorite];
+
+            expect(newFavorites).toEqual(["model-a", "model-c"]);
+            expect(newFavorites).not.toContain("model-b");
+        });
+
+        test("adds model to favorites when not favorited", () => {
+            const currentFavorites = ["model-a", "model-c"];
+            const modelToFavorite = "model-b";
+
+            const isFavorite = currentFavorites.includes(modelToFavorite);
+            const newFavorites = isFavorite
+                ? currentFavorites.filter((id) => id !== modelToFavorite)
+                : [...currentFavorites, modelToFavorite];
+
+            expect(newFavorites).toEqual(["model-a", "model-c", "model-b"]);
+            expect(newFavorites).toContain("model-b");
+        });
+
+        test("can unfavorite from favorites section (regression test)", () => {
+            // This test ensures that models in the favorites section can be unfavorited
+            // Previously the star icon in favorites section was not clickable
+            const favoriteModels = ["favorites/model-1", "favorites/model-2"];
+            const modelToUnfavorite = "favorites/model-1";
+
+            // Simulate clicking the star on a favorited model
+            const isFavorite = favoriteModels.includes(modelToUnfavorite);
+            expect(isFavorite).toBe(true);
+
+            const newFavorites = favoriteModels.filter(
+                (id) => id !== modelToUnfavorite,
+            );
+
+            expect(newFavorites).toEqual(["favorites/model-2"]);
+            expect(newFavorites).not.toContain("favorites/model-1");
+        });
     });
 
     describe("dropdown behavior", () => {

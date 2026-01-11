@@ -230,15 +230,35 @@ export function ModelSelector({
                                         type="button"
                                         onClick={() => handleSelect(model.id)}
                                         className={cn(
-                                            "w-full text-left px-4 py-2.5 text-sm transition-all duration-150 hover:bg-primary/5 cursor-pointer flex items-center gap-2.5",
+                                            "w-full text-left px-4 py-2.5 text-sm transition-all duration-150 hover:bg-primary/5 cursor-pointer flex items-center gap-2.5 group",
                                             model.id === selectedModel &&
                                                 "bg-primary/10 border-l-2 border-primary",
                                         )}
                                     >
-                                        <Star
-                                            size={12}
-                                            className="text-primary fill-primary flex-shrink-0"
-                                        />
+                                        <div
+                                            role="button"
+                                            tabIndex={0}
+                                            onClick={(e) =>
+                                                handleToggleFavorite(
+                                                    e,
+                                                    model.id,
+                                                )
+                                            }
+                                            onKeyDown={(e) =>
+                                                e.key === "Enter" &&
+                                                handleToggleFavorite(
+                                                    e as unknown as React.MouseEvent,
+                                                    model.id,
+                                                )
+                                            }
+                                            className="p-1 hover:bg-muted rounded-xs transition-colors cursor-pointer"
+                                            title="Remove from favorites"
+                                        >
+                                            <Star
+                                                size={12}
+                                                className="text-primary fill-primary flex-shrink-0 group-hover:fill-primary/70"
+                                            />
+                                        </div>
                                         <span className="truncate text-foreground">
                                             {model.name}
                                         </span>
