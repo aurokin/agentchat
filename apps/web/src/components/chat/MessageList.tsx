@@ -15,6 +15,7 @@ import {
     Sparkles,
     ChevronDown,
     ChevronUp,
+    ChevronRight,
     Search,
     Cpu,
 } from "lucide-react";
@@ -70,6 +71,74 @@ export function MessageList({ messages, sending, loading }: MessageListProps) {
 
             {/* Auto-scroll anchor */}
             <div ref={bottomRef} />
+        </div>
+    );
+}
+
+interface ReasoningSectionProps {
+    thinking: string;
+    isStreaming?: boolean;
+}
+
+function ReasoningSection({ thinking, isStreaming }: ReasoningSectionProps) {
+    const [isExpanded, setIsExpanded] = useState(false);
+    const [copied, setCopied] = useState(false);
+
+    const copyToClipboard = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!navigator.clipboard) return;
+        await navigator.clipboard.writeText(thinking);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    return (
+        <div className="mb-3 border border-warning/20 bg-warning/5">
+            <button
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="w-full flex items-center gap-2 px-4 py-3 text-warning hover:bg-warning/10 active:bg-warning/15 transition-colors"
+            >
+                {isExpanded ? (
+                    <ChevronDown size={14} />
+                ) : (
+                    <ChevronRight size={14} />
+                )}
+                <Brain size={14} />
+                <span className="text-xs font-medium uppercase tracking-wider">
+                    Reasoning
+                </span>
+
+                {isStreaming && (
+                    <span className="ml-2 flex items-center gap-1.5 text-warning/70">
+                        <span className="typing-indicator flex gap-0.5">
+                            <span />
+                            <span />
+                            <span />
+                        </span>
+                    </span>
+                )}
+
+                {!isStreaming && navigator.clipboard && (
+                    <button
+                        onClick={copyToClipboard}
+                        className="ml-auto p-2.5 -mr-1 hover:bg-warning/20 active:bg-warning/30 transition-colors"
+                        title="Copy reasoning"
+                    >
+                        {copied ? (
+                            <Check size={14} className="text-success" />
+                        ) : (
+                            <Copy size={14} />
+                        )}
+                    </button>
+                )}
+            </button>
+            {isExpanded && (
+                <div className="px-4 pb-3 border-t border-warning/10">
+                    <p className="text-warning/80 text-sm whitespace-pre-wrap mono leading-relaxed pt-3 max-h-64 sm:max-h-96 overflow-y-auto">
+                        {thinking}
+                    </p>
+                </div>
+            )}
         </div>
     );
 }
@@ -164,19 +233,12 @@ function MessageItem({
                     </details>
                 )}
 
-                {/* Thinking content */}
+                {/* Reasoning section - collapsible, above message */}
                 {message.thinking && (
-                    <div className="mb-3 p-4 bg-warning/5 border-l-2 border-warning">
-                        <div className="flex items-center gap-2 text-warning mb-2">
-                            <Brain size={14} />
-                            <span className="text-xs font-medium uppercase tracking-wider">
-                                Thinking
-                            </span>
-                        </div>
-                        <p className="text-warning/80 text-sm whitespace-pre-wrap mono leading-relaxed">
-                            {message.thinking}
-                        </p>
-                    </div>
+                    <ReasoningSection
+                        thinking={message.thinking}
+                        isStreaming={sending && !message.content}
+                    />
                 )}
 
                 {/* Main content */}
@@ -188,7 +250,8 @@ function MessageItem({
                             : "bg-background-elevated border border-border prose-headings:text-foreground prose-p:text-foreground prose-pre:bg-muted prose-pre:border prose-pre:border-border prose-code:text-primary",
                     )}
                 >
-                    {sending ? (
+                    {sending && !message.thinking ? (
+                        // No reasoning yet - show "Generating..." indicator
                         <div className="flex items-center gap-3 text-muted-foreground">
                             <div className="typing-indicator flex gap-1">
                                 <span />
@@ -197,6 +260,11 @@ function MessageItem({
                             </div>
                             <span className="text-sm">Generating...</span>
                         </div>
+                    ) : sending && message.thinking && !message.content ? (
+                        // Reasoning is streaming, waiting for content
+                        <span className="text-muted-foreground italic">
+                            ...
+                        </span>
                     ) : message.content ? (
                         <ReactMarkdown
                             remarkPlugins={[remarkGfm]}
