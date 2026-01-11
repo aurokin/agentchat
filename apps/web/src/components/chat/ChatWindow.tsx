@@ -19,6 +19,7 @@ import {
     type PendingAttachment,
     type Attachment,
     type ImageMimeType,
+    type ChatSession,
 } from "@/lib/types";
 import { saveAttachments, getAttachmentsByMessage } from "@/lib/db";
 import { generateUUID } from "@/lib/utils";
@@ -27,6 +28,19 @@ import { Hexagon, Sparkles, AlertCircle, RefreshCw } from "lucide-react";
 interface ErrorState {
     message: string;
     isRetryable: boolean;
+}
+
+export function getChatTitleUpdate(
+    chat: ChatSession | null,
+    content: string,
+    messageCount: number,
+): ChatSession | null {
+    if (!chat || chat.title !== "New Chat" || messageCount !== 0) {
+        return null;
+    }
+
+    const title = content.slice(0, 50) + (content.length > 50 ? "..." : "");
+    return { ...chat, title };
 }
 
 export function ChatWindow() {
@@ -46,6 +60,11 @@ export function ChatWindow() {
         contextContent: string;
     } | null>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
+    const currentChatRef = useRef(currentChat);
+
+    useEffect(() => {
+        currentChatRef.current = currentChat;
+    }, [currentChat]);
 
     useEffect(() => {
         if (currentChat && inputRef.current) {
@@ -217,10 +236,13 @@ export function ChatWindow() {
                 },
             );
 
-            if (currentChat.title === "New Chat" && messages.length === 0) {
-                const title =
-                    content.slice(0, 50) + (content.length > 50 ? "..." : "");
-                updateChat({ ...currentChat, title });
+            const updatedChat = getChatTitleUpdate(
+                currentChatRef.current,
+                content,
+                messages.length,
+            );
+            if (updatedChat) {
+                updateChat(updatedChat);
             }
         } catch (err) {
             if (err instanceof OpenRouterApiError) {
