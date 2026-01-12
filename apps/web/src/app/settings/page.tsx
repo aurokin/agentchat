@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Sidebar } from "@/components/chat/Sidebar";
 import { useSettings } from "@/contexts/SettingsContext";
@@ -9,6 +9,11 @@ import { validateApiKey } from "@/lib/openrouter";
 import type { ThinkingLevel, Skill } from "@/lib/types";
 import { ThinkingToggle } from "@/components/chat/ThinkingToggle";
 import { SearchToggle } from "@/components/chat/SearchToggle";
+import {
+    getStorageUsage,
+    cleanupOldAttachments,
+    MAX_TOTAL_STORAGE,
+} from "@/lib/db";
 import {
     Settings,
     Key,
@@ -29,6 +34,8 @@ import {
     Cpu,
     Info,
     Hexagon,
+    Image as ImageIcon,
+    HardDrive,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -58,6 +65,61 @@ export default function SettingsPage() {
         null,
     );
     const [saving, setSaving] = useState(false);
+
+    // Storage management state
+    const [storageUsage, setStorageUsage] = useState<{
+        attachments: number;
+        messages: number;
+        sessions: number;
+    } | null>(null);
+    const [loadingStorage, setLoadingStorage] = useState(true);
+    const [clearingStorage, setClearingStorage] = useState(false);
+
+    // Load storage usage on mount
+    const loadStorageUsage = useCallback(async () => {
+        try {
+            const usage = await getStorageUsage();
+            setStorageUsage(usage);
+        } catch (error) {
+            console.error("Failed to load storage usage:", error);
+        } finally {
+            setLoadingStorage(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        loadStorageUsage();
+    }, [loadStorageUsage]);
+
+    // Clear old attachments
+    const handleClearAttachments = async () => {
+        if (
+            !confirm(
+                "This will delete all image attachments from your conversations. This cannot be undone. Continue?",
+            )
+        ) {
+            return;
+        }
+
+        setClearingStorage(true);
+        try {
+            await cleanupOldAttachments(0); // Clear all by setting max to 0
+            await loadStorageUsage();
+        } catch (error) {
+            console.error("Failed to clear attachments:", error);
+        } finally {
+            setClearingStorage(false);
+        }
+    };
+
+    // Format bytes to human readable
+    const formatBytes = (bytes: number): string => {
+        if (bytes === 0) return "0 B";
+        const k = 1024;
+        const sizes = ["B", "KB", "MB", "GB"];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+    };
 
     // Ctrl + Shift + O to create new chat
     useEffect(() => {
@@ -674,6 +736,130 @@ export default function SettingsPage() {
                                         </div>
                                     </div>
                                 ))}
+                            </div>
+                        )}
+                    </section>
+
+                    {/* Image Storage */}
+                    <section className="card-deco mb-6">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-8 h-8 bg-primary/10 flex items-center justify-center">
+                                <HardDrive size={16} className="text-primary" />
+                            </div>
+                            <h2 className="text-lg font-medium">
+                                Image Storage
+                            </h2>
+                        </div>
+                        <p className="text-sm text-muted-foreground mb-5 leading-relaxed">
+                            Manage storage used by image attachments in your
+                            conversations. Images are stored locally in your
+                            browser.
+                        </p>
+
+                        {loadingStorage ? (
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                                <Loader2 size={14} className="animate-spin" />
+                                <span className="text-sm">
+                                    Loading storage info...
+                                </span>
+                            </div>
+                        ) : storageUsage ? (
+                            <div className="space-y-4">
+                                {/* Storage bar */}
+                                <div>
+                                    <div className="flex items-center justify-between text-sm mb-2">
+                                        <span className="text-muted-foreground">
+                                            Image Storage Used
+                                        </span>
+                                        <span className="font-medium">
+                                            {formatBytes(
+                                                storageUsage.attachments,
+                                            )}{" "}
+                                            / {formatBytes(MAX_TOTAL_STORAGE)}
+                                        </span>
+                                    </div>
+                                    <div className="h-2 bg-muted border border-border overflow-hidden">
+                                        <div
+                                            className={cn(
+                                                "h-full transition-all duration-300",
+                                                storageUsage.attachments /
+                                                    MAX_TOTAL_STORAGE >
+                                                    0.9
+                                                    ? "bg-error"
+                                                    : storageUsage.attachments /
+                                                            MAX_TOTAL_STORAGE >
+                                                        0.7
+                                                      ? "bg-warning"
+                                                      : "bg-primary",
+                                            )}
+                                            style={{
+                                                width: `${Math.min(100, (storageUsage.attachments / MAX_TOTAL_STORAGE) * 100)}%`,
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Stats */}
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="p-3 bg-muted/30 border border-border">
+                                        <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                                            <ImageIcon size={14} />
+                                            <span className="text-xs">
+                                                Images
+                                            </span>
+                                        </div>
+                                        <span className="text-lg font-medium">
+                                            {formatBytes(
+                                                storageUsage.attachments,
+                                            )}
+                                        </span>
+                                    </div>
+                                    <div className="p-3 bg-muted/30 border border-border">
+                                        <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                                            <Info size={14} />
+                                            <span className="text-xs">
+                                                Conversations
+                                            </span>
+                                        </div>
+                                        <span className="text-lg font-medium">
+                                            {storageUsage.sessions}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Clear button */}
+                                {storageUsage.attachments > 0 && (
+                                    <button
+                                        onClick={handleClearAttachments}
+                                        disabled={clearingStorage}
+                                        className="flex items-center gap-2 px-4 py-2 text-error border border-error/30 hover:bg-error/10 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {clearingStorage ? (
+                                            <Loader2
+                                                size={14}
+                                                className="animate-spin"
+                                            />
+                                        ) : (
+                                            <Trash2 size={14} />
+                                        )}
+                                        <span>
+                                            {clearingStorage
+                                                ? "Clearing..."
+                                                : "Clear All Images"}
+                                        </span>
+                                    </button>
+                                )}
+
+                                {storageUsage.attachments === 0 && (
+                                    <div className="flex items-center gap-2 text-muted-foreground/70 text-sm">
+                                        <Check size={14} />
+                                        <span>No images stored</span>
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="text-sm text-muted-foreground">
+                                Unable to load storage information
                             </div>
                         )}
                     </section>
