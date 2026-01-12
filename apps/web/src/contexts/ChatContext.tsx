@@ -10,7 +10,6 @@ import React, {
 import type { ChatSession, Message, Skill, ThinkingLevel } from "@/lib/types";
 import * as db from "@/lib/db";
 import * as storage from "@/lib/storage";
-import { useSettings } from "./SettingsContext";
 import { v4 as uuid } from "uuid";
 
 interface ChatContextType {
@@ -180,15 +179,22 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 Pick<Message, "content" | "contextContent" | "thinking">
             >,
         ) => {
+            let updatedMessage: Message | undefined;
+
             setMessages((prev) => {
                 const message = prev.find((m) => m.id === id);
                 if (!message) return prev;
 
                 const updated = { ...message, ...updates };
-                db.updateMessage(updated);
+                updatedMessage = updated;
 
                 return prev.map((m) => (m.id === id ? updated : m));
             });
+
+            // Move db update outside setState callback to avoid side effects in state updater
+            if (updatedMessage) {
+                db.updateMessage(updatedMessage);
+            }
         },
         [],
     );
