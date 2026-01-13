@@ -61,9 +61,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     const refreshPromiseRef = useRef<Promise<void> | null>(null);
 
     const refreshModels = useCallback(async () => {
-        const apiKey = storage.getApiKey();
-        if (!apiKey) return;
-
         // Prevent duplicate requests
         if (refreshPromiseRef.current) {
             return refreshPromiseRef.current;
@@ -71,7 +68,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
         setLoadingModels(true);
         try {
-            const promise = fetchModels(apiKey).then((fetchedModels) => {
+            const promise = fetchModels().then((fetchedModels) => {
                 setModels(fetchedModels);
 
                 // Select appropriate default model
@@ -136,7 +133,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     useEffect(() => {
-        if (mounted && storage.getApiKey()) {
+        if (mounted) {
             refreshModels();
         }
     }, [mounted, refreshModels]);
@@ -144,17 +141,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     const setApiKey = (key: string) => {
         storage.setApiKey(key);
         setSettings((prev) => ({ ...prev, apiKey: key }));
-        if (key) {
-            refreshModels();
-        } else {
-            setModels([]);
-        }
     };
 
     const clearApiKey = () => {
         storage.clearApiKey();
         setSettings((prev) => ({ ...prev, apiKey: null }));
-        setModels([]);
     };
 
     const setDefaultModel = (modelId: string) => {

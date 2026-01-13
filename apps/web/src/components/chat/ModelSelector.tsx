@@ -191,7 +191,7 @@ export function ModelSelector({
                                 />
                                 <p>No models available</p>
                                 <p className="text-xs mt-1">
-                                    Add an API key to fetch models
+                                    Failed to load models
                                 </p>
                             </div>
                         )}
