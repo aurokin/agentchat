@@ -141,7 +141,7 @@ function ReasoningSection({ thinking, isStreaming }: ReasoningSectionProps) {
     const [isExpanded, setIsExpanded] = useState(false);
 
     return (
-        <div className="mb-3 inline-flex flex-col max-w-full border border-warning/20 bg-warning/5">
+        <div className="mb-3 inline-flex flex-col max-w-[90%] border border-warning/20 bg-warning/5">
             <button
                 onClick={() => setIsExpanded(!isExpanded)}
                 className="w-full flex items-center gap-2 px-4 py-3 text-warning hover:bg-warning/10 active:bg-warning/15 transition-colors"
@@ -294,25 +294,15 @@ function MessageItem({
             )}
             style={{ animationDelay: `${index * 30}ms` }}
         >
-            <div className="inline-block max-w-[90%] relative group">
-                {/* Copy button */}
-                {message.content && navigator.clipboard && (
-                    <button
-                        onClick={copyToClipboard}
-                        className="absolute top-3 right-3 p-1.5 bg-background/90 border border-border opacity-0 group-hover:opacity-100 transition-all duration-200 hover:border-primary/30 z-10"
-                        title="Copy to clipboard"
-                    >
-                        {copied ? (
-                            <Check size={12} className="text-success" />
-                        ) : (
-                            <Copy size={12} className="text-muted-foreground" />
-                        )}
-                    </button>
+            <div
+                className={cn(
+                    "flex flex-col",
+                    isUser ? "items-end" : "items-start",
                 )}
-
+            >
                 {/* Skill collapsible for user message with skill */}
                 {isSkillMessage && skill && (
-                    <details className="mb-3 inline-flex flex-col max-w-full border border-primary/20 bg-primary/5">
+                    <details className="mb-3 inline-flex flex-col max-w-[90%] border border-primary/20 bg-primary/5">
                         <summary
                             className="flex items-center gap-2 px-4 py-2.5 cursor-pointer select-none text-primary"
                             onClick={() => setShowSkill(!showSkill)}
@@ -349,10 +339,12 @@ function MessageItem({
                 {isUser &&
                     message.attachmentIds &&
                     message.attachmentIds.length > 0 && (
-                        <MessageAttachments
-                            attachmentIds={message.attachmentIds}
-                            onImageClick={onImageClick}
-                        />
+                        <div className="max-w-[90%]">
+                            <MessageAttachments
+                                attachmentIds={message.attachmentIds}
+                                onImageClick={onImageClick}
+                            />
+                        </div>
                     )}
 
                 {/* Reasoning section - collapsible, above message */}
@@ -365,36 +357,56 @@ function MessageItem({
 
                 {/* Main content - hidden while reasoning is streaming */}
                 {!(sending && message.thinking && !message.content) && (
-                    <div
-                        className={cn(
-                            "p-5 prose prose-sm dark:prose-invert max-w-none",
-                            isUser
-                                ? "bg-primary/10 border border-primary/20"
-                                : "bg-background-elevated border border-border prose-headings:text-foreground prose-p:text-foreground prose-pre:bg-muted prose-pre:border prose-pre:border-border prose-code:text-primary",
-                        )}
-                    >
-                        {sending && !message.content ? (
-                            // Show "Generating..." when waiting for content
-                            <div className="flex items-center gap-3 text-muted-foreground">
-                                <div className="typing-indicator flex gap-1">
-                                    <span />
-                                    <span />
-                                    <span />
-                                </div>
-                                <span className="text-sm">Generating...</span>
-                            </div>
-                        ) : message.content ? (
-                            <ReactMarkdown
-                                remarkPlugins={[remarkGfm]}
-                                rehypePlugins={[rehypeHighlight, rehypeRaw]}
+                    <div className="relative group inline-flex max-w-[90%]">
+                        {message.content && navigator.clipboard && (
+                            <button
+                                onClick={copyToClipboard}
+                                className="absolute top-3 right-3 p-1.5 bg-background/90 border border-border opacity-0 group-hover:opacity-100 transition-all duration-200 hover:border-primary/30 z-10"
+                                title="Copy to clipboard"
                             >
-                                {message.content}
-                            </ReactMarkdown>
-                        ) : (
-                            <span className="text-muted-foreground italic">
-                                ...
-                            </span>
+                                {copied ? (
+                                    <Check size={12} className="text-success" />
+                                ) : (
+                                    <Copy
+                                        size={12}
+                                        className="text-muted-foreground"
+                                    />
+                                )}
+                            </button>
                         )}
+                        <div
+                            className={cn(
+                                "p-5 prose prose-sm dark:prose-invert max-w-none",
+                                isUser
+                                    ? "bg-primary/10 border border-primary/20"
+                                    : "bg-background-elevated border border-border prose-headings:text-foreground prose-p:text-foreground prose-pre:bg-muted prose-pre:border prose-pre:border-border prose-code:text-primary",
+                            )}
+                        >
+                            {sending && !message.content ? (
+                                // Show "Generating..." when waiting for content
+                                <div className="flex items-center gap-3 text-muted-foreground">
+                                    <div className="typing-indicator flex gap-1">
+                                        <span />
+                                        <span />
+                                        <span />
+                                    </div>
+                                    <span className="text-sm">
+                                        Generating...
+                                    </span>
+                                </div>
+                            ) : message.content ? (
+                                <ReactMarkdown
+                                    remarkPlugins={[remarkGfm]}
+                                    rehypePlugins={[rehypeHighlight, rehypeRaw]}
+                                >
+                                    {message.content}
+                                </ReactMarkdown>
+                            ) : (
+                                <span className="text-muted-foreground italic">
+                                    ...
+                                </span>
+                            )}
+                        </div>
                     </div>
                 )}
 
