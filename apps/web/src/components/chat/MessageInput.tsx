@@ -249,6 +249,11 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
                             <div className="w-px h-5 bg-border/60" />
                             <SkillSelector disabled={disabled} />
                             <div className="flex-1" />
+                            <SearchToggle
+                                value={searchLevel}
+                                onChange={onSearchChange}
+                                disabled={disabled || !searchSupported}
+                            />
                             {reasoningSupported && (
                                 <ThinkingToggle
                                     value={thinkingLevel}
@@ -256,11 +261,6 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
                                     disabled={disabled}
                                 />
                             )}
-                            <SearchToggle
-                                value={searchLevel}
-                                onChange={onSearchChange}
-                                disabled={disabled || !searchSupported}
-                            />
                         </div>
                         <AttachmentPreview
                             attachments={pendingAttachments}
