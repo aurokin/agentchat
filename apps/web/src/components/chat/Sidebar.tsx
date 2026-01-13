@@ -53,6 +53,7 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
 
     const handleNewChat = async () => {
         await createChat();
+        router.push("/chat");
         if (isMobile) {
             onClose?.();
         }
