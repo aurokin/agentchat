@@ -458,98 +458,100 @@ export default function SettingsPage() {
                         </div>
                     </section>
 
-                    {/* Default Model */}
+                    {/* Conversation Defaults */}
                     <section className="card-deco mb-6">
                         <div className="flex items-center gap-3 mb-4">
                             <div className="w-8 h-8 bg-primary/10 flex items-center justify-center">
-                                <Cpu size={16} className="text-primary" />
+                                <Settings size={16} className="text-primary" />
                             </div>
                             <h2 className="text-lg font-medium">
-                                Default Model
+                                Conversation Defaults
                             </h2>
                         </div>
-                        <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
-                            Set the default model for new conversations. This
-                            can be changed per-chat.
+                        <p className="text-sm text-muted-foreground mb-5 leading-relaxed">
+                            Configure default settings for new conversations.
+                            These can be changed per-chat.
                         </p>
-                        <div>
-                            <label className="label-deco">Model</label>
-                            <ModelSelector
-                                selectedModel={defaultModel}
-                                onModelChange={setDefaultModel}
-                                variant="settings"
-                            />
-                        </div>
-                    </section>
 
-                    {/* Default Thinking Level */}
-                    <section className="card-deco mb-6">
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="w-8 h-8 bg-warning/10 flex items-center justify-center">
-                                <Brain size={16} className="text-warning" />
+                        <div className="space-y-5">
+                            {/* Model */}
+                            <div>
+                                <label className="label-deco flex items-center gap-2">
+                                    <Cpu size={14} className="text-primary" />
+                                    Model
+                                </label>
+                                <ModelSelector
+                                    selectedModel={defaultModel}
+                                    onModelChange={setDefaultModel}
+                                    variant="settings"
+                                />
                             </div>
-                            <h2 className="text-lg font-medium">
-                                Default Thinking Level
-                            </h2>
-                        </div>
-                        <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
-                            Set the default thinking level for new
-                            conversations.
-                        </p>
-                        <div className="flex items-center gap-4">
-                            <ThinkingToggle
-                                value={defaultThinking}
-                                onChange={(value) =>
-                                    setDefaultThinking(value as ThinkingLevel)
-                                }
-                            />
-                            <span className="text-sm text-muted-foreground">
-                                {defaultThinking === "none" &&
-                                    "Thinking disabled"}
-                                {defaultThinking === "minimal" &&
-                                    "Minimal thinking"}
-                                {defaultThinking === "low" &&
-                                    "Low thinking effort"}
-                                {defaultThinking === "medium" &&
-                                    "Medium thinking effort"}
-                                {defaultThinking === "high" &&
-                                    "High thinking effort"}
-                                {defaultThinking === "xhigh" &&
-                                    "Extended thinking"}
-                            </span>
-                        </div>
-                    </section>
 
-                    {/* Default Search */}
-                    <section className="card-deco mb-6">
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="w-8 h-8 bg-accent/10 flex items-center justify-center">
-                                <Globe size={16} className="text-accent" />
+                            {/* Thinking & Search Row */}
+                            <div className="grid grid-cols-2 gap-4">
+                                {/* Thinking */}
+                                <div>
+                                    <label className="label-deco flex items-center gap-2">
+                                        <Brain
+                                            size={14}
+                                            className="text-warning"
+                                        />
+                                        Thinking
+                                    </label>
+                                    <div className="flex items-center gap-3 p-3 bg-background-elevated border border-border">
+                                        <ThinkingToggle
+                                            value={defaultThinking}
+                                            onChange={(value) =>
+                                                setDefaultThinking(
+                                                    value as ThinkingLevel,
+                                                )
+                                            }
+                                        />
+                                        <span className="text-xs text-muted-foreground">
+                                            {defaultThinking === "none" &&
+                                                "Off"}
+                                            {defaultThinking === "minimal" &&
+                                                "Minimal"}
+                                            {defaultThinking === "low" && "Low"}
+                                            {defaultThinking === "medium" &&
+                                                "Medium"}
+                                            {defaultThinking === "high" &&
+                                                "High"}
+                                            {defaultThinking === "xhigh" &&
+                                                "Extended"}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Search */}
+                                <div>
+                                    <label className="label-deco flex items-center gap-2">
+                                        <Globe
+                                            size={14}
+                                            className="text-accent"
+                                        />
+                                        Web Search
+                                    </label>
+                                    <div className="flex items-center gap-3 p-3 bg-background-elevated border border-border">
+                                        <SearchToggle
+                                            value={defaultSearchLevel}
+                                            onChange={(level) =>
+                                                setDefaultSearchLevel(level)
+                                            }
+                                        />
+                                        <span className="text-xs text-muted-foreground">
+                                            {defaultSearchLevel === "none" &&
+                                                "Off"}
+                                            {defaultSearchLevel === "low" &&
+                                                "3 results"}
+                                            {defaultSearchLevel === "medium" &&
+                                                "6 results"}
+                                            {defaultSearchLevel === "high" &&
+                                                "10 results"}
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
-                            <h2 className="text-lg font-medium">
-                                Default Web Search
-                            </h2>
-                        </div>
-                        <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
-                            Set the default web search level for new
-                            conversations.
-                        </p>
-                        <div className="flex items-center gap-4">
-                            <SearchToggle
-                                value={defaultSearchLevel}
-                                onChange={(level) =>
-                                    setDefaultSearchLevel(level)
-                                }
-                            />
-                            <span className="text-sm text-muted-foreground">
-                                {defaultSearchLevel === "none"
-                                    ? "Search disabled by default"
-                                    : defaultSearchLevel === "low"
-                                      ? "3 search results by default"
-                                      : defaultSearchLevel === "medium"
-                                        ? "6 search results by default"
-                                        : "10 search results by default"}
-                            </span>
                         </div>
                     </section>
 
