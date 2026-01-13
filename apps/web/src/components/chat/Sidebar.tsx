@@ -8,6 +8,7 @@ import { formatDistanceToNow } from "date-fns";
 import { Plus, Trash2, Settings, Hexagon } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import * as db from "@/lib/db";
 import { ChatListSkeleton } from "./ChatListSkeleton";
 import {
     useIsMobile,
@@ -23,8 +24,15 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
     const router = useRouter();
-    const { chats, loading, createChat, deleteChat, selectChat, currentChat } =
-        useChat();
+    const {
+        chats,
+        loading,
+        createChat,
+        deleteChat,
+        selectChat,
+        currentChat,
+        messages,
+    } = useChat();
     const { apiKey } = useSettings();
     const isMobile = useIsMobile();
     const isTablet = useIsTablet();
@@ -67,7 +75,17 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
         }
     };
 
-    const requestDeleteChat = (chatId: string) => {
+    const requestDeleteChat = async (chatId: string) => {
+        const hasMessages =
+            currentChat?.id === chatId
+                ? messages.length > 0
+                : (await db.getMessagesByChat(chatId)).length > 0;
+
+        if (!hasMessages) {
+            await deleteChat(chatId);
+            return;
+        }
+
         setPendingDeleteChatId(chatId);
     };
 

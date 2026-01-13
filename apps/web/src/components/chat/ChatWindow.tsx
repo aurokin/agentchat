@@ -21,6 +21,7 @@ import {
     type Attachment,
     type ImageMimeType,
     type ChatSession,
+    type Skill,
 } from "@/lib/types";
 import { saveAttachments, getAttachmentsByMessage } from "@/lib/db";
 import * as storage from "@/lib/storage";
@@ -43,6 +44,30 @@ export function getChatTitleUpdate(
 
     const title = content.slice(0, 50) + (content.length > 50 ? "..." : "");
     return { ...chat, title };
+}
+
+export function getSkillSelectionUpdate({
+    messageCount,
+    defaultSkill,
+    selectedSkill,
+}: {
+    messageCount: number;
+    defaultSkill: Skill | null;
+    selectedSkill: Skill | null;
+}): Skill | null | undefined {
+    if (messageCount > 0) {
+        return undefined;
+    }
+
+    if (defaultSkill && selectedSkill?.id !== defaultSkill.id) {
+        return defaultSkill;
+    }
+
+    if (!defaultSkill && selectedSkill) {
+        return null;
+    }
+
+    return undefined;
 }
 
 export function ChatWindow() {
@@ -71,15 +96,13 @@ export function ChatWindow() {
 
     useEffect(() => {
         if (!currentChat) return;
-        if (messages.length === 0) {
-            if (defaultSkill && selectedSkill?.id !== defaultSkill.id) {
-                setSelectedSkill(defaultSkill, { updateDefault: false });
-            }
-            if (!defaultSkill && selectedSkill) {
-                setSelectedSkill(null, { updateDefault: false });
-            }
-        } else if (selectedSkill) {
-            setSelectedSkill(null, { updateDefault: false });
+        const nextSkill = getSkillSelectionUpdate({
+            messageCount: messages.length,
+            defaultSkill,
+            selectedSkill,
+        });
+        if (nextSkill !== undefined) {
+            setSelectedSkill(nextSkill, { updateDefault: false });
         }
     }, [
         currentChat,
