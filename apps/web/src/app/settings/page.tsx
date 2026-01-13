@@ -38,6 +38,7 @@ import {
     HardDrive,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ModelSelector } from "@/components/chat/ModelSelector";
 
 export default function SettingsPage() {
     const router = useRouter();
@@ -472,21 +473,11 @@ export default function SettingsPage() {
                             can be changed per-chat.
                         </p>
                         <div>
-                            <label
-                                htmlFor="defaultModel"
-                                className="label-deco"
-                            >
-                                Model ID
-                            </label>
-                            <input
-                                id="defaultModel"
-                                type="text"
-                                value={defaultModel}
-                                onChange={(e) =>
-                                    setDefaultModel(e.target.value)
-                                }
-                                placeholder="e.g., anthropic/claude-3.5-sonnet"
-                                className="input-deco font-mono"
+                            <label className="label-deco">Model</label>
+                            <ModelSelector
+                                selectedModel={defaultModel}
+                                onModelChange={setDefaultModel}
+                                variant="settings"
                             />
                         </div>
                     </section>

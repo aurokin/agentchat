@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useEffect, useMemo, useState } from "react";
-import { ChevronDown, Loader2, Cpu, Star, Search } from "lucide-react";
+import { ChevronDown, Cpu, Star, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/contexts/SettingsContext";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -9,11 +9,14 @@ import { Skeleton } from "@/components/ui/Skeleton";
 interface ModelSelectorProps {
     selectedModel: string;
     onModelChange: (modelId: string) => void;
+    /** Variant controls styling: 'compact' for chat input, 'settings' for settings page */
+    variant?: "compact" | "settings";
 }
 
 export function ModelSelector({
     selectedModel,
     onModelChange,
+    variant = "compact",
 }: ModelSelectorProps) {
     const { models, loadingModels, favoriteModels, toggleFavoriteModel } =
         useSettings();
@@ -110,6 +113,15 @@ export function ModelSelector({
         );
     }, [otherModels]);
 
+    // Get display text for the selected model
+    const selectedModelDisplay = useMemo(() => {
+        if (!selectedModel) return "Select a model";
+        const model = models.find((m) => m.id === selectedModel);
+        if (model) return model.name;
+        // Fallback to extracting name from ID
+        return selectedModel.split("/").pop() || selectedModel;
+    }, [selectedModel, models]);
+
     return (
         <div className="relative" ref={containerRef}>
             <button
@@ -117,10 +129,14 @@ export function ModelSelector({
                 onClick={() => !loadingModels && setIsOpen(!isOpen)}
                 disabled={loadingModels}
                 className={cn(
-                    "flex items-center gap-2.5 px-4 py-2.5 bg-background-elevated border border-border transition-all duration-200",
+                    "flex items-center gap-2.5 bg-background-elevated border border-border transition-all duration-200",
                     "hover:border-primary/30 hover:bg-muted/50",
                     isOpen && "border-primary/50",
                     loadingModels && "opacity-50 cursor-not-allowed",
+                    // Variant-specific styles
+                    variant === "compact" && "px-4 py-2.5",
+                    variant === "settings" &&
+                        "w-full px-4 py-3 justify-between",
                 )}
             >
                 {loadingModels ? (
@@ -130,17 +146,29 @@ export function ModelSelector({
                     </>
                 ) : (
                     <>
-                        <Cpu size={14} className="text-primary" />
-                        <span className="text-sm font-medium max-w-48 truncate">
-                            {selectedModel.split("/").pop() || selectedModel}
-                        </span>
+                        <div className="flex items-center gap-2.5 min-w-0">
+                            <Cpu
+                                size={variant === "settings" ? 16 : 14}
+                                className="text-primary flex-shrink-0"
+                            />
+                            <span
+                                className={cn(
+                                    "font-medium truncate",
+                                    variant === "compact" && "text-sm max-w-48",
+                                    variant === "settings" && "text-sm",
+                                    !selectedModel && "text-muted-foreground",
+                                )}
+                            >
+                                {selectedModelDisplay}
+                            </span>
+                        </div>
                     </>
                 )}
                 {!loadingModels && (
                     <ChevronDown
-                        size={14}
+                        size={variant === "settings" ? 16 : 14}
                         className={cn(
-                            "text-muted-foreground transition-transform",
+                            "text-muted-foreground transition-transform flex-shrink-0",
                             isOpen && "rotate-180",
                         )}
                     />
@@ -148,7 +176,14 @@ export function ModelSelector({
             </button>
 
             {isOpen && (
-                <div className="absolute z-[100] w-80 bg-background-elevated border border-border shadow-deco-elevated bottom-full mb-2 animate-fade-in flex flex-col">
+                <div
+                    className={cn(
+                        "absolute z-[100] bg-background-elevated border border-border shadow-deco-elevated animate-fade-in flex flex-col",
+                        // Variant-specific positioning and sizing
+                        variant === "compact" && "w-80 bottom-full mb-2",
+                        variant === "settings" && "w-full top-full mt-1",
+                    )}
+                >
                     {/* Search input - sticky at top */}
                     <div className="p-2 border-b border-border bg-background-elevated sticky top-0 z-10">
                         <div className="relative">
