@@ -139,15 +139,6 @@ interface ReasoningSectionProps {
 
 function ReasoningSection({ thinking, isStreaming }: ReasoningSectionProps) {
     const [isExpanded, setIsExpanded] = useState(false);
-    const [copied, setCopied] = useState(false);
-
-    const copyToClipboard = async (e: React.MouseEvent) => {
-        e.stopPropagation();
-        if (!navigator.clipboard) return;
-        await navigator.clipboard.writeText(thinking);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    };
 
     return (
         <div className="mb-3 inline-flex flex-col max-w-full border border-warning/20 bg-warning/5">
@@ -173,20 +164,6 @@ function ReasoningSection({ thinking, isStreaming }: ReasoningSectionProps) {
                             <span />
                         </span>
                     </span>
-                )}
-
-                {!isStreaming && navigator.clipboard && (
-                    <button
-                        onClick={copyToClipboard}
-                        className="ml-auto p-2.5 -mr-1 hover:bg-warning/20 active:bg-warning/30 transition-colors"
-                        title="Copy reasoning"
-                    >
-                        {copied ? (
-                            <Check size={14} className="text-success" />
-                        ) : (
-                            <Copy size={14} />
-                        )}
-                    </button>
                 )}
             </button>
             {isExpanded && (
