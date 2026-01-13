@@ -560,6 +560,15 @@ export default function SettingsPage() {
                                                     <KeyCaps>↓</KeyCaps>
                                                 </div>
                                             </div>
+                                            <div className="flex items-center justify-between gap-3">
+                                                <span className="text-sm">
+                                                    Latest conversation
+                                                </span>
+                                                <div className="flex items-center gap-1">
+                                                    <KeyCaps>Cmd/Ctrl</KeyCaps>
+                                                    <KeyCaps>←</KeyCaps>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                     <div className="border border-border bg-muted/20 p-4 space-y-3">

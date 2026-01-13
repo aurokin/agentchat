@@ -87,6 +87,17 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
         [chats, currentChat, isMobile, onClose, router, selectChat],
     );
 
+    const focusLatestChat = useCallback(async () => {
+        const latestChat = chats[0];
+        if (!latestChat) return;
+        if (currentChat?.id === latestChat.id) return;
+        await selectChat(latestChat.id);
+        router.push("/chat");
+        if (isMobile) {
+            onClose?.();
+        }
+    }, [chats, currentChat?.id, isMobile, onClose, router, selectChat]);
+
     const deleteChatAndSelectNext = useCallback(
         async (chatId: string) => {
             const chatIndex = chats.findIndex((chat) => chat.id === chatId);
@@ -181,6 +192,13 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                 event.preventDefault();
                 event.stopPropagation();
                 focusChatByOffset(1);
+                return;
+            }
+
+            if (hasModifier && !event.shiftKey && key === "arrowleft") {
+                event.preventDefault();
+                event.stopPropagation();
+                void focusLatestChat();
             }
         };
 
@@ -189,6 +207,7 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
     }, [
         currentChat,
         focusChatByOffset,
+        focusLatestChat,
         handleNewChat,
         isKeybindingBlocked,
         requestDeleteChat,
