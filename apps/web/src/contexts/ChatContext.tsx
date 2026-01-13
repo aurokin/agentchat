@@ -160,11 +160,18 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             setMessages((prev) => [...prev, newMessage]);
 
             if (currentChat) {
-                const updated = { ...currentChat, updatedAt: Date.now() };
+                const latestChat = await db.getChat(currentChat.id);
+                const updated = {
+                    ...(latestChat ?? currentChat),
+                    updatedAt: Date.now(),
+                };
                 await db.updateChat(updated);
                 setChats((prev) =>
-                    prev.map((c) => (c.id === currentChat.id ? updated : c)),
+                    prev.map((c) => (c.id === updated.id ? updated : c)),
                 );
+                if (currentChat?.id === updated.id) {
+                    setCurrentChat(updated);
+                }
             }
 
             return newMessage;

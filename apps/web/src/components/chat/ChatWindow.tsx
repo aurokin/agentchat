@@ -154,6 +154,15 @@ export function ChatWindow() {
                 attachmentIds,
             });
 
+            const updatedChat = getChatTitleUpdate(
+                currentChatRef.current,
+                content,
+                messages.length,
+            );
+            if (updatedChat) {
+                await updateChat(updatedChat);
+            }
+
             // Build messages array with attachments for API
             const currentMessages: Array<{
                 role: string;
@@ -235,15 +244,6 @@ export function ChatWindow() {
                     });
                 },
             );
-
-            const updatedChat = getChatTitleUpdate(
-                currentChatRef.current,
-                content,
-                messages.length,
-            );
-            if (updatedChat) {
-                updateChat(updatedChat);
-            }
         } catch (err) {
             if (err instanceof OpenRouterApiError) {
                 setError({
