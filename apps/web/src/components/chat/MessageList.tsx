@@ -150,7 +150,7 @@ function ReasoningSection({ thinking, isStreaming }: ReasoningSectionProps) {
     };
 
     return (
-        <div className="mb-3 border border-warning/20 bg-warning/5">
+        <div className="mb-3 inline-flex flex-col max-w-full border border-warning/20 bg-warning/5">
             <button
                 onClick={() => setIsExpanded(!isExpanded)}
                 className="w-full flex items-center gap-2 px-4 py-3 text-warning hover:bg-warning/10 active:bg-warning/15 transition-colors"
