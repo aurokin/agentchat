@@ -877,7 +877,7 @@ export default function SettingsPage() {
                         </p>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground/70">
                             <div className="w-1.5 h-1.5 bg-primary rounded-full" />
-                            <span>Version 0.1.0</span>
+                            <span>Version 0.1.1</span>
                         </div>
                     </section>
                 </div>
