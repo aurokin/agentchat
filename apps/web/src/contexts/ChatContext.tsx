@@ -37,6 +37,7 @@ interface ChatContextType {
         thinkingLevel?: ThinkingLevel;
         searchLevel?: SearchLevel;
         attachmentIds?: string[];
+        chatId?: string;
     }) => Promise<Message>;
     updateMessage: (
         id: string,
@@ -142,8 +143,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             thinkingLevel?: ThinkingLevel;
             searchLevel?: SearchLevel;
             attachmentIds?: string[];
+            chatId?: string;
         }): Promise<Message> => {
-            if (!currentChat) {
+            const targetChatId = message.chatId ?? currentChat?.id;
+            if (!targetChatId) {
                 throw new Error("No current chat selected");
             }
 
@@ -157,24 +160,29 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 thinkingLevel: message.thinkingLevel,
                 searchLevel: message.searchLevel,
                 attachmentIds: message.attachmentIds,
-                sessionId: currentChat.id,
+                sessionId: targetChatId,
                 id: uuid(),
                 createdAt: Date.now(),
             };
 
             await db.createMessage(newMessage);
-            setMessages((prev) => [...prev, newMessage]);
+            if (currentChat?.id === targetChatId) {
+                setMessages((prev) => [...prev, newMessage]);
+            }
 
-            if (currentChat) {
-                const latestChat = await db.getChat(currentChat.id);
+            const baseChat = await db.getChat(targetChatId);
+            if (baseChat ?? (currentChat?.id === targetChatId && currentChat)) {
                 const updated = {
-                    ...(latestChat ?? currentChat),
+                    ...(baseChat ?? currentChat!),
                     updatedAt: Date.now(),
                 };
                 await db.updateChat(updated);
-                setChats((prev) =>
-                    prev.map((c) => (c.id === updated.id ? updated : c)),
-                );
+                setChats((prev) => {
+                    if (!prev.some((c) => c.id === updated.id)) {
+                        return prev;
+                    }
+                    return prev.map((c) => (c.id === updated.id ? updated : c));
+                });
                 if (currentChat?.id === updated.id) {
                     setCurrentChat(updated);
                 }
@@ -204,9 +212,15 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 return prev.map((m) => (m.id === id ? updated : m));
             });
 
-            // Move db update outside setState callback to avoid side effects in state updater
             if (updatedMessage) {
-                db.updateMessage(updatedMessage);
+                await db.updateMessage(updatedMessage);
+                return;
+            }
+
+            const database = await db.getDB();
+            const message = await database.get("messages", id);
+            if (message) {
+                await database.put("messages", { ...message, ...updates });
             }
         },
         [],

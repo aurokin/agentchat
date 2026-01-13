@@ -88,11 +88,6 @@ export function ChatWindow() {
         contextContent: string;
     } | null>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
-    const currentChatRef = useRef(currentChat);
-
-    useEffect(() => {
-        currentChatRef.current = currentChat;
-    }, [currentChat]);
 
     useEffect(() => {
         if (!currentChat) return;
@@ -123,6 +118,9 @@ export function ChatWindow() {
         content: string,
         pendingAttachments?: PendingAttachment[],
     ) => {
+        const chatSnapshot = currentChat;
+        const messagesSnapshot = messages;
+
         if (!apiKey) {
             setError({
                 message: "Please add your OpenRouter API key in Settings",
@@ -131,7 +129,7 @@ export function ChatWindow() {
             return;
         }
 
-        if (!currentChat) {
+        if (!chatSnapshot) {
             setError({ message: "No chat selected", isRetryable: false });
             return;
         }
@@ -147,25 +145,25 @@ export function ChatWindow() {
 
         try {
             const currentModel = models.find(
-                (m) => m.id === currentChat.modelId,
+                (m) => m.id === chatSnapshot.modelId,
             );
             const supportsReasoning = modelSupportsReasoning(currentModel);
             const supportsSearch = modelSupportsSearch(currentModel);
 
-            storage.setDefaultModel(currentChat.modelId);
+            storage.setDefaultModel(chatSnapshot.modelId);
             if (supportsReasoning) {
-                storage.setDefaultThinking(currentChat.thinking);
+                storage.setDefaultThinking(chatSnapshot.thinking);
             }
             if (supportsSearch) {
-                storage.setDefaultSearchLevel(currentChat.searchLevel);
+                storage.setDefaultSearchLevel(chatSnapshot.searchLevel);
             }
 
             const effectiveThinking = supportsReasoning
-                ? currentChat.thinking
+                ? chatSnapshot.thinking
                 : "none";
             const effectiveSearchLevel: SearchLevel =
-                supportsSearch && currentChat.searchLevel !== "none"
-                    ? currentChat.searchLevel
+                supportsSearch && chatSnapshot.searchLevel !== "none"
+                    ? chatSnapshot.searchLevel
                     : "none";
 
             const contextContent = skillForMessage
@@ -205,16 +203,17 @@ export function ChatWindow() {
                 content: content,
                 contextContent: contextContent,
                 skill: clonedSkill,
-                modelId: currentChat.modelId,
+                modelId: chatSnapshot.modelId,
                 thinkingLevel: effectiveThinking,
                 searchLevel: effectiveSearchLevel,
                 attachmentIds,
+                chatId: chatSnapshot.id,
             });
 
             const updatedChat = getChatTitleUpdate(
-                currentChatRef.current,
+                chatSnapshot,
                 content,
-                messages.length,
+                messagesSnapshot.length,
             );
             if (updatedChat) {
                 await updateChat(updatedChat);
@@ -227,7 +226,7 @@ export function ChatWindow() {
             }> = [];
 
             // Add past messages with their attachments
-            for (const m of messages) {
+            for (const m of messagesSnapshot) {
                 let messageContent: MessageContent = m.contextContent;
 
                 // Load attachments if present
@@ -274,9 +273,10 @@ export function ChatWindow() {
                 content: "",
                 contextContent: "",
                 skill: null,
-                modelId: currentChat.modelId,
+                modelId: chatSnapshot.modelId,
                 thinkingLevel: effectiveThinking,
                 searchLevel: effectiveSearchLevel,
+                chatId: chatSnapshot.id,
             });
 
             let fullResponse = "";
@@ -285,7 +285,7 @@ export function ChatWindow() {
             await sendMessage(
                 apiKey,
                 currentMessages,
-                currentChat,
+                chatSnapshot,
                 currentModel,
                 (chunk, thinking) => {
                     if (thinking !== undefined) {
