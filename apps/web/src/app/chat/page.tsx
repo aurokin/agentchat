@@ -24,23 +24,5 @@ export default function ChatPage() {
         }
     }, [initialized, currentChat, loading, chats, createChat, selectChat]);
 
-    // Ctrl + Shift + O to create new chat
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (
-                (e.ctrlKey || e.metaKey) &&
-                e.shiftKey &&
-                e.key.toLowerCase() === "o"
-            ) {
-                e.preventDefault();
-                e.stopPropagation();
-                createChat();
-            }
-        };
-
-        window.addEventListener("keydown", handleKeyDown, true);
-        return () => window.removeEventListener("keydown", handleKeyDown, true);
-    }, [createChat]);
-
     return <ChatLayout />;
 }

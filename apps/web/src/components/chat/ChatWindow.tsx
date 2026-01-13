@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useChat } from "@/contexts/ChatContext";
 import { useSettings } from "@/contexts/SettingsContext";
 import {
@@ -32,6 +33,22 @@ interface ErrorState {
     message: string;
     isRetryable: boolean;
 }
+
+const isKeybindingBlocked = () => {
+    if (typeof document === "undefined") return false;
+    return Boolean(
+        document.querySelector(
+            "[data-keybinding-scope='modal'][data-keybinding-open='true'], [data-keybinding-scope='dropdown'][data-keybinding-open='true']",
+        ),
+    );
+};
+
+const isTypingTarget = (target: EventTarget | null) => {
+    if (!(target instanceof HTMLElement)) return false;
+    if (target.isContentEditable) return true;
+    const tag = target.tagName;
+    return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+};
 
 export function getChatTitleUpdate(
     chat: ChatSession | null,
@@ -71,6 +88,7 @@ export function getSkillSelectionUpdate({
 }
 
 export function ChatWindow() {
+    const router = useRouter();
     const {
         currentChat,
         messages,
@@ -79,8 +97,15 @@ export function ChatWindow() {
         updateChat,
         createChat,
     } = useChat();
-    const { apiKey, selectedSkill, defaultSkill, setSelectedSkill, models } =
-        useSettings();
+    const {
+        apiKey,
+        selectedSkill,
+        defaultSkill,
+        setSelectedSkill,
+        models,
+        favoriteModels,
+        skills,
+    } = useSettings();
     const [sending, setSending] = useState(false);
     const [error, setError] = useState<ErrorState | null>(null);
     const [retryChat, setRetryChat] = useState<{
@@ -113,6 +138,144 @@ export function ChatWindow() {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentChat?.id]);
+
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (isKeybindingBlocked()) return;
+
+            const key = event.key.toLowerCase();
+            const hasModifier = event.ctrlKey || event.metaKey;
+
+            if (
+                !hasModifier &&
+                !event.shiftKey &&
+                !event.altKey &&
+                key === "/"
+            ) {
+                if (isTypingTarget(event.target)) return;
+                event.preventDefault();
+                inputRef.current?.focus();
+                return;
+            }
+
+            if (
+                hasModifier &&
+                !event.shiftKey &&
+                !event.altKey &&
+                key === ","
+            ) {
+                event.preventDefault();
+                router.push("/settings");
+                return;
+            }
+
+            if (!currentChat) return;
+
+            if (hasModifier && event.altKey && !event.shiftKey && key === "m") {
+                const availableFavorites = favoriteModels.filter((modelId) =>
+                    models.some((model) => model.id === modelId),
+                );
+                if (availableFavorites.length === 0) return;
+                const currentIndex = availableFavorites.indexOf(
+                    currentChat.modelId,
+                );
+                const nextIndex =
+                    currentIndex === -1
+                        ? 0
+                        : (currentIndex + 1) % availableFavorites.length;
+                const nextModelId = availableFavorites[nextIndex];
+                if (nextModelId && nextModelId !== currentChat.modelId) {
+                    event.preventDefault();
+                    void updateChat({ ...currentChat, modelId: nextModelId });
+                }
+                return;
+            }
+
+            if (hasModifier && event.altKey && !event.shiftKey && key === "s") {
+                event.preventDefault();
+                const skillSequence = [null, ...skills];
+                const currentIndex = selectedSkill
+                    ? skillSequence.findIndex(
+                          (skill) => skill?.id === selectedSkill.id,
+                      )
+                    : 0;
+                const nextIndex =
+                    (currentIndex + 1) % Math.max(skillSequence.length, 1);
+                const nextSkill = skillSequence[nextIndex] ?? null;
+                setSelectedSkill(nextSkill);
+                return;
+            }
+
+            if (hasModifier && event.altKey && !event.shiftKey && key === "n") {
+                event.preventDefault();
+                setSelectedSkill(null);
+                return;
+            }
+
+            if (hasModifier && event.altKey && !event.shiftKey) {
+                const level = Number.parseInt(key, 10);
+                if (!Number.isNaN(level) && level >= 0 && level <= 5) {
+                    const currentModel = models.find(
+                        (model) => model.id === currentChat.modelId,
+                    );
+                    if (!modelSupportsReasoning(currentModel)) return;
+                    const levels: ThinkingLevel[] = [
+                        "none",
+                        "minimal",
+                        "low",
+                        "medium",
+                        "high",
+                        "xhigh",
+                    ];
+                    const nextLevel = levels[level];
+                    if (nextLevel) {
+                        event.preventDefault();
+                        void updateChat({
+                            ...currentChat,
+                            thinking: nextLevel,
+                        });
+                    }
+                    return;
+                }
+            }
+
+            if (hasModifier && event.shiftKey && !event.altKey) {
+                const level = Number.parseInt(key, 10);
+                if (!Number.isNaN(level) && level >= 0 && level <= 3) {
+                    const currentModel = models.find(
+                        (model) => model.id === currentChat.modelId,
+                    );
+                    if (!modelSupportsSearch(currentModel)) return;
+                    const levels: SearchLevel[] = [
+                        "none",
+                        "low",
+                        "medium",
+                        "high",
+                    ];
+                    const nextLevel = levels[level];
+                    if (nextLevel) {
+                        event.preventDefault();
+                        void updateChat({
+                            ...currentChat,
+                            searchLevel: nextLevel,
+                        });
+                    }
+                }
+            }
+        };
+
+        window.addEventListener("keydown", handleKeyDown, true);
+        return () => window.removeEventListener("keydown", handleKeyDown, true);
+    }, [
+        currentChat,
+        favoriteModels,
+        models,
+        router,
+        selectedSkill,
+        setSelectedSkill,
+        skills,
+        updateChat,
+    ]);
 
     const handleSendMessage = async (
         content: string,

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useChat } from "@/contexts/ChatContext";
 import { useSettings } from "@/contexts/SettingsContext";
@@ -50,6 +50,43 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
 
     const isMobileActionMode = isMobile || isTablet || isTouchDevice;
 
+    const handleNewChat = useCallback(async () => {
+        await createChat();
+        router.push("/chat");
+        if (isMobile) {
+            onClose?.();
+        }
+    }, [createChat, isMobile, onClose, router]);
+
+    const isKeybindingBlocked = useCallback(() => {
+        if (typeof document === "undefined") return false;
+        return Boolean(
+            document.querySelector(
+                "[data-keybinding-scope='modal'][data-keybinding-open='true'], [data-keybinding-scope='dropdown'][data-keybinding-open='true']",
+            ),
+        );
+    }, []);
+
+    const focusChatByOffset = useCallback(
+        async (offset: number) => {
+            if (chats.length === 0) return;
+            const currentIndex = currentChat
+                ? chats.findIndex((chat) => chat.id === currentChat.id)
+                : -1;
+            const baseIndex = currentIndex === -1 ? 0 : currentIndex;
+            const nextIndex =
+                (baseIndex + offset + chats.length) % chats.length;
+            const targetChat = chats[nextIndex];
+            if (!targetChat) return;
+            await selectChat(targetChat.id);
+            router.push("/chat");
+            if (isMobile) {
+                onClose?.();
+            }
+        },
+        [chats, currentChat, isMobile, onClose, router, selectChat],
+    );
+
     useEffect(() => {
         /* eslint-disable react-hooks/set-state-in-effect */
         const macCheck =
@@ -59,13 +96,37 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
         /* eslint-enable react-hooks/set-state-in-effect */
     }, []);
 
-    const handleNewChat = async () => {
-        await createChat();
-        router.push("/chat");
-        if (isMobile) {
-            onClose?.();
-        }
-    };
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (isKeybindingBlocked()) return;
+
+            const key = event.key.toLowerCase();
+            const hasModifier = event.ctrlKey || event.metaKey;
+
+            if (hasModifier && event.shiftKey && key === "o") {
+                event.preventDefault();
+                event.stopPropagation();
+                handleNewChat();
+                return;
+            }
+
+            if (hasModifier && !event.shiftKey && key === "arrowup") {
+                event.preventDefault();
+                event.stopPropagation();
+                focusChatByOffset(-1);
+                return;
+            }
+
+            if (hasModifier && !event.shiftKey && key === "arrowdown") {
+                event.preventDefault();
+                event.stopPropagation();
+                focusChatByOffset(1);
+            }
+        };
+
+        window.addEventListener("keydown", handleKeyDown, true);
+        return () => window.removeEventListener("keydown", handleKeyDown, true);
+    }, [focusChatByOffset, handleNewChat, isKeybindingBlocked]);
 
     const handleSelectChat = (chatId: string) => {
         selectChat(chatId);

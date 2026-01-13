@@ -123,7 +123,12 @@ export function ModelSelector({
     }, [selectedModel, models]);
 
     return (
-        <div className="relative" ref={containerRef}>
+        <div
+            className="relative"
+            ref={containerRef}
+            data-keybinding-scope="dropdown"
+            data-keybinding-open={isOpen ? "true" : "false"}
+        >
             <button
                 type="button"
                 onClick={() => !loadingModels && setIsOpen(!isOpen)}
