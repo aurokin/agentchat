@@ -332,7 +332,7 @@ export function ChatWindow() {
 
                         <h2 className="text-4xl font-light mb-3 tracking-tight">
                             Welcome to{" "}
-                            <span className="font-semibold text-gradient-gold">
+                            <span className="font-semibold text-gradient-primary">
                                 RouterChat
                             </span>
                         </h2>

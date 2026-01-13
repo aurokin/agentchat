@@ -582,11 +582,12 @@ body {
     border: 1px solid var(--border-accent);
 }
 
-.text-gradient-gold {
+.text-gradient-primary {
     background: linear-gradient(
         135deg,
         var(--primary) 0%,
-        #f5d76e 50%,
+        #d4dcff 45%,
+        #c9d1df 70%,
         var(--primary) 100%
     );
     -webkit-background-clip: text;
