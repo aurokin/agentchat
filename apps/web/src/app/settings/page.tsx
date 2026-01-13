@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { Sidebar } from "@/components/chat/Sidebar";
+import { useChat } from "@/contexts/ChatContext";
 import { useSettings } from "@/contexts/SettingsContext";
 import { validateApiKey } from "@/lib/openrouter";
 import type { Skill } from "@/lib/types";
@@ -34,7 +36,25 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+const isKeybindingBlocked = () => {
+    if (typeof document === "undefined") return false;
+    return Boolean(
+        document.querySelector(
+            "[data-keybinding-scope='modal'][data-keybinding-open='true'], [data-keybinding-scope='dropdown'][data-keybinding-open='true']",
+        ),
+    );
+};
+
+const isTypingTarget = (target: EventTarget | null) => {
+    if (!(target instanceof HTMLElement)) return false;
+    if (target.isContentEditable) return true;
+    const tag = target.tagName;
+    return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+};
+
 export default function SettingsPage() {
+    const router = useRouter();
+    const { currentChat, clearCurrentChat } = useChat();
     const {
         apiKey,
         setApiKey,
@@ -78,7 +98,31 @@ export default function SettingsPage() {
         loadStorageUsage();
     }, [loadStorageUsage]);
 
-    // Clear old attachments
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (isKeybindingBlocked()) return;
+
+            if (isTypingTarget(event.target)) return;
+
+            if (event.shiftKey || event.altKey) return;
+
+            const key = event.key.toLowerCase();
+            const hasModifier = event.metaKey || event.ctrlKey;
+
+            if (!hasModifier || key !== "," || event.repeat) return;
+
+            event.preventDefault();
+            event.stopPropagation();
+            if (!currentChat) {
+                clearCurrentChat();
+            }
+            router.push("/chat");
+        };
+
+        window.addEventListener("keydown", handleKeyDown, true);
+        return () => window.removeEventListener("keydown", handleKeyDown, true);
+    }, [clearCurrentChat, currentChat, router]);
+
     const handleClearAttachments = async () => {
         if (
             !confirm(
@@ -472,7 +516,7 @@ export default function SettingsPage() {
                                     dropdowns take priority, then global
                                     bindings, then chat-only actions.
                                 </p>
-                                <div className="grid gap-4 md:grid-cols-2">
+                                <div className="space-y-4">
                                     <div className="border border-border bg-muted/20 p-4 space-y-3">
                                         <div className="text-xs uppercase tracking-wider text-muted-foreground">
                                             Global
@@ -521,7 +565,7 @@ export default function SettingsPage() {
                                             </div>
                                             <div className="flex items-center justify-between gap-3">
                                                 <span className="text-sm">
-                                                    Open settings
+                                                    Toggle settings
                                                 </span>
                                                 <div className="flex items-center gap-1">
                                                     <KeyCaps>Cmd/Ctrl</KeyCaps>
