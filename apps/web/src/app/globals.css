@@ -132,81 +132,98 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   NOIR DECO DESIGN SYSTEM
-   Art Deco-inspired luxury interface with geometric elegance
+   MIDNIGHT SLATE - Dark Mode
+   Cool, refined dark theme with exceptional contrast and clarity
    ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
-    /* Base - Deep noir foundation */
-    --background: #0a0f14;
-    --background-elevated: #0f151c;
-    --foreground: #f5f0e8;
-    --foreground-muted: #a8a29e;
+    /* Base - Cool midnight foundation */
+    --background: #0b0d12;
+    --background-elevated: #13161d;
+    --foreground: #eaecf0;
+    --foreground-muted: #8b919e;
 
-    /* Champagne Gold - Primary accent */
-    --primary: #d4af37;
-    --primary-glow: rgba(212, 175, 55, 0.15);
-    --primary-foreground: #0a0f14;
+    /* Soft Periwinkle - Primary accent */
+    --primary: #a5b4fc;
+    --primary-glow: rgba(165, 180, 252, 0.15);
+    --primary-foreground: #0b0d12;
 
-    /* Slate Rose - Secondary accent */
-    --secondary: #c9a9a6;
-    --secondary-foreground: #0a0f14;
+    /* Soft Mint - Secondary accent */
+    --secondary: #86efac;
+    --secondary-foreground: #0b0d12;
 
-    /* Deep Teal - Tertiary accent */
-    --accent: #2dd4bf;
-    --accent-foreground: #0a0f14;
+    /* Dusty Rose - Tertiary accent */
+    --accent: #f9a8d4;
+    --accent-foreground: #0b0d12;
 
     /* UI Surface colors */
-    --muted: #151c24;
-    --muted-foreground: #78716c;
-    --border: #2a3441;
-    --border-accent: rgba(212, 175, 55, 0.3);
-    --input: #151c24;
-    --ring: #d4af37;
+    --muted: #1a1d26;
+    --muted-foreground: #6b7280;
+    --border: #252a36;
+    --border-accent: rgba(165, 180, 252, 0.25);
+    --input: #1a1d26;
+    --ring: #a5b4fc;
 
     /* Status palette */
+    --success: #34d399;
+    --warning: #fbbf24;
+    --error: #f87171;
+
+    /* Design tokens */
+    --radius: 2px;
+    --shadow-deco:
+        0 4px 24px -4px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(165, 180, 252, 0.08);
+    --shadow-elevated:
+        0 8px 32px -8px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(165, 180, 252, 0.12);
+    --shadow-glow: 0 0 24px rgba(165, 180, 252, 0.15);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DREAMSICLE - Light Mode
+   Warm, soft peachy cream with vibrant orange accents
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.light {
+    /* Base - Soft peachy cream */
+    --background: #fdf8f3;
+    --background-elevated: #ffffff;
+    --foreground: #2a2523;
+    --foreground-muted: #7a706a;
+
+    /* Dreamsicle Orange - Primary accent */
+    --primary: #f97316;
+    --primary-glow: rgba(249, 115, 22, 0.12);
+    --primary-foreground: #ffffff;
+
+    /* Soft Peach - Secondary accent */
+    --secondary: #fdba74;
+    --secondary-foreground: #2a2523;
+
+    /* Deep Terracotta - Tertiary accent */
+    --accent: #ea580c;
+    --accent-foreground: #ffffff;
+
+    /* UI Surface colors */
+    --muted: #fef3eb;
+    --muted-foreground: #9a8d85;
+    --border: #f5e6da;
+    --border-accent: rgba(249, 115, 22, 0.3);
+    --input: #ffffff;
+    --ring: #f97316;
+
+    /* Status palette - warmer variants */
     --success: #22c55e;
     --warning: #f59e0b;
     --error: #ef4444;
 
     /* Design tokens */
-    --radius: 2px;
     --shadow-deco:
-        0 4px 24px -4px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(212, 175, 55, 0.1);
+        0 4px 24px -4px rgba(42, 37, 35, 0.08),
+        0 0 0 1px rgba(249, 115, 22, 0.08);
     --shadow-elevated:
-        0 8px 32px -8px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(212, 175, 55, 0.15);
-    --shadow-glow: 0 0 20px rgba(212, 175, 55, 0.2);
-}
-
-.light {
-    /* Light theme - Cream & Gold */
-    --background: #faf8f5;
-    --background-elevated: #ffffff;
-    --foreground: #1c1917;
-    --foreground-muted: #78716c;
-
-    --primary: #b8860b;
-    --primary-glow: rgba(184, 134, 11, 0.1);
-    --primary-foreground: #faf8f5;
-
-    --secondary: #9f8483;
-    --secondary-foreground: #faf8f5;
-
-    --accent: #0d9488;
-    --accent-foreground: #faf8f5;
-
-    --muted: #f5f0e8;
-    --muted-foreground: #a8a29e;
-    --border: #e7e0d6;
-    --border-accent: rgba(184, 134, 11, 0.3);
-    --input: #ffffff;
-    --ring: #b8860b;
-
-    --shadow-deco:
-        0 4px 24px -4px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(184, 134, 11, 0.1);
-    --shadow-elevated:
-        0 8px 32px -8px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(184, 134, 11, 0.15);
-    --shadow-glow: 0 0 20px rgba(184, 134, 11, 0.15);
+        0 8px 32px -8px rgba(42, 37, 35, 0.12),
+        0 0 0 1px rgba(249, 115, 22, 0.12);
+    --shadow-glow: 0 0 24px rgba(249, 115, 22, 0.15);
 }
 
 * {
@@ -303,14 +320,15 @@ body {
 }
 
 .btn-deco-primary {
-    background: linear-gradient(135deg, var(--primary) 0%, #c9a227 100%);
+    background: var(--primary);
     color: var(--primary-foreground);
     border-color: var(--primary);
     font-weight: 500;
 }
 
 .btn-deco-primary:hover {
-    background: linear-gradient(135deg, #e5c048 0%, var(--primary) 100%);
+    background: var(--accent);
+    border-color: var(--accent);
 }
 
 .btn-deco-secondary {

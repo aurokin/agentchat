@@ -139,7 +139,7 @@ function ReasoningSection({ thinking, isStreaming }: ReasoningSectionProps) {
     const [isExpanded, setIsExpanded] = useState(false);
 
     return (
-        <div className="mb-3 inline-flex flex-col max-w-[90%] border border-warning/20 bg-warning/5">
+        <div className="mb-3 inline-flex flex-col max-w-[90%] border border-warning/30 bg-warning/15">
             <button
                 onClick={() => setIsExpanded(!isExpanded)}
                 className="w-full flex items-center gap-2 px-4 py-3 text-warning hover:bg-warning/10 active:bg-warning/15 transition-colors"
@@ -165,8 +165,8 @@ function ReasoningSection({ thinking, isStreaming }: ReasoningSectionProps) {
                 )}
             </button>
             {isExpanded && (
-                <div className="px-4 pb-3 border-t border-warning/10">
-                    <p className="text-warning/80 text-sm whitespace-pre-wrap mono leading-relaxed pt-3 max-h-64 sm:max-h-96 overflow-y-auto">
+                <div className="px-4 pb-3 border-t border-warning/20">
+                    <p className="text-foreground text-sm whitespace-pre-wrap mono leading-relaxed pt-3 max-h-64 sm:max-h-96 overflow-y-auto">
                         {thinking}
                     </p>
                 </div>
@@ -290,7 +290,7 @@ function MessageItem({
             >
                 {/* Skill collapsible for user message with skill */}
                 {isSkillMessage && skill && (
-                    <details className="mb-3 inline-flex flex-col max-w-[90%] border border-primary/20 bg-primary/5">
+                    <details className="mb-3 inline-flex flex-col max-w-[90%] border border-primary/30 bg-primary/15">
                         <summary
                             className="flex items-center gap-2 px-4 py-2.5 cursor-pointer select-none text-primary"
                             onClick={() => setShowSkill(!showSkill)}
@@ -310,13 +310,13 @@ function MessageItem({
                                 <ChevronLeft size={14} className="ml-2" />
                             )}
                         </summary>
-                        <div className="px-4 pb-3 text-sm border-t border-primary/10">
+                        <div className="px-4 pb-3 text-sm border-t border-primary/20">
                             {skill.description && (
-                                <p className="text-muted-foreground py-2">
+                                <p className="text-foreground py-2">
                                     {skill.description}
                                 </p>
                             )}
-                            <div className="p-3 bg-muted/50 border border-border mono text-xs whitespace-pre-wrap text-muted-foreground max-h-40 overflow-y-auto">
+                            <div className="p-3 bg-muted/50 border border-border mono text-xs whitespace-pre-wrap text-foreground max-h-40 overflow-y-auto">
                                 {skill.prompt}
                             </div>
                         </div>
@@ -350,7 +350,7 @@ function MessageItem({
                             className={cn(
                                 "p-5 prose prose-sm dark:prose-invert max-w-none",
                                 isUser
-                                    ? "bg-primary/10 border border-primary/20"
+                                    ? "bg-primary/20 border border-primary/30"
                                     : "bg-background-elevated border border-border prose-headings:text-foreground prose-p:text-foreground prose-pre:bg-muted prose-pre:border prose-pre:border-border prose-code:text-primary",
                             )}
                         >
