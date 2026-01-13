@@ -50,6 +50,17 @@ const isTypingTarget = (target: EventTarget | null) => {
     return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
 };
 
+const getDigitFromEvent = (event: KeyboardEvent): number | null => {
+    if (event.code.startsWith("Digit")) {
+        return Number.parseInt(event.code.replace("Digit", ""), 10);
+    }
+    if (event.code.startsWith("Numpad")) {
+        return Number.parseInt(event.code.replace("Numpad", ""), 10);
+    }
+    const parsed = Number.parseInt(event.key, 10);
+    return Number.isNaN(parsed) ? null : parsed;
+};
+
 export function getChatTitleUpdate(
     chat: ChatSession | null,
     content: string,
@@ -213,8 +224,8 @@ export function ChatWindow() {
             }
 
             if (hasModifier && event.altKey && !event.shiftKey) {
-                const level = Number.parseInt(key, 10);
-                if (!Number.isNaN(level) && level >= 0 && level <= 5) {
+                const level = getDigitFromEvent(event);
+                if (level !== null && level >= 0 && level <= 5) {
                     const currentModel = models.find(
                         (model) => model.id === currentChat.modelId,
                     );
@@ -240,8 +251,8 @@ export function ChatWindow() {
             }
 
             if (hasModifier && event.shiftKey && !event.altKey) {
-                const level = Number.parseInt(key, 10);
-                if (!Number.isNaN(level) && level >= 0 && level <= 3) {
+                const level = getDigitFromEvent(event);
+                if (level !== null && level >= 0 && level <= 3) {
                     const currentModel = models.find(
                         (model) => model.id === currentChat.modelId,
                     );
