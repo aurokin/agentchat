@@ -9,7 +9,7 @@ export interface Message {
     // Settings snapshot when message was created
     modelId?: string;
     thinkingLevel?: ThinkingLevel;
-    searchEnabled?: boolean;
+    searchLevel?: SearchLevel;
     attachmentIds?: string[]; // References to attachments store
     createdAt: number;
 }
@@ -22,12 +22,14 @@ export type ThinkingLevel =
     | "minimal"
     | "none";
 
+export type SearchLevel = "none" | "low" | "medium" | "high";
+
 export interface ChatSession {
     id: string;
     title: string;
     modelId: string;
     thinking: ThinkingLevel;
-    searchEnabled: boolean;
+    searchLevel: SearchLevel;
     createdAt: number;
     updatedAt: number;
 }
@@ -36,7 +38,7 @@ export interface UserSettings {
     apiKey: string | null;
     defaultModel: string;
     defaultThinking: ThinkingLevel;
-    defaultSearchEnabled: boolean;
+    defaultSearchLevel: SearchLevel;
     theme: "light" | "dark" | "system";
     favoriteModels: string[];
 }

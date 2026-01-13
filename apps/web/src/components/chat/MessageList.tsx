@@ -395,7 +395,7 @@ function MessageItem({
                     </span>
 
                     {/* Divider */}
-                    {(message.searchEnabled ||
+                    {((message.searchLevel && message.searchLevel !== "none") ||
                         (message.thinkingLevel &&
                             message.thinkingLevel !== "none") ||
                         message.modelId) && (
@@ -403,11 +403,16 @@ function MessageItem({
                     )}
 
                     {/* Search badge */}
-                    {message.searchEnabled && (
+                    {message.searchLevel && message.searchLevel !== "none" && (
                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-accent/10 border border-accent/20 text-accent">
                             <Search size={10} />
                             <span className="uppercase tracking-wider font-medium">
-                                Web
+                                Web-
+                                {message.searchLevel === "low"
+                                    ? "3"
+                                    : message.searchLevel === "medium"
+                                      ? "6"
+                                      : "10"}
                             </span>
                         </span>
                     )}

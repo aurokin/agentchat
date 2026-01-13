@@ -16,6 +16,7 @@ import {
     modelSupportsReasoning,
     modelSupportsVision,
     type ThinkingLevel,
+    type SearchLevel,
     type PendingAttachment,
     type Attachment,
     type ImageMimeType,
@@ -109,7 +110,10 @@ export function ChatWindow() {
             const effectiveThinking = supportsReasoning
                 ? currentChat.thinking
                 : "none";
-            const effectiveSearch = supportsSearch && currentChat.searchEnabled;
+            const effectiveSearchLevel: SearchLevel =
+                supportsSearch && currentChat.searchLevel !== "none"
+                    ? currentChat.searchLevel
+                    : "none";
 
             const contextContent = skillForMessage
                 ? `${skillForMessage.prompt}\n\nUser: ${content}`
@@ -150,7 +154,7 @@ export function ChatWindow() {
                 skill: clonedSkill,
                 modelId: currentChat.modelId,
                 thinkingLevel: effectiveThinking,
-                searchEnabled: effectiveSearch,
+                searchLevel: effectiveSearchLevel,
                 attachmentIds,
             });
 
@@ -219,7 +223,7 @@ export function ChatWindow() {
                 skill: null,
                 modelId: currentChat.modelId,
                 thinkingLevel: effectiveThinking,
-                searchEnabled: effectiveSearch,
+                searchLevel: effectiveSearchLevel,
             });
 
             let fullResponse = "";
@@ -290,9 +294,9 @@ export function ChatWindow() {
         await updateChat({ ...currentChat, thinking: value });
     };
 
-    const handleSearchChange = async (enabled: boolean) => {
+    const handleSearchChange = async (level: SearchLevel) => {
         if (!currentChat) return;
-        await updateChat({ ...currentChat, searchEnabled: enabled });
+        await updateChat({ ...currentChat, searchLevel: level });
     };
 
     if (!currentChat) {
@@ -405,7 +409,7 @@ export function ChatWindow() {
                     reasoningSupported={modelSupportsReasoning(
                         models.find((m) => m.id === currentChat.modelId),
                     )}
-                    searchEnabled={currentChat.searchEnabled}
+                    searchLevel={currentChat.searchLevel}
                     onSearchChange={handleSearchChange}
                     searchSupported={modelSupportsSearch(
                         models.find((m) => m.id === currentChat.modelId),

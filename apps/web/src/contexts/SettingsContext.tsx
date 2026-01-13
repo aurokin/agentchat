@@ -12,6 +12,7 @@ import type {
     UserSettings,
     OpenRouterModel,
     ThinkingLevel,
+    SearchLevel,
     Skill,
 } from "@/lib/types";
 import { v4 as uuid } from "uuid";
@@ -23,7 +24,7 @@ interface SettingsContextType extends UserSettings {
     clearApiKey: () => void;
     setDefaultModel: (modelId: string) => void;
     setDefaultThinking: (value: ThinkingLevel) => void;
-    setDefaultSearchEnabled: (enabled: boolean) => void;
+    setDefaultSearchLevel: (level: SearchLevel) => void;
     setTheme: (theme: UserSettings["theme"]) => void;
     toggleFavoriteModel: (modelId: string) => void;
     models: OpenRouterModel[];
@@ -41,7 +42,7 @@ const defaultSettings: UserSettings = {
     apiKey: null,
     defaultModel: "",
     defaultThinking: "none",
-    defaultSearchEnabled: false,
+    defaultSearchLevel: "none",
     theme: "system",
     favoriteModels: [],
 };
@@ -119,7 +120,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
             apiKey: storage.getApiKey(),
             defaultModel: storage.getDefaultModel(),
             defaultThinking: storage.getDefaultThinking(),
-            defaultSearchEnabled: storage.getDefaultSearchEnabled(),
+            defaultSearchLevel: storage.getDefaultSearchLevel(),
             theme: storage.getTheme(),
             favoriteModels: storage.getFavoriteModels(),
         });
@@ -166,9 +167,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         setSettings((prev) => ({ ...prev, defaultThinking: value }));
     };
 
-    const setDefaultSearchEnabled = (enabled: boolean) => {
-        storage.setDefaultSearchEnabled(enabled);
-        setSettings((prev) => ({ ...prev, defaultSearchEnabled: enabled }));
+    const setDefaultSearchLevel = (level: SearchLevel) => {
+        storage.setDefaultSearchLevel(level);
+        setSettings((prev) => ({ ...prev, defaultSearchLevel: level }));
     };
 
     const setTheme = (theme: UserSettings["theme"]) => {
@@ -255,7 +256,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
                 clearApiKey,
                 setDefaultModel,
                 setDefaultThinking,
-                setDefaultSearchEnabled,
+                setDefaultSearchLevel,
                 setTheme,
                 toggleFavoriteModel,
                 models,

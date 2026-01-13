@@ -1,4 +1,4 @@
-import type { Skill } from "./types";
+import type { SearchLevel, Skill } from "./types";
 
 const STORAGE_KEYS = {
     API_KEY: "router-chat-api-key",
@@ -95,14 +95,22 @@ export function setDefaultThinking(
     localStorage.setItem(STORAGE_KEYS.DEFAULT_THINKING, value);
 }
 
-export function getDefaultSearchEnabled(): boolean {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem(STORAGE_KEYS.DEFAULT_SEARCH) === "true";
+export function getDefaultSearchLevel(): SearchLevel {
+    if (typeof window === "undefined") return "none";
+    const stored = localStorage.getItem(STORAGE_KEYS.DEFAULT_SEARCH);
+    // Handle migration from old boolean format
+    if (stored === "true") return "medium";
+    if (stored === "false" || stored === null) return "none";
+    // New format - validate it's a valid SearchLevel
+    if (["none", "low", "medium", "high"].includes(stored)) {
+        return stored as SearchLevel;
+    }
+    return "none";
 }
 
-export function setDefaultSearchEnabled(enabled: boolean): void {
+export function setDefaultSearchLevel(level: SearchLevel): void {
     if (typeof window === "undefined") return;
-    localStorage.setItem(STORAGE_KEYS.DEFAULT_SEARCH, String(enabled));
+    localStorage.setItem(STORAGE_KEYS.DEFAULT_SEARCH, level);
 }
 
 export function getSkills(): Skill[] {

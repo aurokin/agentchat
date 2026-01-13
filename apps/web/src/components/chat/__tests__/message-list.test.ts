@@ -215,12 +215,12 @@ describe("MessageList logic", () => {
             expect(message.thinkingLevel).toBe("high");
         });
 
-        test("has searchEnabled", () => {
+        test("has searchLevel", () => {
             const message = createMockMessage({
-                searchEnabled: true,
+                searchLevel: "medium",
             });
 
-            expect(message.searchEnabled).toBe(true);
+            expect(message.searchLevel).toBe("medium");
         });
     });
 

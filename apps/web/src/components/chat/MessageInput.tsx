@@ -16,7 +16,11 @@ import { SearchToggle } from "./SearchToggle";
 import { AttachmentButton } from "./AttachmentButton";
 import { AttachmentPreview } from "./AttachmentPreview";
 import { StorageErrorModal } from "./StorageErrorModal";
-import type { ThinkingLevel, PendingAttachment } from "@/lib/types";
+import type {
+    ThinkingLevel,
+    SearchLevel,
+    PendingAttachment,
+} from "@/lib/types";
 import {
     processImage,
     generateThumbnail,
@@ -42,8 +46,8 @@ interface MessageInputProps {
     thinkingLevel: ThinkingLevel;
     onThinkingChange: (value: ThinkingLevel) => void;
     reasoningSupported?: boolean;
-    searchEnabled: boolean;
-    onSearchChange: (enabled: boolean) => void;
+    searchLevel: SearchLevel;
+    onSearchChange: (level: SearchLevel) => void;
     searchSupported?: boolean;
     visionSupported?: boolean;
     sessionId?: string;
@@ -60,7 +64,7 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
             thinkingLevel,
             onThinkingChange,
             reasoningSupported = true,
-            searchEnabled,
+            searchLevel,
             onSearchChange,
             searchSupported = true,
             visionSupported = false,
@@ -253,7 +257,7 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
                                 />
                             )}
                             <SearchToggle
-                                enabled={searchEnabled}
+                                value={searchLevel}
                                 onChange={onSearchChange}
                                 disabled={disabled || !searchSupported}
                             />

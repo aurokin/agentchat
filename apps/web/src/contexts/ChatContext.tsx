@@ -7,7 +7,13 @@ import React, {
     useState,
     useCallback,
 } from "react";
-import type { ChatSession, Message, Skill, ThinkingLevel } from "@/lib/types";
+import type {
+    ChatSession,
+    Message,
+    Skill,
+    ThinkingLevel,
+    SearchLevel,
+} from "@/lib/types";
 import * as db from "@/lib/db";
 import * as storage from "@/lib/storage";
 import { v4 as uuid } from "uuid";
@@ -29,7 +35,7 @@ interface ChatContextType {
         skill?: Skill | null;
         modelId?: string;
         thinkingLevel?: ThinkingLevel;
-        searchEnabled?: boolean;
+        searchLevel?: SearchLevel;
         attachmentIds?: string[];
     }) => Promise<Message>;
     updateMessage: (
@@ -68,13 +74,13 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             const defaultModel =
                 storage.getDefaultModel() || "minimax/minimax-m2.1";
             const defaultThinking = storage.getDefaultThinking();
-            const defaultSearch = storage.getDefaultSearchEnabled();
+            const defaultSearchLevel = storage.getDefaultSearchLevel();
             const chat: ChatSession = {
                 id: uuid(),
                 title: title || "New Chat",
                 modelId: modelId || defaultModel,
                 thinking: defaultThinking,
-                searchEnabled: defaultSearch,
+                searchLevel: defaultSearchLevel,
                 createdAt: Date.now(),
                 updatedAt: Date.now(),
             };
@@ -134,7 +140,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             skill?: Skill | null;
             modelId?: string;
             thinkingLevel?: ThinkingLevel;
-            searchEnabled?: boolean;
+            searchLevel?: SearchLevel;
             attachmentIds?: string[];
         }): Promise<Message> => {
             if (!currentChat) {
@@ -149,7 +155,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 skill: message.skill,
                 modelId: message.modelId,
                 thinkingLevel: message.thinkingLevel,
-                searchEnabled: message.searchEnabled,
+                searchLevel: message.searchLevel,
                 attachmentIds: message.attachmentIds,
                 sessionId: currentChat.id,
                 id: uuid(),

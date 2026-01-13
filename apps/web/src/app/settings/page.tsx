@@ -49,8 +49,8 @@ export default function SettingsPage() {
         setDefaultModel,
         defaultThinking,
         setDefaultThinking,
-        defaultSearchEnabled,
-        setDefaultSearchEnabled,
+        defaultSearchLevel,
+        setDefaultSearchLevel,
         theme,
         setTheme,
         skills,
@@ -540,19 +540,24 @@ export default function SettingsPage() {
                             </h2>
                         </div>
                         <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
-                            Enable web search by default for new conversations.
+                            Set the default web search level for new
+                            conversations.
                         </p>
                         <div className="flex items-center gap-4">
                             <SearchToggle
-                                enabled={defaultSearchEnabled}
-                                onChange={(enabled) =>
-                                    setDefaultSearchEnabled(enabled)
+                                value={defaultSearchLevel}
+                                onChange={(level) =>
+                                    setDefaultSearchLevel(level)
                                 }
                             />
                             <span className="text-sm text-muted-foreground">
-                                {defaultSearchEnabled
-                                    ? "Search enabled by default"
-                                    : "Search disabled by default"}
+                                {defaultSearchLevel === "none"
+                                    ? "Search disabled by default"
+                                    : defaultSearchLevel === "low"
+                                      ? "3 search results by default"
+                                      : defaultSearchLevel === "medium"
+                                        ? "6 search results by default"
+                                        : "10 search results by default"}
                             </span>
                         </div>
                     </section>
