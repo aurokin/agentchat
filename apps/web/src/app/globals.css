@@ -522,7 +522,7 @@ body {
     width: 6px;
     height: 6px;
     margin: 0 2px;
-    background: var(--primary);
+    background: currentColor;
     border-radius: 50%;
     animation: typing-dot 1.2s ease-in-out infinite;
 }
