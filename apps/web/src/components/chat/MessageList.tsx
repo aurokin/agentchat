@@ -10,8 +10,6 @@ import rehypeRaw from "rehype-raw";
 import {
     Brain,
     MessageCircle,
-    Copy,
-    Check,
     Sparkles,
     ChevronDown,
     ChevronLeft,
@@ -260,17 +258,7 @@ function MessageItem({
     onImageClick: (imageId: string) => void;
 }) {
     const isUser = message.role === "user";
-    const [copied, setCopied] = useState(false);
     const [showSkill, setShowSkill] = useState(false);
-
-    const copyToClipboard = async () => {
-        if (!navigator.clipboard) {
-            return;
-        }
-        await navigator.clipboard.writeText(message.content || "");
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    };
 
     // Use skill directly from message (already cloned)
     const skill = message.skill;
@@ -357,23 +345,7 @@ function MessageItem({
 
                 {/* Main content - hidden while reasoning is streaming */}
                 {!(sending && message.thinking && !message.content) && (
-                    <div className="relative group inline-flex max-w-[90%]">
-                        {message.content && navigator.clipboard && (
-                            <button
-                                onClick={copyToClipboard}
-                                className="absolute top-3 right-3 p-1.5 bg-background/90 border border-border opacity-0 group-hover:opacity-100 transition-all duration-200 hover:border-primary/30 z-10"
-                                title="Copy to clipboard"
-                            >
-                                {copied ? (
-                                    <Check size={12} className="text-success" />
-                                ) : (
-                                    <Copy
-                                        size={12}
-                                        className="text-muted-foreground"
-                                    />
-                                )}
-                            </button>
-                        )}
+                    <div className="inline-flex max-w-[90%]">
                         <div
                             className={cn(
                                 "p-5 prose prose-sm dark:prose-invert max-w-none",
