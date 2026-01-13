@@ -87,6 +87,35 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
         [chats, currentChat, isMobile, onClose, router, selectChat],
     );
 
+    const deleteChatAndSelectNext = useCallback(
+        async (chatId: string) => {
+            const chatIndex = chats.findIndex((chat) => chat.id === chatId);
+            const nextChatId =
+                currentChat?.id === chatId
+                    ? (chats[chatIndex + 1]?.id ?? null)
+                    : null;
+
+            await deleteChat(chatId);
+
+            if (nextChatId) {
+                await selectChat(nextChatId);
+                router.push("/chat");
+                if (isMobile) {
+                    onClose?.();
+                }
+            }
+        },
+        [
+            chats,
+            currentChat?.id,
+            deleteChat,
+            isMobile,
+            onClose,
+            router,
+            selectChat,
+        ],
+    );
+
     const requestDeleteChat = useCallback(
         async (chatId: string) => {
             const hasMessages =
@@ -95,18 +124,18 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                     : (await db.getMessagesByChat(chatId)).length > 0;
 
             if (!hasMessages) {
-                await deleteChat(chatId);
+                await deleteChatAndSelectNext(chatId);
                 return;
             }
 
             setPendingDeleteChatId(chatId);
         },
-        [currentChat?.id, deleteChat, messages.length],
+        [currentChat?.id, deleteChatAndSelectNext, messages.length],
     );
 
     const handleConfirmDelete = async () => {
         if (!pendingDeleteChatId) return;
-        await deleteChat(pendingDeleteChatId);
+        await deleteChatAndSelectNext(pendingDeleteChatId);
         setPendingDeleteChatId(null);
     };
 
