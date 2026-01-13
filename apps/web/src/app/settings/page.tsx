@@ -565,7 +565,17 @@ export default function SettingsPage() {
                                                 <div className="flex items-center gap-1">
                                                     <KeyCaps>Cmd/Ctrl</KeyCaps>
                                                     <KeyCaps>Alt</KeyCaps>
-                                                    <KeyCaps>0-5</KeyCaps>
+                                                    <KeyCaps>1-5</KeyCaps>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center justify-between gap-3">
+                                                <span className="text-sm">
+                                                    Thinking off
+                                                </span>
+                                                <div className="flex items-center gap-1">
+                                                    <KeyCaps>Cmd/Ctrl</KeyCaps>
+                                                    <KeyCaps>Alt</KeyCaps>
+                                                    <KeyCaps>Backspace</KeyCaps>
                                                 </div>
                                             </div>
                                             <div className="flex items-center justify-between gap-3">
@@ -575,7 +585,17 @@ export default function SettingsPage() {
                                                 <div className="flex items-center gap-1">
                                                     <KeyCaps>Cmd/Ctrl</KeyCaps>
                                                     <KeyCaps>Shift</KeyCaps>
-                                                    <KeyCaps>0-3</KeyCaps>
+                                                    <KeyCaps>1-3</KeyCaps>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center justify-between gap-3">
+                                                <span className="text-sm">
+                                                    Search off
+                                                </span>
+                                                <div className="flex items-center gap-1">
+                                                    <KeyCaps>Cmd/Ctrl</KeyCaps>
+                                                    <KeyCaps>Shift</KeyCaps>
+                                                    <KeyCaps>Backspace</KeyCaps>
                                                 </div>
                                             </div>
                                         </div>

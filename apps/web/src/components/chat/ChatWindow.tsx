@@ -223,22 +223,36 @@ export function ChatWindow() {
                 return;
             }
 
+            if (
+                hasModifier &&
+                event.altKey &&
+                !event.shiftKey &&
+                event.key === "Backspace"
+            ) {
+                const currentModel = models.find(
+                    (model) => model.id === currentChat.modelId,
+                );
+                if (!modelSupportsReasoning(currentModel)) return;
+                event.preventDefault();
+                void updateChat({ ...currentChat, thinking: "none" });
+                return;
+            }
+
             if (hasModifier && event.altKey && !event.shiftKey) {
                 const level = getDigitFromEvent(event);
-                if (level !== null && level >= 0 && level <= 5) {
+                if (level !== null && level >= 1 && level <= 5) {
                     const currentModel = models.find(
                         (model) => model.id === currentChat.modelId,
                     );
                     if (!modelSupportsReasoning(currentModel)) return;
                     const levels: ThinkingLevel[] = [
-                        "none",
                         "minimal",
                         "low",
                         "medium",
                         "high",
                         "xhigh",
                     ];
-                    const nextLevel = levels[level];
+                    const nextLevel = levels[level - 1];
                     if (nextLevel) {
                         event.preventDefault();
                         void updateChat({
@@ -250,20 +264,30 @@ export function ChatWindow() {
                 }
             }
 
+            if (
+                hasModifier &&
+                event.shiftKey &&
+                !event.altKey &&
+                event.key === "Backspace"
+            ) {
+                const currentModel = models.find(
+                    (model) => model.id === currentChat.modelId,
+                );
+                if (!modelSupportsSearch(currentModel)) return;
+                event.preventDefault();
+                void updateChat({ ...currentChat, searchLevel: "none" });
+                return;
+            }
+
             if (hasModifier && event.shiftKey && !event.altKey) {
                 const level = getDigitFromEvent(event);
-                if (level !== null && level >= 0 && level <= 3) {
+                if (level !== null && level >= 1 && level <= 3) {
                     const currentModel = models.find(
                         (model) => model.id === currentChat.modelId,
                     );
                     if (!modelSupportsSearch(currentModel)) return;
-                    const levels: SearchLevel[] = [
-                        "none",
-                        "low",
-                        "medium",
-                        "high",
-                    ];
-                    const nextLevel = levels[level];
+                    const levels: SearchLevel[] = ["low", "medium", "high"];
+                    const nextLevel = levels[level - 1];
                     if (nextLevel) {
                         event.preventDefault();
                         void updateChat({
