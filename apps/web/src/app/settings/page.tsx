@@ -6,9 +6,7 @@ import { Sidebar } from "@/components/chat/Sidebar";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useChat } from "@/contexts/ChatContext";
 import { validateApiKey } from "@/lib/openrouter";
-import type { ThinkingLevel, Skill } from "@/lib/types";
-import { ThinkingToggle } from "@/components/chat/ThinkingToggle";
-import { SearchToggle } from "@/components/chat/SearchToggle";
+import type { Skill } from "@/lib/types";
 import {
     getStorageUsage,
     cleanupOldAttachments,
@@ -25,20 +23,16 @@ import {
     Loader2,
     Shield,
     ExternalLink,
-    Brain,
-    Globe,
     Book,
     Plus,
     Edit2,
     Trash2,
-    Cpu,
     Info,
     Hexagon,
     Image as ImageIcon,
     HardDrive,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { ModelSelector } from "@/components/chat/ModelSelector";
 
 export default function SettingsPage() {
     const router = useRouter();
@@ -46,12 +40,6 @@ export default function SettingsPage() {
         apiKey,
         setApiKey,
         clearApiKey,
-        defaultModel,
-        setDefaultModel,
-        defaultThinking,
-        setDefaultThinking,
-        defaultSearchLevel,
-        setDefaultSearchLevel,
         theme,
         setTheme,
         skills,
@@ -462,97 +450,17 @@ export default function SettingsPage() {
                     <section className="card-deco mb-6">
                         <div className="flex items-center gap-3 mb-4">
                             <div className="w-8 h-8 bg-primary/10 flex items-center justify-center">
-                                <Settings size={16} className="text-primary" />
+                                <Info size={16} className="text-primary" />
                             </div>
                             <h2 className="text-lg font-medium">
                                 Conversation Defaults
                             </h2>
                         </div>
-                        <p className="text-sm text-muted-foreground mb-5 leading-relaxed">
-                            Configure default settings for new conversations.
-                            These can be changed per-chat.
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                            Defaults update automatically when you send a
+                            message. Each chat keeps its last-used model,
+                            thinking, and search settings.
                         </p>
-
-                        <div className="space-y-5">
-                            {/* Model */}
-                            <div>
-                                <label className="label-deco flex items-center gap-2">
-                                    <Cpu size={14} className="text-primary" />
-                                    Model
-                                </label>
-                                <ModelSelector
-                                    selectedModel={defaultModel}
-                                    onModelChange={setDefaultModel}
-                                    variant="settings"
-                                />
-                            </div>
-
-                            {/* Thinking & Search Row */}
-                            <div className="grid grid-cols-2 gap-4">
-                                {/* Thinking */}
-                                <div>
-                                    <label className="label-deco flex items-center gap-2">
-                                        <Brain
-                                            size={14}
-                                            className="text-warning"
-                                        />
-                                        Thinking
-                                    </label>
-                                    <div className="flex items-center gap-3 p-3 bg-background-elevated border border-border">
-                                        <ThinkingToggle
-                                            value={defaultThinking}
-                                            onChange={(value) =>
-                                                setDefaultThinking(
-                                                    value as ThinkingLevel,
-                                                )
-                                            }
-                                        />
-                                        <span className="text-xs text-muted-foreground">
-                                            {defaultThinking === "none" &&
-                                                "Off"}
-                                            {defaultThinking === "minimal" &&
-                                                "Minimal"}
-                                            {defaultThinking === "low" && "Low"}
-                                            {defaultThinking === "medium" &&
-                                                "Medium"}
-                                            {defaultThinking === "high" &&
-                                                "High"}
-                                            {defaultThinking === "xhigh" &&
-                                                "Extended"}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                {/* Search */}
-                                <div>
-                                    <label className="label-deco flex items-center gap-2">
-                                        <Globe
-                                            size={14}
-                                            className="text-accent"
-                                        />
-                                        Web Search
-                                    </label>
-                                    <div className="flex items-center gap-3 p-3 bg-background-elevated border border-border">
-                                        <SearchToggle
-                                            value={defaultSearchLevel}
-                                            onChange={(level) =>
-                                                setDefaultSearchLevel(level)
-                                            }
-                                        />
-                                        <span className="text-xs text-muted-foreground">
-                                            {defaultSearchLevel === "none" &&
-                                                "Off"}
-                                            {defaultSearchLevel === "low" &&
-                                                "3 results"}
-                                            {defaultSearchLevel === "medium" &&
-                                                "6 results"}
-                                            {defaultSearchLevel === "high" &&
-                                                "10 results"}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
                     </section>
 
                     {/* Skills */}
@@ -572,9 +480,14 @@ export default function SettingsPage() {
                                 <span className="text-sm">New Skill</span>
                             </button>
                         </div>
-                        <p className="text-sm text-muted-foreground mb-5 leading-relaxed">
+                        <p className="text-sm text-muted-foreground mb-3 leading-relaxed">
                             Create reusable prompt templates that are prepended
                             to your messages when selected.
+                        </p>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                            The last skill you pick becomes the default for new
+                            chats and applies to the first message only. Choose
+                            None to clear it.
                         </p>
 
                         {/* Skill Form */}

@@ -9,6 +9,7 @@ const STORAGE_KEYS = {
     DEFAULT_SEARCH: "router-chat-default-search",
     FAVORITE_MODELS: "router-chat-favorite-models",
     SKILLS: "router-chat-skills",
+    DEFAULT_SKILL: "router-chat-default-skill",
     SELECTED_SKILL: "router-chat-selected-skill",
 } as const;
 
@@ -25,6 +26,7 @@ describe("storage.ts STORAGE_KEYS", () => {
             "router-chat-favorite-models",
         );
         expect(STORAGE_KEYS.SKILLS).toBe("router-chat-skills");
+        expect(STORAGE_KEYS.DEFAULT_SKILL).toBe("router-chat-default-skill");
         expect(STORAGE_KEYS.SELECTED_SKILL).toBe("router-chat-selected-skill");
     });
 
@@ -368,28 +370,28 @@ describe("storage.ts setSkills", () => {
     });
 });
 
-describe("storage.ts getSelectedSkillId", () => {
+describe("storage.ts getDefaultSkillId", () => {
     test("returns null when not set", () => {
         const mockGetItem = mock((key: string) => null);
-        const result = mockGetItem(STORAGE_KEYS.SELECTED_SKILL);
+        const result = mockGetItem(STORAGE_KEYS.DEFAULT_SKILL);
         expect(result).toBeNull();
     });
 
     test("returns skill ID when set", () => {
         const mockGetItem = mock((key: string) => "skill-123");
-        const result = mockGetItem(STORAGE_KEYS.SELECTED_SKILL);
+        const result = mockGetItem(STORAGE_KEYS.DEFAULT_SKILL);
         expect(result).toBe("skill-123");
     });
 });
 
-describe("storage.ts setSelectedSkillId", () => {
+describe("storage.ts setDefaultSkillId", () => {
     test("stores skill ID when provided", () => {
         const storedValues: Record<string, string> = {};
         const mockSetItem = mock((key: string, value: string) => {
             storedValues[key] = value;
         });
-        mockSetItem(STORAGE_KEYS.SELECTED_SKILL, "skill-456");
-        expect(storedValues[STORAGE_KEYS.SELECTED_SKILL]).toBe("skill-456");
+        mockSetItem(STORAGE_KEYS.DEFAULT_SKILL, "skill-456");
+        expect(storedValues[STORAGE_KEYS.DEFAULT_SKILL]).toBe("skill-456");
     });
 
     test("removes skill ID when null", () => {
@@ -401,9 +403,9 @@ describe("storage.ts setSelectedSkillId", () => {
         if (skillId) {
             // would set
         } else {
-            mockRemoveItem(STORAGE_KEYS.SELECTED_SKILL);
+            mockRemoveItem(STORAGE_KEYS.DEFAULT_SKILL);
         }
-        expect(removedKeys).toContain(STORAGE_KEYS.SELECTED_SKILL);
+        expect(removedKeys).toContain(STORAGE_KEYS.DEFAULT_SKILL);
     });
 });
 
@@ -453,7 +455,7 @@ describe("storage.ts server-side safety", () => {
         expect(isServer).toBe(true);
     });
 
-    test("setSelectedSkillId does nothing on server", () => {
+    test("setDefaultSkillId does nothing on server", () => {
         const isServer = typeof window === "undefined";
         expect(isServer).toBe(true);
     });

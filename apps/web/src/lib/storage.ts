@@ -8,6 +8,7 @@ const STORAGE_KEYS = {
     DEFAULT_SEARCH: "router-chat-default-search",
     FAVORITE_MODELS: "router-chat-favorite-models",
     SKILLS: "router-chat-skills",
+    DEFAULT_SKILL: "router-chat-default-skill",
     SELECTED_SKILL: "router-chat-selected-skill",
 } as const;
 
@@ -128,16 +129,24 @@ export function setSkills(skills: Skill[]): void {
     localStorage.setItem(STORAGE_KEYS.SKILLS, JSON.stringify(skills));
 }
 
-export function getSelectedSkillId(): string | null {
+export function getDefaultSkillId(): string | null {
     if (typeof window === "undefined") return null;
-    return localStorage.getItem(STORAGE_KEYS.SELECTED_SKILL);
+    const stored = localStorage.getItem(STORAGE_KEYS.DEFAULT_SKILL);
+    if (stored) return stored;
+    const legacy = localStorage.getItem(STORAGE_KEYS.SELECTED_SKILL);
+    if (legacy) {
+        localStorage.setItem(STORAGE_KEYS.DEFAULT_SKILL, legacy);
+        localStorage.removeItem(STORAGE_KEYS.SELECTED_SKILL);
+        return legacy;
+    }
+    return null;
 }
 
-export function setSelectedSkillId(skillId: string | null): void {
+export function setDefaultSkillId(skillId: string | null): void {
     if (typeof window === "undefined") return;
     if (skillId) {
-        localStorage.setItem(STORAGE_KEYS.SELECTED_SKILL, skillId);
+        localStorage.setItem(STORAGE_KEYS.DEFAULT_SKILL, skillId);
     } else {
-        localStorage.removeItem(STORAGE_KEYS.SELECTED_SKILL);
+        localStorage.removeItem(STORAGE_KEYS.DEFAULT_SKILL);
     }
 }

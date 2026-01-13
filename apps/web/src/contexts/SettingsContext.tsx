@@ -35,7 +35,11 @@ interface SettingsContextType extends UserSettings {
     updateSkill: (id: string, updates: Partial<Skill>) => void;
     deleteSkill: (id: string) => void;
     selectedSkill: Skill | null;
-    setSelectedSkill: (skill: Skill | null) => void;
+    defaultSkill: Skill | null;
+    setSelectedSkill: (
+        skill: Skill | null,
+        options?: { updateDefault?: boolean },
+    ) => void;
 }
 
 const defaultSettings: UserSettings = {
@@ -58,6 +62,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     const [mounted, setMounted] = useState(false);
     const [skills, setSkills] = useState<Skill[]>([]);
     const [selectedSkill, setSelectedSkillState] = useState<Skill | null>(null);
+    const [defaultSkillId, setDefaultSkillIdState] = useState<string | null>(
+        null,
+    );
     const refreshPromiseRef = useRef<Promise<void> | null>(null);
 
     const refreshModels = useCallback(async () => {
@@ -121,14 +128,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
             theme: storage.getTheme(),
             favoriteModels: storage.getFavoriteModels(),
         });
-        setSkills(storage.getSkills());
-        const selectedId = storage.getSelectedSkillId();
-        if (selectedId) {
-            const allSkills = storage.getSkills();
-            setSelectedSkillState(
-                allSkills.find((s) => s.id === selectedId) || null,
-            );
-        }
+        const storedSkills = storage.getSkills();
+        setSkills(storedSkills);
+        setDefaultSkillIdState(storage.getDefaultSkillId());
         setMounted(true);
     }, []);
 
@@ -218,20 +220,53 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
+    const setDefaultSkill = useCallback((skill: Skill | null) => {
+        const skillId = skill?.id ?? null;
+        setDefaultSkillIdState(skillId);
+        storage.setDefaultSkillId(skillId);
+    }, []);
+
     const deleteSkill = (id: string) => {
         const newSkills = skills.filter((s) => s.id !== id);
         setSkills(newSkills);
         storage.setSkills(newSkills);
         if (selectedSkill?.id === id) {
             setSelectedSkillState(null);
-            storage.setSelectedSkillId(null);
+        }
+        if (defaultSkillId === id) {
+            setDefaultSkill(null);
         }
     };
 
-    const setSelectedSkill = (skill: Skill | null) => {
+    const setSelectedSkill = (
+        skill: Skill | null,
+        options?: { updateDefault?: boolean },
+    ) => {
         setSelectedSkillState(skill);
-        storage.setSelectedSkillId(skill?.id || null);
+        const shouldUpdateDefault = options?.updateDefault ?? true;
+        if (shouldUpdateDefault) {
+            setDefaultSkill(skill);
+        }
     };
+
+    useEffect(() => {
+        if (
+            defaultSkillId &&
+            !skills.find((skill) => skill.id === defaultSkillId)
+        ) {
+            setDefaultSkill(null);
+        }
+        if (
+            selectedSkill &&
+            !skills.find((skill) => skill.id === selectedSkill.id)
+        ) {
+            setSelectedSkillState(null);
+        }
+    }, [defaultSkillId, selectedSkill, skills, setDefaultSkill]);
+
+    const defaultSkill = defaultSkillId
+        ? skills.find((skill) => skill.id === defaultSkillId) || null
+        : null;
 
     useEffect(() => {
         if (mounted) {
@@ -258,6 +293,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
                 updateSkill,
                 deleteSkill,
                 selectedSkill,
+                defaultSkill,
                 setSelectedSkill,
             }}
         >

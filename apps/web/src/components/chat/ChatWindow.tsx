@@ -23,6 +23,7 @@ import {
     type ChatSession,
 } from "@/lib/types";
 import { saveAttachments, getAttachmentsByMessage } from "@/lib/db";
+import * as storage from "@/lib/storage";
 import { generateUUID } from "@/lib/utils";
 import { Hexagon, Sparkles, AlertCircle, RefreshCw } from "lucide-react";
 
@@ -53,7 +54,8 @@ export function ChatWindow() {
         updateChat,
         createChat,
     } = useChat();
-    const { apiKey, selectedSkill, setSelectedSkill, models } = useSettings();
+    const { apiKey, selectedSkill, defaultSkill, setSelectedSkill, models } =
+        useSettings();
     const [sending, setSending] = useState(false);
     const [error, setError] = useState<ErrorState | null>(null);
     const [retryChat, setRetryChat] = useState<{
@@ -66,6 +68,26 @@ export function ChatWindow() {
     useEffect(() => {
         currentChatRef.current = currentChat;
     }, [currentChat]);
+
+    useEffect(() => {
+        if (!currentChat) return;
+        if (messages.length === 0) {
+            if (defaultSkill && selectedSkill?.id !== defaultSkill.id) {
+                setSelectedSkill(defaultSkill, { updateDefault: false });
+            }
+            if (!defaultSkill && selectedSkill) {
+                setSelectedSkill(null, { updateDefault: false });
+            }
+        } else if (selectedSkill) {
+            setSelectedSkill(null, { updateDefault: false });
+        }
+    }, [
+        currentChat,
+        defaultSkill,
+        messages.length,
+        selectedSkill,
+        setSelectedSkill,
+    ]);
 
     useEffect(() => {
         if (currentChat && inputRef.current) {
@@ -97,7 +119,7 @@ export function ChatWindow() {
 
         const skillForMessage = selectedSkill;
         if (skillForMessage) {
-            setSelectedSkill(null);
+            setSelectedSkill(null, { updateDefault: false });
         }
 
         try {
@@ -106,6 +128,14 @@ export function ChatWindow() {
             );
             const supportsReasoning = modelSupportsReasoning(currentModel);
             const supportsSearch = modelSupportsSearch(currentModel);
+
+            storage.setDefaultModel(currentChat.modelId);
+            if (supportsReasoning) {
+                storage.setDefaultThinking(currentChat.thinking);
+            }
+            if (supportsSearch) {
+                storage.setDefaultSearchLevel(currentChat.searchLevel);
+            }
 
             const effectiveThinking = supportsReasoning
                 ? currentChat.thinking
