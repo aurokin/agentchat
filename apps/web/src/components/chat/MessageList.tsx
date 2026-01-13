@@ -14,7 +14,7 @@ import {
     Check,
     Sparkles,
     ChevronDown,
-    ChevronUp,
+    ChevronLeft,
     ChevronRight,
     Search,
     Cpu,
@@ -312,19 +312,24 @@ function MessageItem({
 
                 {/* Skill collapsible for user message with skill */}
                 {isSkillMessage && skill && (
-                    <details className="mb-3 border border-primary/20 bg-primary/5">
+                    <details className="mb-3 inline-flex flex-col max-w-full border border-primary/20 bg-primary/5">
                         <summary
                             className="flex items-center gap-2 px-4 py-2.5 cursor-pointer select-none text-primary"
                             onClick={() => setShowSkill(!showSkill)}
                         >
-                            <Sparkles size={14} />
-                            <span className="font-medium text-sm">
+                            <span
+                                className={cn(
+                                    "font-medium text-sm",
+                                    showSkill && "flex-1 text-right",
+                                )}
+                            >
                                 {skill.name}
                             </span>
+                            <Sparkles size={14} className="ml-auto" />
                             {showSkill ? (
-                                <ChevronUp size={14} className="ml-auto" />
+                                <ChevronDown size={14} className="ml-2" />
                             ) : (
-                                <ChevronDown size={14} className="ml-auto" />
+                                <ChevronLeft size={14} className="ml-2" />
                             )}
                         </summary>
                         <div className="px-4 pb-3 text-sm border-t border-primary/10">
