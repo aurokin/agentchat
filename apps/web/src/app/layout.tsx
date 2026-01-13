@@ -18,8 +18,10 @@ const ibmPlexMono = IBM_Plex_Mono({
     weight: ["400", "500", "600"],
 });
 
+const isDevelopment = process.env.NODE_ENV === "development";
+
 export const metadata: Metadata = {
-    title: "RouterChat",
+    title: isDevelopment ? "RouterChat - DEV" : "RouterChat",
     description: "Chat with AI models through OpenRouter",
 };
 
