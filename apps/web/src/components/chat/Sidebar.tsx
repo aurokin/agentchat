@@ -92,9 +92,12 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
             )}
             <aside
                 className={cn(
-                    "h-full bg-background-elevated border-r border-border flex flex-col relative overflow-hidden",
-                    isMobile &&
-                        "fixed left-0 top-0 bottom-0 z-50 w-72 transition-transform duration-300",
+                    "h-full bg-background-elevated border-r border-border flex flex-col relative overflow-hidden flex-shrink-0",
+                    isMobile
+                        ? "fixed left-0 top-0 bottom-0 z-50 w-72 transition-transform duration-300"
+                        : isTablet
+                          ? "w-64"
+                          : "w-72",
                     isMobile && !propsIsOpen && "-translate-x-full",
                 )}
                 aria-label="Chat sidebar"
