@@ -28,11 +28,15 @@ export function ConfirmDialog({
             if (event.key === "Escape") {
                 onCancel();
             }
+            if (event.key === "Enter") {
+                event.preventDefault();
+                onConfirm();
+            }
         };
 
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [open, onCancel]);
+    }, [open, onCancel, onConfirm]);
 
     if (!open) return null;
 

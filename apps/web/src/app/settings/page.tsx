@@ -534,6 +534,16 @@ export default function SettingsPage() {
                                             </div>
                                             <div className="flex items-center justify-between gap-3">
                                                 <span className="text-sm">
+                                                    Delete conversation
+                                                </span>
+                                                <div className="flex items-center gap-1">
+                                                    <KeyCaps>Cmd/Ctrl</KeyCaps>
+                                                    <KeyCaps>Shift</KeyCaps>
+                                                    <KeyCaps>D</KeyCaps>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center justify-between gap-3">
+                                                <span className="text-sm">
                                                     Previous conversation
                                                 </span>
                                                 <div className="flex items-center gap-1">

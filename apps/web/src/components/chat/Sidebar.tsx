@@ -87,6 +87,29 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
         [chats, currentChat, isMobile, onClose, router, selectChat],
     );
 
+    const requestDeleteChat = useCallback(
+        async (chatId: string) => {
+            const hasMessages =
+                currentChat?.id === chatId
+                    ? messages.length > 0
+                    : (await db.getMessagesByChat(chatId)).length > 0;
+
+            if (!hasMessages) {
+                await deleteChat(chatId);
+                return;
+            }
+
+            setPendingDeleteChatId(chatId);
+        },
+        [currentChat?.id, deleteChat, messages.length],
+    );
+
+    const handleConfirmDelete = async () => {
+        if (!pendingDeleteChatId) return;
+        await deleteChat(pendingDeleteChatId);
+        setPendingDeleteChatId(null);
+    };
+
     useEffect(() => {
         /* eslint-disable react-hooks/set-state-in-effect */
         const macCheck =
@@ -110,6 +133,14 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                 return;
             }
 
+            if (hasModifier && event.shiftKey && key === "d") {
+                if (!currentChat) return;
+                event.preventDefault();
+                event.stopPropagation();
+                void requestDeleteChat(currentChat.id);
+                return;
+            }
+
             if (hasModifier && !event.shiftKey && key === "arrowup") {
                 event.preventDefault();
                 event.stopPropagation();
@@ -126,7 +157,13 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
 
         window.addEventListener("keydown", handleKeyDown, true);
         return () => window.removeEventListener("keydown", handleKeyDown, true);
-    }, [focusChatByOffset, handleNewChat, isKeybindingBlocked]);
+    }, [
+        currentChat,
+        focusChatByOffset,
+        handleNewChat,
+        isKeybindingBlocked,
+        requestDeleteChat,
+    ]);
 
     const handleSelectChat = (chatId: string) => {
         selectChat(chatId);
@@ -134,26 +171,6 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
         if (isMobile) {
             onClose?.();
         }
-    };
-
-    const requestDeleteChat = async (chatId: string) => {
-        const hasMessages =
-            currentChat?.id === chatId
-                ? messages.length > 0
-                : (await db.getMessagesByChat(chatId)).length > 0;
-
-        if (!hasMessages) {
-            await deleteChat(chatId);
-            return;
-        }
-
-        setPendingDeleteChatId(chatId);
-    };
-
-    const handleConfirmDelete = async () => {
-        if (!pendingDeleteChatId) return;
-        await deleteChat(pendingDeleteChatId);
-        setPendingDeleteChatId(null);
     };
 
     if (!propsIsOpen && isMobile) {
