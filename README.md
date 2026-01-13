@@ -2,19 +2,9 @@
 
 A web application for chatting with AI models through OpenRouter. Users provide their own OpenRouter API key, and all data is stored locally in the browser.
 
-## Tech Stack
+## Try It Now
 
-| Category  | Technology                     |
-| --------- | ------------------------------ |
-| Runtime   | Bun 1.x                        |
-| Framework | Next.js 15 (App Router)        |
-| Language  | TypeScript 5.x                 |
-| UI        | Tailwind CSS                   |
-| State     | React Context + Hooks          |
-| Storage   | IndexedDB (idb) + localStorage |
-| API       | OpenRouter API                 |
-| Linting   | ESLint                         |
-| Testing   | Bun Test                       |
+Visit https://www.routerchat.chat to start chatting with your OpenRouter API key.
 
 ## Features
 
@@ -29,7 +19,29 @@ A web application for chatting with AI models through OpenRouter. Users provide 
 - **IndexedDB Persistence** - Full chat history stored locally
 - **Theme Support** - Light, dark, and system theme options
 
+## Tech Stack
+
+| Category  | Technology                     |
+| --------- | ------------------------------ |
+| Runtime   | Bun 1.x                        |
+| Framework | Next.js 16 (App Router)        |
+| Language  | TypeScript 5.x                 |
+| UI        | Tailwind CSS 4                 |
+| State     | React Context + Hooks          |
+| Storage   | IndexedDB (idb) + localStorage |
+| API       | OpenRouter API                 |
+| Linting   | ESLint                         |
+| Testing   | Bun Test                       |
+
+## Using the App
+
+1. Open https://www.routerchat.chat
+2. Add your OpenRouter API key in Settings
+3. Start a new chat and choose a model
+
 ## Getting Started
+
+For local development and self-hosting.
 
 ### Prerequisites
 
