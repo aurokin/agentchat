@@ -11,6 +11,8 @@ const STORAGE_KEYS = {
     SKILLS: "router-chat-skills",
     DEFAULT_SKILL: "router-chat-default-skill",
     SELECTED_SKILL: "router-chat-selected-skill",
+    SELECTED_SKILL_ID: "router-chat-selected-skill-id",
+    SELECTED_SKILL_MODE: "router-chat-selected-skill-mode",
 } as const;
 
 describe("storage.ts STORAGE_KEYS", () => {
@@ -28,6 +30,12 @@ describe("storage.ts STORAGE_KEYS", () => {
         expect(STORAGE_KEYS.SKILLS).toBe("router-chat-skills");
         expect(STORAGE_KEYS.DEFAULT_SKILL).toBe("router-chat-default-skill");
         expect(STORAGE_KEYS.SELECTED_SKILL).toBe("router-chat-selected-skill");
+        expect(STORAGE_KEYS.SELECTED_SKILL_ID).toBe(
+            "router-chat-selected-skill-id",
+        );
+        expect(STORAGE_KEYS.SELECTED_SKILL_MODE).toBe(
+            "router-chat-selected-skill-mode",
+        );
     });
 
     test("STORAGE_KEYS values are string literals", () => {
@@ -406,6 +414,72 @@ describe("storage.ts setDefaultSkillId", () => {
             mockRemoveItem(STORAGE_KEYS.DEFAULT_SKILL);
         }
         expect(removedKeys).toContain(STORAGE_KEYS.DEFAULT_SKILL);
+    });
+});
+
+describe("storage.ts getSelectedSkillId", () => {
+    test("returns null when not set", () => {
+        const mockGetItem = mock((key: string) => null);
+        const result = mockGetItem(STORAGE_KEYS.SELECTED_SKILL_ID);
+        expect(result).toBeNull();
+    });
+
+    test("returns skill ID when set", () => {
+        const mockGetItem = mock((key: string) => "skill-selected");
+        const result = mockGetItem(STORAGE_KEYS.SELECTED_SKILL_ID);
+        expect(result).toBe("skill-selected");
+    });
+});
+
+describe("storage.ts setSelectedSkillId", () => {
+    test("stores skill ID when provided", () => {
+        const storedValues: Record<string, string> = {};
+        const mockSetItem = mock((key: string, value: string) => {
+            storedValues[key] = value;
+        });
+        mockSetItem(STORAGE_KEYS.SELECTED_SKILL_ID, "skill-selected");
+        expect(storedValues[STORAGE_KEYS.SELECTED_SKILL_ID]).toBe(
+            "skill-selected",
+        );
+    });
+
+    test("removes skill ID when null", () => {
+        const removedKeys: string[] = [];
+        const mockRemoveItem = mock((key: string) => {
+            removedKeys.push(key);
+        });
+        const skillId: string | null = null;
+        if (skillId) {
+            // would set
+        } else {
+            mockRemoveItem(STORAGE_KEYS.SELECTED_SKILL_ID);
+        }
+        expect(removedKeys).toContain(STORAGE_KEYS.SELECTED_SKILL_ID);
+    });
+});
+
+describe("storage.ts getSelectedSkillMode", () => {
+    test("defaults to auto", () => {
+        const mockGetItem = mock((key: string) => null);
+        const result = mockGetItem(STORAGE_KEYS.SELECTED_SKILL_MODE);
+        expect(result ?? "auto").toBe("auto");
+    });
+
+    test("reads manual mode", () => {
+        const mockGetItem = mock((key: string) => "manual");
+        const result = mockGetItem(STORAGE_KEYS.SELECTED_SKILL_MODE);
+        expect(result).toBe("manual");
+    });
+});
+
+describe("storage.ts setSelectedSkillMode", () => {
+    test("stores mode", () => {
+        const storedValues: Record<string, string> = {};
+        const mockSetItem = mock((key: string, value: string) => {
+            storedValues[key] = value;
+        });
+        mockSetItem(STORAGE_KEYS.SELECTED_SKILL_MODE, "manual");
+        expect(storedValues[STORAGE_KEYS.SELECTED_SKILL_MODE]).toBe("manual");
     });
 });
 

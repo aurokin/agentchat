@@ -136,6 +136,12 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         const storedSkills = storage.getSkills();
         setSkills(storedSkills);
         setDefaultSkillIdState(storage.getDefaultSkillId());
+        const storedSelectedSkillId = storage.getSelectedSkillId();
+        const storedSelectedSkill = storedSkills.find(
+            (skill) => skill.id === storedSelectedSkillId,
+        );
+        setSelectedSkillState(storedSelectedSkill ?? null);
+        setSelectedSkillMode(storage.getSelectedSkillMode());
         setMounted(true);
     }, []);
 
@@ -238,6 +244,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         if (selectedSkill?.id === id) {
             setSelectedSkillState(null);
             setSelectedSkillMode("auto");
+            storage.setSelectedSkillId(null);
+            storage.setSelectedSkillMode("auto");
         }
         if (defaultSkillId === id) {
             setDefaultSkill(null);
@@ -248,8 +256,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         skill: Skill | null,
         options?: { mode?: "auto" | "manual" },
     ) => {
+        const mode = options?.mode ?? "manual";
         setSelectedSkillState(skill);
-        setSelectedSkillMode(options?.mode ?? "manual");
+        setSelectedSkillMode(mode);
+        storage.setSelectedSkillId(skill?.id ?? null);
+        storage.setSelectedSkillMode(mode);
     };
 
     useEffect(() => {
@@ -265,6 +276,8 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         ) {
             setSelectedSkillState(null);
             setSelectedSkillMode("auto");
+            storage.setSelectedSkillId(null);
+            storage.setSelectedSkillMode("auto");
         }
     }, [defaultSkillId, selectedSkill, skills, setDefaultSkill]);
 

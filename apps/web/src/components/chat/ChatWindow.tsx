@@ -350,8 +350,8 @@ export function ChatWindow() {
         setRetryChat(null);
 
         const skillForMessage = selectedSkill;
-        if (skillForMessage || selectedSkillMode === "manual") {
-            setDefaultSkill(skillForMessage ?? null);
+        if (skillForMessage) {
+            setDefaultSkill(skillForMessage);
         }
 
         try {
