@@ -65,6 +65,26 @@ cd apps/web && bun dev
 3. Generate an API key from https://openrouter.ai/keys
 4. Enter the key in the app's Settings page
 
+### Cloud Sync Hosting
+
+Only required if you are hosting an instance with Cloud Sync enabled.
+
+**`.env` (app runtime)**
+
+- `CONVEX_DEPLOYMENT`
+- `NEXT_PUBLIC_CONVEX_URL`
+
+**Convex environment variables**
+
+- `AUTH_GOOGLE_ID`
+- `AUTH_GOOGLE_SECRET`
+- `JWKS`
+- `JWT_PRIVATE_KEY`
+- `SITE_URL`
+- `STRIPE_PRO_PRICE_ID`
+- `STRIPE_SECRET_KEY`
+- `STRIPE_WEBHOOK_SECRET`
+
 ## Development
 
 ```bash
