@@ -51,14 +51,41 @@ const isTypingTarget = (target: EventTarget | null) => {
 };
 
 const getDigitFromEvent = (event: KeyboardEvent): number | null => {
-    if (event.code.startsWith("Digit")) {
-        return Number.parseInt(event.code.replace("Digit", ""), 10);
+    const code = event.code.toLowerCase();
+    if (code.startsWith("digit")) {
+        return Number.parseInt(code.replace("digit", ""), 10);
     }
-    if (event.code.startsWith("Numpad")) {
-        return Number.parseInt(event.code.replace("Numpad", ""), 10);
+    if (code.startsWith("numpad")) {
+        return Number.parseInt(code.replace("numpad", ""), 10);
     }
+
     const parsed = Number.parseInt(event.key, 10);
-    return Number.isNaN(parsed) ? null : parsed;
+    if (!Number.isNaN(parsed)) {
+        return parsed;
+    }
+
+    const hasAlt =
+        event.altKey ||
+        event.getModifierState("Alt") ||
+        event.getModifierState("AltGraph");
+    if (!hasAlt) {
+        return null;
+    }
+
+    const optionDigitMap: Record<string, number> = {
+        "¡": 1,
+        "™": 2,
+        "£": 3,
+        "¢": 4,
+        "∞": 5,
+        "§": 6,
+        "¶": 7,
+        "•": 8,
+        ª: 9,
+        º: 0,
+    };
+
+    return optionDigitMap[event.key] ?? null;
 };
 
 export function getChatTitleUpdate(
