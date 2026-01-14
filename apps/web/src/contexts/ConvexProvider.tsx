@@ -5,7 +5,14 @@ import {
     ConvexReactClient,
 } from "convex/react";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
-import { createContext, useContext, useMemo, type ReactNode } from "react";
+import {
+    createContext,
+    useContext,
+    useMemo,
+    useEffect,
+    useState,
+    type ReactNode,
+} from "react";
 import { isConvexConfigured, getConvexUrl } from "@/lib/sync/config";
 
 interface ConvexAvailabilityContextType {
@@ -21,8 +28,35 @@ interface SafeConvexProviderProps {
 }
 
 export function SafeConvexProvider({ children }: SafeConvexProviderProps) {
+    const [mounted, setMounted] = useState(false);
+    const [clientKey, setClientKey] = useState(0);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    useEffect(() => {
+        if (!mounted) return;
+
+        const checkAndReload = () => {
+            const jwtKey = Object.keys(localStorage).find((k) =>
+                k.startsWith("__convexAuthJWT_"),
+            );
+            const token = jwtKey ? localStorage.getItem(jwtKey) : null;
+
+            if (token && token !== localStorage.getItem("_lastUsedToken")) {
+                localStorage.setItem("_lastUsedToken", token);
+                setClientKey((k) => k + 1);
+            }
+        };
+
+        checkAndReload();
+        const interval = setInterval(checkAndReload, 2000);
+        return () => clearInterval(interval);
+    }, [mounted]);
+
     const convexClient = useMemo(() => {
-        if (!isConvexConfigured()) {
+        if (!mounted || !isConvexConfigured()) {
             return null;
         }
 
@@ -33,11 +67,10 @@ export function SafeConvexProvider({ children }: SafeConvexProviderProps) {
 
         try {
             return new ConvexReactClient(url);
-        } catch (error) {
-            console.warn("Failed to initialize Convex client:", error);
+        } catch {
             return null;
         }
-    }, []);
+    }, [mounted, clientKey]);
 
     const availabilityValue = useMemo(
         () => ({
