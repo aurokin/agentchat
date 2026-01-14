@@ -78,12 +78,21 @@ export function getSkillSelectionUpdate({
     messageCount,
     defaultSkill,
     selectedSkill,
+    selectedSkillMode,
 }: {
     messageCount: number;
     defaultSkill: Skill | null;
     selectedSkill: Skill | null;
+    selectedSkillMode: "auto" | "manual";
 }): Skill | null | undefined {
     if (messageCount > 0) {
+        if (selectedSkillMode === "auto" && selectedSkill) {
+            return null;
+        }
+        return undefined;
+    }
+
+    if (selectedSkillMode === "manual") {
         return undefined;
     }
 
@@ -112,7 +121,9 @@ export function ChatWindow() {
         apiKey,
         selectedSkill,
         defaultSkill,
+        selectedSkillMode,
         setSelectedSkill,
+        setDefaultSkill,
         models,
         favoriteModels,
         skills,
@@ -131,15 +142,17 @@ export function ChatWindow() {
             messageCount: messages.length,
             defaultSkill,
             selectedSkill,
+            selectedSkillMode,
         });
         if (nextSkill !== undefined) {
-            setSelectedSkill(nextSkill, { updateDefault: false });
+            setSelectedSkill(nextSkill, { mode: "auto" });
         }
     }, [
         currentChat,
         defaultSkill,
         messages.length,
         selectedSkill,
+        selectedSkillMode,
         setSelectedSkill,
     ]);
 
@@ -213,13 +226,13 @@ export function ChatWindow() {
                 const nextIndex =
                     (currentIndex + 1) % Math.max(skillSequence.length, 1);
                 const nextSkill = skillSequence[nextIndex] ?? null;
-                setSelectedSkill(nextSkill);
+                setSelectedSkill(nextSkill, { mode: "manual" });
                 return;
             }
 
             if (hasModifier && event.altKey && !event.shiftKey && key === "n") {
                 event.preventDefault();
-                setSelectedSkill(null);
+                setSelectedSkill(null, { mode: "manual" });
                 return;
             }
 
@@ -337,8 +350,8 @@ export function ChatWindow() {
         setRetryChat(null);
 
         const skillForMessage = selectedSkill;
-        if (skillForMessage) {
-            setSelectedSkill(null, { updateDefault: false });
+        if (skillForMessage || selectedSkillMode === "manual") {
+            setDefaultSkill(skillForMessage ?? null);
         }
 
         try {
@@ -407,6 +420,8 @@ export function ChatWindow() {
                 attachmentIds,
                 chatId: chatSnapshot.id,
             });
+
+            setSelectedSkill(null, { mode: "auto" });
 
             const updatedChat = getChatTitleUpdate(
                 chatSnapshot,
