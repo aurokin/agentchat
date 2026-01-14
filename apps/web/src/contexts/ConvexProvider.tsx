@@ -1,44 +1,31 @@
 "use client";
 
-import {
-    ConvexProvider as BaseConvexProvider,
-    ConvexReactClient,
-} from "convex/react";
+import { ConvexReactClient } from "convex/react";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
-import { createContext, useContext, useMemo, type ReactNode } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 import { isConvexConfigured, getConvexUrl } from "@/lib/sync/config";
 
 interface ConvexAvailabilityContextType {
     isAvailable: boolean;
-    client: ConvexReactClient | null;
 }
 
 const ConvexAvailabilityContext =
     createContext<ConvexAvailabilityContextType | null>(null);
 
-// Module-level singleton for Convex client (recommended pattern)
-let convexClientSingleton: ConvexReactClient | null = null;
+// Module-level singleton for Convex client
+let convexClient: ConvexReactClient | null = null;
 
-function getConvexClient(): ConvexReactClient | null {
-    if (typeof window === "undefined" || !isConvexConfigured()) {
-        return null;
-    }
+function getClient(): ConvexReactClient | null {
+    if (typeof window === "undefined") return null;
+    if (!isConvexConfigured()) return null;
 
-    if (convexClientSingleton) {
-        return convexClientSingleton;
+    if (!convexClient) {
+        const url = getConvexUrl();
+        if (url) {
+            convexClient = new ConvexReactClient(url);
+        }
     }
-
-    const url = getConvexUrl();
-    if (!url) {
-        return null;
-    }
-
-    try {
-        convexClientSingleton = new ConvexReactClient(url);
-        return convexClientSingleton;
-    } catch {
-        return null;
-    }
+    return convexClient;
 }
 
 interface SafeConvexProviderProps {
@@ -46,46 +33,25 @@ interface SafeConvexProviderProps {
 }
 
 export function SafeConvexProvider({ children }: SafeConvexProviderProps) {
-    const convexClient = getConvexClient();
+    const client = getClient();
 
-    const availabilityValue = useMemo(
-        () => ({
-            isAvailable: convexClient !== null,
-            client: convexClient,
-        }),
-        [convexClient],
-    );
-
-    if (!convexClient) {
+    // When Convex is not configured, just render children without provider
+    if (!client) {
         return (
-            <ConvexAvailabilityContext.Provider value={availabilityValue}>
-                <BaseConvexProvider client={convexClient as any}>
-                    {children}
-                </BaseConvexProvider>
+            <ConvexAvailabilityContext.Provider value={{ isAvailable: false }}>
+                {children}
             </ConvexAvailabilityContext.Provider>
         );
     }
 
     return (
-        <ConvexAvailabilityContext.Provider value={availabilityValue}>
-            <ConvexAuthProvider client={convexClient}>
-                <BaseConvexProvider client={convexClient}>
-                    {children}
-                </BaseConvexProvider>
-            </ConvexAuthProvider>
+        <ConvexAvailabilityContext.Provider value={{ isAvailable: true }}>
+            <ConvexAuthProvider client={client}>{children}</ConvexAuthProvider>
         </ConvexAvailabilityContext.Provider>
     );
 }
 
-export function useConvexAvailability(): ConvexAvailabilityContextType {
-    const context = useContext(ConvexAvailabilityContext);
-    if (!context) {
-        return { isAvailable: false, client: null };
-    }
-    return context;
-}
-
 export function useIsConvexAvailable(): boolean {
-    const { isAvailable } = useConvexAvailability();
-    return isAvailable;
+    const context = useContext(ConvexAvailabilityContext);
+    return context?.isAvailable ?? false;
 }

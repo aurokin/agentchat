@@ -1,21 +1,15 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect, Suspense } from "react";
 
 function AuthHandler() {
-    const searchParams = useSearchParams();
-    const code = searchParams?.get("code");
+    const router = useRouter();
 
     useEffect(() => {
-        if (!code) {
-            window.location.href = "/chat";
-        }
-    }, [code]);
-
-    if (!code) {
-        return null;
-    }
+        // Redirect to chat
+        router.replace("/chat");
+    }, [router]);
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-background">
@@ -23,10 +17,7 @@ function AuthHandler() {
                 <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10">
                     <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                 </div>
-                <p className="text-lg font-medium">Authenticating...</p>
-                <p className="text-sm text-muted-foreground">
-                    Completing sign in, please wait
-                </p>
+                <p className="text-lg font-medium">Loading...</p>
             </div>
         </div>
     );
