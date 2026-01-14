@@ -327,7 +327,7 @@ export default function SettingsPage() {
                                 <button
                                     onClick={handleValidate}
                                     disabled={validating || !newApiKey.trim()}
-                                    className="btn-deco btn-deco-secondary"
+                                    className="btn-deco btn-deco-secondary cursor-pointer"
                                 >
                                     {validating ? (
                                         <Loader2
@@ -343,7 +343,7 @@ export default function SettingsPage() {
                                 <button
                                     onClick={handleSave}
                                     disabled={saving}
-                                    className="btn-deco btn-deco-primary"
+                                    className="btn-deco btn-deco-primary cursor-pointer"
                                 >
                                     <span className="text-sm">
                                         {saving ? "Saving..." : "Save Key"}
@@ -353,7 +353,7 @@ export default function SettingsPage() {
                                 {apiKey && (
                                     <button
                                         onClick={handleClear}
-                                        className="px-4 py-2 text-error border border-error/30 hover:bg-error/10 transition-colors text-sm"
+                                        className="px-4 py-2 text-error border border-error/30 hover:bg-error/10 transition-colors text-sm cursor-pointer"
                                     >
                                         Clear
                                     </button>
@@ -411,7 +411,7 @@ export default function SettingsPage() {
                             <button
                                 onClick={() => setTheme("light")}
                                 className={cn(
-                                    "p-4 border flex flex-col items-center gap-2 transition-all duration-200",
+                                    "p-4 border flex flex-col items-center gap-2 transition-all duration-200 cursor-pointer",
                                     theme === "light"
                                         ? "border-primary bg-primary/10 shadow-deco"
                                         : "border-border hover:border-primary/40 bg-background-elevated",
@@ -433,7 +433,7 @@ export default function SettingsPage() {
                             <button
                                 onClick={() => setTheme("dark")}
                                 className={cn(
-                                    "p-4 border flex flex-col items-center gap-2 transition-all duration-200",
+                                    "p-4 border flex flex-col items-center gap-2 transition-all duration-200 cursor-pointer",
                                     theme === "dark"
                                         ? "border-primary bg-primary/10 shadow-deco"
                                         : "border-border hover:border-primary/40 bg-background-elevated",
@@ -455,7 +455,7 @@ export default function SettingsPage() {
                             <button
                                 onClick={() => setTheme("system")}
                                 className={cn(
-                                    "p-4 border flex flex-col items-center gap-2 transition-all duration-200",
+                                    "p-4 border flex flex-col items-center gap-2 transition-all duration-200 cursor-pointer",
                                     theme === "system"
                                         ? "border-primary bg-primary/10 shadow-deco"
                                         : "border-border hover:border-primary/40 bg-background-elevated",
@@ -684,7 +684,7 @@ export default function SettingsPage() {
                             </div>
                             <button
                                 onClick={openNewSkillForm}
-                                className="btn-deco btn-deco-primary flex items-center gap-2"
+                                className="btn-deco btn-deco-primary flex items-center gap-2 cursor-pointer"
                             >
                                 <Plus size={14} />
                                 <span className="text-sm">New Skill</span>
@@ -771,7 +771,7 @@ export default function SettingsPage() {
                                                 !skillName.trim() ||
                                                 !skillPrompt.trim()
                                             }
-                                            className="btn-deco btn-deco-primary"
+                                            className="btn-deco btn-deco-primary cursor-pointer"
                                         >
                                             <span className="text-sm">
                                                 {editingSkillId
@@ -781,7 +781,7 @@ export default function SettingsPage() {
                                         </button>
                                         <button
                                             onClick={closeSkillForm}
-                                            className="btn-deco btn-deco-secondary"
+                                            className="btn-deco btn-deco-secondary cursor-pointer"
                                         >
                                             <span className="text-sm">
                                                 Cancel
@@ -953,7 +953,7 @@ export default function SettingsPage() {
                                     <button
                                         onClick={handleClearAttachments}
                                         disabled={clearingStorage}
-                                        className="flex items-center gap-2 px-4 py-2 text-error border border-error/30 hover:bg-error/10 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="flex items-center gap-2 px-4 py-2 text-error border border-error/30 hover:bg-error/10 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                                     >
                                         {clearingStorage ? (
                                             <Loader2

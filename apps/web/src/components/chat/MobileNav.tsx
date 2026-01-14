@@ -16,7 +16,7 @@ export function MobileNav({ isOpen, onToggle }: MobileNavProps) {
         >
             <button
                 type="button"
-                className="hamburger-menu flex items-center justify-center w-10 h-10 touch-feedback"
+                className="hamburger-menu flex items-center justify-center w-10 h-10 touch-feedback cursor-pointer"
                 onClick={onToggle}
                 aria-expanded={isOpen}
                 aria-label={isOpen ? "Close sidebar" : "Open sidebar"}

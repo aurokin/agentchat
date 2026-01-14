@@ -142,7 +142,7 @@ function ReasoningSection({ thinking, isStreaming }: ReasoningSectionProps) {
         <div className="mb-3 inline-flex flex-col max-w-[90%] border border-warning/30 bg-warning/15">
             <button
                 onClick={() => setIsExpanded(!isExpanded)}
-                className="w-full flex items-center gap-2 px-4 py-3 text-warning hover:bg-warning/10 active:bg-warning/15 transition-colors"
+                className="w-full flex items-center gap-2 px-4 py-3 text-warning hover:bg-warning/10 active:bg-warning/15 transition-colors cursor-pointer"
             >
                 {isExpanded ? (
                     <ChevronDown size={14} />
@@ -229,7 +229,7 @@ function MessageAttachments({
                 <button
                     key={attachment.id}
                     onClick={() => onImageClick(attachment.id)}
-                    className="relative w-20 h-20 bg-muted/30 border border-border/50 overflow-hidden hover:border-primary/50 transition-colors"
+                    className="relative w-20 h-20 bg-muted/30 border border-border/50 overflow-hidden hover:border-primary/50 transition-colors cursor-pointer"
                 >
                     <img
                         src={createDataUrl(

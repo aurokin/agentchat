@@ -68,7 +68,7 @@ export function ConfirmDialog({
                     <button
                         type="button"
                         onClick={onCancel}
-                        className="btn-deco btn-deco-secondary"
+                        className="btn-deco btn-deco-secondary cursor-pointer"
                     >
                         <span className="text-sm font-medium">
                             {cancelLabel}
@@ -77,7 +77,7 @@ export function ConfirmDialog({
                     <button
                         type="button"
                         onClick={onConfirm}
-                        className="btn-deco btn-deco-primary"
+                        className="btn-deco btn-deco-primary cursor-pointer"
                     >
                         <span className="text-sm font-medium">
                             {confirmLabel}

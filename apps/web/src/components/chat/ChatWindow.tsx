@@ -638,7 +638,7 @@ export function ChatWindow() {
 
                         <button
                             onClick={() => createChat()}
-                            className="btn-deco btn-deco-primary text-base px-8 py-3"
+                            className="btn-deco btn-deco-primary text-base px-8 py-3 cursor-pointer"
                         >
                             <Sparkles size={18} />
                             <span>Start New Conversation</span>
@@ -669,7 +669,7 @@ export function ChatWindow() {
                     {error.isRetryable && (
                         <button
                             onClick={handleRetry}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-error/10 hover:bg-error/20 text-error rounded-md transition-colors"
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-error/10 hover:bg-error/20 text-error rounded-md transition-colors cursor-pointer"
                             disabled={sending}
                         >
                             <RefreshCw

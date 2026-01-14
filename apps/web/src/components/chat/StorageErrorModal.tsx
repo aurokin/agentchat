@@ -60,7 +60,7 @@ export function StorageErrorModal({
                     <button
                         type="button"
                         onClick={onDismiss}
-                        className="btn-deco btn-deco-primary"
+                        className="btn-deco btn-deco-primary cursor-pointer"
                     >
                         <span className="text-sm font-medium">OK</span>
                     </button>

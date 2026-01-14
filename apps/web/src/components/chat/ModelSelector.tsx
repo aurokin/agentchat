@@ -134,7 +134,7 @@ export function ModelSelector({
                 onClick={() => !loadingModels && setIsOpen(!isOpen)}
                 disabled={loadingModels}
                 className={cn(
-                    "flex items-center gap-2.5 bg-background-elevated border border-border transition-all duration-200",
+                    "flex items-center gap-2.5 bg-background-elevated border border-border transition-all duration-200 cursor-pointer",
                     "hover:border-primary/30 hover:bg-muted/50",
                     isOpen && "border-primary/50",
                     loadingModels && "opacity-50 cursor-not-allowed",
@@ -213,7 +213,7 @@ export function ModelSelector({
                                 <button
                                     type="button"
                                     onClick={() => setSearchQuery("")}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs px-1.5 py-0.5 bg-border/50 hover:bg-border transition-colors"
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs px-1.5 py-0.5 bg-border/50 hover:bg-border transition-colors cursor-pointer"
                                 >
                                     ESC
                                 </button>

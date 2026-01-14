@@ -275,7 +275,7 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                     <button
                         type="button"
                         onClick={handleNewChat}
-                        className="w-full btn-deco btn-deco-primary group"
+                        className="w-full btn-deco btn-deco-primary group cursor-pointer"
                         title={isMac ? "Cmd+Shift+O" : "Ctrl+Shift+O"}
                         suppressHydrationWarning
                     >
