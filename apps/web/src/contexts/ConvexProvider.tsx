@@ -63,12 +63,9 @@ function AuthAwareConvexProvider({
 }) {
     const router = useRouter();
 
-    const storageNamespace = getConvexUrl() ?? (client as any).address;
-
     return (
         <ConvexAuthProvider
             client={client}
-            storageNamespace={storageNamespace}
             replaceURL={(url) => router.replace(url)}
         >
             {children}
