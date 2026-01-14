@@ -168,6 +168,7 @@ export function ChatWindow() {
             if (isKeybindingBlocked()) return;
 
             const key = event.key.toLowerCase();
+            const code = event.code.toLowerCase();
             const hasModifier = event.ctrlKey || event.metaKey;
 
             if (
@@ -195,7 +196,12 @@ export function ChatWindow() {
 
             if (!currentChat) return;
 
-            if (hasModifier && event.altKey && !event.shiftKey && key === "m") {
+            if (
+                hasModifier &&
+                event.altKey &&
+                !event.shiftKey &&
+                code === "keym"
+            ) {
                 const availableFavorites = favoriteModels.filter((modelId) =>
                     models.some((model) => model.id === modelId),
                 );
@@ -215,7 +221,12 @@ export function ChatWindow() {
                 return;
             }
 
-            if (hasModifier && event.altKey && !event.shiftKey && key === "s") {
+            if (
+                hasModifier &&
+                event.altKey &&
+                !event.shiftKey &&
+                code === "keys"
+            ) {
                 event.preventDefault();
                 const skillSequence = [null, ...skills];
                 const currentIndex = selectedSkill
@@ -230,7 +241,12 @@ export function ChatWindow() {
                 return;
             }
 
-            if (hasModifier && event.altKey && !event.shiftKey && key === "n") {
+            if (
+                hasModifier &&
+                event.altKey &&
+                !event.shiftKey &&
+                code === "keyn"
+            ) {
                 event.preventDefault();
                 setSelectedSkill(null, { mode: "manual" });
                 return;
