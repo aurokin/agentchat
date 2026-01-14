@@ -1,9 +1,14 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
+import { useConvexAuth, useQuery } from "convex/react";
+import { useAuthActions } from "@convex-dev/auth/react";
 import { useChat } from "@/contexts/ChatContext";
 import { useSettings } from "@/contexts/SettingsContext";
+import { useIsConvexAvailable } from "@/contexts/ConvexProvider";
+import { api } from "@/convex/_generated/api";
 import { formatDistanceToNow } from "date-fns";
 import { Plus, Trash2, Settings, Hexagon } from "lucide-react";
 import Link from "next/link";
@@ -390,6 +395,7 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                             Settings
                         </span>
                     </Link>
+                    <AuthStatus />
                     {!apiKey && (
                         <div className="mt-3 p-3 bg-warning/5 border border-warning/20">
                             <p className="text-warning text-xs font-medium">
@@ -420,5 +426,58 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                 onCancel={() => setPendingDeleteChatId(null)}
             />
         </>
+    );
+}
+
+const AuthStatus = dynamic(() => Promise.resolve(AuthStatusClient), {
+    ssr: false,
+});
+
+function AuthStatusClient() {
+    const isConvexAvailable = useIsConvexAvailable();
+    const { isAuthenticated, isLoading } = useConvexAuth();
+    const debugAuth = useQuery(
+        api.users.debugAuth,
+        isConvexAvailable ? undefined : "skip",
+    );
+    const authActions = useAuthActions();
+    const { signIn, signOut } = authActions ?? {};
+
+    useEffect(() => {
+        if (!debugAuth) return;
+        console.log("Convex auth server debug", debugAuth);
+    }, [debugAuth]);
+
+    const handleAuthAction = useCallback(async () => {
+        if (isLoading) return;
+        if (isAuthenticated) {
+            await signOut?.();
+            return;
+        }
+        await signIn?.("google", { redirectTo: "/chat" });
+    }, [isLoading, isAuthenticated, signIn, signOut]);
+
+    if (!isConvexAvailable) {
+        return null;
+    }
+
+    return (
+        <div className="mt-3 flex items-center justify-between text-xs border border-border/60 bg-background/60 px-3 py-2">
+            <span className="text-muted-foreground">
+                {isLoading
+                    ? "Auth loading..."
+                    : isAuthenticated
+                      ? "Signed in"
+                      : "Signed out"}
+            </span>
+            <button
+                type="button"
+                onClick={handleAuthAction}
+                disabled={isLoading}
+                className="text-xs font-medium text-primary hover:text-primary/80 disabled:text-muted-foreground"
+            >
+                {isAuthenticated ? "Sign out" : "Sign in"}
+            </button>
+        </div>
     );
 }
