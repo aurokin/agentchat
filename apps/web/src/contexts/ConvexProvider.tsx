@@ -23,9 +23,7 @@ function getClient(): ConvexReactClient | null {
     if (!convexClient) {
         const url = getConvexUrl();
         if (url) {
-            convexClient = new ConvexReactClient(url, {
-                skipConvexDeploymentUrlCheck: url.includes(".convex.site"),
-            });
+            convexClient = new ConvexReactClient(url);
         }
     }
     return convexClient;

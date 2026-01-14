@@ -3,12 +3,11 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useConvexAuth, useQuery } from "convex/react";
+import { useConvexAuth } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useChat } from "@/contexts/ChatContext";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useIsConvexAvailable } from "@/contexts/ConvexProvider";
-import { api } from "@/convex/_generated/api";
 import { formatDistanceToNow } from "date-fns";
 import { Plus, Trash2, Settings, Hexagon } from "lucide-react";
 import Link from "next/link";
@@ -436,17 +435,8 @@ const AuthStatus = dynamic(() => Promise.resolve(AuthStatusClient), {
 function AuthStatusClient() {
     const isConvexAvailable = useIsConvexAvailable();
     const { isAuthenticated, isLoading } = useConvexAuth();
-    const debugAuth = useQuery(
-        api.users.debugAuth,
-        isConvexAvailable ? undefined : "skip",
-    );
     const authActions = useAuthActions();
     const { signIn, signOut } = authActions ?? {};
-
-    useEffect(() => {
-        if (!debugAuth) return;
-        console.log("Convex auth server debug", debugAuth);
-    }, [debugAuth]);
 
     const handleAuthAction = useCallback(async () => {
         if (isLoading) return;
