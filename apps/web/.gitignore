@@ -2,3 +2,5 @@
 
 # Next.js auto-generated types
 next-env.d.ts
+
+.env.local
