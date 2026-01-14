@@ -169,26 +169,24 @@ export function ChatWindow() {
 
             const key = event.key.toLowerCase();
             const code = event.code.toLowerCase();
-            const hasModifier = event.ctrlKey || event.metaKey;
+            const hasModifier =
+                event.ctrlKey ||
+                event.metaKey ||
+                event.getModifierState("Control") ||
+                event.getModifierState("Meta");
+            const hasAlt =
+                event.altKey ||
+                event.getModifierState("Alt") ||
+                event.getModifierState("AltGraph");
 
-            if (
-                !hasModifier &&
-                !event.shiftKey &&
-                !event.altKey &&
-                key === "/"
-            ) {
+            if (!hasModifier && !event.shiftKey && !hasAlt && key === "/") {
                 if (isTypingTarget(event.target)) return;
                 event.preventDefault();
                 inputRef.current?.focus();
                 return;
             }
 
-            if (
-                hasModifier &&
-                !event.shiftKey &&
-                !event.altKey &&
-                key === ","
-            ) {
+            if (hasModifier && !event.shiftKey && !hasAlt && key === ",") {
                 event.preventDefault();
                 router.push("/settings");
                 return;
@@ -196,12 +194,7 @@ export function ChatWindow() {
 
             if (!currentChat) return;
 
-            if (
-                hasModifier &&
-                event.altKey &&
-                !event.shiftKey &&
-                code === "keym"
-            ) {
+            if (hasModifier && hasAlt && !event.shiftKey && code === "keym") {
                 const availableFavorites = favoriteModels.filter((modelId) =>
                     models.some((model) => model.id === modelId),
                 );
@@ -221,12 +214,7 @@ export function ChatWindow() {
                 return;
             }
 
-            if (
-                hasModifier &&
-                event.altKey &&
-                !event.shiftKey &&
-                code === "keys"
-            ) {
+            if (hasModifier && hasAlt && !event.shiftKey && code === "keys") {
                 event.preventDefault();
                 const skillSequence = [null, ...skills];
                 const currentIndex = selectedSkill
@@ -241,12 +229,7 @@ export function ChatWindow() {
                 return;
             }
 
-            if (
-                hasModifier &&
-                event.altKey &&
-                !event.shiftKey &&
-                code === "keyn"
-            ) {
+            if (hasModifier && hasAlt && !event.shiftKey && code === "keyn") {
                 event.preventDefault();
                 setSelectedSkill(null, { mode: "manual" });
                 return;
@@ -254,7 +237,7 @@ export function ChatWindow() {
 
             if (
                 hasModifier &&
-                event.altKey &&
+                hasAlt &&
                 !event.shiftKey &&
                 event.key === "Backspace"
             ) {
@@ -267,7 +250,7 @@ export function ChatWindow() {
                 return;
             }
 
-            if (hasModifier && event.altKey && !event.shiftKey) {
+            if (hasModifier && hasAlt && !event.shiftKey) {
                 const level = getDigitFromEvent(event);
                 if (level !== null && level >= 1 && level <= 5) {
                     const currentModel = models.find(
@@ -296,7 +279,7 @@ export function ChatWindow() {
             if (
                 hasModifier &&
                 event.shiftKey &&
-                !event.altKey &&
+                !hasAlt &&
                 event.key === "Backspace"
             ) {
                 const currentModel = models.find(
@@ -308,7 +291,7 @@ export function ChatWindow() {
                 return;
             }
 
-            if (hasModifier && event.shiftKey && !event.altKey) {
+            if (hasModifier && event.shiftKey && !hasAlt) {
                 const level = getDigitFromEvent(event);
                 if (level !== null && level >= 1 && level <= 3) {
                     const currentModel = models.find(
