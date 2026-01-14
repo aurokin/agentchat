@@ -13,9 +13,11 @@
         "health": "bun run format && bun run typecheck && bun run lint && bun test"
     },
     "dependencies": {
+        "@auth/core": "0.37.0",
+        "@convex-dev/auth": "^0.0.90",
         "@vercel/analytics": "^1.6.1",
         "clsx": "^2.1.0",
-        "convex": "^1.21.0",
+        "convex": "^1.31.4",
         "date-fns": "^4.1.0",
         "highlight.js": "^11.11.1",
         "idb": "^8.0.0",
