@@ -35,6 +35,7 @@ import {
     ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CloudSyncSettings } from "@/components/sync/CloudSyncSettings";
 
 const isKeybindingBlocked = () => {
     if (typeof document === "undefined") return false;
@@ -983,6 +984,9 @@ export default function SettingsPage() {
                             </div>
                         )}
                     </section>
+
+                    {/* Cloud Sync - only shown when Convex is available */}
+                    <CloudSyncSettings />
 
                     {/* About */}
                     <section className="card-deco">

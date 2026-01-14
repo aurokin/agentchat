@@ -10,6 +10,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import * as db from "@/lib/db";
 import { ChatListSkeleton } from "./ChatListSkeleton";
+import { CloudStatusBadge } from "@/components/sync/CloudStatusBadge";
 import {
     useIsMobile,
     useIsTablet,
@@ -268,6 +269,7 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                             <h1 className="font-semibold text-lg tracking-tight text-foreground">
                                 RouterChat
                             </h1>
+                            <CloudStatusBadge />
                         </div>
                     </div>
                     <button

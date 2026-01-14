@@ -106,6 +106,7 @@ export interface Attachment {
     height: number;
     size: number; // bytes
     createdAt: number;
+    purgedAt?: number; // timestamp when image was purged to save storage
 }
 
 export interface PendingAttachment {

@@ -1,4 +1,6 @@
 import type { SearchLevel, Skill } from "./types";
+import type { SyncState, SyncMetadata } from "./sync/types";
+import { DEFAULT_SYNC_METADATA } from "./sync/types";
 
 const STORAGE_KEYS = {
     API_KEY: "router-chat-api-key",
@@ -10,6 +12,9 @@ const STORAGE_KEYS = {
     SKILLS: "router-chat-skills",
     DEFAULT_SKILL: "router-chat-default-skill",
     SELECTED_SKILL: "router-chat-selected-skill",
+    // Cloud sync keys
+    SYNC_STATE: "router-chat-sync-state",
+    SYNC_METADATA: "router-chat-sync-metadata",
 } as const;
 
 export function getApiKey(): string | null {
@@ -149,4 +154,62 @@ export function setDefaultSkillId(skillId: string | null): void {
     } else {
         localStorage.removeItem(STORAGE_KEYS.DEFAULT_SKILL);
     }
+}
+
+// Cloud Sync Storage Functions
+
+export function getSyncState(): SyncState {
+    if (typeof window === "undefined") return "local-only";
+    const stored = localStorage.getItem(STORAGE_KEYS.SYNC_STATE);
+    if (
+        stored === "local-only" ||
+        stored === "cloud-enabled" ||
+        stored === "cloud-disabled"
+    ) {
+        return stored;
+    }
+    return "local-only";
+}
+
+export function setSyncState(state: SyncState): void {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(STORAGE_KEYS.SYNC_STATE, state);
+}
+
+export function getSyncMetadata(): SyncMetadata {
+    if (typeof window === "undefined") return DEFAULT_SYNC_METADATA;
+    try {
+        const stored = localStorage.getItem(STORAGE_KEYS.SYNC_METADATA);
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            // Validate and merge with defaults to ensure all fields exist
+            return {
+                ...DEFAULT_SYNC_METADATA,
+                ...parsed,
+            };
+        }
+        return DEFAULT_SYNC_METADATA;
+    } catch {
+        return DEFAULT_SYNC_METADATA;
+    }
+}
+
+export function setSyncMetadata(metadata: SyncMetadata): void {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(STORAGE_KEYS.SYNC_METADATA, JSON.stringify(metadata));
+}
+
+export function updateSyncMetadata(
+    updates: Partial<SyncMetadata>,
+): SyncMetadata {
+    const current = getSyncMetadata();
+    const updated = { ...current, ...updates };
+    setSyncMetadata(updated);
+    return updated;
+}
+
+export function clearSyncData(): void {
+    if (typeof window === "undefined") return;
+    localStorage.removeItem(STORAGE_KEYS.SYNC_STATE);
+    localStorage.removeItem(STORAGE_KEYS.SYNC_METADATA);
 }
