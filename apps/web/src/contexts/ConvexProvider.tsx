@@ -1,6 +1,6 @@
 "use client";
 
-import { ConvexReactClient } from "convex/react";
+import { ConvexProvider, ConvexReactClient } from "convex/react";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { createContext, useContext, type ReactNode } from "react";
 import { isConvexConfigured, getConvexUrl } from "@/lib/sync/config";
@@ -46,7 +46,11 @@ export function SafeConvexProvider({ children }: SafeConvexProviderProps) {
 
     return (
         <ConvexAvailabilityContext.Provider value={{ isAvailable: true }}>
-            <ConvexAuthProvider client={client}>{children}</ConvexAuthProvider>
+            <ConvexProvider client={client}>
+                <ConvexAuthProvider client={client}>
+                    {children}
+                </ConvexAuthProvider>
+            </ConvexProvider>
         </ConvexAvailabilityContext.Provider>
     );
 }
