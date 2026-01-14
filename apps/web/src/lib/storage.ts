@@ -12,6 +12,8 @@ const STORAGE_KEYS = {
     SKILLS: "router-chat-skills",
     DEFAULT_SKILL: "router-chat-default-skill",
     SELECTED_SKILL: "router-chat-selected-skill",
+    SELECTED_SKILL_ID: "router-chat-selected-skill-id",
+    SELECTED_SKILL_MODE: "router-chat-selected-skill-mode",
     // Cloud sync keys
     SYNC_STATE: "router-chat-sync-state",
     SYNC_METADATA: "router-chat-sync-metadata",
@@ -154,6 +156,31 @@ export function setDefaultSkillId(skillId: string | null): void {
     } else {
         localStorage.removeItem(STORAGE_KEYS.DEFAULT_SKILL);
     }
+}
+
+export function getSelectedSkillId(): string | null {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem(STORAGE_KEYS.SELECTED_SKILL_ID);
+}
+
+export function setSelectedSkillId(skillId: string | null): void {
+    if (typeof window === "undefined") return;
+    if (skillId) {
+        localStorage.setItem(STORAGE_KEYS.SELECTED_SKILL_ID, skillId);
+    } else {
+        localStorage.removeItem(STORAGE_KEYS.SELECTED_SKILL_ID);
+    }
+}
+
+export function getSelectedSkillMode(): "auto" | "manual" {
+    if (typeof window === "undefined") return "auto";
+    const stored = localStorage.getItem(STORAGE_KEYS.SELECTED_SKILL_MODE);
+    return stored === "manual" ? "manual" : "auto";
+}
+
+export function setSelectedSkillMode(mode: "auto" | "manual"): void {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(STORAGE_KEYS.SELECTED_SKILL_MODE, mode);
 }
 
 // Cloud Sync Storage Functions

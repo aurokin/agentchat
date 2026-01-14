@@ -51,14 +51,41 @@ const isTypingTarget = (target: EventTarget | null) => {
 };
 
 const getDigitFromEvent = (event: KeyboardEvent): number | null => {
-    if (event.code.startsWith("Digit")) {
-        return Number.parseInt(event.code.replace("Digit", ""), 10);
+    const code = event.code.toLowerCase();
+    if (code.startsWith("digit")) {
+        return Number.parseInt(code.replace("digit", ""), 10);
     }
-    if (event.code.startsWith("Numpad")) {
-        return Number.parseInt(event.code.replace("Numpad", ""), 10);
+    if (code.startsWith("numpad")) {
+        return Number.parseInt(code.replace("numpad", ""), 10);
     }
+
     const parsed = Number.parseInt(event.key, 10);
-    return Number.isNaN(parsed) ? null : parsed;
+    if (!Number.isNaN(parsed)) {
+        return parsed;
+    }
+
+    const hasAlt =
+        event.altKey ||
+        event.getModifierState("Alt") ||
+        event.getModifierState("AltGraph");
+    if (!hasAlt) {
+        return null;
+    }
+
+    const optionDigitMap: Record<string, number> = {
+        "¡": 1,
+        "™": 2,
+        "£": 3,
+        "¢": 4,
+        "∞": 5,
+        "§": 6,
+        "¶": 7,
+        "•": 8,
+        ª: 9,
+        º: 0,
+    };
+
+    return optionDigitMap[event.key] ?? null;
 };
 
 export function getChatTitleUpdate(
@@ -78,12 +105,21 @@ export function getSkillSelectionUpdate({
     messageCount,
     defaultSkill,
     selectedSkill,
+    selectedSkillMode,
 }: {
     messageCount: number;
     defaultSkill: Skill | null;
     selectedSkill: Skill | null;
+    selectedSkillMode: "auto" | "manual";
 }): Skill | null | undefined {
     if (messageCount > 0) {
+        if (selectedSkillMode === "auto" && selectedSkill) {
+            return null;
+        }
+        return undefined;
+    }
+
+    if (selectedSkillMode === "manual") {
         return undefined;
     }
 
@@ -112,7 +148,9 @@ export function ChatWindow() {
         apiKey,
         selectedSkill,
         defaultSkill,
+        selectedSkillMode,
         setSelectedSkill,
+        setDefaultSkill,
         models,
         favoriteModels,
         skills,
@@ -131,15 +169,17 @@ export function ChatWindow() {
             messageCount: messages.length,
             defaultSkill,
             selectedSkill,
+            selectedSkillMode,
         });
         if (nextSkill !== undefined) {
-            setSelectedSkill(nextSkill, { updateDefault: false });
+            setSelectedSkill(nextSkill, { mode: "auto" });
         }
     }, [
         currentChat,
         defaultSkill,
         messages.length,
         selectedSkill,
+        selectedSkillMode,
         setSelectedSkill,
     ]);
 
@@ -155,26 +195,25 @@ export function ChatWindow() {
             if (isKeybindingBlocked()) return;
 
             const key = event.key.toLowerCase();
-            const hasModifier = event.ctrlKey || event.metaKey;
+            const code = event.code.toLowerCase();
+            const hasModifier =
+                event.ctrlKey ||
+                event.metaKey ||
+                event.getModifierState("Control") ||
+                event.getModifierState("Meta");
+            const hasAlt =
+                event.altKey ||
+                event.getModifierState("Alt") ||
+                event.getModifierState("AltGraph");
 
-            if (
-                !hasModifier &&
-                !event.shiftKey &&
-                !event.altKey &&
-                key === "/"
-            ) {
+            if (!hasModifier && !event.shiftKey && !hasAlt && key === "/") {
                 if (isTypingTarget(event.target)) return;
                 event.preventDefault();
                 inputRef.current?.focus();
                 return;
             }
 
-            if (
-                hasModifier &&
-                !event.shiftKey &&
-                !event.altKey &&
-                key === ","
-            ) {
+            if (hasModifier && !event.shiftKey && !hasAlt && key === ",") {
                 event.preventDefault();
                 router.push("/settings");
                 return;
@@ -182,7 +221,7 @@ export function ChatWindow() {
 
             if (!currentChat) return;
 
-            if (hasModifier && event.altKey && !event.shiftKey && key === "m") {
+            if (hasModifier && hasAlt && !event.shiftKey && code === "keym") {
                 const availableFavorites = favoriteModels.filter((modelId) =>
                     models.some((model) => model.id === modelId),
                 );
@@ -202,7 +241,7 @@ export function ChatWindow() {
                 return;
             }
 
-            if (hasModifier && event.altKey && !event.shiftKey && key === "s") {
+            if (hasModifier && hasAlt && !event.shiftKey && code === "keys") {
                 event.preventDefault();
                 const skillSequence = [null, ...skills];
                 const currentIndex = selectedSkill
@@ -213,19 +252,19 @@ export function ChatWindow() {
                 const nextIndex =
                     (currentIndex + 1) % Math.max(skillSequence.length, 1);
                 const nextSkill = skillSequence[nextIndex] ?? null;
-                setSelectedSkill(nextSkill);
+                setSelectedSkill(nextSkill, { mode: "manual" });
                 return;
             }
 
-            if (hasModifier && event.altKey && !event.shiftKey && key === "n") {
+            if (hasModifier && hasAlt && !event.shiftKey && code === "keyn") {
                 event.preventDefault();
-                setSelectedSkill(null);
+                setSelectedSkill(null, { mode: "manual" });
                 return;
             }
 
             if (
                 hasModifier &&
-                event.altKey &&
+                hasAlt &&
                 !event.shiftKey &&
                 event.key === "Backspace"
             ) {
@@ -238,7 +277,7 @@ export function ChatWindow() {
                 return;
             }
 
-            if (hasModifier && event.altKey && !event.shiftKey) {
+            if (hasModifier && hasAlt && !event.shiftKey) {
                 const level = getDigitFromEvent(event);
                 if (level !== null && level >= 1 && level <= 5) {
                     const currentModel = models.find(
@@ -267,7 +306,7 @@ export function ChatWindow() {
             if (
                 hasModifier &&
                 event.shiftKey &&
-                !event.altKey &&
+                !hasAlt &&
                 event.key === "Backspace"
             ) {
                 const currentModel = models.find(
@@ -279,7 +318,7 @@ export function ChatWindow() {
                 return;
             }
 
-            if (hasModifier && event.shiftKey && !event.altKey) {
+            if (hasModifier && event.shiftKey && !hasAlt) {
                 const level = getDigitFromEvent(event);
                 if (level !== null && level >= 1 && level <= 3) {
                     const currentModel = models.find(
@@ -338,7 +377,7 @@ export function ChatWindow() {
 
         const skillForMessage = selectedSkill;
         if (skillForMessage) {
-            setSelectedSkill(null, { updateDefault: false });
+            setDefaultSkill(skillForMessage);
         }
 
         try {
@@ -407,6 +446,8 @@ export function ChatWindow() {
                 attachmentIds,
                 chatId: chatSnapshot.id,
             });
+
+            setSelectedSkill(null, { mode: "auto" });
 
             const updatedChat = getChatTitleUpdate(
                 chatSnapshot,
