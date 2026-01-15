@@ -59,9 +59,15 @@ export function useMutationSafe<Mutation extends FunctionReference<"mutation">>(
 ) => Promise<FunctionReturnType<Mutation> | null> {
     const isAvailable = useIsConvexAvailable();
 
-    const mutate = useMutation(mutation);
+    let mutate: ReturnType<typeof useMutation<Mutation>> | null = null;
 
-    if (!isAvailable) {
+    try {
+        mutate = useMutation(mutation);
+    } catch {
+        mutate = null;
+    }
+
+    if (!isAvailable || !mutate) {
         return async () => null;
     }
 
@@ -76,9 +82,15 @@ export function useActionSafe<Action extends FunctionReference<"action">>(
 ): (args: FunctionArgs<Action>) => Promise<FunctionReturnType<Action> | null> {
     const isAvailable = useIsConvexAvailable();
 
-    const act = useAction(action);
+    let act: ReturnType<typeof useAction<Action>> | null = null;
 
-    if (!isAvailable) {
+    try {
+        act = useAction(action);
+    } catch {
+        act = null;
+    }
+
+    if (!isAvailable || !act) {
         return async () => null;
     }
 

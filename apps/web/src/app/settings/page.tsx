@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { useMutation } from "convex/react";
 import { Sidebar } from "@/components/chat/Sidebar";
 import { useChat } from "@/contexts/ChatContext";
 import { useSync } from "@/contexts/SyncContext";
 import { useSettings } from "@/contexts/SettingsContext";
+import { useMutationSafe } from "@/hooks/useConvexSafe";
 import { api } from "@/convex/_generated/api";
 import { validateApiKey } from "@/lib/openrouter";
 import type { Skill } from "@/lib/types";
@@ -65,7 +65,7 @@ export default function SettingsPage() {
         isConvexAvailable,
         refreshQuotaStatus,
     } = useSync();
-    const clearCloudImages = useMutation(api.attachments.clearAllForUser);
+    const clearCloudImages = useMutationSafe(api.attachments.clearAllForUser);
     const {
         apiKey,
         setApiKey,
@@ -166,7 +166,7 @@ export default function SettingsPage() {
 
         setClearingCloudStorage(true);
         try {
-            await clearCloudImages();
+            await clearCloudImages({});
             await refreshQuotaStatus();
         } catch (error) {
             console.error("Failed to clear cloud attachments:", error);
