@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useAction } from "convex/react";
+import { useCallback, useMemo } from "react";
 import { useIsConvexAvailable } from "@/contexts/ConvexProvider";
 import type {
     FunctionReference,
@@ -58,20 +59,13 @@ export function useMutationSafe<Mutation extends FunctionReference<"mutation">>(
     args: FunctionArgs<Mutation>,
 ) => Promise<FunctionReturnType<Mutation> | null> {
     const isAvailable = useIsConvexAvailable();
+    const mutate = useMutation(mutation);
+    const noop = useCallback(async () => null, []);
 
-    let mutate: ReturnType<typeof useMutation<Mutation>> | null = null;
-
-    try {
-        mutate = useMutation(mutation);
-    } catch {
-        mutate = null;
-    }
-
-    if (!isAvailable || !mutate) {
-        return async () => null;
-    }
-
-    return mutate;
+    return useMemo(
+        () => (isAvailable ? mutate : noop),
+        [isAvailable, mutate, noop],
+    );
 }
 
 /**
@@ -81,18 +75,8 @@ export function useActionSafe<Action extends FunctionReference<"action">>(
     action: Action,
 ): (args: FunctionArgs<Action>) => Promise<FunctionReturnType<Action> | null> {
     const isAvailable = useIsConvexAvailable();
+    const act = useAction(action);
+    const noop = useCallback(async () => null, []);
 
-    let act: ReturnType<typeof useAction<Action>> | null = null;
-
-    try {
-        act = useAction(action);
-    } catch {
-        act = null;
-    }
-
-    if (!isAvailable || !act) {
-        return async () => null;
-    }
-
-    return act;
+    return useMemo(() => (isAvailable ? act : noop), [isAvailable, act, noop]);
 }

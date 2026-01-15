@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, startTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useChat } from "@/contexts/ChatContext";
 import { useSettings } from "@/contexts/SettingsContext";
@@ -217,7 +217,9 @@ export function ChatWindow() {
 
             if (hasModifier && !event.shiftKey && !hasAlt && key === ",") {
                 event.preventDefault();
-                router.push("/settings");
+                startTransition(() => {
+                    router.push("/settings");
+                });
                 return;
             }
 

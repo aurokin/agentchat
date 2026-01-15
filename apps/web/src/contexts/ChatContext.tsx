@@ -6,6 +6,7 @@ import React, {
     useEffect,
     useState,
     useCallback,
+    useRef,
 } from "react";
 import type {
     ChatSession,
@@ -57,32 +58,41 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     const [currentChat, setCurrentChat] = useState<ChatSession | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
     const [loading, setLoading] = useState(true);
+    const currentChatIdRef = useRef<string | null>(null);
+
+    useEffect(() => {
+        currentChatIdRef.current = currentChat?.id ?? null;
+    }, [currentChat?.id]);
 
     const loadChats = useCallback(async () => {
         try {
             const allChats = await storageAdapter.getAllChats();
             setChats(allChats);
 
-            if (currentChat) {
-                const refreshedChat = await storageAdapter.getChat(
-                    currentChat.id,
-                );
+            const activeChatId = currentChatIdRef.current;
+            if (activeChatId) {
+                const refreshedChat =
+                    await storageAdapter.getChat(activeChatId);
 
                 if (!refreshedChat) {
-                    setCurrentChat(null);
-                    setMessages([]);
+                    if (currentChatIdRef.current === activeChatId) {
+                        setCurrentChat(null);
+                        setMessages([]);
+                    }
                 } else {
                     setCurrentChat(refreshedChat);
                     const chatMessages = await storageAdapter.getMessagesByChat(
                         refreshedChat.id,
                     );
-                    setMessages(chatMessages);
+                    if (currentChatIdRef.current === refreshedChat.id) {
+                        setMessages(chatMessages);
+                    }
                 }
             }
         } finally {
             setLoading(false);
         }
-    }, [currentChat, storageAdapter]);
+    }, [storageAdapter]);
 
     // Load chats on mount and when adapter changes
     useEffect(() => {

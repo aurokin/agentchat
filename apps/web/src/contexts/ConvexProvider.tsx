@@ -15,6 +15,9 @@ const ConvexAvailabilityContext =
 
 // Module-level singleton for Convex client
 let convexClient: ConvexReactClient | null = null;
+let fallbackConvexClient: ConvexReactClient | null = null;
+
+const FALLBACK_CONVEX_URL = "http://127.0.0.1:3210";
 
 function getClient(): ConvexReactClient | null {
     if (typeof window === "undefined") return null;
@@ -29,25 +32,26 @@ function getClient(): ConvexReactClient | null {
     return convexClient;
 }
 
+function getFallbackClient(): ConvexReactClient {
+    if (!fallbackConvexClient) {
+        fallbackConvexClient = new ConvexReactClient(FALLBACK_CONVEX_URL);
+    }
+    return fallbackConvexClient;
+}
+
 interface SafeConvexProviderProps {
     children: ReactNode;
 }
 
 export function SafeConvexProvider({ children }: SafeConvexProviderProps) {
     const client = getClient();
-
-    // When Convex is not configured, just render children without provider
-    if (!client) {
-        return (
-            <ConvexAvailabilityContext.Provider value={{ isAvailable: false }}>
-                {children}
-            </ConvexAvailabilityContext.Provider>
-        );
-    }
+    const providerClient = client ?? getFallbackClient();
 
     return (
-        <ConvexAvailabilityContext.Provider value={{ isAvailable: true }}>
-            <AuthAwareConvexProvider client={client}>
+        <ConvexAvailabilityContext.Provider
+            value={{ isAvailable: Boolean(client) }}
+        >
+            <AuthAwareConvexProvider client={providerClient}>
                 {children}
             </AuthAwareConvexProvider>
         </ConvexAvailabilityContext.Provider>

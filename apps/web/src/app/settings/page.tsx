@@ -1,13 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback, type ReactNode } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { Sidebar } from "@/components/chat/Sidebar";
 import { useChat } from "@/contexts/ChatContext";
 import { useSync } from "@/contexts/SyncContext";
 import { useSettings } from "@/contexts/SettingsContext";
-import { useMutationSafe } from "@/hooks/useConvexSafe";
-import { api } from "@/convex/_generated/api";
 import { validateApiKey } from "@/lib/openrouter";
 import type { Skill } from "@/lib/types";
 import {
@@ -38,7 +37,13 @@ import {
     ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { CloudSyncSettings } from "@/components/sync/CloudSyncSettings";
+const CloudSyncSettings = dynamic(
+    () =>
+        import("@/components/sync/CloudSyncSettings").then(
+            (mod) => mod.CloudSyncSettings,
+        ),
+    { ssr: false },
+);
 
 const isKeybindingBlocked = () => {
     if (typeof document === "undefined") return false;
@@ -62,10 +67,10 @@ export default function SettingsPage() {
     const {
         cloudQuotaStatus,
         cloudStorageUsage,
+        clearCloudImages,
         isConvexAvailable,
         refreshQuotaStatus,
     } = useSync();
-    const clearCloudImages = useMutationSafe(api.attachments.clearAllForUser);
     const {
         apiKey,
         setApiKey,
@@ -166,7 +171,7 @@ export default function SettingsPage() {
 
         setClearingCloudStorage(true);
         try {
-            await clearCloudImages({});
+            await clearCloudImages();
             await refreshQuotaStatus();
         } catch (error) {
             console.error("Failed to clear cloud attachments:", error);
