@@ -413,7 +413,7 @@ export function ChatWindow() {
                 ? JSON.parse(JSON.stringify(skillForMessage))
                 : null;
 
-            // Generate a temporary message ID for attachments
+            // Generate a stable message ID for attachments
             const messageId = generateUUID();
 
             // Convert pending attachments to stored attachments
@@ -438,6 +438,7 @@ export function ChatWindow() {
             }
 
             await addMessage({
+                id: messageId,
                 role: "user",
                 content: content,
                 contextContent: contextContent,

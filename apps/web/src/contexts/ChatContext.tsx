@@ -28,6 +28,7 @@ interface ChatContextType {
     deleteChat: (chatId: string) => Promise<void>;
     updateChat: (chat: ChatSession) => Promise<void>;
     addMessage: (message: {
+        id?: string;
         role: string;
         content: string;
         contextContent: string;
@@ -156,6 +157,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
     const addMessage = useCallback(
         async (message: {
+            id?: string;
             role: string;
             content: string;
             contextContent: string;
@@ -183,7 +185,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 searchLevel: message.searchLevel,
                 attachmentIds: message.attachmentIds,
                 sessionId: targetChatId,
-                id: uuid(),
+                id: message.id ?? uuid(),
                 createdAt: Date.now(),
             };
 
