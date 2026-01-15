@@ -2,9 +2,12 @@
 
 import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { useMutation } from "convex/react";
 import { Sidebar } from "@/components/chat/Sidebar";
 import { useChat } from "@/contexts/ChatContext";
+import { useSync } from "@/contexts/SyncContext";
 import { useSettings } from "@/contexts/SettingsContext";
+import { api } from "@/convex/_generated/api";
 import { validateApiKey } from "@/lib/openrouter";
 import type { Skill } from "@/lib/types";
 import {
@@ -57,6 +60,13 @@ export default function SettingsPage() {
     const router = useRouter();
     const { currentChat, clearCurrentChat } = useChat();
     const {
+        cloudQuotaStatus,
+        cloudStorageUsage,
+        isConvexAvailable,
+        refreshQuotaStatus,
+    } = useSync();
+    const clearCloudImages = useMutation(api.attachments.clearAllForUser);
+    const {
         apiKey,
         setApiKey,
         clearApiKey,
@@ -82,6 +92,7 @@ export default function SettingsPage() {
     } | null>(null);
     const [loadingStorage, setLoadingStorage] = useState(true);
     const [clearingStorage, setClearingStorage] = useState(false);
+    const [clearingCloudStorage, setClearingCloudStorage] = useState(false);
 
     // Load storage usage on mount
     const loadStorageUsage = useCallback(async () => {
@@ -141,6 +152,26 @@ export default function SettingsPage() {
             console.error("Failed to clear attachments:", error);
         } finally {
             setClearingStorage(false);
+        }
+    };
+
+    const handleClearCloudImages = async () => {
+        if (
+            !confirm(
+                "This will delete all cloud image attachments from your conversations. This cannot be undone. Continue?",
+            )
+        ) {
+            return;
+        }
+
+        setClearingCloudStorage(true);
+        try {
+            await clearCloudImages();
+            await refreshQuotaStatus();
+        } catch (error) {
+            console.error("Failed to clear cloud attachments:", error);
+        } finally {
+            setClearingCloudStorage(false);
         }
     };
 
@@ -398,7 +429,7 @@ export default function SettingsPage() {
                         </div>
                     </section>
 
-                    {/* Theme */}
+                    {/* Theme & Keybindings */}
                     <section className="card-deco mb-6">
                         <div className="flex items-center gap-3 mb-4">
                             <div className="w-8 h-8 bg-warning/10 flex items-center justify-center">
@@ -474,28 +505,8 @@ export default function SettingsPage() {
                                 </span>
                             </button>
                         </div>
-                    </section>
 
-                    {/* Conversation Defaults */}
-                    <section className="card-deco mb-6">
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="w-8 h-8 bg-primary/10 flex items-center justify-center">
-                                <Info size={16} className="text-primary" />
-                            </div>
-                            <h2 className="text-lg font-medium">
-                                Conversation Defaults
-                            </h2>
-                        </div>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
-                            Defaults update automatically when you send a
-                            message. Each chat keeps its last-used model,
-                            thinking, and search settings.
-                        </p>
-                    </section>
-
-                    {/* Keybindings */}
-                    <section className="card-deco mb-6">
-                        <div className="flex items-center gap-3 mb-4">
+                        <div className="mt-6 flex items-center gap-3 mb-4">
                             <div className="w-8 h-8 bg-accent/10 flex items-center justify-center">
                                 <Keyboard size={16} className="text-accent" />
                             </div>
@@ -885,11 +896,11 @@ export default function SettingsPage() {
                             </div>
                         ) : storageUsage ? (
                             <div className="space-y-4">
-                                {/* Storage bar */}
+                                {/* Local storage bar */}
                                 <div>
                                     <div className="flex items-center justify-between text-sm mb-2">
                                         <span className="text-muted-foreground">
-                                            Image Storage Used
+                                            Local Image Storage
                                         </span>
                                         <span className="font-medium">
                                             {formatBytes(
@@ -965,7 +976,7 @@ export default function SettingsPage() {
                                         <span>
                                             {clearingStorage
                                                 ? "Clearing..."
-                                                : "Clear All Images"}
+                                                : "Clear All Local Images"}
                                         </span>
                                     </button>
                                 )}
@@ -976,6 +987,112 @@ export default function SettingsPage() {
                                         <span>No images stored</span>
                                     </div>
                                 )}
+
+                                {isConvexAvailable &&
+                                    cloudQuotaStatus &&
+                                    cloudStorageUsage && (
+                                        <div className="space-y-4 border-t border-border/60 pt-4">
+                                            <div>
+                                                <div className="flex items-center justify-between text-sm mb-2">
+                                                    <span className="text-muted-foreground">
+                                                        Cloud Image Storage
+                                                    </span>
+                                                    <span className="font-medium">
+                                                        {formatBytes(
+                                                            cloudQuotaStatus.used,
+                                                        )}{" "}
+                                                        /{" "}
+                                                        {formatBytes(
+                                                            cloudQuotaStatus.limit,
+                                                        )}
+                                                    </span>
+                                                </div>
+                                                <div className="h-2 bg-muted border border-border overflow-hidden">
+                                                    <div
+                                                        className={cn(
+                                                            "h-full transition-all duration-300",
+                                                            cloudQuotaStatus.used /
+                                                                cloudQuotaStatus.limit >
+                                                                0.9
+                                                                ? "bg-error"
+                                                                : cloudQuotaStatus.used /
+                                                                        cloudQuotaStatus.limit >
+                                                                    0.7
+                                                                  ? "bg-warning"
+                                                                  : "bg-primary",
+                                                        )}
+                                                        style={{
+                                                            width: `${Math.min(100, (cloudQuotaStatus.used / cloudQuotaStatus.limit) * 100)}%`,
+                                                        }}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="p-3 bg-muted/30 border border-border">
+                                                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                                                        <ImageIcon size={14} />
+                                                        <span className="text-xs">
+                                                            Cloud Images
+                                                        </span>
+                                                    </div>
+                                                    <span className="text-lg font-medium">
+                                                        {formatBytes(
+                                                            cloudStorageUsage.bytes,
+                                                        )}
+                                                    </span>
+                                                </div>
+                                                <div className="p-3 bg-muted/30 border border-border">
+                                                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                                                        <Info size={14} />
+                                                        <span className="text-xs">
+                                                            Cloud Conversations
+                                                        </span>
+                                                    </div>
+                                                    <span className="text-lg font-medium">
+                                                        {
+                                                            cloudStorageUsage.sessionCount
+                                                        }
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            {cloudStorageUsage.bytes > 0 && (
+                                                <button
+                                                    onClick={
+                                                        handleClearCloudImages
+                                                    }
+                                                    disabled={
+                                                        clearingCloudStorage
+                                                    }
+                                                    className="flex items-center gap-2 px-4 py-2 text-error border border-error/30 hover:bg-error/10 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                                                >
+                                                    {clearingCloudStorage ? (
+                                                        <Loader2
+                                                            size={14}
+                                                            className="animate-spin"
+                                                        />
+                                                    ) : (
+                                                        <Trash2 size={14} />
+                                                    )}
+                                                    <span>
+                                                        {clearingCloudStorage
+                                                            ? "Clearing..."
+                                                            : "Clear All Cloud Images"}
+                                                    </span>
+                                                </button>
+                                            )}
+
+                                            {cloudStorageUsage.bytes === 0 && (
+                                                <div className="flex items-center gap-2 text-muted-foreground/70 text-sm">
+                                                    <Check size={14} />
+                                                    <span>
+                                                        No cloud images stored
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                             </div>
                         ) : (
                             <div className="text-sm text-muted-foreground">
