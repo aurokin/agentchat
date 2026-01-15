@@ -24,5 +24,12 @@ export default function ChatPage() {
         }
     }, [initialized, currentChat, loading, chats, createChat, selectChat]);
 
+    // If data loads later, select the latest chat when empty.
+    useEffect(() => {
+        if (loading || !initialized) return;
+        if (currentChat || chats.length === 0) return;
+        selectChat(chats[0].id);
+    }, [chats, currentChat, initialized, loading, selectChat]);
+
     return <ChatLayout />;
 }
