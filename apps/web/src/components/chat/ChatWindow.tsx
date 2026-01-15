@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useChat } from "@/contexts/ChatContext";
 import { useSettings } from "@/contexts/SettingsContext";
+import { useStorageAdapter } from "@/contexts/SyncContext";
 import {
     sendMessage,
     OpenRouterApiError,
@@ -24,7 +25,6 @@ import {
     type ChatSession,
     type Skill,
 } from "@/lib/types";
-import { saveAttachments, getAttachmentsByMessage } from "@/lib/db";
 import * as storage from "@/lib/storage";
 import { generateUUID } from "@/lib/utils";
 import { Hexagon, Sparkles, AlertCircle, RefreshCw } from "lucide-react";
@@ -155,6 +155,8 @@ export function ChatWindow() {
         favoriteModels,
         skills,
     } = useSettings();
+    const storageAdapter = useStorageAdapter();
+
     const [sending, setSending] = useState(false);
     const [error, setError] = useState<ErrorState | null>(null);
     const [retryChat, setRetryChat] = useState<{
@@ -431,7 +433,7 @@ export function ChatWindow() {
                     }),
                 );
 
-                await saveAttachments(attachments);
+                await storageAdapter.saveAttachments(attachments);
                 attachmentIds = attachments.map((a) => a.id);
             }
 
@@ -470,7 +472,8 @@ export function ChatWindow() {
 
                 // Load attachments if present
                 if (m.attachmentIds && m.attachmentIds.length > 0) {
-                    const msgAttachments = await getAttachmentsByMessage(m.id);
+                    const msgAttachments =
+                        await storageAdapter.getAttachmentsByMessage(m.id);
                     if (msgAttachments.length > 0) {
                         messageContent = buildMessageContent(
                             m.contextContent,

@@ -2,17 +2,21 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { formatDistanceToNow } from "date-fns";
 import { useConvexAuth } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
+import { Hexagon, Plus, Settings, Trash2 } from "lucide-react";
 import { useChat } from "@/contexts/ChatContext";
-import { useSettings } from "@/contexts/SettingsContext";
 import { useIsConvexAvailable } from "@/contexts/ConvexProvider";
-import { formatDistanceToNow } from "date-fns";
-import { Plus, Trash2, Settings, Hexagon } from "lucide-react";
-import Link from "next/link";
+import { useSettings } from "@/contexts/SettingsContext";
+import {
+    useIsCloudSyncAvailable,
+    useStorageAdapter,
+} from "@/contexts/SyncContext";
 import { cn } from "@/lib/utils";
-import * as db from "@/lib/db";
+
 import { ChatListSkeleton } from "./ChatListSkeleton";
 import { CloudStatusBadge } from "@/components/sync/CloudStatusBadge";
 import {
@@ -43,6 +47,7 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
     const isTablet = useIsTablet();
     const isTouchDevice = useTouchDevice();
 
+    const storageAdapter = useStorageAdapter();
     const [isMac, setIsMac] = useState(false);
     const [pendingDeleteChatId, setPendingDeleteChatId] = useState<
         string | null
@@ -137,7 +142,8 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
             const hasMessages =
                 currentChat?.id === chatId
                     ? messages.length > 0
-                    : (await db.getMessagesByChat(chatId)).length > 0;
+                    : (await storageAdapter.getMessagesByChat(chatId)).length >
+                      0;
 
             if (!hasMessages) {
                 await deleteChatAndSelectNext(chatId);
@@ -146,7 +152,12 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
 
             setPendingDeleteChatId(chatId);
         },
-        [currentChat?.id, deleteChatAndSelectNext, messages.length],
+        [
+            currentChat?.id,
+            deleteChatAndSelectNext,
+            messages.length,
+            storageAdapter,
+        ],
     );
 
     const handleConfirmDelete = async () => {

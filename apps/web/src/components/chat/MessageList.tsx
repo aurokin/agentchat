@@ -21,7 +21,7 @@ import {
 import { cn } from "@/lib/utils";
 import { MessageListSkeleton } from "./MessageListSkeleton";
 import { ImageGalleryDialog, type GalleryImage } from "./ImageGalleryDialog";
-import { getAttachment } from "@/lib/db";
+import { useStorageAdapter } from "@/contexts/SyncContext";
 import { createDataUrl } from "@/lib/imageProcessing";
 
 interface MessageListProps {
@@ -31,6 +31,7 @@ interface MessageListProps {
 }
 
 export function MessageList({ messages, sending, loading }: MessageListProps) {
+    const storageAdapter = useStorageAdapter();
     const bottomRef = useRef<HTMLDivElement>(null);
     const [galleryOpen, setGalleryOpen] = useState(false);
     const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
@@ -48,7 +49,8 @@ export function MessageList({ messages, sending, loading }: MessageListProps) {
             for (const message of messages) {
                 if (message.attachmentIds && message.attachmentIds.length > 0) {
                     for (const attachmentId of message.attachmentIds) {
-                        const attachment = await getAttachment(attachmentId);
+                        const attachment =
+                            await storageAdapter.getAttachment(attachmentId);
                         if (attachment) {
                             images.push({
                                 id: attachment.id,
@@ -68,7 +70,7 @@ export function MessageList({ messages, sending, loading }: MessageListProps) {
         }
 
         collectImages();
-    }, [messages]);
+    }, [messages, storageAdapter]);
 
     const handleImageClick = useCallback((imageId: string) => {
         setSelectedImageId(imageId);
@@ -183,6 +185,7 @@ function MessageAttachments({
     attachmentIds: string[];
     onImageClick: (imageId: string) => void;
 }) {
+    const storageAdapter = useStorageAdapter();
     const [attachments, setAttachments] = useState<Attachment[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -190,7 +193,7 @@ function MessageAttachments({
         async function loadAttachments() {
             const loaded: Attachment[] = [];
             for (const id of attachmentIds) {
-                const attachment = await getAttachment(id);
+                const attachment = await storageAdapter.getAttachment(id);
                 if (attachment) {
                     loaded.push(attachment);
                 }
@@ -199,7 +202,7 @@ function MessageAttachments({
             setLoading(false);
         }
         loadAttachments();
-    }, [attachmentIds]);
+    }, [attachmentIds, storageAdapter]);
 
     if (loading) {
         return (

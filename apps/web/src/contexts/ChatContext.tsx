@@ -14,7 +14,7 @@ import type {
     ThinkingLevel,
     SearchLevel,
 } from "@/lib/types";
-import * as db from "@/lib/db";
+import { useStorageAdapter } from "@/contexts/SyncContext";
 import * as storage from "@/lib/storage";
 import { v4 as uuid } from "uuid";
 
@@ -51,24 +51,42 @@ interface ChatContextType {
 const ChatContext = createContext<ChatContextType | null>(null);
 
 export function ChatProvider({ children }: { children: React.ReactNode }) {
+    const storageAdapter = useStorageAdapter();
     const [chats, setChats] = useState<ChatSession[]>([]);
     const [currentChat, setCurrentChat] = useState<ChatSession | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // Load chats on mount
-    useEffect(() => {
-        loadChats();
-    }, []);
-
-    const loadChats = async () => {
+    const loadChats = useCallback(async () => {
         try {
-            const allChats = await db.getAllChats();
+            const allChats = await storageAdapter.getAllChats();
             setChats(allChats);
+
+            if (currentChat) {
+                const refreshedChat = await storageAdapter.getChat(
+                    currentChat.id,
+                );
+
+                if (!refreshedChat) {
+                    setCurrentChat(null);
+                    setMessages([]);
+                } else {
+                    setCurrentChat(refreshedChat);
+                    const chatMessages = await storageAdapter.getMessagesByChat(
+                        refreshedChat.id,
+                    );
+                    setMessages(chatMessages);
+                }
+            }
         } finally {
             setLoading(false);
         }
-    };
+    }, [currentChat, storageAdapter]);
+
+    // Load chats on mount and when adapter changes
+    useEffect(() => {
+        loadChats();
+    }, [loadChats]);
 
     const createChat = useCallback(
         async (title?: string, modelId?: string): Promise<ChatSession> => {
@@ -86,28 +104,32 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 updatedAt: Date.now(),
             };
 
-            await db.createChat(chat);
+            await storageAdapter.createChat(chat);
             setChats((prev) => [chat, ...prev]);
             setCurrentChat(chat);
             setMessages([]);
 
             return chat;
         },
-        [],
+        [storageAdapter],
     );
 
-    const selectChat = useCallback(async (chatId: string) => {
-        const chat = await db.getChat(chatId);
-        if (chat) {
-            setCurrentChat(chat);
-            const chatMessages = await db.getMessagesByChat(chatId);
-            setMessages(chatMessages);
-        }
-    }, []);
+    const selectChat = useCallback(
+        async (chatId: string) => {
+            const chat = await storageAdapter.getChat(chatId);
+            if (chat) {
+                setCurrentChat(chat);
+                const chatMessages =
+                    await storageAdapter.getMessagesByChat(chatId);
+                setMessages(chatMessages);
+            }
+        },
+        [storageAdapter],
+    );
 
     const deleteChat = useCallback(
         async (chatId: string) => {
-            await db.deleteChat(chatId);
+            await storageAdapter.deleteChat(chatId);
             setChats((prev) => prev.filter((c) => c.id !== chatId));
 
             if (currentChat?.id === chatId) {
@@ -115,13 +137,13 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 setMessages([]);
             }
         },
-        [currentChat],
+        [currentChat, storageAdapter],
     );
 
     const updateChat = useCallback(
         async (chat: ChatSession) => {
             const updated = { ...chat, updatedAt: Date.now() };
-            await db.updateChat(updated);
+            await storageAdapter.updateChat(updated);
             setChats((prev) =>
                 prev.map((c) => (c.id === chat.id ? updated : c)),
             );
@@ -129,7 +151,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 setCurrentChat(updated);
             }
         },
-        [currentChat],
+        [currentChat, storageAdapter],
     );
 
     const addMessage = useCallback(
@@ -165,18 +187,18 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 createdAt: Date.now(),
             };
 
-            await db.createMessage(newMessage);
+            await storageAdapter.createMessage(newMessage);
             if (currentChat?.id === targetChatId) {
                 setMessages((prev) => [...prev, newMessage]);
             }
 
-            const baseChat = await db.getChat(targetChatId);
+            const baseChat = await storageAdapter.getChat(targetChatId);
             if (baseChat ?? (currentChat?.id === targetChatId && currentChat)) {
                 const updated = {
                     ...(baseChat ?? currentChat!),
                     updatedAt: Date.now(),
                 };
-                await db.updateChat(updated);
+                await storageAdapter.updateChat(updated);
                 setChats((prev) => {
                     if (!prev.some((c) => c.id === updated.id)) {
                         return prev;
@@ -190,7 +212,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
             return newMessage;
         },
-        [currentChat],
+        [currentChat, storageAdapter],
     );
 
     const updateMessage = useCallback(
@@ -213,17 +235,24 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             });
 
             if (updatedMessage) {
-                await db.updateMessage(updatedMessage);
+                await storageAdapter.updateMessage(updatedMessage);
                 return;
             }
 
-            const database = await db.getDB();
-            const message = await database.get("messages", id);
-            if (message) {
-                await database.put("messages", { ...message, ...updates });
+            if (currentChat) {
+                const chatMessages = await storageAdapter.getMessagesByChat(
+                    currentChat.id,
+                );
+                const message = chatMessages.find((m) => m.id === id);
+                if (message) {
+                    await storageAdapter.updateMessage({
+                        ...message,
+                        ...updates,
+                    });
+                }
             }
         },
-        [],
+        [currentChat, storageAdapter],
     );
 
     const clearCurrentChat = useCallback(() => {

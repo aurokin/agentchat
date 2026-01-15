@@ -9,6 +9,7 @@ import React, {
 } from "react";
 import { Send } from "lucide-react";
 import { cn, generateUUID } from "@/lib/utils";
+import { useStorageAdapter } from "@/contexts/SyncContext";
 import { ModelSelector } from "./ModelSelector";
 import { SkillSelector } from "./SkillSelector";
 import { ThinkingToggle } from "./ThinkingToggle";
@@ -30,12 +31,7 @@ import {
     hasImageInClipboardEvent,
     readImageFromClipboardEvent,
 } from "@/lib/clipboard";
-import {
-    getStorageUsage,
-    getAttachmentStorageBySession,
-    MAX_SESSION_STORAGE,
-    MAX_TOTAL_STORAGE,
-} from "@/lib/db";
+import { MAX_SESSION_STORAGE, MAX_TOTAL_STORAGE } from "@/lib/db";
 
 interface MessageInputProps {
     onSend: (content: string, attachments?: PendingAttachment[]) => void;
@@ -71,6 +67,7 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
             sessionId,
         } = props;
 
+        const storageAdapter = useStorageAdapter();
         const [content, setContent] = useState("");
         const [pendingAttachments, setPendingAttachments] = useState<
             PendingAttachment[]
@@ -121,8 +118,8 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
             error?: string;
         }> => {
             try {
-                const usage = await getStorageUsage();
-                if (usage.attachments >= MAX_TOTAL_STORAGE) {
+                const usage = await storageAdapter.getStorageUsage();
+                if (usage.bytes >= MAX_TOTAL_STORAGE) {
                     return {
                         allowed: false,
                         error: "Storage limit reached. Delete old conversations to free up space.",
@@ -130,8 +127,23 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
                 }
 
                 if (sessionId) {
-                    const sessionUsage =
-                        await getAttachmentStorageBySession(sessionId);
+                    const sessionMessages =
+                        await storageAdapter.getMessagesByChat(sessionId);
+                    let sessionUsage = 0;
+
+                    for (const message of sessionMessages) {
+                        if (message.attachmentIds?.length) {
+                            const attachments =
+                                await storageAdapter.getAttachmentsByMessage(
+                                    message.id,
+                                );
+                            sessionUsage += attachments.reduce(
+                                (sum, attachment) => sum + attachment.size,
+                                0,
+                            );
+                        }
+                    }
+
                     if (sessionUsage >= MAX_SESSION_STORAGE) {
                         return {
                             allowed: false,
@@ -145,7 +157,7 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
                 // If storage check fails, allow the attachment attempt
                 return { allowed: true };
             }
-        }, [sessionId]);
+        }, [sessionId, storageAdapter]);
 
         // Process files and add as pending attachments
         const processFiles = useCallback(
