@@ -873,8 +873,7 @@ export default function SettingsPage() {
                         </div>
                         <p className="text-sm text-muted-foreground mb-5 leading-relaxed">
                             Manage storage used by image attachments in your
-                            conversations. Images are stored locally in your
-                            browser.
+                            conversations.
                         </p>
 
                         {loadingStorage ? (
@@ -998,8 +997,7 @@ export default function SettingsPage() {
                         </div>
                         <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
                             RouterChat provides a unified interface for AI
-                            conversations through OpenRouter. Your data is
-                            stored locally in your browser.
+                            conversations through OpenRouter.
                         </p>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground/70">
                             <div className="w-1.5 h-1.5 bg-primary rounded-full" />
