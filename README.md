@@ -1,4 +1,4 @@
-# OpenRouter Chat Application
+# RouterChat Application
 
 A web application for chatting with AI models through OpenRouter. Users provide their own OpenRouter API key. Data can be stored locally in the browser or synced to the cloud.
 
@@ -22,17 +22,17 @@ Visit https://www.routerchat.chat to start chatting with your OpenRouter API key
 
 ## Tech Stack
 
-| Category  | Technology                                    |
-| --------- | --------------------------------------------- |
-| Runtime   | Bun 1.x                                       |
-| Framework | Next.js 16 (App Router)                       |
-| Language  | TypeScript 5.x                                |
-| UI        | Tailwind CSS 4                                |
-| State     | React Context + Hooks                         |
+| Category  | Technology                                        |
+| --------- | ------------------------------------------------- |
+| Runtime   | Bun 1.x                                           |
+| Framework | Next.js 16 (App Router)                           |
+| Language  | TypeScript 5.x                                    |
+| UI        | Tailwind CSS 4                                    |
+| State     | React Context + Hooks                             |
 | Storage   | IndexedDB + localStorage (local) / Convex (cloud) |
-| API       | OpenRouter API                                |
-| Linting   | ESLint                                        |
-| Testing   | Bun Test                                      |
+| API       | OpenRouter API                                    |
+| Linting   | ESLint                                            |
+| Testing   | Bun Test                                          |
 
 ## Using the App
 
@@ -111,8 +111,8 @@ cd apps/web && bun build
 
 - **Direct API calls**: OpenRouter API calls are made directly from the client
 - **Dual storage paths**: App supports both local-only and cloud sync modes
-  - **Local mode** (default): All data in IndexedDB + localStorage, no account required
-  - **Cloud mode**: Data synced to Convex, requires authentication and Pro subscription
+    - **Local mode** (default): All data in IndexedDB + localStorage, no account required
+    - **Cloud mode**: Data synced to Convex, requires authentication and Pro subscription
 - **Storage adapter pattern**: Unified interface abstracts local vs cloud storage
 - **Monorepo**: Designed for future mobile expansion with shared types
 - **Offline support**: Local storage (IndexedDB + localStorage) is a separate database from cloud; users can copy cloud data to local storage for offline access

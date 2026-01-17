@@ -3,20 +3,20 @@ import type { SyncState, SyncMetadata } from "./sync/types";
 import { DEFAULT_SYNC_METADATA } from "./sync/types";
 
 const STORAGE_KEYS = {
-    API_KEY: "router-chat-api-key",
-    THEME: "router-chat-theme",
-    DEFAULT_MODEL: "router-chat-default-model",
-    DEFAULT_THINKING: "router-chat-default-thinking",
-    DEFAULT_SEARCH: "router-chat-default-search",
-    FAVORITE_MODELS: "router-chat-favorite-models",
-    SKILLS: "router-chat-skills",
-    DEFAULT_SKILL: "router-chat-default-skill",
-    SELECTED_SKILL: "router-chat-selected-skill",
-    SELECTED_SKILL_ID: "router-chat-selected-skill-id",
-    SELECTED_SKILL_MODE: "router-chat-selected-skill-mode",
+    API_KEY: "routerchat-api-key",
+    THEME: "routerchat-theme",
+    DEFAULT_MODEL: "routerchat-default-model",
+    DEFAULT_THINKING: "routerchat-default-thinking",
+    DEFAULT_SEARCH: "routerchat-default-search",
+    FAVORITE_MODELS: "routerchat-favorite-models",
+    SKILLS: "routerchat-skills",
+    DEFAULT_SKILL: "routerchat-default-skill",
+    SELECTED_SKILL: "routerchat-selected-skill",
+    SELECTED_SKILL_ID: "routerchat-selected-skill-id",
+    SELECTED_SKILL_MODE: "routerchat-selected-skill-mode",
     // Cloud sync keys
-    SYNC_STATE: "router-chat-sync-state",
-    SYNC_METADATA: "router-chat-sync-metadata",
+    SYNC_STATE: "routerchat-sync-state",
+    SYNC_METADATA: "routerchat-sync-metadata",
 } as const;
 
 export function getApiKey(): string | null {

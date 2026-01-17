@@ -2,39 +2,37 @@ import { test, expect, describe, beforeEach, mock } from "bun:test";
 import type { Skill } from "@/lib/types";
 
 const STORAGE_KEYS = {
-    API_KEY: "router-chat-api-key",
-    THEME: "router-chat-theme",
-    DEFAULT_MODEL: "router-chat-default-model",
-    DEFAULT_THINKING: "router-chat-default-thinking",
-    DEFAULT_SEARCH: "router-chat-default-search",
-    FAVORITE_MODELS: "router-chat-favorite-models",
-    SKILLS: "router-chat-skills",
-    DEFAULT_SKILL: "router-chat-default-skill",
-    SELECTED_SKILL: "router-chat-selected-skill",
-    SELECTED_SKILL_ID: "router-chat-selected-skill-id",
-    SELECTED_SKILL_MODE: "router-chat-selected-skill-mode",
+    API_KEY: "routerchat-api-key",
+    THEME: "routerchat-theme",
+    DEFAULT_MODEL: "routerchat-default-model",
+    DEFAULT_THINKING: "routerchat-default-thinking",
+    DEFAULT_SEARCH: "routerchat-default-search",
+    FAVORITE_MODELS: "routerchat-favorite-models",
+    SKILLS: "routerchat-skills",
+    DEFAULT_SKILL: "routerchat-default-skill",
+    SELECTED_SKILL: "routerchat-selected-skill",
+    SELECTED_SKILL_ID: "routerchat-selected-skill-id",
+    SELECTED_SKILL_MODE: "routerchat-selected-skill-mode",
 } as const;
 
 describe("storage.ts STORAGE_KEYS", () => {
     test("STORAGE_KEYS contains all expected keys", () => {
-        expect(STORAGE_KEYS.API_KEY).toBe("router-chat-api-key");
-        expect(STORAGE_KEYS.THEME).toBe("router-chat-theme");
-        expect(STORAGE_KEYS.DEFAULT_MODEL).toBe("router-chat-default-model");
+        expect(STORAGE_KEYS.API_KEY).toBe("routerchat-api-key");
+        expect(STORAGE_KEYS.THEME).toBe("routerchat-theme");
+        expect(STORAGE_KEYS.DEFAULT_MODEL).toBe("routerchat-default-model");
         expect(STORAGE_KEYS.DEFAULT_THINKING).toBe(
-            "router-chat-default-thinking",
+            "routerchat-default-thinking",
         );
-        expect(STORAGE_KEYS.DEFAULT_SEARCH).toBe("router-chat-default-search");
-        expect(STORAGE_KEYS.FAVORITE_MODELS).toBe(
-            "router-chat-favorite-models",
-        );
-        expect(STORAGE_KEYS.SKILLS).toBe("router-chat-skills");
-        expect(STORAGE_KEYS.DEFAULT_SKILL).toBe("router-chat-default-skill");
-        expect(STORAGE_KEYS.SELECTED_SKILL).toBe("router-chat-selected-skill");
+        expect(STORAGE_KEYS.DEFAULT_SEARCH).toBe("routerchat-default-search");
+        expect(STORAGE_KEYS.FAVORITE_MODELS).toBe("routerchat-favorite-models");
+        expect(STORAGE_KEYS.SKILLS).toBe("routerchat-skills");
+        expect(STORAGE_KEYS.DEFAULT_SKILL).toBe("routerchat-default-skill");
+        expect(STORAGE_KEYS.SELECTED_SKILL).toBe("routerchat-selected-skill");
         expect(STORAGE_KEYS.SELECTED_SKILL_ID).toBe(
-            "router-chat-selected-skill-id",
+            "routerchat-selected-skill-id",
         );
         expect(STORAGE_KEYS.SELECTED_SKILL_MODE).toBe(
-            "router-chat-selected-skill-mode",
+            "routerchat-selected-skill-mode",
         );
     });
 
