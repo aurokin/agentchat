@@ -1,6 +1,6 @@
 # OpenRouter Chat Application
 
-A web application for chatting with AI models through OpenRouter. Users provide their own OpenRouter API key, and all data is stored locally in the browser.
+A web application for chatting with AI models through OpenRouter. Users provide their own OpenRouter API key. Data can be stored locally in the browser or synced to the cloud.
 
 ## Try It Now
 
@@ -15,23 +15,24 @@ Visit https://www.routerchat.chat to start chatting with your OpenRouter API key
 - **System Skills** - Choose from preset prompts or create custom system messages
 - **Markdown Support** - Rich text rendering for code blocks, lists, and formatting
 - **Copy Messages** - One-click copy for any message
-- **Local Storage** - API key, settings, and chat history stored in browser
+- **Local Storage** - API key, settings, and chat history stored in browser (default)
+- **Cloud Sync** - Optional sync to Convex for cross-device access (Pro subscription)
 - **IndexedDB Persistence** - Full chat history stored locally
 - **Theme Support** - Light, dark, and system theme options
 
 ## Tech Stack
 
-| Category  | Technology                     |
-| --------- | ------------------------------ |
-| Runtime   | Bun 1.x                        |
-| Framework | Next.js 16 (App Router)        |
-| Language  | TypeScript 5.x                 |
-| UI        | Tailwind CSS 4                 |
-| State     | React Context + Hooks          |
-| Storage   | IndexedDB (idb) + localStorage |
-| API       | OpenRouter API                 |
-| Linting   | ESLint                         |
-| Testing   | Bun Test                       |
+| Category  | Technology                                    |
+| --------- | --------------------------------------------- |
+| Runtime   | Bun 1.x                                       |
+| Framework | Next.js 16 (App Router)                       |
+| Language  | TypeScript 5.x                                |
+| UI        | Tailwind CSS 4                                |
+| State     | React Context + Hooks                         |
+| Storage   | IndexedDB + localStorage (local) / Convex (cloud) |
+| API       | OpenRouter API                                |
+| Linting   | ESLint                                        |
+| Testing   | Bun Test                                      |
 
 ## Using the App
 
@@ -76,14 +77,22 @@ Only required if you are hosting an instance with Cloud Sync enabled.
 
 **Convex environment variables**
 
-- `AUTH_GOOGLE_ID`
-- `AUTH_GOOGLE_SECRET`
-- `JWKS`
-- `JWT_PRIVATE_KEY`
-- `SITE_URL`
-- `STRIPE_PRO_PRICE_ID`
-- `STRIPE_SECRET_KEY`
-- `STRIPE_WEBHOOK_SECRET`
+- `AUTH_GOOGLE_ID` - Google OAuth client ID
+- `AUTH_GOOGLE_SECRET` - Google OAuth client secret
+- `JWKS` - JSON Web Key Set for auth
+- `JWT_PRIVATE_KEY` - Private key for JWT signing
+- `SITE_URL` - Your deployment URL
+- `STRIPE_PRO_PRICE_ID` - Stripe price ID for Pro subscription
+- `STRIPE_SECRET_KEY` - Stripe secret API key
+- `STRIPE_WEBHOOK_SECRET` - Stripe webhook signing secret
+- `ENCRYPTION_KEY` - AES-256 key for encrypting sensitive data (API keys)
+
+**Generating the encryption key:**
+
+```bash
+# Generate and set in one command
+bunx convex env set ENCRYPTION_KEY "$(openssl rand -base64 32)"
+```
 
 ## Development
 
@@ -101,9 +110,12 @@ cd apps/web && bun build
 ## Architecture Notes
 
 - **Direct API calls**: OpenRouter API calls are made directly from the client
-- **Local storage only**: No backend server; all data stored in browser
+- **Dual storage paths**: App supports both local-only and cloud sync modes
+  - **Local mode** (default): All data in IndexedDB + localStorage, no account required
+  - **Cloud mode**: Data synced to Convex, requires authentication and Pro subscription
+- **Storage adapter pattern**: Unified interface abstracts local vs cloud storage
 - **Monorepo**: Designed for future mobile expansion with shared types
-- **Offline support**: Chat history loads from IndexedDB, but API calls require internet
+- **Offline support**: Local storage (IndexedDB + localStorage) is a separate database from cloud; users can copy cloud data to local storage for offline access
 
 ## License
 
