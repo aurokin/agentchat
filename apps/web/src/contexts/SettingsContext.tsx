@@ -19,6 +19,7 @@ import type {
 import { v4 as uuid } from "uuid";
 import * as storage from "@/lib/storage";
 import { fetchModels } from "@/lib/openrouter";
+import { useApiKey } from "@/hooks/useApiKey";
 
 interface SettingsContextType extends UserSettings {
     setApiKey: (key: string) => void;
@@ -74,6 +75,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     const refreshPromiseRef = useRef<Promise<void> | null>(null);
     const storageAdapter = useStorageAdapter();
 
+    // Use the useApiKey hook for cloud-synced API key management
+    const {
+        apiKey: cloudApiKey,
+        setApiKey: setCloudApiKey,
+        clearApiKey: clearCloudApiKey,
+    } = useApiKey();
+
     const refreshModels = useCallback(async () => {
         // Prevent duplicate requests
         if (refreshPromiseRef.current) {
@@ -126,17 +134,26 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         }
     }, []);
 
+    // Initialize non-API-key settings from localStorage
     useEffect(() => {
-        setSettings({
-            apiKey: storage.getApiKey(),
+        setSettings((prev) => ({
+            ...prev,
             defaultModel: storage.getDefaultModel(),
             defaultThinking: storage.getDefaultThinking(),
             defaultSearchLevel: storage.getDefaultSearchLevel(),
             theme: storage.getTheme(),
             favoriteModels: storage.getFavoriteModels(),
-        });
+        }));
         setMounted(true);
     }, []);
+
+    // Sync API key from the useApiKey hook (handles cloud sync automatically)
+    useEffect(() => {
+        setSettings((prev) => ({
+            ...prev,
+            apiKey: cloudApiKey,
+        }));
+    }, [cloudApiKey]);
 
     useEffect(() => {
         let isActive = true;
@@ -179,15 +196,22 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         }
     }, [mounted, refreshModels]);
 
-    const setApiKey = (key: string) => {
-        storage.setApiKey(key);
-        setSettings((prev) => ({ ...prev, apiKey: key }));
-    };
+    const setApiKey = useCallback(
+        (key: string) => {
+            // Use the cloud-synced API key setter
+            // This will save to both local storage and cloud (if enabled)
+            void setCloudApiKey(key);
+            // Local state will be updated via the useEffect that watches cloudApiKey
+        },
+        [setCloudApiKey],
+    );
 
-    const clearApiKey = () => {
-        storage.clearApiKey();
-        setSettings((prev) => ({ ...prev, apiKey: null }));
-    };
+    const clearApiKey = useCallback(() => {
+        // Use the cloud-synced API key clearer
+        // This will clear from both local storage and cloud (if enabled)
+        void clearCloudApiKey();
+        // Local state will be updated via the useEffect that watches cloudApiKey
+    }, [clearCloudApiKey]);
 
     const setDefaultModel = (modelId: string) => {
         storage.setDefaultModel(modelId);
