@@ -1119,9 +1119,55 @@ export default function SettingsPage() {
                         </div>
                         <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
                             RouterChat provides a unified interface for AI
-                            conversations through OpenRouter.
+                            conversations through OpenRouter, with a flexible
+                            setup that lets you choose how your data is stored.
                         </p>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground/70">
+                        <details className="group mt-4">
+                            <summary className="flex items-center justify-between gap-4 cursor-pointer select-none border border-border bg-background-elevated px-4 py-3 text-sm text-foreground hover:border-primary/40 transition-colors">
+                                <span className="font-medium">Learn More</span>
+                                <ChevronDown
+                                    size={16}
+                                    className="text-muted-foreground transition-transform group-open:rotate-180"
+                                />
+                            </summary>
+                            <div className="mt-4 space-y-4">
+                                <div className="border border-border bg-muted/20 p-4 space-y-2">
+                                    <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                                        Local Only
+                                    </div>
+                                    <p className="text-sm text-muted-foreground leading-relaxed">
+                                        RouterChat works offline by default.
+                                        Your data stays on this device, and
+                                        requests are sent directly to OpenRouter
+                                        using your API key.
+                                    </p>
+                                </div>
+                                <div className="border border-border bg-muted/20 p-4 space-y-2">
+                                    <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                                        Cloud Sync
+                                    </div>
+                                    <p className="text-sm text-muted-foreground leading-relaxed">
+                                        Enable cloud sync with a Pro
+                                        subscription. Sync is powered by Convex,
+                                        and API keys are stored in encrypted
+                                        form for additional safety.
+                                    </p>
+                                </div>
+                                <div className="border border-border bg-muted/20 p-4 space-y-2">
+                                    <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                                        Our Ethos
+                                    </div>
+                                    <p className="text-sm text-muted-foreground leading-relaxed">
+                                        Choose any model available through
+                                        OpenRouter and tailor the experience to
+                                        your workflow. RouterChat is built to
+                                        maximize flexibility and put you in
+                                        control.
+                                    </p>
+                                </div>
+                            </div>
+                        </details>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground/70 mt-4">
                             <div className="w-1.5 h-1.5 bg-primary rounded-full" />
                             <span>Version 0.1.1</span>
                         </div>

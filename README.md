@@ -20,6 +20,14 @@ Visit https://www.routerchat.chat to start chatting with your OpenRouter API key
 - **IndexedDB Persistence** - Full chat history stored locally
 - **Theme Support** - Light, dark, and system theme options
 
+## About RouterChat
+
+RouterChat is designed to keep you in control of your data and model choices.
+
+- **Local-first** - Works offline by default. Data stays on-device and requests go straight to OpenRouter.
+- **Optional cloud sync** - Enable sync with a Pro subscription, powered by Convex. API keys are stored in encrypted form.
+- **User-empowered** - Choose any model available through OpenRouter and customize your experience.
+
 ## Tech Stack
 
 | Category  | Technology                                        |
