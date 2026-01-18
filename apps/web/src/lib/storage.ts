@@ -14,10 +14,93 @@ const STORAGE_KEYS = {
     SELECTED_SKILL: "routerchat-selected-skill",
     SELECTED_SKILL_ID: "routerchat-selected-skill-id",
     SELECTED_SKILL_MODE: "routerchat-selected-skill-mode",
+    CLOUD_DEFAULT_SKILL: "routerchat-cloud-default-skill",
+    CLOUD_SELECTED_SKILL_ID: "routerchat-cloud-selected-skill-id",
+    CLOUD_SELECTED_SKILL_MODE: "routerchat-cloud-selected-skill-mode",
     // Cloud sync keys
     SYNC_STATE: "routerchat-sync-state",
     SYNC_METADATA: "routerchat-sync-metadata",
 } as const;
+
+type SkillSettingsKeys = {
+    defaultSkillId: string;
+    selectedSkillId: string;
+    selectedSkillMode: string;
+    legacySelectedSkill?: string;
+};
+
+const LOCAL_SKILL_SETTINGS_KEYS: SkillSettingsKeys = {
+    defaultSkillId: STORAGE_KEYS.DEFAULT_SKILL,
+    selectedSkillId: STORAGE_KEYS.SELECTED_SKILL_ID,
+    selectedSkillMode: STORAGE_KEYS.SELECTED_SKILL_MODE,
+    legacySelectedSkill: STORAGE_KEYS.SELECTED_SKILL,
+};
+
+const CLOUD_SKILL_SETTINGS_KEYS: SkillSettingsKeys = {
+    defaultSkillId: STORAGE_KEYS.CLOUD_DEFAULT_SKILL,
+    selectedSkillId: STORAGE_KEYS.CLOUD_SELECTED_SKILL_ID,
+    selectedSkillMode: STORAGE_KEYS.CLOUD_SELECTED_SKILL_MODE,
+};
+
+function getDefaultSkillIdFromKeys(keys: SkillSettingsKeys): string | null {
+    if (typeof window === "undefined") return null;
+    const stored = localStorage.getItem(keys.defaultSkillId);
+    if (stored) return stored;
+    if (keys.legacySelectedSkill) {
+        const legacy = localStorage.getItem(keys.legacySelectedSkill);
+        if (legacy) {
+            localStorage.setItem(keys.defaultSkillId, legacy);
+            localStorage.removeItem(keys.legacySelectedSkill);
+            return legacy;
+        }
+    }
+    return null;
+}
+
+function setDefaultSkillIdFromKeys(
+    keys: SkillSettingsKeys,
+    skillId: string | null,
+): void {
+    if (typeof window === "undefined") return;
+    if (skillId) {
+        localStorage.setItem(keys.defaultSkillId, skillId);
+    } else {
+        localStorage.removeItem(keys.defaultSkillId);
+    }
+}
+
+function getSelectedSkillIdFromKeys(keys: SkillSettingsKeys): string | null {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem(keys.selectedSkillId);
+}
+
+function setSelectedSkillIdFromKeys(
+    keys: SkillSettingsKeys,
+    skillId: string | null,
+): void {
+    if (typeof window === "undefined") return;
+    if (skillId) {
+        localStorage.setItem(keys.selectedSkillId, skillId);
+    } else {
+        localStorage.removeItem(keys.selectedSkillId);
+    }
+}
+
+function getSelectedSkillModeFromKeys(
+    keys: SkillSettingsKeys,
+): "auto" | "manual" {
+    if (typeof window === "undefined") return "auto";
+    const stored = localStorage.getItem(keys.selectedSkillMode);
+    return stored === "manual" ? "manual" : "auto";
+}
+
+function setSelectedSkillModeFromKeys(
+    keys: SkillSettingsKeys,
+    mode: "auto" | "manual",
+): void {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(keys.selectedSkillMode, mode);
+}
 
 export function getApiKey(): string | null {
     if (typeof window === "undefined") return null;
@@ -137,50 +220,51 @@ export function setSkills(skills: Skill[]): void {
 }
 
 export function getDefaultSkillId(): string | null {
-    if (typeof window === "undefined") return null;
-    const stored = localStorage.getItem(STORAGE_KEYS.DEFAULT_SKILL);
-    if (stored) return stored;
-    const legacy = localStorage.getItem(STORAGE_KEYS.SELECTED_SKILL);
-    if (legacy) {
-        localStorage.setItem(STORAGE_KEYS.DEFAULT_SKILL, legacy);
-        localStorage.removeItem(STORAGE_KEYS.SELECTED_SKILL);
-        return legacy;
-    }
-    return null;
+    return getDefaultSkillIdFromKeys(LOCAL_SKILL_SETTINGS_KEYS);
 }
 
 export function setDefaultSkillId(skillId: string | null): void {
-    if (typeof window === "undefined") return;
-    if (skillId) {
-        localStorage.setItem(STORAGE_KEYS.DEFAULT_SKILL, skillId);
-    } else {
-        localStorage.removeItem(STORAGE_KEYS.DEFAULT_SKILL);
-    }
+    setDefaultSkillIdFromKeys(LOCAL_SKILL_SETTINGS_KEYS, skillId);
 }
 
 export function getSelectedSkillId(): string | null {
-    if (typeof window === "undefined") return null;
-    return localStorage.getItem(STORAGE_KEYS.SELECTED_SKILL_ID);
+    return getSelectedSkillIdFromKeys(LOCAL_SKILL_SETTINGS_KEYS);
 }
 
 export function setSelectedSkillId(skillId: string | null): void {
-    if (typeof window === "undefined") return;
-    if (skillId) {
-        localStorage.setItem(STORAGE_KEYS.SELECTED_SKILL_ID, skillId);
-    } else {
-        localStorage.removeItem(STORAGE_KEYS.SELECTED_SKILL_ID);
-    }
+    setSelectedSkillIdFromKeys(LOCAL_SKILL_SETTINGS_KEYS, skillId);
 }
 
 export function getSelectedSkillMode(): "auto" | "manual" {
-    if (typeof window === "undefined") return "auto";
-    const stored = localStorage.getItem(STORAGE_KEYS.SELECTED_SKILL_MODE);
-    return stored === "manual" ? "manual" : "auto";
+    return getSelectedSkillModeFromKeys(LOCAL_SKILL_SETTINGS_KEYS);
 }
 
 export function setSelectedSkillMode(mode: "auto" | "manual"): void {
-    if (typeof window === "undefined") return;
-    localStorage.setItem(STORAGE_KEYS.SELECTED_SKILL_MODE, mode);
+    setSelectedSkillModeFromKeys(LOCAL_SKILL_SETTINGS_KEYS, mode);
+}
+
+export function getCloudDefaultSkillId(): string | null {
+    return getDefaultSkillIdFromKeys(CLOUD_SKILL_SETTINGS_KEYS);
+}
+
+export function setCloudDefaultSkillId(skillId: string | null): void {
+    setDefaultSkillIdFromKeys(CLOUD_SKILL_SETTINGS_KEYS, skillId);
+}
+
+export function getCloudSelectedSkillId(): string | null {
+    return getSelectedSkillIdFromKeys(CLOUD_SKILL_SETTINGS_KEYS);
+}
+
+export function setCloudSelectedSkillId(skillId: string | null): void {
+    setSelectedSkillIdFromKeys(CLOUD_SKILL_SETTINGS_KEYS, skillId);
+}
+
+export function getCloudSelectedSkillMode(): "auto" | "manual" {
+    return getSelectedSkillModeFromKeys(CLOUD_SKILL_SETTINGS_KEYS);
+}
+
+export function setCloudSelectedSkillMode(mode: "auto" | "manual"): void {
+    setSelectedSkillModeFromKeys(CLOUD_SKILL_SETTINGS_KEYS, mode);
 }
 
 // Cloud Sync Storage Functions

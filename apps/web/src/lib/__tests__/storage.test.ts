@@ -13,6 +13,9 @@ const STORAGE_KEYS = {
     SELECTED_SKILL: "routerchat-selected-skill",
     SELECTED_SKILL_ID: "routerchat-selected-skill-id",
     SELECTED_SKILL_MODE: "routerchat-selected-skill-mode",
+    CLOUD_DEFAULT_SKILL: "routerchat-cloud-default-skill",
+    CLOUD_SELECTED_SKILL_ID: "routerchat-cloud-selected-skill-id",
+    CLOUD_SELECTED_SKILL_MODE: "routerchat-cloud-selected-skill-mode",
 } as const;
 
 describe("storage.ts STORAGE_KEYS", () => {
@@ -33,6 +36,15 @@ describe("storage.ts STORAGE_KEYS", () => {
         );
         expect(STORAGE_KEYS.SELECTED_SKILL_MODE).toBe(
             "routerchat-selected-skill-mode",
+        );
+        expect(STORAGE_KEYS.CLOUD_DEFAULT_SKILL).toBe(
+            "routerchat-cloud-default-skill",
+        );
+        expect(STORAGE_KEYS.CLOUD_SELECTED_SKILL_ID).toBe(
+            "routerchat-cloud-selected-skill-id",
+        );
+        expect(STORAGE_KEYS.CLOUD_SELECTED_SKILL_MODE).toBe(
+            "routerchat-cloud-selected-skill-mode",
         );
     });
 
