@@ -1,6 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback, type ReactNode } from "react";
+import {
+    useState,
+    useEffect,
+    useCallback,
+    useRef,
+    type ReactNode,
+} from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { Sidebar } from "@/components/chat/Sidebar";
@@ -69,6 +75,7 @@ export default function SettingsPage() {
         cloudStorageUsage,
         clearCloudImages,
         isConvexAvailable,
+        localQuotaStatus,
         refreshQuotaStatus,
     } = useSync();
     const {
@@ -98,6 +105,7 @@ export default function SettingsPage() {
     const [loadingStorage, setLoadingStorage] = useState(true);
     const [clearingStorage, setClearingStorage] = useState(false);
     const [clearingCloudStorage, setClearingCloudStorage] = useState(false);
+    const previousLocalUsageRef = useRef<number | null>(null);
 
     // Load storage usage on mount
     const loadStorageUsage = useCallback(async () => {
@@ -114,6 +122,14 @@ export default function SettingsPage() {
     useEffect(() => {
         loadStorageUsage();
     }, [loadStorageUsage]);
+
+    useEffect(() => {
+        const previousUsage = previousLocalUsageRef.current;
+        previousLocalUsageRef.current = localQuotaStatus.used;
+        if (previousUsage !== null && previousUsage !== localQuotaStatus.used) {
+            loadStorageUsage();
+        }
+    }, [localQuotaStatus.used, loadStorageUsage]);
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
