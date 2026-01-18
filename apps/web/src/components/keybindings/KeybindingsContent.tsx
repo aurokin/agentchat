@@ -1,7 +1,20 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Brain, Cpu, Search, Sparkles, type LucideIcon } from "lucide-react";
+import {
+    ArrowDown,
+    ArrowUp,
+    Brain,
+    Cpu,
+    History,
+    Keyboard,
+    Mail,
+    Search,
+    Settings,
+    Sparkles,
+    Trash2,
+    type LucideIcon,
+} from "lucide-react";
 
 export interface KeybindingItem {
     id: string;
@@ -15,26 +28,31 @@ const GLOBAL_KEYBINDINGS: KeybindingItem[] = [
         id: "newConversation",
         label: "New conversation",
         keys: ["Cmd/Ctrl", "Shift", "O"],
+        icon: Mail,
     },
     {
         id: "deleteConversation",
         label: "Delete conversation",
         keys: ["Cmd/Ctrl", "Shift", "D"],
+        icon: Trash2,
     },
     {
         id: "previousConversation",
         label: "Previous conversation",
         keys: ["Cmd/Ctrl", "↑"],
+        icon: ArrowUp,
     },
     {
         id: "nextConversation",
         label: "Next conversation",
         keys: ["Cmd/Ctrl", "↓"],
+        icon: ArrowDown,
     },
     {
         id: "latestConversation",
         label: "Latest conversation",
         keys: ["Cmd/Ctrl", "←"],
+        icon: History,
     },
 ];
 
@@ -43,11 +61,13 @@ const CHAT_KEYBINDINGS: KeybindingItem[] = [
         id: "focusInput",
         label: "Focus input",
         keys: ["/"],
+        icon: Keyboard,
     },
     {
         id: "toggleSettings",
         label: "Toggle settings",
         keys: ["Cmd/Ctrl", ","],
+        icon: Settings,
     },
     {
         id: "cycleFavoriteModels",
