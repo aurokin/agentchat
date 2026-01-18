@@ -17,7 +17,7 @@
     },
     "apps/web": {
       "name": "routerchat-web",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "dependencies": {
         "@auth/core": "0.37.0",
         "@convex-dev/auth": "^0.0.90",
@@ -59,7 +59,7 @@
     },
     "packages/shared": {
       "name": "@routerchat/shared",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "devDependencies": {
         "typescript": "^5.0.0",
       },
