@@ -79,12 +79,13 @@ cd apps/web && bun dev
 
 Only required if you are hosting an instance with Cloud Sync enabled.
 
-See `docs/cloud_dashboard_setup.md` for the Convex/Stripe dashboard checklist.
+See `docs/cloud_dashboard_setup.md` for the Convex/RevenueCat dashboard checklist.
 
 **`.env` (app runtime)**
 
 - `CONVEX_DEPLOYMENT`
 - `NEXT_PUBLIC_CONVEX_URL`
+- `REVENUECAT_WEB_PURCHASE_URL` - RevenueCat purchase link template (without `app_user_id`)
 
 **Convex environment variables**
 
@@ -93,9 +94,8 @@ See `docs/cloud_dashboard_setup.md` for the Convex/Stripe dashboard checklist.
 - `JWKS` - JSON Web Key Set for auth
 - `JWT_PRIVATE_KEY` - Private key for JWT signing
 - `SITE_URL` - Your deployment URL
-- `STRIPE_PRO_PRICE_ID` - Stripe price ID for Pro subscription
-- `STRIPE_SECRET_KEY` - Stripe secret API key
-- `STRIPE_WEBHOOK_SECRET` - Stripe webhook signing secret
+- `REVENUECAT_WEBHOOK_SECRET` - Authorization header secret for RevenueCat webhooks
+- `REVENUECAT_API_KEY` - RevenueCat secret API key for entitlement refresh
 - `ENCRYPTION_KEY` - AES-256 key for encrypting sensitive data (API keys)
 
 **Generating the encryption key:**
