@@ -85,6 +85,7 @@ export default function SettingsPage() {
         deleteSkill,
     } = useSettings();
     const [newApiKey, setNewApiKey] = useState(apiKey || "");
+    const lastApiKeyRef = useRef<string | null>(apiKey ?? null);
     const [validating, setValidating] = useState(false);
     const [validationResult, setValidationResult] = useState<boolean | null>(
         null,
@@ -125,6 +126,16 @@ export default function SettingsPage() {
             loadStorageUsage();
         }
     }, [localQuotaStatus.used, loadStorageUsage]);
+
+    useEffect(() => {
+        if (apiKey !== lastApiKeyRef.current) {
+            const lastApiKey = lastApiKeyRef.current ?? "";
+            if (!newApiKey || newApiKey === lastApiKey) {
+                setNewApiKey(apiKey ?? "");
+            }
+            lastApiKeyRef.current = apiKey ?? null;
+        }
+    }, [apiKey, newApiKey]);
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
