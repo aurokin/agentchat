@@ -79,6 +79,8 @@ cd apps/web && bun dev
 
 Only required if you are hosting an instance with Cloud Sync enabled.
 
+See `docs/cloud_dashboard_setup.md` for the Convex/Stripe dashboard checklist.
+
 **`.env` (app runtime)**
 
 - `CONVEX_DEPLOYMENT`
