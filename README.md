@@ -111,11 +111,11 @@ bunx convex env set ENCRYPTION_KEY "$(openssl rand -base64 32)"
 # Run web dev server
 cd apps/web && bun dev
 
-# Type check
-cd apps/web && bun typecheck
+# Type check, lint, test, and format
+cd apps/web && bun health
 
 # Build for production
-cd apps/web && bun build
+cd apps/web && bun run build
 ```
 
 ## Architecture Notes
