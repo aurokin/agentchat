@@ -17,6 +17,7 @@ import { SearchToggle } from "./SearchToggle";
 import { AttachmentButton } from "./AttachmentButton";
 import { AttachmentPreview } from "./AttachmentPreview";
 import { StorageErrorModal } from "./StorageErrorModal";
+import { KeybindingsHelp } from "../keybindings/KeybindingsHelp";
 import type {
     ThinkingLevel,
     SearchLevel,
@@ -291,7 +292,7 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
                                 className={cn(
                                     "w-full px-4 py-3.5 bg-transparent text-foreground resize-none",
                                     "placeholder:text-muted-foreground",
-                                    visionSupported ? "pr-24" : "pr-14",
+                                    visionSupported ? "pr-32" : "pr-20",
                                 )}
                                 style={{ outline: "none", boxShadow: "none" }}
                                 rows={1}
@@ -303,6 +304,7 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
                                         disabled={disabled}
                                     />
                                 )}
+                                <KeybindingsHelp />
                                 <button
                                     type="submit"
                                     disabled={!canSubmit}

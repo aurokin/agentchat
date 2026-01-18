@@ -1,15 +1,10 @@
 "use client";
 
-import {
-    useState,
-    useEffect,
-    useCallback,
-    useRef,
-    type ReactNode,
-} from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { Sidebar } from "@/components/chat/Sidebar";
+import { KeybindingsContent } from "@/components/keybindings/KeybindingsContent";
 import { useChat } from "@/contexts/ChatContext";
 import { useSync } from "@/contexts/SyncContext";
 import { useSettings } from "@/contexts/SettingsContext";
@@ -204,12 +199,6 @@ export default function SettingsPage() {
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
     };
-
-    const KeyCaps = ({ children }: { children: ReactNode }) => (
-        <span className="inline-flex items-center justify-center min-w-[28px] px-2 py-1 text-[11px] uppercase tracking-widest border border-border bg-background-elevated text-muted-foreground">
-            {children}
-        </span>
-    );
 
     // Skill management state
     const [showSkillForm, setShowSkillForm] = useState(false);
@@ -543,164 +532,8 @@ export default function SettingsPage() {
                                     className="text-muted-foreground transition-transform group-open:rotate-180"
                                 />
                             </summary>
-                            <div className="mt-4 space-y-4">
-                                <p className="text-sm text-muted-foreground leading-relaxed">
-                                    Shortcuts follow scope rules: modals and
-                                    dropdowns take priority, then global
-                                    bindings, then chat-only actions.
-                                </p>
-                                <div className="space-y-4">
-                                    <div className="border border-border bg-muted/20 p-4 space-y-3">
-                                        <div className="text-xs uppercase tracking-wider text-muted-foreground">
-                                            Global
-                                        </div>
-                                        <div className="space-y-2">
-                                            <div className="flex items-center justify-between gap-3">
-                                                <span className="text-sm">
-                                                    New conversation
-                                                </span>
-                                                <div className="flex items-center gap-1">
-                                                    <KeyCaps>Cmd/Ctrl</KeyCaps>
-                                                    <KeyCaps>Shift</KeyCaps>
-                                                    <KeyCaps>O</KeyCaps>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center justify-between gap-3">
-                                                <span className="text-sm">
-                                                    Delete conversation
-                                                </span>
-                                                <div className="flex items-center gap-1">
-                                                    <KeyCaps>Cmd/Ctrl</KeyCaps>
-                                                    <KeyCaps>Shift</KeyCaps>
-                                                    <KeyCaps>D</KeyCaps>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center justify-between gap-3">
-                                                <span className="text-sm">
-                                                    Previous conversation
-                                                </span>
-                                                <div className="flex items-center gap-1">
-                                                    <KeyCaps>Cmd/Ctrl</KeyCaps>
-                                                    <KeyCaps>↑</KeyCaps>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center justify-between gap-3">
-                                                <span className="text-sm">
-                                                    Next conversation
-                                                </span>
-                                                <div className="flex items-center gap-1">
-                                                    <KeyCaps>Cmd/Ctrl</KeyCaps>
-                                                    <KeyCaps>↓</KeyCaps>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center justify-between gap-3">
-                                                <span className="text-sm">
-                                                    Latest conversation
-                                                </span>
-                                                <div className="flex items-center gap-1">
-                                                    <KeyCaps>Cmd/Ctrl</KeyCaps>
-                                                    <KeyCaps>←</KeyCaps>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="border border-border bg-muted/20 p-4 space-y-3">
-                                        <div className="text-xs uppercase tracking-wider text-muted-foreground">
-                                            Chat
-                                        </div>
-                                        <div className="space-y-2">
-                                            <div className="flex items-center justify-between gap-3">
-                                                <span className="text-sm">
-                                                    Focus input
-                                                </span>
-                                                <KeyCaps>/</KeyCaps>
-                                            </div>
-                                            <div className="flex items-center justify-between gap-3">
-                                                <span className="text-sm">
-                                                    Toggle settings
-                                                </span>
-                                                <div className="flex items-center gap-1">
-                                                    <KeyCaps>Cmd/Ctrl</KeyCaps>
-                                                    <KeyCaps>,</KeyCaps>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center justify-between gap-3">
-                                                <span className="text-sm">
-                                                    Cycle favorite models
-                                                </span>
-                                                <div className="flex items-center gap-1">
-                                                    <KeyCaps>Cmd/Ctrl</KeyCaps>
-                                                    <KeyCaps>Alt</KeyCaps>
-                                                    <KeyCaps>M</KeyCaps>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center justify-between gap-3">
-                                                <span className="text-sm">
-                                                    Cycle skills
-                                                </span>
-                                                <div className="flex items-center gap-1">
-                                                    <KeyCaps>Cmd/Ctrl</KeyCaps>
-                                                    <KeyCaps>Alt</KeyCaps>
-                                                    <KeyCaps>S</KeyCaps>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center justify-between gap-3">
-                                                <span className="text-sm">
-                                                    Clear skill (None)
-                                                </span>
-                                                <div className="flex items-center gap-1">
-                                                    <KeyCaps>Cmd/Ctrl</KeyCaps>
-                                                    <KeyCaps>Alt</KeyCaps>
-                                                    <KeyCaps>N</KeyCaps>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center justify-between gap-3">
-                                                <span className="text-sm">
-                                                    Thinking level
-                                                </span>
-                                                <div className="flex items-center gap-1">
-                                                    <KeyCaps>Cmd/Ctrl</KeyCaps>
-                                                    <KeyCaps>Alt</KeyCaps>
-                                                    <KeyCaps>1-5</KeyCaps>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center justify-between gap-3">
-                                                <span className="text-sm">
-                                                    Thinking off
-                                                </span>
-                                                <div className="flex items-center gap-1">
-                                                    <KeyCaps>Cmd/Ctrl</KeyCaps>
-                                                    <KeyCaps>Alt</KeyCaps>
-                                                    <KeyCaps>Backspace</KeyCaps>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center justify-between gap-3">
-                                                <span className="text-sm">
-                                                    Search level
-                                                </span>
-                                                <div className="flex items-center gap-1">
-                                                    <KeyCaps>Cmd/Ctrl</KeyCaps>
-                                                    <KeyCaps>Shift</KeyCaps>
-                                                    <KeyCaps>1-3</KeyCaps>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center justify-between gap-3">
-                                                <span className="text-sm">
-                                                    Search off
-                                                </span>
-                                                <div className="flex items-center gap-1">
-                                                    <KeyCaps>Cmd/Ctrl</KeyCaps>
-                                                    <KeyCaps>Shift</KeyCaps>
-                                                    <KeyCaps>Backspace</KeyCaps>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="text-xs text-muted-foreground/80 border border-border bg-background-elevated px-3 py-2">
-                                    Dropdowns and modals temporarily override
-                                    shortcuts so navigation stays predictable.
-                                </div>
+                            <div className="mt-4">
+                                <KeybindingsContent />
                             </div>
                         </details>
                     </section>
