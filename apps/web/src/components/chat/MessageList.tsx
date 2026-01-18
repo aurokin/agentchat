@@ -18,7 +18,7 @@ import {
     Cpu,
     Image as ImageIcon,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, externalLinkProps } from "@/lib/utils";
 import { MessageListSkeleton } from "./MessageListSkeleton";
 import { ImageGalleryDialog, type GalleryImage } from "./ImageGalleryDialog";
 import { useStorageAdapter } from "@/contexts/SyncContext";
@@ -373,6 +373,16 @@ function MessageItem({
                                 <ReactMarkdown
                                     remarkPlugins={[remarkGfm]}
                                     rehypePlugins={[rehypeHighlight, rehypeRaw]}
+                                    components={{
+                                        a: ({ children, ...props }) => (
+                                            <a
+                                                {...props}
+                                                {...externalLinkProps}
+                                            >
+                                                {children}
+                                            </a>
+                                        ),
+                                    }}
                                 >
                                     {message.content}
                                 </ReactMarkdown>

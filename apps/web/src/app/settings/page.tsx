@@ -37,7 +37,7 @@ import {
     Keyboard,
     ChevronDown,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, externalLinkProps } from "@/lib/utils";
 const CloudSyncSettings = dynamic(
     () =>
         import("@/components/sync/CloudSyncSettings").then(
@@ -476,8 +476,7 @@ export default function SettingsPage() {
                                     Get your API key from{" "}
                                     <a
                                         href="https://openrouter.ai/keys"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
+                                        {...externalLinkProps}
                                         className="text-primary hover:underline"
                                     >
                                         openrouter.ai/keys
