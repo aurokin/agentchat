@@ -17,6 +17,7 @@ Visit https://www.routerchat.chat to start chatting with your OpenRouter API key
 - **Copy Messages** - One-click copy for any message
 - **Local Storage** - API key, settings, and chat history stored in browser (default)
 - **Cloud Sync** - Optional sync to Convex for cross-device access (Pro subscription)
+- **First-run Tutorial** - Short, skippable setup for sync and API keys
 - **IndexedDB Persistence** - Full chat history stored locally
 - **Theme Support** - Light, dark, and system theme options
 

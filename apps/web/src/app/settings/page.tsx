@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Sidebar } from "@/components/chat/Sidebar";
 import { KeybindingsContent } from "@/components/keybindings/KeybindingsContent";
 import { useChat } from "@/contexts/ChatContext";
@@ -91,6 +91,36 @@ export default function SettingsPage() {
         null,
     );
     const [saving, setSaving] = useState(false);
+    const searchParams = useSearchParams();
+    const [highlightCloudSync, setHighlightCloudSync] = useState(false);
+    const [highlightApiKey, setHighlightApiKey] = useState(false);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const highlight = searchParams.get("highlight");
+        setHighlightCloudSync(highlight === "cloud-sync");
+        setHighlightApiKey(highlight === "api-key");
+
+        const hash = window.location.hash.replace("#", "");
+        if (hash) {
+            const target = document.getElementById(hash);
+            if (target) {
+                requestAnimationFrame(() => {
+                    target.scrollIntoView({
+                        behavior: "smooth",
+                        block: "start",
+                    });
+                });
+            }
+        }
+
+        if (!highlight) return;
+        const timeout = window.setTimeout(() => {
+            setHighlightCloudSync(false);
+            setHighlightApiKey(false);
+        }, 4000);
+        return () => window.clearTimeout(timeout);
+    }, [searchParams]);
 
     // Storage management state
     const [storageUsage, setStorageUsage] = useState<{
@@ -332,7 +362,14 @@ export default function SettingsPage() {
                     </div>
 
                     {/* OpenRouter API Key */}
-                    <section className="card-deco mb-6">
+                    <section
+                        id="api-key"
+                        className={cn(
+                            "card-deco mb-6",
+                            highlightApiKey &&
+                                "ring-2 ring-primary/40 shadow-deco",
+                        )}
+                    >
                         <div className="flex items-center gap-3 mb-4">
                             <div className="w-8 h-8 bg-primary/10 flex items-center justify-center">
                                 <Key size={16} className="text-primary" />
@@ -967,7 +1004,7 @@ export default function SettingsPage() {
                     </section>
 
                     {/* Cloud Sync - only shown when Convex is available */}
-                    <CloudSyncSettings />
+                    <CloudSyncSettings highlightEnable={highlightCloudSync} />
 
                     {/* About */}
                     <section className="card-deco">
@@ -1029,7 +1066,7 @@ export default function SettingsPage() {
                         </details>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground/70 mt-4">
                             <div className="w-1.5 h-1.5 bg-primary rounded-full" />
-                            <span>Version 0.1.1</span>
+                            <span>Version 0.2.0</span>
                         </div>
                     </section>
                 </div>
