@@ -85,7 +85,7 @@ See `docs/cloud_dashboard_setup.md` for the Convex/RevenueCat dashboard checklis
 
 - `CONVEX_DEPLOYMENT`
 - `NEXT_PUBLIC_CONVEX_URL`
-- `REVENUECAT_WEB_PURCHASE_URL` - RevenueCat purchase link template (without `app_user_id`)
+- `REVENUECAT_WEB_PURCHASE_URL` - RevenueCat purchase link template without trailing slash (e.g., `https://pay.rev.cat/sandbox/abc123`); userId is appended as a path segment
 
 **Convex environment variables**
 
