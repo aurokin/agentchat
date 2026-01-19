@@ -64,6 +64,12 @@ const CHAT_KEYBINDINGS: KeybindingItem[] = [
         icon: Keyboard,
     },
     {
+        id: "newLine",
+        label: "New line",
+        keys: ["Shift+Enter", "Ctrl+J"],
+        icon: Keyboard,
+    },
+    {
         id: "toggleSettings",
         label: "Toggle settings",
         keys: ["Cmd/Ctrl", ","],

@@ -97,7 +97,26 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
             }
         };
 
-        const handleKeyDown = (e: React.KeyboardEvent) => {
+        const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+            const isCtrlJ =
+                !e.shiftKey &&
+                (e.ctrlKey || e.getModifierState("Control")) &&
+                e.key.toLowerCase() === "j";
+
+            if (isCtrlJ) {
+                e.preventDefault();
+                const target = e.currentTarget;
+                const start = target.selectionStart ?? target.value.length;
+                const end = target.selectionEnd ?? target.value.length;
+                const nextValue = `${target.value.slice(0, start)}\n${target.value.slice(end)}`;
+                setContent(nextValue);
+                requestAnimationFrame(() => {
+                    target.selectionStart = start + 1;
+                    target.selectionEnd = start + 1;
+                });
+                return;
+            }
+
             if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 if (canSubmit) {
@@ -328,7 +347,7 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
                         </div>
                     </div>
                     <div className="flex items-center justify-between mt-2 px-1 text-xs text-muted-foreground opacity-60">
-                        <span>Shift + Enter for new line</span>
+                        <span>Shift + Enter or Ctrl + J for new line</span>
                         <span className={!canSend ? "text-amber-600/70" : ""}>
                             {!canSend
                                 ? "Sending... (Enter disabled)"
