@@ -1,4 +1,4 @@
-# RouterChat Application
+# RouterChat
 
 A web application for chatting with AI models through OpenRouter. Users provide their own OpenRouter API key. Data can be stored locally in the browser or synced to the cloud.
 
