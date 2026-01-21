@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Sidebar } from "@/components/chat/Sidebar";
@@ -62,7 +62,7 @@ const isTypingTarget = (target: EventTarget | null) => {
     return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
 };
 
-export default function SettingsPage() {
+function SettingsPageContent() {
     const router = useRouter();
     const { currentChat, clearCurrentChat } = useChat();
     const {
@@ -1071,5 +1071,19 @@ export default function SettingsPage() {
                 </div>
             </main>
         </div>
+    );
+}
+
+export default function SettingsPage() {
+    return (
+        <Suspense
+            fallback={
+                <div className="flex h-screen items-center justify-center bg-background text-muted-foreground">
+                    Loading settings...
+                </div>
+            }
+        >
+            <SettingsPageContent />
+        </Suspense>
     );
 }
