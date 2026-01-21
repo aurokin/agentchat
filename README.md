@@ -97,6 +97,8 @@ See `docs/cloud_dashboard_setup.md` for the Convex/RevenueCat dashboard checklis
 - `REVENUECAT_WEBHOOK_SECRET` - Authorization header secret for RevenueCat webhooks
 - `REVENUECAT_API_KEY` - RevenueCat v2 secret API key for entitlement refresh
 - `REVENUECAT_PROJECT_ID` - RevenueCat project ID for API v2 calls
+- `REVENUECAT_ENTITLEMENT_IDS` - Optional comma-separated entitlement identifiers or IDs to treat as Pro (defaults to `pro`)
+- `REVENUECAT_DEBUG` - Optional debug flag for logging RevenueCat responses
 - `ENCRYPTION_KEY` - AES-256 key for encrypting sensitive data (API keys)
 
 **Generating the encryption key:**

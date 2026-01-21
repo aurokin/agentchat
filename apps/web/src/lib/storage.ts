@@ -20,6 +20,7 @@ const STORAGE_KEYS = {
     // Cloud sync keys
     SYNC_STATE: "routerchat-sync-state",
     SYNC_METADATA: "routerchat-sync-metadata",
+    SYNC_AUTO_ENABLE: "routerchat-sync-auto-enable",
 } as const;
 
 type SkillSettingsKeys = {
@@ -287,6 +288,27 @@ export function setSyncState(state: SyncState): void {
     localStorage.setItem(STORAGE_KEYS.SYNC_STATE, state);
 }
 
+export type SyncAutoEnableReason = "login" | "billing";
+
+export function getSyncAutoEnableReason(): SyncAutoEnableReason | null {
+    if (typeof window === "undefined") return null;
+    const stored = localStorage.getItem(STORAGE_KEYS.SYNC_AUTO_ENABLE);
+    if (stored === "login" || stored === "billing") {
+        return stored;
+    }
+    return null;
+}
+
+export function setSyncAutoEnableReason(reason: SyncAutoEnableReason): void {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(STORAGE_KEYS.SYNC_AUTO_ENABLE, reason);
+}
+
+export function clearSyncAutoEnableReason(): void {
+    if (typeof window === "undefined") return;
+    localStorage.removeItem(STORAGE_KEYS.SYNC_AUTO_ENABLE);
+}
+
 export function getSyncMetadata(): SyncMetadata {
     if (typeof window === "undefined") return DEFAULT_SYNC_METADATA;
     try {
@@ -323,4 +345,5 @@ export function clearSyncData(): void {
     if (typeof window === "undefined") return;
     localStorage.removeItem(STORAGE_KEYS.SYNC_STATE);
     localStorage.removeItem(STORAGE_KEYS.SYNC_METADATA);
+    localStorage.removeItem(STORAGE_KEYS.SYNC_AUTO_ENABLE);
 }
