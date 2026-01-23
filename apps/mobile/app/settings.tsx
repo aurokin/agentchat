@@ -1,0 +1,359 @@
+import React, { useState, useEffect, type ReactElement } from "react";
+import {
+    View,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    StyleSheet,
+    SafeAreaView,
+    ActivityIndicator,
+    ScrollView,
+    Alert,
+} from "react-native";
+import { useRouter } from "expo-router";
+import { useAppContext } from "../src/contexts/AppContext";
+import { getApiKey, setApiKey, clearApiKey } from "../src/lib/storage";
+import { validateApiKey } from "@shared/core/openrouter";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+
+export default function SettingsScreen(): ReactElement {
+    const router = useRouter();
+    const { syncState } = useAppContext();
+
+    const [apiKey, setApiKeyValue] = useState("");
+    const [isLoading, setIsLoading] = useState(true);
+    const [isValidating, setIsValidating] = useState(false);
+    const [isValid, setIsValid] = useState<boolean | null>(null);
+
+    useEffect(() => {
+        const loadApiKey = async () => {
+            try {
+                const key = await getApiKey();
+                setApiKeyValue(key || "");
+                if (key) {
+                    setIsValidating(true);
+                    const valid = await validateApiKey(key);
+                    setIsValid(valid);
+                }
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        loadApiKey();
+    }, []);
+
+    const handleSaveApiKey = async () => {
+        if (!apiKey.trim()) {
+            await clearApiKey();
+            setIsValid(null);
+            Alert.alert("API Key Removed", "Your API key has been cleared.");
+            return;
+        }
+
+        setIsValidating(true);
+        try {
+            const valid = await validateApiKey(apiKey);
+            setIsValid(valid);
+
+            if (valid) {
+                await setApiKey(apiKey.trim());
+                Alert.alert(
+                    "API Key Saved",
+                    "Your OpenRouter API key has been saved.",
+                );
+            } else {
+                Alert.alert(
+                    "Invalid API Key",
+                    "The API key you entered is not valid. Please check and try again.",
+                );
+            }
+        } catch {
+            setIsValid(false);
+            Alert.alert(
+                "Validation Error",
+                "Could not validate your API key. Please check your connection and try again.",
+            );
+        } finally {
+            setIsValidating(false);
+        }
+    };
+
+    const handleClearApiKey = async () => {
+        await clearApiKey();
+        setApiKeyValue("");
+        setIsValid(null);
+        Alert.alert("API Key Cleared", "Your API key has been removed.");
+    };
+
+    return (
+        <SafeAreaProvider>
+            <SafeAreaView style={styles.container}>
+                <View style={styles.header}>
+                    <TouchableOpacity onPress={() => router.replace("/")}>
+                        <Text style={styles.backButton}>← Back</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle}>Settings</Text>
+                    <View style={styles.headerSpacer} />
+                </View>
+
+                <ScrollView style={styles.scrollContent}>
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Sync</Text>
+                        <View style={styles.settingItem}>
+                            <View style={styles.settingInfo}>
+                                <Text style={styles.settingLabel}>
+                                    Sync Mode
+                                </Text>
+                                <Text style={styles.settingValue}>
+                                    {syncState === "local-only"
+                                        ? "Local Only"
+                                        : syncState === "cloud-enabled"
+                                          ? "Cloud Enabled"
+                                          : "Cloud Disabled"}
+                                </Text>
+                            </View>
+                        </View>
+                        <Text style={styles.settingDescription}>
+                            {syncState === "local-only"
+                                ? "Your chats are stored only on this device."
+                                : "Your chats are synced to the cloud."}
+                        </Text>
+                    </View>
+
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>OpenRouter API</Text>
+
+                        {isLoading ? (
+                            <ActivityIndicator style={styles.loading} />
+                        ) : (
+                            <>
+                                <View style={styles.inputContainer}>
+                                    <Text style={styles.inputLabel}>
+                                        API Key
+                                    </Text>
+                                    <TextInput
+                                        style={styles.textInput}
+                                        value={apiKey}
+                                        onChangeText={setApiKeyValue}
+                                        placeholder="sk-..."
+                                        placeholderTextColor="#999"
+                                        secureTextEntry
+                                        autoCapitalize="none"
+                                        autoCorrect={false}
+                                    />
+                                </View>
+
+                                {apiKey.length > 0 && (
+                                    <View style={styles.validationContainer}>
+                                        {isValidating ? (
+                                            <ActivityIndicator size="small" />
+                                        ) : isValid === true ? (
+                                            <Text style={styles.validText}>
+                                                ✓ Valid API key
+                                            </Text>
+                                        ) : isValid === false ? (
+                                            <Text style={styles.invalidText}>
+                                                ✗ Invalid API key
+                                            </Text>
+                                        ) : null}
+                                    </View>
+                                )}
+
+                                <View style={styles.buttonRow}>
+                                    <TouchableOpacity
+                                        style={styles.saveButton}
+                                        onPress={handleSaveApiKey}
+                                        disabled={isValidating}
+                                    >
+                                        <Text style={styles.saveButtonText}>
+                                            Save API Key
+                                        </Text>
+                                    </TouchableOpacity>
+
+                                    {apiKey.length > 0 && (
+                                        <TouchableOpacity
+                                            style={styles.clearButton}
+                                            onPress={handleClearApiKey}
+                                            disabled={isValidating}
+                                        >
+                                            <Text
+                                                style={styles.clearButtonText}
+                                            >
+                                                Clear
+                                            </Text>
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
+
+                                <Text style={styles.helpText}>
+                                    Get your API key from{" "}
+                                    <Text
+                                        style={styles.linkText}
+                                        onPress={() => {
+                                            // In a real app, this would open a URL
+                                        }}
+                                    >
+                                        openrouter.ai
+                                    </Text>
+                                </Text>
+                            </>
+                        )}
+                    </View>
+
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>About</Text>
+                        <View style={styles.settingItem}>
+                            <Text style={styles.appName}>RouterChat</Text>
+                            <Text style={styles.version}>Version 1.0.0</Text>
+                        </View>
+                        <Text style={styles.settingDescription}>
+                            An offline-first chat app powered by OpenRouter.
+                        </Text>
+                    </View>
+                </ScrollView>
+            </SafeAreaView>
+        </SafeAreaProvider>
+    );
+}
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: "#fff",
+    },
+    header: {
+        flexDirection: "row",
+        alignItems: "center",
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: "#eee",
+    },
+    backButton: {
+        fontSize: 16,
+        color: "#007AFF",
+    },
+    headerTitle: {
+        flex: 1,
+        fontSize: 18,
+        fontWeight: "600",
+        textAlign: "center",
+    },
+    headerSpacer: {
+        width: 60,
+    },
+    scrollContent: {
+        flex: 1,
+    },
+    section: {
+        padding: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: "#eee",
+    },
+    sectionTitle: {
+        fontSize: 14,
+        fontWeight: "600",
+        color: "#666",
+        marginBottom: 12,
+        textTransform: "uppercase",
+    },
+    settingItem: {
+        marginBottom: 8,
+    },
+    settingInfo: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+    },
+    settingLabel: {
+        fontSize: 16,
+        color: "#000",
+    },
+    settingValue: {
+        fontSize: 16,
+        color: "#666",
+    },
+    settingDescription: {
+        fontSize: 14,
+        color: "#888",
+        marginTop: 4,
+    },
+    inputContainer: {
+        marginBottom: 12,
+    },
+    inputLabel: {
+        fontSize: 14,
+        fontWeight: "500",
+        marginBottom: 8,
+        color: "#333",
+    },
+    textInput: {
+        borderWidth: 1,
+        borderColor: "#ddd",
+        borderRadius: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        fontSize: 16,
+        backgroundColor: "#f9f9f9",
+    },
+    validationContainer: {
+        marginBottom: 12,
+    },
+    validText: {
+        color: "#34C759",
+        fontSize: 14,
+    },
+    invalidText: {
+        color: "#FF3B30",
+        fontSize: 14,
+    },
+    buttonRow: {
+        flexDirection: "row",
+        gap: 12,
+    },
+    saveButton: {
+        backgroundColor: "#007AFF",
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        borderRadius: 8,
+        flex: 1,
+        alignItems: "center",
+    },
+    saveButtonText: {
+        color: "#fff",
+        fontSize: 16,
+        fontWeight: "600",
+    },
+    clearButton: {
+        backgroundColor: "#FF3B30",
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        borderRadius: 8,
+    },
+    clearButtonText: {
+        color: "#fff",
+        fontSize: 16,
+        fontWeight: "600",
+    },
+    helpText: {
+        fontSize: 14,
+        color: "#666",
+        marginTop: 12,
+    },
+    linkText: {
+        color: "#007AFF",
+        textDecorationLine: "underline",
+    },
+    loading: {
+        paddingVertical: 20,
+    },
+    appName: {
+        fontSize: 18,
+        fontWeight: "600",
+        marginBottom: 4,
+    },
+    version: {
+        fontSize: 14,
+        color: "#666",
+    },
+});
