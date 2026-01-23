@@ -16,9 +16,19 @@
 ## Key Directories
 
 - `apps/web`: Next.js app, UI, client logic
+- `apps/mobile`: Expo app (React Native), uses Expo Router
 - `convex`: Cloud sync, auth, billing, encryption utilities
 - `src/lib/sync`: Storage adapters and sync state
 - `src/lib/db.ts`, `src/lib/storage.ts`: IndexedDB/local storage helpers
+
+## Mobile App Notes
+
+- Use Bun for all package management in mobile (`cd apps/mobile && bun install`)
+- Mobile uses Expo Router with file-based routing in `app/` directory
+- Entry point is `index.tsx` which imports `expo-router/entry`
+- TypeScript config extends `expo/tsconfig.base`
+- EAS config for dev builds is in `eas.json`
+- Bundle ID: `com.routerchat.app` (configured in `app.json`)
 
 ## Required Parity Rules
 
