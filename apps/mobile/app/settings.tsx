@@ -10,17 +10,47 @@ import {
     ScrollView,
     Alert,
     Image,
+    Dimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useAppContext } from "../src/contexts/AppContext";
-import { getApiKey, setApiKey, clearApiKey } from "../src/lib/storage";
+import { useSkillsContext } from "../src/contexts/SkillsContext";
+import {
+    getApiKey,
+    setApiKey,
+    clearApiKey,
+    getTheme,
+    setTheme,
+    type UserTheme,
+} from "../src/lib/storage";
 import { validateApiKey } from "@shared/core/openrouter";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useAuthContext } from "../src/lib/convex/AuthContext";
+import {
+    getStorageUsage,
+    formatBytes,
+    LOCAL_IMAGE_QUOTA,
+    getLocalQuotaStatus,
+} from "../src/lib/storage";
+
+type Keybinding = {
+    key: string;
+    description: string;
+};
+
+const KEYBINDINGS: Keybinding[] = [
+    { key: "Cmd/Ctrl + ,", description: "Open settings" },
+    { key: "Cmd/Ctrl + K", description: "Focus model selector" },
+    { key: "Cmd/Ctrl + /", description: "Show keyboard shortcuts" },
+    { key: "Escape", description: "Close modal/dropdown" },
+    { key: "Enter", description: "Send message" },
+    { key: "Shift + Enter", description: "New line in message" },
+];
 
 export default function SettingsScreen(): ReactElement {
     const router = useRouter();
     const { syncState, setSyncState } = useAppContext();
+    const { skills, addSkill, updateSkill, deleteSkill } = useSkillsContext();
     const {
         user,
         isAuthenticated,
@@ -34,12 +64,27 @@ export default function SettingsScreen(): ReactElement {
     const [isLoading, setIsLoading] = useState(true);
     const [isValidating, setIsValidating] = useState(false);
     const [isValid, setIsValid] = useState<boolean | null>(null);
+    const [currentTheme, setCurrentTheme] = useState<UserTheme>("system");
+    const [storageUsage, setStorageUsage] = useState<{
+        attachments: number;
+        messages: number;
+        sessions: number;
+    } | null>(null);
+    const [quotaStatus, setQuotaStatus] = useState<{
+        used: number;
+        limit: number;
+    } | null>(null);
+    const [isLoadingStorage, setIsLoadingStorage] = useState(true);
 
     useEffect(() => {
-        const loadApiKey = async () => {
+        const loadSettings = async () => {
             try {
-                const key = await getApiKey();
+                const [key, theme] = await Promise.all([
+                    getApiKey(),
+                    getTheme(),
+                ]);
                 setApiKeyValue(key || "");
+                setCurrentTheme(theme);
                 if (key) {
                     setIsValidating(true);
                     const valid = await validateApiKey(key);
@@ -49,7 +94,25 @@ export default function SettingsScreen(): ReactElement {
                 setIsLoading(false);
             }
         };
-        loadApiKey();
+        loadSettings();
+    }, []);
+
+    useEffect(() => {
+        const loadStorage = async () => {
+            try {
+                const [usage, quota] = await Promise.all([
+                    getStorageUsage(),
+                    getLocalQuotaStatus(),
+                ]);
+                setStorageUsage(usage);
+                setQuotaStatus({ used: quota.used, limit: quota.limit });
+            } catch (error) {
+                console.error("Failed to load storage:", error);
+            } finally {
+                setIsLoadingStorage(false);
+            }
+        };
+        loadStorage();
     }, []);
 
     const handleSaveApiKey = async () => {
@@ -207,6 +270,11 @@ export default function SettingsScreen(): ReactElement {
         );
     };
 
+    const handleThemeChange = async (theme: UserTheme) => {
+        setCurrentTheme(theme);
+        await setTheme(theme);
+    };
+
     const getSyncStatusColor = () => {
         switch (syncState) {
             case "cloud-enabled":
@@ -227,6 +295,14 @@ export default function SettingsScreen(): ReactElement {
             default:
                 return "Your chats are stored only on this device.";
         }
+    };
+
+    const getQuotaBarColor = () => {
+        if (!quotaStatus) return "#8E8E93";
+        const percentage = quotaStatus.used / quotaStatus.limit;
+        if (percentage > 0.9) return "#FF3B30";
+        if (percentage > 0.7) return "#FF9500";
+        return "#34C759";
     };
 
     return (
@@ -453,15 +529,203 @@ export default function SettingsScreen(): ReactElement {
                                     Get your API key from{" "}
                                     <Text
                                         style={styles.linkText}
-                                        onPress={() => {
-                                            // In a real app, this would open a URL
-                                        }}
+                                        onPress={() => {}}
                                     >
                                         openrouter.ai
                                     </Text>
                                 </Text>
                             </>
                         )}
+                    </View>
+
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Theme</Text>
+                        <Text style={styles.sectionDescription}>
+                            Choose your preferred color scheme
+                        </Text>
+                        <View style={styles.themeContainer}>
+                            <TouchableOpacity
+                                style={[
+                                    styles.themeOption,
+                                    currentTheme === "light" &&
+                                        styles.themeOptionSelected,
+                                ]}
+                                onPress={() => handleThemeChange("light")}
+                            >
+                                <Text style={styles.themeIcon}>☀️</Text>
+                                <Text
+                                    style={[
+                                        styles.themeLabel,
+                                        currentTheme === "light" &&
+                                            styles.themeLabelSelected,
+                                    ]}
+                                >
+                                    Light
+                                </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[
+                                    styles.themeOption,
+                                    currentTheme === "dark" &&
+                                        styles.themeOptionSelected,
+                                ]}
+                                onPress={() => handleThemeChange("dark")}
+                            >
+                                <Text style={styles.themeIcon}>🌙</Text>
+                                <Text
+                                    style={[
+                                        styles.themeLabel,
+                                        currentTheme === "dark" &&
+                                            styles.themeLabelSelected,
+                                    ]}
+                                >
+                                    Dark
+                                </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[
+                                    styles.themeOption,
+                                    currentTheme === "system" &&
+                                        styles.themeOptionSelected,
+                                ]}
+                                onPress={() => handleThemeChange("system")}
+                            >
+                                <Text style={styles.themeIcon}>💻</Text>
+                                <Text
+                                    style={[
+                                        styles.themeLabel,
+                                        currentTheme === "system" &&
+                                            styles.themeLabelSelected,
+                                    ]}
+                                >
+                                    System
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Image Storage</Text>
+                        <Text style={styles.sectionDescription}>
+                            Manage storage used by image attachments
+                        </Text>
+
+                        {isLoadingStorage ? (
+                            <ActivityIndicator style={styles.loading} />
+                        ) : storageUsage && quotaStatus ? (
+                            <View style={styles.storageContainer}>
+                                <View style={styles.storageRow}>
+                                    <Text style={styles.storageLabel}>
+                                        Local Image Storage
+                                    </Text>
+                                    <Text style={styles.storageValue}>
+                                        {formatBytes(storageUsage.attachments)}{" "}
+                                        / {formatBytes(LOCAL_IMAGE_QUOTA)}
+                                    </Text>
+                                </View>
+                                <View style={styles.storageBar}>
+                                    <View
+                                        style={[
+                                            styles.storageBarFill,
+                                            {
+                                                width: `${Math.min(100, (quotaStatus.used / quotaStatus.limit) * 100)}%`,
+                                                backgroundColor:
+                                                    getQuotaBarColor(),
+                                            },
+                                        ]}
+                                    />
+                                </View>
+
+                                <View style={styles.statsRow}>
+                                    <View style={styles.statCard}>
+                                        <Text style={styles.statValue}>
+                                            {formatBytes(
+                                                storageUsage.attachments,
+                                            )}
+                                        </Text>
+                                        <Text style={styles.statLabel}>
+                                            Images
+                                        </Text>
+                                    </View>
+                                    <View style={styles.statCard}>
+                                        <Text style={styles.statValue}>
+                                            {storageUsage.sessions}
+                                        </Text>
+                                        <Text style={styles.statLabel}>
+                                            Conversations
+                                        </Text>
+                                    </View>
+                                </View>
+                            </View>
+                        ) : (
+                            <Text style={styles.errorText}>
+                                Unable to load storage information
+                            </Text>
+                        )}
+                    </View>
+
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Skills</Text>
+                        <Text style={styles.sectionDescription}>
+                            Create reusable prompt templates
+                        </Text>
+
+                        {skills.length === 0 ? (
+                            <View style={styles.emptySkills}>
+                                <Text style={styles.emptySkillsText}>
+                                    No skills created yet
+                                </Text>
+                                <Text style={styles.emptySkillsSubtext}>
+                                    Skills you create will appear here
+                                </Text>
+                            </View>
+                        ) : (
+                            <View style={styles.skillsList}>
+                                {skills.slice(0, 3).map((skill) => (
+                                    <View
+                                        key={skill.id}
+                                        style={styles.skillCard}
+                                    >
+                                        <Text style={styles.skillName}>
+                                            {skill.name}
+                                        </Text>
+                                        {skill.description && (
+                                            <Text
+                                                style={styles.skillDescription}
+                                            >
+                                                {skill.description}
+                                            </Text>
+                                        )}
+                                    </View>
+                                ))}
+                                {skills.length > 3 && (
+                                    <Text style={styles.moreSkills}>
+                                        +{skills.length - 3} more skills
+                                    </Text>
+                                )}
+                            </View>
+                        )}
+                    </View>
+
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Keybindings</Text>
+                        <Text style={styles.sectionDescription}>
+                            Built-in shortcuts
+                        </Text>
+                        <View style={styles.keybindingsList}>
+                            {KEYBINDINGS.map((kb, index) => (
+                                <View key={index} style={styles.keybindingRow}>
+                                    <Text style={styles.keybindingKey}>
+                                        {kb.key}
+                                    </Text>
+                                    <Text style={styles.keybindingDesc}>
+                                        {kb.description}
+                                    </Text>
+                                </View>
+                            ))}
+                        </View>
                     </View>
 
                     <View style={styles.section}>
@@ -518,8 +782,13 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: "600",
         color: "#666",
-        marginBottom: 12,
+        marginBottom: 4,
         textTransform: "uppercase",
+    },
+    sectionDescription: {
+        fontSize: 14,
+        color: "#888",
+        marginBottom: 12,
     },
     settingItem: {
         marginBottom: 8,
@@ -733,5 +1002,151 @@ const styles = StyleSheet.create({
     syncWarningText: {
         fontSize: 14,
         color: "#856404",
+    },
+    themeContainer: {
+        flexDirection: "row",
+        gap: 12,
+    },
+    themeOption: {
+        flex: 1,
+        padding: 16,
+        borderRadius: 12,
+        borderWidth: 2,
+        borderColor: "#ddd",
+        alignItems: "center",
+        backgroundColor: "#f9f9f9",
+    },
+    themeOptionSelected: {
+        borderColor: "#007AFF",
+        backgroundColor: "#e6f0ff",
+    },
+    themeIcon: {
+        fontSize: 24,
+        marginBottom: 8,
+    },
+    themeLabel: {
+        fontSize: 14,
+        fontWeight: "500",
+        color: "#333",
+    },
+    themeLabelSelected: {
+        color: "#007AFF",
+        fontWeight: "600",
+    },
+    storageContainer: {
+        marginTop: 8,
+    },
+    storageRow: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        marginBottom: 8,
+    },
+    storageLabel: {
+        fontSize: 14,
+        color: "#666",
+    },
+    storageValue: {
+        fontSize: 14,
+        fontWeight: "600",
+        color: "#000",
+    },
+    storageBar: {
+        height: 8,
+        backgroundColor: "#e0e0e0",
+        borderRadius: 4,
+        overflow: "hidden",
+        marginBottom: 16,
+    },
+    storageBarFill: {
+        height: "100%",
+        borderRadius: 4,
+    },
+    statsRow: {
+        flexDirection: "row",
+        gap: 12,
+    },
+    statCard: {
+        flex: 1,
+        padding: 12,
+        backgroundColor: "#f5f5f5",
+        borderRadius: 8,
+        alignItems: "center",
+    },
+    statValue: {
+        fontSize: 18,
+        fontWeight: "600",
+        color: "#000",
+    },
+    statLabel: {
+        fontSize: 12,
+        color: "#666",
+        marginTop: 4,
+    },
+    errorText: {
+        fontSize: 14,
+        color: "#FF3B30",
+    },
+    emptySkills: {
+        padding: 24,
+        backgroundColor: "#f5f5f5",
+        borderRadius: 8,
+        alignItems: "center",
+        borderStyle: "dashed",
+        borderWidth: 1,
+        borderColor: "#ccc",
+    },
+    emptySkillsText: {
+        fontSize: 14,
+        color: "#666",
+        marginBottom: 4,
+    },
+    emptySkillsSubtext: {
+        fontSize: 12,
+        color: "#999",
+    },
+    skillsList: {
+        gap: 8,
+    },
+    skillCard: {
+        padding: 12,
+        backgroundColor: "#f5f5f5",
+        borderRadius: 8,
+    },
+    skillName: {
+        fontSize: 16,
+        fontWeight: "500",
+        color: "#000",
+    },
+    skillDescription: {
+        fontSize: 14,
+        color: "#666",
+        marginTop: 4,
+    },
+    moreSkills: {
+        fontSize: 14,
+        color: "#007AFF",
+        textAlign: "center",
+        marginTop: 8,
+    },
+    keybindingsList: {
+        gap: 8,
+    },
+    keybindingRow: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        paddingVertical: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: "#eee",
+    },
+    keybindingKey: {
+        fontSize: 14,
+        fontWeight: "600",
+        color: "#007AFF",
+        fontFamily: "monospace",
+    },
+    keybindingDesc: {
+        fontSize: 14,
+        color: "#666",
     },
 });

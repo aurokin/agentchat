@@ -25,7 +25,14 @@ export {
     clearRefreshToken,
     clearAllCredentials,
 } from "./credential-storage";
-export { getSyncState, setSyncState, clearSyncState } from "./sync-storage";
+export {
+    getSyncState,
+    setSyncState,
+    clearSyncState,
+    getTheme,
+    setTheme,
+    type UserTheme,
+} from "./sync-storage";
 export {
     processImage,
     isValidImageMimeType,
@@ -36,6 +43,7 @@ export {
     getLocalQuotaStatus,
     getLocalQuotaUsageString,
     checkQuotaBeforeUpload,
+    getStorageUsage,
     formatBytes,
     LOCAL_IMAGE_QUOTA,
     type QuotaStatus,

@@ -748,3 +748,132 @@ async function createAttachmentFromAsset(
 - Image processing: `src/lib/storage/image-processing.ts`
 - Attachment picker: `src/components/chat/AttachmentPicker.tsx`
 - Storage exports: `src/lib/storage/index.ts`
+
+## Settings Page Patterns
+
+The mobile settings page should maintain parity with the web settings page. Key features to include:
+
+### Required Settings Sections
+
+1. **Account** - Google OAuth sign-in/sign-out, user profile info
+2. **Sync** - Cloud sync status with enable/disable toggle
+3. **OpenRouter API** - API key validation with save/clear functionality
+4. **Theme** - Light/Dark/System toggle for color scheme
+5. **Image Storage** - Storage usage meter with progress bar showing attachments/sessions
+6. **Skills** - List of user-created skills (read-only, full CRUD in chat)
+7. **Keybindings** - List of built-in keyboard shortcuts
+8. **About** - App version and description
+
+### Theme Selection
+
+Theme is stored in SecureStore under `routerchat-theme` key:
+
+```typescript
+import { getTheme, setTheme, type UserTheme } from "@/lib/storage";
+
+type UserTheme = "light" | "dark" | "system";
+
+// Get current theme (defaults to "system")
+const theme = await getTheme(); // Returns "light" | "dark" | "system"
+
+// Set theme
+await setTheme("dark");
+
+// Theme values:
+// - "light": Always use light mode
+// - "dark": Always use dark mode
+// - "system": Follow device system setting
+```
+
+### Storage Usage Meter
+
+Storage usage is retrieved from the database and quota status from shared core:
+
+```typescript
+import {
+    getStorageUsage,
+    formatBytes,
+    LOCAL_IMAGE_QUOTA,
+    getLocalQuotaStatus,
+} from "@/lib/storage";
+
+// Get detailed storage usage
+const usage = await getStorageUsage();
+// Returns: { attachments: number, messages: number, sessions: number }
+
+// Get quota status from shared core
+const quota = await getLocalQuotaStatus();
+// Returns: { used: number, limit: number }
+
+// Format for display
+const formattedSize = formatBytes(usage.attachments); // "2.5 MB"
+const percentage = (quota.used / quota.limit) * 100; // e.g., 45.2
+```
+
+### Keybindings Section
+
+Keybindings are displayed as a simple list with keyboard shortcut and description:
+
+```typescript
+const KEYBINDINGS = [
+    { key: "Cmd/Ctrl + ,", description: "Open settings" },
+    { key: "Cmd/Ctrl + K", description: "Focus model selector" },
+    { key: "Escape", description: "Close modal/dropdown" },
+    { key: "Enter", description: "Send message" },
+    { key: "Shift + Enter", description: "New line in message" },
+];
+```
+
+### Skills Display
+
+Skills are read-only in settings (full CRUD is available in chat context). Show up to 3 skills with a "+X more" indicator:
+
+```typescript
+import { useSkillsContext } from "../src/contexts/SkillsContext";
+
+const { skills } = useSkillsContext();
+
+// Display first 3 skills
+skills.slice(0, 3).map(skill => (
+    <SkillCard key={skill.id} skill={skill} />
+));
+
+// Show count if more than 3
+{skills.length > 3 && (
+    <Text>+{skills.length - 3} more skills</Text>
+)}
+```
+
+### API Key Validation
+
+API keys are validated using the shared core validation function:
+
+```typescript
+import { validateApiKey } from "@shared/core/openrouter";
+
+const handleValidate = async () => {
+    setIsValidating(true);
+    try {
+        const valid = await validateApiKey(apiKey);
+        setIsValid(valid);
+    } catch {
+        setIsValid(false);
+    } finally {
+        setIsValidating(false);
+    }
+};
+```
+
+### Settings Screen Layout
+
+- Use `ScrollView` for scrollable content
+- Group related settings in `View` containers with `section` style
+- Use `SafeAreaView` for proper edge handling
+- Section titles use uppercase, 14px, 600 weight, gray color
+
+### Related Files
+
+- Settings screen: `app/settings.tsx`
+- Theme storage: `src/lib/storage/sync-storage.ts`
+- Quota utilities: `src/lib/quota.ts`
+- Skills context: `src/contexts/SkillsContext.tsx`

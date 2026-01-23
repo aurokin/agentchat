@@ -1,7 +1,10 @@
 import * as SecureStore from "expo-secure-store";
 import type { SyncState } from "@shared/core/sync";
 
+export type UserTheme = "light" | "dark" | "system";
+
 const SYNC_STATE_KEY = "routerchat-sync-state";
+const THEME_KEY = "routerchat-theme";
 
 export async function getSyncState(): Promise<SyncState | null> {
     try {
@@ -35,5 +38,25 @@ export async function clearSyncState(): Promise<void> {
         await SecureStore.deleteItemAsync(SYNC_STATE_KEY);
     } catch (error) {
         console.error("Failed to clear sync state:", error);
+    }
+}
+
+export async function getTheme(): Promise<UserTheme> {
+    try {
+        const theme = await SecureStore.getItemAsync(THEME_KEY);
+        if (theme === "light" || theme === "dark" || theme === "system") {
+            return theme;
+        }
+        return "system";
+    } catch {
+        return "system";
+    }
+}
+
+export async function setTheme(theme: UserTheme): Promise<void> {
+    try {
+        await SecureStore.setItemAsync(THEME_KEY, theme);
+    } catch (error) {
+        console.error("Failed to save theme:", error);
     }
 }
