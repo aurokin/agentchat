@@ -7,7 +7,6 @@ import {
     StyleSheet,
     ActivityIndicator,
     Image,
-    Dimensions,
     Alert,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -306,43 +305,58 @@ export default function ChatScreen(): ReactElement {
         return baseStyle;
     };
 
-    const screenWidth = Dimensions.get("window").width;
+    const formatFileSize = (bytes: number): string => {
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    };
+
+    const renderAttachmentThumbnail = (attachment: Attachment) => {
+        const aspectRatio =
+            attachment.width && attachment.height
+                ? attachment.width / attachment.height
+                : 1;
+        const thumbnailSize = 80;
+        const thumbnailWidth = thumbnailSize;
+        const thumbnailHeight = thumbnailSize / aspectRatio;
+
+        return (
+            <View
+                key={attachment.id}
+                style={styles.attachmentThumbnailContainer}
+            >
+                <Image
+                    source={{ uri: attachment.data }}
+                    style={[
+                        styles.attachmentThumbnail,
+                        { width: thumbnailWidth, height: thumbnailHeight },
+                    ]}
+                    resizeMode="cover"
+                />
+                <View style={styles.attachmentMetadata}>
+                    <Text style={styles.attachmentDimension}>
+                        {attachment.width} × {attachment.height}
+                    </Text>
+                    <Text style={styles.attachmentSize}>
+                        {formatFileSize(attachment.size)}
+                    </Text>
+                </View>
+            </View>
+        );
+    };
 
     const renderAttachments = (attachmentIds: string[]) => {
         if (!attachmentIds || attachmentIds.length === 0) return null;
 
+        const attachments = attachmentIds
+            .map((id) => getAttachment(id))
+            .filter((a): a is Attachment => a !== undefined);
+
+        if (attachments.length === 0) return null;
+
         return (
             <View style={styles.attachmentsContainer}>
-                {attachmentIds.map((attachmentId) => {
-                    const attachment = getAttachment(attachmentId);
-                    if (!attachment) return null;
-
-                    const aspectRatio =
-                        attachment.width && attachment.height
-                            ? attachment.width / attachment.height
-                            : 1;
-                    const maxWidth = screenWidth - 80;
-                    const maxHeight = 300;
-                    let imageWidth = maxWidth;
-                    let imageHeight = maxWidth / aspectRatio;
-
-                    if (imageHeight > maxHeight) {
-                        imageHeight = maxHeight;
-                        imageWidth = maxHeight * aspectRatio;
-                    }
-
-                    return (
-                        <Image
-                            key={attachment.id}
-                            source={{ uri: attachment.data }}
-                            style={[
-                                styles.attachmentImage,
-                                { width: imageWidth, height: imageHeight },
-                            ]}
-                            resizeMode="contain"
-                        />
-                    );
-                })}
+                {attachments.map(renderAttachmentThumbnail)}
             </View>
         );
     };
@@ -594,7 +608,29 @@ const styles = StyleSheet.create({
     },
     attachmentsContainer: {
         marginTop: 8,
+        flexDirection: "row",
+        flexWrap: "wrap",
         gap: 8,
+    },
+    attachmentThumbnailContainer: {
+        alignItems: "flex-start",
+        gap: 4,
+    },
+    attachmentThumbnail: {
+        borderRadius: 8,
+        backgroundColor: "rgba(0,0,0,0.05)",
+    },
+    attachmentMetadata: {
+        paddingHorizontal: 4,
+        paddingVertical: 2,
+    },
+    attachmentDimension: {
+        fontSize: 10,
+        color: "#666",
+    },
+    attachmentSize: {
+        fontSize: 10,
+        color: "#999",
     },
     attachmentImage: {
         borderRadius: 8,
