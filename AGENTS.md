@@ -53,6 +53,15 @@
 - `ENCRYPTION_KEY` is required in Convex for API key sync
 - Update `cloneCloudToLocal` when Convex data expands
 
+## Migration Runner Pattern
+
+- Shared migration runner lives in `packages/shared/src/core/sync/index.ts`
+- Key exports: `runMigration`, `runClone`, `MigrationConfig`, `CloneOptions`, `calculateMigrationProgress`
+- MigrationProgress phases: `preparing` | `chats` | `messages` | `attachments` | `complete`
+- Migration runner uses StorageAdapter interface - platform adapters must implement all methods
+- Platform-specific logic (clearing data, API key sync) stays in platform code
+- The shared runner handles data transfer logic with progress callbacks
+
 ## Tooling Expectations
 
 - Use Bun for scripts and installs (`bun install`, `bun dev`, `bun run <script>`)
