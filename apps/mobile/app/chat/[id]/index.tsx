@@ -16,6 +16,7 @@ import { getApiKey } from "../../../src/lib/storage";
 import { sendMessage } from "@shared/core/openrouter";
 import type { Message } from "@shared/core/types";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Markdown from "react-native-markdown-display";
 
 export default function ChatScreen(): ReactElement {
     const params = useLocalSearchParams();
@@ -156,6 +157,34 @@ export default function ChatScreen(): ReactElement {
 
     const chatMessages = messages[chatId] || [];
 
+    const getMarkdownStyle = (role: string) => {
+        const baseStyle = {
+            body: {
+                fontSize: 16,
+                lineHeight: 22,
+                color: role === "user" ? "#fff" : "#000",
+            },
+            code: {
+                backgroundColor: "rgba(0,0,0,0.1)",
+                paddingHorizontal: 4,
+                paddingVertical: 2,
+                borderRadius: 4,
+                fontFamily: role === "user" ? undefined : "monospace",
+            },
+            codeblock: {
+                backgroundColor: "rgba(0,0,0,0.1)",
+                padding: 12,
+                borderRadius: 8,
+                fontFamily: role === "user" ? undefined : "monospace",
+            },
+            link: {
+                color: role === "user" ? "#8ecfff" : "#007AFF",
+                textDecorationLine: "underline" as const,
+            },
+        };
+        return baseStyle;
+    };
+
     if (!currentChat) {
         return (
             <SafeAreaView style={styles.container}>
@@ -205,16 +234,9 @@ export default function ChatScreen(): ReactElement {
                                 : styles.assistantMessage,
                         ]}
                     >
-                        <Text
-                            style={[
-                                styles.messageText,
-                                item.role === "user"
-                                    ? styles.userMessageText
-                                    : styles.assistantMessageText,
-                            ]}
-                        >
+                        <Markdown style={getMarkdownStyle(item.role)}>
                             {item.content}
-                        </Text>
+                        </Markdown>
                         {item.thinking && (
                             <View style={styles.thinkingContainer}>
                                 <Text style={styles.thinkingLabel}>
