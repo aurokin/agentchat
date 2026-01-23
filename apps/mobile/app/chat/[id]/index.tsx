@@ -9,10 +9,13 @@ import {
     KeyboardAvoidingView,
     Platform,
     ActivityIndicator,
+    Image,
+    Dimensions,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useChatContext } from "../../../src/contexts/ChatContext";
 import { getApiKey } from "../../../src/lib/storage";
+import { getAttachment } from "../../../src/lib/db";
 import { sendMessage } from "@shared/core/openrouter";
 import type { Message } from "@shared/core/types";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -185,6 +188,71 @@ export default function ChatScreen(): ReactElement {
         return baseStyle;
     };
 
+    const screenWidth = Dimensions.get("window").width;
+
+    const renderAttachments = (attachmentIds: string[]) => {
+        if (!attachmentIds || attachmentIds.length === 0) return null;
+
+        return (
+            <View style={styles.attachmentsContainer}>
+                {attachmentIds.map((attachmentId) => {
+                    const attachment = getAttachment(attachmentId);
+                    if (!attachment) return null;
+
+                    const aspectRatio =
+                        attachment.width && attachment.height
+                            ? attachment.width / attachment.height
+                            : 1;
+                    const maxWidth = screenWidth - 80;
+                    const maxHeight = 300;
+                    let imageWidth = maxWidth;
+                    let imageHeight = maxWidth / aspectRatio;
+
+                    if (imageHeight > maxHeight) {
+                        imageHeight = maxHeight;
+                        imageWidth = maxHeight * aspectRatio;
+                    }
+
+                    return (
+                        <Image
+                            key={attachment.id}
+                            source={{ uri: attachment.data }}
+                            style={[
+                                styles.attachmentImage,
+                                { width: imageWidth, height: imageHeight },
+                            ]}
+                            resizeMode="contain"
+                        />
+                    );
+                })}
+            </View>
+        );
+    };
+
+    const renderMessage = ({ item }: { item: Message }) => (
+        <View
+            style={[
+                styles.messageContainer,
+                item.role === "user"
+                    ? styles.userMessage
+                    : styles.assistantMessage,
+            ]}
+        >
+            <Markdown style={getMarkdownStyle(item.role)}>
+                {item.content}
+            </Markdown>
+            {item.attachmentIds &&
+                item.attachmentIds.length > 0 &&
+                renderAttachments(item.attachmentIds)}
+            {item.thinking && (
+                <View style={styles.thinkingContainer}>
+                    <Text style={styles.thinkingLabel}>Thinking:</Text>
+                    <Text style={styles.thinkingText}>{item.thinking}</Text>
+                </View>
+            )}
+        </View>
+    );
+
     if (!currentChat) {
         return (
             <SafeAreaView style={styles.container}>
@@ -225,30 +293,7 @@ export default function ChatScreen(): ReactElement {
                         : []),
                 ]}
                 keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
-                    <View
-                        style={[
-                            styles.messageContainer,
-                            item.role === "user"
-                                ? styles.userMessage
-                                : styles.assistantMessage,
-                        ]}
-                    >
-                        <Markdown style={getMarkdownStyle(item.role)}>
-                            {item.content}
-                        </Markdown>
-                        {item.thinking && (
-                            <View style={styles.thinkingContainer}>
-                                <Text style={styles.thinkingLabel}>
-                                    Thinking:
-                                </Text>
-                                <Text style={styles.thinkingText}>
-                                    {item.thinking}
-                                </Text>
-                            </View>
-                        )}
-                    </View>
-                )}
+                renderItem={renderMessage}
                 contentContainerStyle={styles.listContent}
                 onContentSizeChange={() =>
                     flatListRef.current?.scrollToEnd?.({ animated: true })
@@ -398,5 +443,13 @@ const styles = StyleSheet.create({
         color: "#fff",
         fontSize: 16,
         fontWeight: "600",
+    },
+    attachmentsContainer: {
+        marginTop: 8,
+        gap: 8,
+    },
+    attachmentImage: {
+        borderRadius: 8,
+        backgroundColor: "rgba(0,0,0,0.05)",
     },
 });
