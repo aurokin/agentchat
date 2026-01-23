@@ -537,3 +537,54 @@ const handleSend = async () => {
 - Chat screen: `app/chat/[id]/index.tsx`
 - Database operations: `src/lib/db/operations.ts`
 - Shared types: `@shared/core/types`
+
+## Clipboard Image Paste
+
+The mobile app supports pasting images from the clipboard using React Native's `Clipboard` API.
+
+### Required Package
+
+No additional package needed - `Clipboard` is built into `react-native`:
+
+```typescript
+import { Clipboard } from "react-native";
+```
+
+### Clipboard Paste Pattern
+
+The `AttachmentPicker` component includes a "Paste from Clipboard" option that:
+
+1. Gets clipboard content via `Clipboard.getString()`
+2. Validates it's an image URI (starts with `file://`, `http://`, or `data:image`)
+3. Creates an attachment from the URI using `createAttachmentFromUri()`
+4. Shows appropriate alerts when clipboard is empty or doesn't contain an image
+
+### Supported Clipboard Formats
+
+- **file:// URIs**: Local image files (from file manager apps, etc.)
+- **http:// URIs**: Remote image URLs
+- **data:image URIs**: Base64-encoded image data
+
+### Fallback Behavior
+
+When clipboard doesn't contain an image, users see helpful alerts:
+
+- **Empty clipboard**: "No Image" alert with instructions
+- **Non-image content**: "Not an Image" alert with instructions
+- **Error**: Generic error alert suggesting to use file picker instead
+
+### Attachment from URI
+
+For clipboard images, use `createAttachmentFromUri()` which:
+
+- Fetches the image to get size
+- For local files (`file://`): Uses `react-native` Image to get dimensions
+- For remote/data URIs: Infers MIME type from file extension
+- Returns an Attachment object compatible with the SQLite schema
+
+### Important Notes
+
+- Clipboard API only supports `getString()` - images must be stored as URI strings
+- iOS typically stores copied images as file:// URIs
+- Android may vary depending on the source app
+- Always wrap clipboard operations in try-catch for error handling
