@@ -138,6 +138,95 @@ export default function SettingsScreen(): ReactElement {
         Alert.alert("API Key Cleared", "Your API key has been removed.");
     };
 
+    const handleEnableCloudSync = async () => {
+        if (!isAuthenticated) {
+            Alert.alert(
+                "Sign In Required",
+                "Please sign in with Google to enable cloud sync.",
+                [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                        text: "Sign In",
+                        onPress: async () => {
+                            try {
+                                await signIn();
+                            } catch {
+                                Alert.alert(
+                                    "Sign In Failed",
+                                    "Could not sign in. Please try again.",
+                                );
+                            }
+                        },
+                    },
+                ],
+            );
+            return;
+        }
+
+        try {
+            await setSyncState("cloud-enabled");
+            Alert.alert(
+                "Cloud Sync Enabled",
+                "Your chats will now sync across devices when connected to the internet.",
+            );
+        } catch (error) {
+            Alert.alert(
+                "Error",
+                "Failed to enable cloud sync. Please try again.",
+            );
+        }
+    };
+
+    const handleDisableCloudSync = async () => {
+        Alert.alert(
+            "Disable Cloud Sync",
+            "Your chats will no longer sync to the cloud. Your local data will be preserved.",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Disable",
+                    style: "destructive",
+                    onPress: async () => {
+                        try {
+                            await setSyncState("cloud-disabled");
+                            Alert.alert(
+                                "Cloud Sync Disabled",
+                                "Your chats are now stored only on this device.",
+                            );
+                        } catch (error) {
+                            Alert.alert(
+                                "Error",
+                                "Failed to disable cloud sync. Please try again.",
+                            );
+                        }
+                    },
+                },
+            ],
+        );
+    };
+
+    const getSyncStatusColor = () => {
+        switch (syncState) {
+            case "cloud-enabled":
+                return "#34C759";
+            case "cloud-disabled":
+                return "#FF9500";
+            default:
+                return "#8E8E93";
+        }
+    };
+
+    const getSyncStatusText = () => {
+        switch (syncState) {
+            case "cloud-enabled":
+                return "Your chats sync to the cloud automatically.";
+            case "cloud-disabled":
+                return "Cloud sync is disabled. Your data stays on this device.";
+            default:
+                return "Your chats are stored only on this device.";
+        }
+    };
+
     return (
         <SafeAreaProvider>
             <SafeAreaView style={styles.container}>
@@ -214,25 +303,83 @@ export default function SettingsScreen(): ReactElement {
 
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>Sync</Text>
-                        <View style={styles.settingItem}>
-                            <View style={styles.settingInfo}>
-                                <Text style={styles.settingLabel}>
-                                    Sync Mode
-                                </Text>
-                                <Text style={styles.settingValue}>
-                                    {syncState === "local-only"
-                                        ? "Local Only"
-                                        : syncState === "cloud-enabled"
-                                          ? "Cloud Enabled"
-                                          : "Cloud Disabled"}
+
+                        {isConvexAvailable && (
+                            <View style={styles.syncStatusCard}>
+                                <View style={styles.syncStatusHeader}>
+                                    <View
+                                        style={[
+                                            styles.syncStatusIndicator,
+                                            {
+                                                backgroundColor:
+                                                    getSyncStatusColor(),
+                                            },
+                                        ]}
+                                    />
+                                    <View style={styles.syncStatusInfo}>
+                                        <Text style={styles.syncStatusTitle}>
+                                            {syncState === "cloud-enabled"
+                                                ? "Cloud Sync Active"
+                                                : syncState === "cloud-disabled"
+                                                  ? "Cloud Sync Off"
+                                                  : "Local Only"}
+                                        </Text>
+                                        <Text
+                                            style={styles.syncStatusDescription}
+                                        >
+                                            {getSyncStatusText()}
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                {syncState === "local-only" && (
+                                    <TouchableOpacity
+                                        style={styles.enableSyncButton}
+                                        onPress={handleEnableCloudSync}
+                                    >
+                                        <Text
+                                            style={styles.enableSyncButtonText}
+                                        >
+                                            Enable Cloud Sync
+                                        </Text>
+                                    </TouchableOpacity>
+                                )}
+
+                                {syncState === "cloud-enabled" && (
+                                    <TouchableOpacity
+                                        style={styles.disableSyncButton}
+                                        onPress={handleDisableCloudSync}
+                                    >
+                                        <Text
+                                            style={styles.disableSyncButtonText}
+                                        >
+                                            Disable Cloud Sync
+                                        </Text>
+                                    </TouchableOpacity>
+                                )}
+
+                                {syncState === "cloud-disabled" && (
+                                    <TouchableOpacity
+                                        style={styles.enableSyncButton}
+                                        onPress={handleEnableCloudSync}
+                                    >
+                                        <Text
+                                            style={styles.enableSyncButtonText}
+                                        >
+                                            Re-enable Cloud Sync
+                                        </Text>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        )}
+
+                        {!isConvexAvailable && (
+                            <View style={styles.syncWarning}>
+                                <Text style={styles.syncWarningText}>
+                                    Cloud sync requires Convex configuration.
                                 </Text>
                             </View>
-                        </View>
-                        <Text style={styles.settingDescription}>
-                            {syncState === "local-only"
-                                ? "Your chats are stored only on this device."
-                                : "Your chats are synced to the cloud."}
-                        </Text>
+                        )}
                     </View>
 
                     <View style={styles.section}>
@@ -519,6 +666,69 @@ const styles = StyleSheet.create({
         marginTop: 12,
     },
     cloudWarningText: {
+        fontSize: 14,
+        color: "#856404",
+    },
+    syncStatusCard: {
+        backgroundColor: "#f5f5f5",
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 12,
+    },
+    syncStatusHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        marginBottom: 16,
+    },
+    syncStatusIndicator: {
+        width: 12,
+        height: 12,
+        borderRadius: 6,
+        marginRight: 12,
+    },
+    syncStatusInfo: {
+        flex: 1,
+    },
+    syncStatusTitle: {
+        fontSize: 16,
+        fontWeight: "600",
+        color: "#000",
+        marginBottom: 4,
+    },
+    syncStatusDescription: {
+        fontSize: 14,
+        color: "#666",
+    },
+    enableSyncButton: {
+        backgroundColor: "#007AFF",
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        borderRadius: 8,
+        alignItems: "center",
+    },
+    enableSyncButtonText: {
+        color: "#fff",
+        fontSize: 16,
+        fontWeight: "600",
+    },
+    disableSyncButton: {
+        backgroundColor: "#FF3B30",
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        borderRadius: 8,
+        alignItems: "center",
+    },
+    disableSyncButtonText: {
+        color: "#fff",
+        fontSize: 16,
+        fontWeight: "600",
+    },
+    syncWarning: {
+        backgroundColor: "#FFF3CD",
+        padding: 12,
+        borderRadius: 8,
+    },
+    syncWarningText: {
         fontSize: 14,
         color: "#856404",
     },
