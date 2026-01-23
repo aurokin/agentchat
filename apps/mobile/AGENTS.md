@@ -211,3 +211,67 @@ await clearAllCredentials();
 - Expo SecureStore automatically encrypts data on Android and iOS
 - Keys are prefixed with `routerchat-` to avoid collisions with other apps
 - Always use `clearAllCredentials()` for complete logout, not just `clearApiKey()`
+
+## Google OAuth via Convex Auth
+
+The mobile app uses Expo Auth Session with Convex Auth for Google sign-in.
+
+### Required Packages
+
+Add these to `package.json`:
+
+- `expo-auth-session`: For OAuth flow
+- `@convex-dev/auth`: For Convex Auth integration
+- `expo-crypto`: For crypto operations
+
+### Auth Configuration
+
+Convex URL is stored in SecureStore under `routerchat-convex-url`. Configure it before enabling cloud sync.
+
+### Auth Context
+
+Use `useAuthContext()` hook to access authentication state:
+
+```typescript
+import { useAuthContext } from "@/lib/convex";
+
+const { user, isAuthenticated, isLoading, signIn, signOut, isConvexAvailable } =
+    useAuthContext();
+```
+
+### Auth Flow
+
+1. User clicks "Sign in with Google" in settings
+2. Expo Auth Session opens Google OAuth
+3. On success, Convex client queries `auth:user` with the access token
+4. User is set in AuthContext state
+5. Cloud sync becomes available
+
+### Sign-Out Flow
+
+1. User clicks "Sign Out" in settings
+2. AuthContext clears user state
+3. Convex client is cleared
+4. All credentials are cleared via `clearAllCredentials()`
+5. Sync state reverts to "local-only"
+
+### Environment Variables
+
+Set in `app.config.js` or `app.config.ts`:
+
+- `EXPO_PUBLIC_GOOGLE_CLIENT_ID`: Google OAuth client ID for mobile
+
+### Redirect URI
+
+The redirect URI uses the app's scheme: `routerchat://convex-auth`
+
+### Offline Mode
+
+Authentication is optional. The app works in local-only mode without authentication. API key validation works independently of Convex Auth.
+
+## Related Files
+
+- Auth context: `src/lib/convex/AuthContext.tsx`
+- Convex client: `src/lib/convex/client.ts`
+- Config: `src/lib/convex/config.ts`
+- Index exports: `src/lib/convex/index.ts`

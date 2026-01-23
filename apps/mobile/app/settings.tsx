@@ -9,16 +9,26 @@ import {
     ActivityIndicator,
     ScrollView,
     Alert,
+    Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useAppContext } from "../src/contexts/AppContext";
 import { getApiKey, setApiKey, clearApiKey } from "../src/lib/storage";
 import { validateApiKey } from "@shared/core/openrouter";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { useAuthContext } from "../src/lib/convex/AuthContext";
 
 export default function SettingsScreen(): ReactElement {
     const router = useRouter();
-    const { syncState } = useAppContext();
+    const { syncState, setSyncState } = useAppContext();
+    const {
+        user,
+        isAuthenticated,
+        isLoading: isAuthLoading,
+        signIn,
+        signOut,
+        isConvexAvailable,
+    } = useAuthContext();
 
     const [apiKey, setApiKeyValue] = useState("");
     const [isLoading, setIsLoading] = useState(true);
@@ -78,6 +88,49 @@ export default function SettingsScreen(): ReactElement {
         }
     };
 
+    const handleSignOut = async () => {
+        Alert.alert(
+            "Sign Out",
+            "Are you sure you want to sign out? Your local data will be preserved.",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Sign Out",
+                    style: "destructive",
+                    onPress: async () => {
+                        await signOut();
+                        await setSyncState("local-only");
+                        Alert.alert(
+                            "Signed Out",
+                            "You have been signed out successfully.",
+                        );
+                    },
+                },
+            ],
+        );
+    };
+
+    const handleGoogleSignIn = async () => {
+        if (!isConvexAvailable) {
+            Alert.alert(
+                "Cloud Sync Not Configured",
+                "Please configure your Convex URL first to enable cloud sync.",
+                [{ text: "OK" }],
+            );
+            return;
+        }
+
+        try {
+            await signIn();
+        } catch (error) {
+            Alert.alert(
+                "Sign In Failed",
+                "Could not sign in with Google. Please try again.",
+                [{ text: "OK" }],
+            );
+        }
+    };
+
     const handleClearApiKey = async () => {
         await clearApiKey();
         setApiKeyValue("");
@@ -97,6 +150,68 @@ export default function SettingsScreen(): ReactElement {
                 </View>
 
                 <ScrollView style={styles.scrollContent}>
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Account</Text>
+
+                        {isAuthLoading ? (
+                            <ActivityIndicator style={styles.loading} />
+                        ) : isAuthenticated && user ? (
+                            <View style={styles.userInfo}>
+                                {user.image && (
+                                    <Image
+                                        source={{ uri: user.image }}
+                                        style={styles.userAvatar}
+                                    />
+                                )}
+                                <View style={styles.userDetails}>
+                                    <Text style={styles.userName}>
+                                        {user.name || "User"}
+                                    </Text>
+                                    <Text style={styles.userEmail}>
+                                        {user.email}
+                                    </Text>
+                                </View>
+                            </View>
+                        ) : (
+                            <Text style={styles.notSignedIn}>
+                                Sign in to enable cloud sync across devices.
+                            </Text>
+                        )}
+
+                        {isConvexAvailable && (
+                            <TouchableOpacity
+                                style={styles.googleButton}
+                                onPress={
+                                    isAuthenticated
+                                        ? handleSignOut
+                                        : handleGoogleSignIn
+                                }
+                                disabled={isAuthLoading}
+                            >
+                                {isAuthLoading ? (
+                                    <ActivityIndicator color="#fff" />
+                                ) : (
+                                    <>
+                                        <Text style={styles.googleButtonText}>
+                                            {isAuthenticated
+                                                ? "Sign Out"
+                                                : "Sign in with Google"}
+                                        </Text>
+                                    </>
+                                )}
+                            </TouchableOpacity>
+                        )}
+
+                        {!isConvexAvailable && (
+                            <View style={styles.cloudWarning}>
+                                <Text style={styles.cloudWarningText}>
+                                    Cloud sync requires Convex configuration.
+                                    Add your Convex URL in the About section.
+                                </Text>
+                            </View>
+                        )}
+                    </View>
+
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>Sync</Text>
                         <View style={styles.settingItem}>
@@ -355,5 +470,56 @@ const styles = StyleSheet.create({
     version: {
         fontSize: 14,
         color: "#666",
+    },
+    userInfo: {
+        flexDirection: "row",
+        alignItems: "center",
+        marginBottom: 16,
+    },
+    userAvatar: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        marginRight: 12,
+    },
+    userDetails: {
+        flex: 1,
+    },
+    userName: {
+        fontSize: 16,
+        fontWeight: "600",
+        color: "#000",
+    },
+    userEmail: {
+        fontSize: 14,
+        color: "#666",
+        marginTop: 2,
+    },
+    notSignedIn: {
+        fontSize: 14,
+        color: "#666",
+        marginBottom: 16,
+    },
+    googleButton: {
+        backgroundColor: "#4285F4",
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        borderRadius: 8,
+        alignItems: "center",
+    },
+    googleButtonText: {
+        color: "#fff",
+        fontSize: 16,
+        fontWeight: "600",
+    },
+    cloudWarning: {
+        backgroundColor: "#FFF3CD",
+        padding: 12,
+        borderRadius: 8,
+        marginTop: 12,
+    },
+    cloudWarningText: {
+        fontSize: 14,
+        color: "#856404",
     },
 });
