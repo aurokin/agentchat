@@ -415,3 +415,125 @@ attachmentImage: {
     backgroundColor: "rgba(0,0,0,0.05)",
 },
 ```
+
+## Camera and Library Image Picker
+
+The mobile app uses `expo-image-picker` for capturing photos and selecting images from the library.
+
+### Required Package
+
+Add to `package.json`:
+
+```json
+"expo-image-picker": "~16.0.3"
+```
+
+### Attachment Picker Component
+
+Use `src/components/chat/AttachmentPicker.tsx` for image selection:
+
+```typescript
+import { AttachmentPicker } from "../../../src/components/chat/AttachmentPicker";
+import type { Attachment } from "@shared/core/types";
+
+// In your component state
+const [attachments, setAttachments] = useState<Attachment[]>([]);
+
+// Handle new attachments from picker
+const handleAttachmentsSelected = (newAttachments: Attachment[]) => {
+    setAttachments((prev) => [...prev, ...newAttachments]);
+};
+
+// Remove individual attachment
+const handleRemoveAttachment = (attachmentId: string) => {
+    setAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
+};
+
+// In JSX
+<AttachmentPicker
+    onAttachmentsSelected={handleAttachmentsSelected}
+    maxAttachments={5}
+    disabled={isLoading}
+/>
+```
+
+### Image Picker Permissions
+
+The picker requires runtime permissions:
+
+- **Camera**: `ImagePicker.requestCameraPermissionsAsync()`
+- **Library**: `ImagePicker.requestMediaLibraryPermissionsAsync()`
+
+The `AttachmentPicker` component handles permission requests automatically.
+
+### Supported Formats
+
+- Media types: `ImagePicker.MediaTypeOptions.Images`
+- Multiple selection: Up to `maxAttachments` (default: 5)
+- Quality: 0.8 (80% quality)
+
+### Attachment Data Flow
+
+1. User selects images via camera or library
+2. `createAttachmentFromAsset()` creates attachment objects with metadata
+3. Attachments stored in component state (not yet saved to database)
+4. On send, attachments are:
+    - Saved to SQLite with temporary messageId
+    - Message created with attachmentIds
+    - Attachments updated with actual messageId
+
+### Message Input Integration
+
+The `MessageInput` component supports attachments with:
+
+```typescript
+<MessageInput
+    // ... existing props
+    attachments={attachments}
+    onAttachmentsChange={handleAttachmentsSelected}
+    onRemoveAttachment={handleRemoveAttachment}
+/>
+```
+
+### Attachment Preview in MessageInput
+
+MessageInput renders attachment thumbnails in a horizontal FlatList with remove buttons.
+
+### Sending Messages with Attachments
+
+```typescript
+const handleSend = async () => {
+    // Save attachments to database first
+    const attachmentIds: string[] = [];
+    for (const attachment of attachments) {
+        const savedAttachment = { ...attachment, messageId: "" };
+        const id = saveAttachment(savedAttachment);
+        attachmentIds.push(id);
+    }
+
+    // Create message with attachmentIds
+    const message = await addMessage({
+        sessionId: chatId,
+        role: "user",
+        content: inputText,
+        contextContent: inputText,
+        attachmentIds: attachmentIds.length > 0 ? attachmentIds : undefined,
+    });
+
+    // Update attachments with actual messageId
+    for (const id of attachmentIds) {
+        const attachment = getAttachment(id);
+        if (attachment) {
+            saveAttachment({ ...attachment, messageId: message.id });
+        }
+    }
+};
+```
+
+## Related Files
+
+- Attachment picker: `src/components/chat/AttachmentPicker.tsx`
+- Message input: `src/components/chat/MessageInput.tsx`
+- Chat screen: `app/chat/[id]/index.tsx`
+- Database operations: `src/lib/db/operations.ts`
+- Shared types: `@shared/core/types`

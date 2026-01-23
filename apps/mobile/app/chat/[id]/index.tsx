@@ -8,19 +8,25 @@ import {
     ActivityIndicator,
     Image,
     Dimensions,
+    Alert,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useChatContext } from "../../../src/contexts/ChatContext";
 import { useModelContext } from "../../../src/contexts/ModelContext";
 import { useSkillsContext } from "../../../src/contexts/SkillsContext";
 import { getApiKey } from "../../../src/lib/storage";
-import { getAttachment } from "../../../src/lib/db";
+import { getAttachment, saveAttachment } from "../../../src/lib/db";
 import { sendMessage } from "@shared/core/openrouter";
 import {
     modelSupportsReasoning,
     modelSupportsSearch,
 } from "@shared/core/models";
-import type { Message, ThinkingLevel, SearchLevel } from "@shared/core/types";
+import type {
+    Message,
+    ThinkingLevel,
+    SearchLevel,
+    Attachment,
+} from "@shared/core/types";
 import type { Skill } from "@shared/core/skills";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Markdown from "react-native-markdown-display";
@@ -52,6 +58,7 @@ export default function ChatScreen(): ReactElement {
     const [inputText, setInputText] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [apiKey, setApiKey] = useState<string | null>(null);
+    const [attachments, setAttachments] = useState<Attachment[]>([]);
 
     const flatListRef = useRef<FlatList<Message>>(null);
     const [replyText, setReplyText] = useState("");
@@ -104,16 +111,46 @@ export default function ChatScreen(): ReactElement {
         await updateChat(updatedChat);
     };
 
+    const handleAttachmentsSelected = (newAttachments: Attachment[]) => {
+        setAttachments((prev) => [...prev, ...newAttachments]);
+    };
+
+    const handleRemoveAttachment = (attachmentId: string) => {
+        setAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
+    };
+
     const handleSend = async () => {
-        if (!inputText.trim() || isLoading || !currentChat) return;
+        if (
+            (!inputText.trim() && attachments.length === 0) ||
+            isLoading ||
+            !currentChat
+        )
+            return;
 
         const userMessageText = inputText.trim();
         setInputText("");
+        setAttachments([]);
 
         const skillForMessage = selectedSkill;
         const contextContent = skillForMessage
             ? `${skillForMessage.prompt}\n\nUser: ${userMessageText}`
             : userMessageText;
+
+        const attachmentIds: string[] = [];
+
+        if (attachments.length > 0) {
+            const savedAttachments = await Promise.all(
+                attachments.map(async (attachment) => {
+                    const savedAttachment = {
+                        ...attachment,
+                        messageId: "", // Will be updated after message is created
+                    };
+                    const id = saveAttachment(savedAttachment);
+                    attachmentIds.push(id);
+                    return savedAttachment;
+                }),
+            );
+        }
 
         const userMessage = await addMessage({
             sessionId: chatId,
@@ -121,7 +158,22 @@ export default function ChatScreen(): ReactElement {
             content: userMessageText,
             contextContent: contextContent,
             skill: skillForMessage,
+            attachmentIds: attachmentIds.length > 0 ? attachmentIds : undefined,
         });
+
+        if (attachmentIds.length > 0) {
+            await Promise.all(
+                attachmentIds.map((id) => {
+                    const attachment = getAttachment(id);
+                    if (attachment) {
+                        saveAttachment({
+                            ...attachment,
+                            messageId: userMessage.id,
+                        });
+                    }
+                }),
+            );
+        }
 
         if (skillForMessage) {
             setSelectedSkill(null);
@@ -413,6 +465,9 @@ export default function ChatScreen(): ReactElement {
                 skills={skills}
                 selectedSkill={selectedSkill}
                 onSkillSelect={setSelectedSkill}
+                attachments={attachments}
+                onAttachmentsChange={handleAttachmentsSelected}
+                onRemoveAttachment={handleRemoveAttachment}
             />
         </SafeAreaView>
     );

@@ -8,14 +8,19 @@ import {
     ActivityIndicator,
     KeyboardAvoidingView,
     Platform,
+    Image,
+    FlatList,
+    Dimensions,
 } from "react-native";
 import type { OpenRouterModel } from "@shared/core/models";
 import type { ThinkingLevel, SearchLevel } from "@shared/core/types";
 import type { Skill } from "@shared/core/skills";
+import type { Attachment } from "@shared/core/types";
 import { ModelSelector } from "./ModelSelector";
 import { ThinkingToggle } from "./ThinkingToggle";
 import { SearchToggle } from "./SearchToggle";
 import { SkillSelector } from "./SkillSelector";
+import { AttachmentPicker } from "./AttachmentPicker";
 
 interface MessageInputProps {
     inputText: string;
@@ -35,6 +40,9 @@ interface MessageInputProps {
     skills: Skill[];
     selectedSkill: Skill | null;
     onSkillSelect: (skill: Skill | null) => void;
+    attachments: Attachment[];
+    onAttachmentsChange: (attachments: Attachment[]) => void;
+    onRemoveAttachment: (attachmentId: string) => void;
 }
 
 export function MessageInput({
@@ -55,8 +63,41 @@ export function MessageInput({
     skills,
     selectedSkill,
     onSkillSelect,
+    attachments,
+    onAttachmentsChange,
+    onRemoveAttachment,
 }: MessageInputProps): ReactElement {
-    const canSend = inputText.trim().length > 0 && !disabled;
+    const canSend =
+        (inputText.trim().length > 0 || attachments.length > 0) && !disabled;
+
+    const screenWidth = Dimensions.get("window").width;
+
+    const renderAttachmentThumbnail = ({ item }: { item: Attachment }) => {
+        const aspectRatio =
+            item.width && item.height ? item.width / item.height : 1;
+        const thumbnailWidth = 60;
+        const thumbnailHeight = thumbnailWidth / aspectRatio;
+
+        return (
+            <View style={styles.attachmentThumbnailContainer}>
+                <Image
+                    source={{ uri: item.data }}
+                    style={[
+                        styles.attachmentThumbnail,
+                        { width: thumbnailWidth, height: thumbnailHeight },
+                    ]}
+                    resizeMode="cover"
+                />
+                <TouchableOpacity
+                    style={styles.removeAttachmentButton}
+                    onPress={() => onRemoveAttachment(item.id)}
+                    activeOpacity={0.7}
+                >
+                    <Text style={styles.removeAttachmentText}>×</Text>
+                </TouchableOpacity>
+            </View>
+        );
+    };
 
     return (
         <KeyboardAvoidingView
@@ -64,7 +105,24 @@ export function MessageInput({
             keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
             style={styles.container}
         >
+            {attachments.length > 0 && (
+                <View style={styles.attachmentsContainer}>
+                    <FlatList
+                        data={attachments}
+                        renderItem={renderAttachmentThumbnail}
+                        keyExtractor={(item) => item.id}
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.attachmentsList}
+                    />
+                </View>
+            )}
+
             <View style={styles.controlsRow}>
+                <AttachmentPicker
+                    onAttachmentsSelected={onAttachmentsChange}
+                    disabled={isLoading || disabled}
+                />
                 <ModelSelector
                     models={models}
                     selectedModelId={selectedModelId}
@@ -99,7 +157,11 @@ export function MessageInput({
                     style={styles.textInput}
                     value={inputText}
                     onChangeText={onInputChange}
-                    placeholder="Type a message..."
+                    placeholder={
+                        attachments.length > 0
+                            ? "Add a caption..."
+                            : "Type a message..."
+                    }
                     multiline
                     maxLength={10000}
                     editable={!disabled}
@@ -129,6 +191,40 @@ const styles = StyleSheet.create({
         borderTopWidth: 1,
         borderTopColor: "#eee",
         backgroundColor: "#fff",
+    },
+    attachmentsContainer: {
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: "#f5f5f5",
+    },
+    attachmentsList: {
+        gap: 8,
+    },
+    attachmentThumbnailContainer: {
+        position: "relative",
+        marginRight: 8,
+    },
+    attachmentThumbnail: {
+        borderRadius: 8,
+        backgroundColor: "#f0f0f0",
+    },
+    removeAttachmentButton: {
+        position: "absolute",
+        top: -6,
+        right: -6,
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        backgroundColor: "#FF3B30",
+        justifyContent: "center",
+        alignItems: "center",
+    },
+    removeAttachmentText: {
+        color: "#fff",
+        fontSize: 14,
+        fontWeight: "bold",
+        lineHeight: 18,
     },
     controlsRow: {
         flexDirection: "row",
