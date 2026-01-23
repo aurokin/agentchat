@@ -959,3 +959,131 @@ function OnboardingWrapper({ children }: { children: React.ReactNode }): React.R
 - Explains both local-first and optional cloud sync clearly
 - "Back" and "Next" buttons for navigation
 - Completes automatically when user taps "Get Started"
+
+## Attachment Gallery Viewer
+
+The mobile app includes a full-screen image gallery viewer that opens when tapping attachment thumbnails. The viewer supports swipe navigation between all attachments in a chat and displays image metadata.
+
+### Gallery Component
+
+Use `src/components/chat/AttachmentGallery.tsx` for the full-screen image viewer:
+
+```typescript
+import { AttachmentGallery } from "../../../src/components/chat/AttachmentGallery";
+import type { Attachment } from "@shared/core/types";
+
+// In component state
+const [galleryVisible, setGalleryVisible] = useState(false);
+const [galleryAttachments, setGalleryAttachments] = useState<Attachment[]>([]);
+const [galleryInitialIndex, setGalleryInitialIndex] = useState(0);
+
+// Collect all attachments from the chat
+const getChatAttachments = (): Attachment[] => {
+    const allAttachments: Attachment[] = [];
+    const seenIds = new Set<string>();
+
+    chatMessages.forEach((message) => {
+        if (message.attachmentIds) {
+            message.attachmentIds.forEach((id) => {
+                if (!seenIds.has(id)) {
+                    seenIds.add(id);
+                    const attachment = getAttachment(id);
+                    if (attachment) {
+                        allAttachments.push(attachment);
+                    }
+                }
+            });
+        }
+    });
+
+    return allAttachments;
+};
+
+// Open gallery when tapping thumbnail
+const openGallery = (attachmentId: string, attachments: Attachment[]) => {
+    const index = attachments.findIndex((a) => a.id === attachmentId);
+    if (index >= 0) {
+        setGalleryAttachments(attachments);
+        setGalleryInitialIndex(index);
+        setGalleryVisible(true);
+    }
+};
+
+// In JSX
+<AttachmentGallery
+    visible={galleryVisible}
+    attachments={galleryAttachments}
+    initialIndex={galleryInitialIndex}
+    onClose={() => setGalleryVisible(false)}
+/>
+```
+
+### Making Thumbnails Tappable
+
+Update `renderAttachmentThumbnail` to include a touch handler:
+
+```typescript
+const renderAttachmentThumbnail = (attachment: Attachment) => {
+    const aspectRatio = attachment.width && attachment.height
+        ? attachment.width / attachment.height
+        : 1;
+    const thumbnailSize = 80;
+    const thumbnailWidth = thumbnailSize;
+    const thumbnailHeight = thumbnailSize / aspectRatio;
+
+    return (
+        <TouchableOpacity
+            key={attachment.id}
+            style={styles.attachmentThumbnailContainer}
+            onPress={() => openGallery(attachment.id, getChatAttachments())}
+            activeOpacity={0.7}
+        >
+            <Image
+                source={{ uri: attachment.data }}
+                style={[
+                    styles.attachmentThumbnail,
+                    { width: thumbnailWidth, height: thumbnailHeight },
+                ]}
+                resizeMode="cover"
+            />
+            {/* Metadata display... */}
+        </TouchableOpacity>
+    );
+};
+```
+
+### Gallery Features
+
+- **Full-screen display**: Black background with centered image
+- **Swipe navigation**: Pan gesture or navigation arrows to swipe between images
+- **Metadata display**: Shows dimensions and file size below the image
+- **Position indicator**: Shows "1 of N" position in the gallery
+- **Dot indicators**: Visual dots showing total images and current position
+- **Close button**: Top-right button to dismiss the gallery
+- **Touch gestures**: Swipe left/right to navigate, swipe down to dismiss
+
+### Gallery Props
+
+```typescript
+interface AttachmentGalleryProps {
+    visible: boolean; // Whether gallery is visible
+    attachments: Attachment[]; // Array of all attachments to browse
+    initialIndex: number; // Starting image index (0-based)
+    onClose: () => void; // Callback when gallery closes
+}
+```
+
+### Important Notes
+
+- Use `TouchableOpacity` with `activeOpacity={0.7}` for better touch feedback on thumbnails
+- Collect all chat attachments using `getChatAttachments()` to enable full gallery navigation
+- Reset `translateX` animation value when gallery opens to prevent animation issues
+- Gallery dimensions use `Dimensions.get("window")` for responsive sizing
+- Metadata (dimensions and size) uses the same format as thumbnail display
+
+### Related Files
+
+- Gallery component: `src/components/chat/AttachmentGallery.tsx`
+- Chat screen: `app/chat/[id]/index.tsx`
+- Database operations: `src/lib/db/operations.ts`
+- Shared types: `@shared/core/types`

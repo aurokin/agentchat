@@ -30,6 +30,7 @@ import type { Skill } from "@shared/core/skills";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Markdown from "react-native-markdown-display";
 import { MessageInput } from "../../../src/components/chat/MessageInput";
+import { AttachmentGallery } from "../../../src/components/chat/AttachmentGallery";
 
 const BrainIcon = ({ size }: { size: number }) => (
     <Text style={{ fontSize: size, lineHeight: size }}>🧠</Text>
@@ -64,6 +65,11 @@ export default function ChatScreen(): ReactElement {
     const [expandedThinking, setExpandedThinking] = useState<
         Record<string, boolean>
     >({});
+    const [galleryVisible, setGalleryVisible] = useState(false);
+    const [galleryAttachments, setGalleryAttachments] = useState<Attachment[]>(
+        [],
+    );
+    const [galleryInitialIndex, setGalleryInitialIndex] = useState(0);
 
     useEffect(() => {
         if (chatId) {
@@ -275,6 +281,36 @@ export default function ChatScreen(): ReactElement {
         }));
     };
 
+    const openGallery = (attachmentId: string, attachments: Attachment[]) => {
+        const index = attachments.findIndex((a) => a.id === attachmentId);
+        if (index >= 0) {
+            setGalleryAttachments(attachments);
+            setGalleryInitialIndex(index);
+            setGalleryVisible(true);
+        }
+    };
+
+    const getChatAttachments = (): Attachment[] => {
+        const allAttachments: Attachment[] = [];
+        const seenIds = new Set<string>();
+
+        chatMessages.forEach((message) => {
+            if (message.attachmentIds) {
+                message.attachmentIds.forEach((id) => {
+                    if (!seenIds.has(id)) {
+                        seenIds.add(id);
+                        const attachment = getAttachment(id);
+                        if (attachment) {
+                            allAttachments.push(attachment);
+                        }
+                    }
+                });
+            }
+        });
+
+        return allAttachments;
+    };
+
     const chatMessages = messages[chatId] || [];
 
     const getMarkdownStyle = (role: string) => {
@@ -321,9 +357,11 @@ export default function ChatScreen(): ReactElement {
         const thumbnailHeight = thumbnailSize / aspectRatio;
 
         return (
-            <View
+            <TouchableOpacity
                 key={attachment.id}
                 style={styles.attachmentThumbnailContainer}
+                onPress={() => openGallery(attachment.id, getChatAttachments())}
+                activeOpacity={0.7}
             >
                 <Image
                     source={{ uri: attachment.data }}
@@ -341,7 +379,7 @@ export default function ChatScreen(): ReactElement {
                         {formatFileSize(attachment.size)}
                     </Text>
                 </View>
-            </View>
+            </TouchableOpacity>
         );
     };
 
@@ -482,6 +520,13 @@ export default function ChatScreen(): ReactElement {
                 attachments={attachments}
                 onAttachmentsChange={handleAttachmentsSelected}
                 onRemoveAttachment={handleRemoveAttachment}
+            />
+
+            <AttachmentGallery
+                visible={galleryVisible}
+                attachments={galleryAttachments}
+                initialIndex={galleryInitialIndex}
+                onClose={() => setGalleryVisible(false)}
             />
         </SafeAreaView>
     );
