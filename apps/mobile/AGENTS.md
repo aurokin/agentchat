@@ -275,3 +275,71 @@ Authentication is optional. The app works in local-only mode without authenticat
 - Convex client: `src/lib/convex/client.ts`
 - Config: `src/lib/convex/config.ts`
 - Index exports: `src/lib/convex/index.ts`
+
+## Sync State Management
+
+The mobile app uses a sync state pattern similar to the web app, with three states:
+
+- `local-only`: Default state, all data stored locally only
+- `cloud-enabled`: Cloud sync is active, data syncs to Convex
+- `cloud-disabled`: Cloud sync is configured but disabled by user
+
+### Sync State Storage
+
+Sync state is stored in SecureStore under `routerchat-sync-state` key.
+
+### Sync State Module
+
+Use `lib/storage/sync-storage.ts` for sync state operations:
+
+```typescript
+import { getSyncState, setSyncState, clearSyncState } from "@/lib/storage";
+
+// Get current sync state
+const state = await getSyncState(); // Returns SyncState | null
+
+// Set sync state
+await setSyncState("cloud-enabled");
+
+// Clear sync state
+await clearSyncState();
+```
+
+### Sync State Context
+
+Use `useAppContext()` to access sync state:
+
+```typescript
+import { useAppContext } from "../src/contexts/AppContext";
+
+const { syncState, isConvexAvailable, setSyncState } = useAppContext();
+
+// Check if cloud sync is available
+const canUseCloud = isConvexAvailable && syncState === "cloud-enabled";
+```
+
+### Convex Availability Check
+
+Convex availability is checked at runtime using the configured URL:
+
+```typescript
+import { isConvexConfigured } from "@/lib/convex";
+
+const available = isConvexConfigured();
+```
+
+### State Transitions
+
+- **Initial launch**: Defaults to `local-only`
+- **After Convex configuration**: Loads persisted state from storage
+- **After successful sign-in**: User can enable cloud sync
+- **After sign-out**: State reverts to `local-only`
+
+### Graceful Degradation
+
+When Convex is unavailable:
+
+- App operates in `local-only` mode
+- All features work without cloud sync
+- UI indicates cloud sync is not available
+- No errors thrown for cloud operations

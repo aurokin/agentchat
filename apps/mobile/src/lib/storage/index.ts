@@ -25,3 +25,4 @@ export {
     clearRefreshToken,
     clearAllCredentials,
 } from "./credential-storage";
+export { getSyncState, setSyncState, clearSyncState } from "./sync-storage";
