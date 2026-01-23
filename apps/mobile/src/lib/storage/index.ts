@@ -31,6 +31,8 @@ export {
     clearSyncState,
     getTheme,
     setTheme,
+    getHasCompletedOnboarding,
+    setHasCompletedOnboarding,
     type UserTheme,
 } from "./sync-storage";
 export {

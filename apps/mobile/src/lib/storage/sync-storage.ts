@@ -5,6 +5,7 @@ export type UserTheme = "light" | "dark" | "system";
 
 const SYNC_STATE_KEY = "routerchat-sync-state";
 const THEME_KEY = "routerchat-theme";
+const ONBOARDING_KEY = "routerchat-has-completed-onboarding";
 
 export async function getSyncState(): Promise<SyncState | null> {
     try {
@@ -58,5 +59,22 @@ export async function setTheme(theme: UserTheme): Promise<void> {
         await SecureStore.setItemAsync(THEME_KEY, theme);
     } catch (error) {
         console.error("Failed to save theme:", error);
+    }
+}
+
+export async function getHasCompletedOnboarding(): Promise<boolean> {
+    try {
+        const result = await SecureStore.getItemAsync(ONBOARDING_KEY);
+        return result === "true";
+    } catch {
+        return false;
+    }
+}
+
+export async function setHasCompletedOnboarding(): Promise<void> {
+    try {
+        await SecureStore.setItemAsync(ONBOARDING_KEY, "true");
+    } catch (error) {
+        console.error("Failed to save onboarding state:", error);
     }
 }

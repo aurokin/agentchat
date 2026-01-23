@@ -1,60 +1,127 @@
-import React, { type ReactElement } from "react";
+import React, { type ReactElement, useState } from "react";
 import {
     View,
     Text,
     TouchableOpacity,
     StyleSheet,
     SafeAreaView,
+    ScrollView,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
-export default function OnboardingScreen(): ReactElement {
-    const router = useRouter();
+interface OnboardingScreenProps {
+    onComplete: () => Promise<void>;
+}
 
-    const handleGetStarted = () => {
+export default function OnboardingScreen({
+    onComplete,
+}: OnboardingScreenProps): ReactElement {
+    const router = useRouter();
+    const [currentStep, setCurrentStep] = useState(0);
+
+    const handleGetStarted = async () => {
+        await onComplete();
         router.replace("/");
     };
+
+    const handleNext = async () => {
+        if (currentStep < 2) {
+            setCurrentStep(currentStep + 1);
+        } else {
+            await handleGetStarted();
+        }
+    };
+
+    const handleBack = () => {
+        if (currentStep > 0) {
+            setCurrentStep(currentStep - 1);
+        }
+    };
+
+    const steps = [
+        {
+            title: "Welcome to RouterChat",
+            subtitle: "An offline-first chat app powered by OpenRouter",
+            content: [],
+        },
+        {
+            title: "Local-First Design",
+            subtitle: "Your chats stay on your device by default",
+            content: [
+                "• All chats stored locally on your device",
+                "• Works completely offline",
+                "• Fast and private - no server required",
+                "• Your API key stays on your device",
+            ],
+        },
+        {
+            title: "Optional Cloud Sync",
+            subtitle: "Sync across devices when you're ready",
+            content: [
+                "• Sign in with Google to enable cloud sync",
+                "• Chats sync across mobile and web",
+                "• Backup your conversations safely",
+                "• Turn sync on or off anytime",
+            ],
+        },
+    ];
+
+    const step = steps[currentStep];
 
     return (
         <SafeAreaProvider>
             <SafeAreaView style={styles.container}>
-                <View style={styles.content}>
-                    <Text style={styles.title}>Welcome to RouterChat</Text>
-                    <Text style={styles.subtitle}>
-                        An offline-first chat app powered by OpenRouter
-                    </Text>
-
-                    <View style={styles.featureList}>
-                        <View style={styles.featureItem}>
-                            <Text style={styles.featureText}>
-                                • Chat offline with local storage
-                            </Text>
-                        </View>
-                        <View style={styles.featureItem}>
-                            <Text style={styles.featureText}>
-                                • Optional cloud sync across devices
-                            </Text>
-                        </View>
-                        <View style={styles.featureItem}>
-                            <Text style={styles.featureText}>
-                                • Support for thinking models
-                            </Text>
-                        </View>
-                        <View style={styles.featureItem}>
-                            <Text style={styles.featureText}>
-                                • Image attachments
-                            </Text>
-                        </View>
+                <ScrollView
+                    style={styles.scrollContent}
+                    contentContainerStyle={styles.content}
+                >
+                    <View style={styles.progressContainer}>
+                        {[0, 1, 2].map((i) => (
+                            <View
+                                key={i}
+                                style={[
+                                    styles.progressDot,
+                                    i === currentStep &&
+                                        styles.progressDotActive,
+                                ]}
+                            />
+                        ))}
                     </View>
 
-                    <TouchableOpacity
-                        style={styles.button}
-                        onPress={handleGetStarted}
-                    >
-                        <Text style={styles.buttonText}>Get Started</Text>
-                    </TouchableOpacity>
-                </View>
+                    <Text style={styles.title}>{step.title}</Text>
+                    <Text style={styles.subtitle}>{step.subtitle}</Text>
+
+                    <View style={styles.featureList}>
+                        {step.content.map((item, index) => (
+                            <View key={index} style={styles.featureItem}>
+                                <Text style={styles.featureText}>{item}</Text>
+                            </View>
+                        ))}
+                    </View>
+
+                    <View style={styles.buttonContainer}>
+                        {currentStep > 0 && (
+                            <TouchableOpacity
+                                style={styles.backButton}
+                                onPress={handleBack}
+                            >
+                                <Text style={styles.backButtonText}>Back</Text>
+                            </TouchableOpacity>
+                        )}
+                        <TouchableOpacity
+                            style={[
+                                styles.button,
+                                currentStep === 0 && styles.buttonFullWidth,
+                            ]}
+                            onPress={handleNext}
+                        >
+                            <Text style={styles.buttonText}>
+                                {currentStep === 2 ? "Get Started" : "Next"}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                </ScrollView>
             </SafeAreaView>
         </SafeAreaProvider>
     );
@@ -65,24 +132,44 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: "#fff",
     },
+    scrollContent: {
+        flex: 1,
+    },
     content: {
         flex: 1,
         justifyContent: "center",
         alignItems: "center",
         paddingHorizontal: 24,
+        paddingVertical: 32,
+    },
+    progressContainer: {
+        flexDirection: "row",
+        justifyContent: "center",
+        alignItems: "center",
+        marginBottom: 32,
+    },
+    progressDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: "#E0E0E0",
+        marginHorizontal: 4,
+    },
+    progressDotActive: {
+        backgroundColor: "#007AFF",
     },
     title: {
         fontSize: 28,
         fontWeight: "bold",
         textAlign: "center",
-        marginBottom: 16,
+        marginBottom: 12,
         color: "#000",
     },
     subtitle: {
-        fontSize: 16,
+        fontSize: 18,
         textAlign: "center",
         color: "#666",
-        marginBottom: 32,
+        marginBottom: 24,
     },
     featureList: {
         width: "100%",
@@ -94,14 +181,36 @@ const styles = StyleSheet.create({
     featureText: {
         fontSize: 16,
         color: "#333",
+        lineHeight: 24,
+    },
+    buttonContainer: {
+        flexDirection: "row",
+        justifyContent: "center",
+        alignItems: "center",
+        width: "100%",
+        marginTop: 16,
     },
     button: {
         backgroundColor: "#007AFF",
         paddingHorizontal: 32,
         paddingVertical: 14,
         borderRadius: 8,
-        width: "100%",
+        flex: 1,
         alignItems: "center",
+    },
+    buttonFullWidth: {
+        flex: 0,
+        width: "100%",
+    },
+    backButton: {
+        paddingHorizontal: 24,
+        paddingVertical: 14,
+        marginRight: 12,
+    },
+    backButtonText: {
+        color: "#666",
+        fontSize: 16,
+        fontWeight: "600",
     },
     buttonText: {
         color: "#fff",

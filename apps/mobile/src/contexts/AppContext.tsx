@@ -9,7 +9,12 @@ import React, {
 import type { SyncState, SyncMetadata } from "@shared/core/sync";
 import { DEFAULT_SYNC_METADATA } from "@shared/core/sync";
 import { getSqliteStorageAdapter } from "../lib/sync/sqlite-adapter";
-import { getSyncState, setSyncState } from "../lib/storage";
+import {
+    getSyncState,
+    setSyncState,
+    getHasCompletedOnboarding,
+    setHasCompletedOnboarding,
+} from "../lib/storage";
 import { isConvexConfigured } from "../lib/convex";
 
 interface AppContextValue {
@@ -17,8 +22,10 @@ interface AppContextValue {
     syncMetadata: SyncMetadata;
     isInitialized: boolean;
     isConvexAvailable: boolean;
+    hasCompletedOnboarding: boolean;
     setSyncState: (state: SyncState) => Promise<void>;
     initializeApp: () => Promise<void>;
+    completeOnboarding: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -42,6 +49,8 @@ export function AppProvider({
     const [syncMetadata] = useState<SyncMetadata>(DEFAULT_SYNC_METADATA);
     const [isInitialized, setIsInitialized] = useState(false);
     const [isConvexAvailable, setIsConvexAvailable] = useState(false);
+    const [hasCompletedOnboarding, setHasCompletedOnboardingState] =
+        useState(false);
 
     const initializeApp = useCallback(async () => {
         const convexAvailable = isConvexConfigured();
@@ -58,12 +67,20 @@ export function AppProvider({
             }
         }
 
+        const onboardingCompleted = await getHasCompletedOnboarding();
+        setHasCompletedOnboardingState(onboardingCompleted);
+
         setIsInitialized(true);
     }, []);
 
     const setSyncState = useCallback(async (newState: SyncState) => {
         setSyncStateValue(newState);
         await setSyncState(newState);
+    }, []);
+
+    const completeOnboarding = useCallback(async () => {
+        setHasCompletedOnboardingState(true);
+        await setHasCompletedOnboarding();
     }, []);
 
     useEffect(() => {
@@ -77,8 +94,10 @@ export function AppProvider({
                 syncMetadata,
                 isInitialized,
                 isConvexAvailable,
+                hasCompletedOnboarding,
                 setSyncState,
                 initializeApp,
+                completeOnboarding,
             }}
         >
             {children}

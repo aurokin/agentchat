@@ -877,3 +877,85 @@ const handleValidate = async () => {
 - Theme storage: `src/lib/storage/sync-storage.ts`
 - Quota utilities: `src/lib/quota.ts`
 - Skills context: `src/contexts/SkillsContext.tsx`
+
+## First-Run Onboarding
+
+The mobile app includes a first-run tutorial that explains cloud vs local sync options.
+
+### Onboarding Storage
+
+Onboarding completion is stored in SecureStore under `routerchat-has-completed-onboarding` key.
+
+```typescript
+import {
+    getHasCompletedOnboarding,
+    setHasCompletedOnboarding,
+} from "@/lib/storage";
+
+// Check if onboarding has been completed
+const completed = await getHasCompletedOnboarding(); // Returns boolean
+
+// Mark onboarding as complete
+await setHasCompletedOnboarding();
+```
+
+### Onboarding State in AppContext
+
+The `useAppContext()` hook provides onboarding state:
+
+```typescript
+import { useAppContext } from "../src/contexts/AppContext";
+
+const { hasCompletedOnboarding, completeOnboarding, isInitialized } =
+    useAppContext();
+
+// Check if app is ready and onboarding hasn't been shown
+if (isInitialized && !hasCompletedOnboarding) {
+    // Show onboarding screen
+}
+```
+
+### Onboarding Screen
+
+The onboarding screen (`app/onboarding.tsx`) shows a multi-step tutorial:
+
+- **Step 1**: Welcome to RouterChat with feature highlights
+- **Step 2**: Local-first design explanation (offline-first, private, fast)
+- **Step 3**: Optional cloud sync explanation (sign-in, cross-device sync)
+
+### Onboarding Wrapper Component
+
+The `_layout.tsx` uses an `OnboardingWrapper` component to conditionally show the onboarding:
+
+```typescript
+function OnboardingWrapper({ children }: { children: React.ReactNode }): React.ReactElement {
+    const { isInitialized, hasCompletedOnboarding, completeOnboarding } = useAppContext();
+    const [showOnboarding, setShowOnboarding] = useState(false);
+
+    useEffect(() => {
+        if (isInitialized && !hasCompletedOnboarding) {
+            setShowOnboarding(true);
+        }
+    }, [isInitialized, hasCompletedOnboarding]);
+
+    const handleOnboardingComplete = async () => {
+        await completeOnboarding();
+        setShowOnboarding(false);
+    };
+
+    if (showOnboarding) {
+        return <OnboardingScreen onComplete={handleOnboardingComplete} />;
+    }
+
+    return <>{children}</>;
+}
+```
+
+### Key Points
+
+- Onboarding appears only on first launch (when `hasCompletedOnboarding` is false)
+- Uses SecureStore for persistence across app restarts
+- Multi-step design with progress indicators
+- Explains both local-first and optional cloud sync clearly
+- "Back" and "Next" buttons for navigation
+- Completes automatically when user taps "Get Started"
