@@ -1,5 +1,5 @@
 import { test, expect, describe } from "bun:test";
-import type { OpenRouterModel } from "@/lib/types";
+import type { OpenRouterModel } from "@shared/core/models";
 
 describe("ModelSelector logic", () => {
     const mockModels: OpenRouterModel[] = [

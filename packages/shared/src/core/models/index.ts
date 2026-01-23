@@ -12,19 +12,26 @@ export enum SupportedParameter {
 }
 
 export function modelSupportsSearch(
-    _model: OpenRouterModel | undefined,
+    model: OpenRouterModel | undefined,
 ): boolean {
-    return false;
+    return (
+        model?.supportedParameters?.includes(SupportedParameter.Tools) ?? false
+    );
 }
 
 export function modelSupportsReasoning(
-    _model: OpenRouterModel | undefined,
+    model: OpenRouterModel | undefined,
 ): boolean {
-    return false;
+    return (
+        model?.supportedParameters?.includes(SupportedParameter.Reasoning) ??
+        false
+    );
 }
 
 export function modelSupportsVision(
-    _model: OpenRouterModel | undefined,
+    model: OpenRouterModel | undefined,
 ): boolean {
-    return false;
+    return (
+        model?.supportedParameters?.includes(SupportedParameter.Vision) ?? false
+    );
 }
