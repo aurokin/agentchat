@@ -162,4 +162,52 @@ Run typecheck: `bun run typecheck`
 - CRUD operations: `src/lib/db/operations.ts`
 - File storage: `src/lib/storage/file-storage.ts`
 - Attachment storage: `src/lib/storage/attachment-storage.ts`
+- Credential storage: `src/lib/storage/credential-storage.ts`
 - Storage exports: `src/lib/storage/index.ts`
+
+## Credential Storage (API Keys & Tokens)
+
+Sensitive credentials (API key, auth tokens) are stored using `expo-secure-store` which provides encrypted storage.
+
+### Credential Storage Location
+
+- Storage: Expo SecureStore (encrypted key-value storage)
+- Keys: `routerchat-api-key`, `routerchat-auth-token`, `routerchat-refresh-token`
+
+### Credential Storage Module
+
+Use `lib/storage/credential-storage.ts` for credential operations:
+
+```typescript
+import {
+    getApiKey,
+    setApiKey,
+    clearApiKey,
+    getAuthToken,
+    setAuthToken,
+    clearAuthToken,
+    getRefreshToken,
+    setRefreshToken,
+    clearRefreshToken,
+    clearAllCredentials,
+} from "@/lib/storage";
+
+// Get API key for OpenRouter requests
+const apiKey = await getApiKey();
+if (apiKey) {
+    // Use API key for requests
+}
+
+// Save API key
+await setApiKey("sk-...");
+
+// Clear all credentials on logout
+await clearAllCredentials();
+```
+
+### Important Notes
+
+- All credential storage functions are async (unlike web's localStorage which is sync)
+- Expo SecureStore automatically encrypts data on Android and iOS
+- Keys are prefixed with `routerchat-` to avoid collisions with other apps
+- Always use `clearAllCredentials()` for complete logout, not just `clearApiKey()`
