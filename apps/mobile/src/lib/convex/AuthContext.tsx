@@ -6,13 +6,12 @@ import React, {
     useCallback,
     type ReactNode,
 } from "react";
-import * as SecureStore from "expo-secure-store";
 import * as WebBrowser from "expo-web-browser";
 import { makeRedirectUri, useAuthRequest } from "expo-auth-session";
 import * as Google from "expo-auth-session/providers/google";
 import { ConvexReactClient } from "convex/react";
 import { getConvexClient, clearConvexClient } from "./client";
-import { isConvexConfigured } from "./config";
+import { isConvexConfigured, setConvexUrl, clearConvexUrl } from "./config";
 import { clearAllCredentials } from "../storage";
 
 interface User {
@@ -30,6 +29,7 @@ interface AuthContextValue {
     signIn: () => Promise<void>;
     signOut: () => Promise<void>;
     configureConvex: (url: string) => Promise<void>;
+    clearConvexOverride: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -94,11 +94,18 @@ export function AuthProvider({
 
     const configureConvex = useCallback(
         async (url: string) => {
-            await SecureStore.setItem("routerchat-convex-url", url);
+            await setConvexUrl(url);
+            clearConvexClient();
             checkConvexAvailability();
         },
         [checkConvexAvailability],
     );
+
+    const clearConvexOverride = useCallback(async () => {
+        await clearConvexUrl();
+        clearConvexClient();
+        checkConvexAvailability();
+    }, [checkConvexAvailability]);
 
     useEffect(() => {
         checkConvexAvailability();
@@ -142,6 +149,7 @@ export function AuthProvider({
                 signIn,
                 signOut,
                 configureConvex,
+                clearConvexOverride,
             }}
         >
             {children}

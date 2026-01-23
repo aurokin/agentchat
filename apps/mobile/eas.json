@@ -6,6 +6,10 @@
         "development": {
             "developmentClient": true,
             "distribution": "internal",
+            "env": {
+                "EXPO_PUBLIC_CONVEX_URL": "https://your-development.convex.cloud",
+                "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "your-google-client-id.apps.googleusercontent.com"
+            },
             "android": {
                 "buildType": "apk"
             },
@@ -15,11 +19,20 @@
         },
         "preview": {
             "distribution": "internal",
+            "env": {
+                "EXPO_PUBLIC_CONVEX_URL": "https://your-preview.convex.cloud",
+                "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "your-google-client-id.apps.googleusercontent.com"
+            },
             "android": {
                 "buildType": "apk"
             }
         },
-        "production": {}
+        "production": {
+            "env": {
+                "EXPO_PUBLIC_CONVEX_URL": "https://your-production.convex.cloud",
+                "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "your-google-client-id.apps.googleusercontent.com"
+            }
+        }
     },
     "submit": {
         "production": {}

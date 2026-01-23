@@ -26,6 +26,7 @@ import {
 import { validateApiKey } from "@shared/core/openrouter";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useAuthContext } from "../src/lib/convex/AuthContext";
+import { getConvexUrlOverride, getEnvConvexUrl } from "../src/lib/convex";
 import { formatBytes } from "../src/lib/storage";
 
 type Keybinding = {
@@ -44,7 +45,7 @@ const KEYBINDINGS: Keybinding[] = [
 
 export default function SettingsScreen(): ReactElement {
     const router = useRouter();
-    const { syncState, setSyncState } = useAppContext();
+    const { syncState, setSyncState, initializeApp } = useAppContext();
     const { skills, addSkill, updateSkill, deleteSkill } = useSkillsContext();
     const {
         user,
@@ -53,6 +54,8 @@ export default function SettingsScreen(): ReactElement {
         signIn,
         signOut,
         isConvexAvailable,
+        configureConvex,
+        clearConvexOverride,
     } = useAuthContext();
 
     const [apiKey, setApiKeyValue] = useState("");
@@ -60,6 +63,15 @@ export default function SettingsScreen(): ReactElement {
     const [isValidating, setIsValidating] = useState(false);
     const [isValid, setIsValid] = useState<boolean | null>(null);
     const [currentTheme, setCurrentTheme] = useState<UserTheme>("system");
+    const [convexOverrideInput, setConvexOverrideInput] = useState("");
+    const [convexOverrideSaved, setConvexOverrideSaved] = useState<
+        string | null
+    >(null);
+
+    const buildConvexUrl = getEnvConvexUrl();
+    const convexUnavailableMessage = __DEV__
+        ? "Cloud sync isn't configured for this build. Set a Convex URL in Developer settings."
+        : "Cloud sync isn't configured for this build.";
 
     useEffect(() => {
         const loadSettings = async () => {
@@ -70,6 +82,9 @@ export default function SettingsScreen(): ReactElement {
                 ]);
                 setApiKeyValue(key || "");
                 setCurrentTheme(theme);
+                const override = getConvexUrlOverride();
+                setConvexOverrideSaved(override);
+                setConvexOverrideInput(override ?? "");
                 if (key) {
                     setIsValidating(true);
                     const valid = await validateApiKey(key);
@@ -144,11 +159,9 @@ export default function SettingsScreen(): ReactElement {
 
     const handleGoogleSignIn = async () => {
         if (!isConvexAvailable) {
-            Alert.alert(
-                "Cloud Sync Not Configured",
-                "Please configure your Convex URL first to enable cloud sync.",
-                [{ text: "OK" }],
-            );
+            Alert.alert("Cloud Sync Not Configured", convexUnavailableMessage, [
+                { text: "OK" },
+            ]);
             return;
         }
 
@@ -168,6 +181,57 @@ export default function SettingsScreen(): ReactElement {
         setApiKeyValue("");
         setIsValid(null);
         Alert.alert("API Key Cleared", "Your API key has been removed.");
+    };
+
+    const handleSaveConvexOverride = async () => {
+        if (!__DEV__) {
+            return;
+        }
+        const nextUrl = convexOverrideInput.trim();
+        if (!nextUrl) {
+            Alert.alert(
+                "Convex URL Required",
+                "Enter a valid https:// Convex URL to save an override.",
+            );
+            return;
+        }
+        try {
+            await configureConvex(nextUrl);
+            setConvexOverrideSaved(nextUrl);
+            setConvexOverrideInput(nextUrl);
+            await initializeApp();
+            Alert.alert(
+                "Convex Override Saved",
+                "This build now uses the override Convex URL.",
+            );
+        } catch (error) {
+            const message =
+                error instanceof Error
+                    ? error.message
+                    : "Failed to save the Convex override.";
+            Alert.alert("Invalid Convex URL", message);
+        }
+    };
+
+    const handleClearConvexOverride = async () => {
+        if (!__DEV__) {
+            return;
+        }
+        try {
+            await clearConvexOverride();
+            setConvexOverrideSaved(null);
+            setConvexOverrideInput("");
+            await initializeApp();
+            Alert.alert(
+                "Convex Override Cleared",
+                "Using the build-time Convex URL.",
+            );
+        } catch {
+            Alert.alert(
+                "Error",
+                "Failed to clear the Convex override. Please try again.",
+            );
+        }
     };
 
     const handleEnableCloudSync = async () => {
@@ -331,8 +395,7 @@ export default function SettingsScreen(): ReactElement {
                         {!isConvexAvailable && (
                             <View style={styles.cloudWarning}>
                                 <Text style={styles.cloudWarningText}>
-                                    Cloud sync requires Convex configuration.
-                                    Add your Convex URL in the About section.
+                                    {convexUnavailableMessage}
                                 </Text>
                             </View>
                         )}
@@ -413,7 +476,7 @@ export default function SettingsScreen(): ReactElement {
                         {!isConvexAvailable && (
                             <View style={styles.syncWarning}>
                                 <Text style={styles.syncWarningText}>
-                                    Cloud sync requires Convex configuration.
+                                    {convexUnavailableMessage}
                                 </Text>
                             </View>
                         )}
@@ -655,6 +718,59 @@ export default function SettingsScreen(): ReactElement {
                             ))}
                         </View>
                     </View>
+
+                    {__DEV__ && (
+                        <View style={styles.section}>
+                            <Text style={styles.sectionTitle}>Developer</Text>
+                            <Text style={styles.sectionDescription}>
+                                Override the Convex URL for local testing
+                            </Text>
+                            <View style={styles.inputContainer}>
+                                <Text style={styles.inputLabel}>
+                                    Convex URL Override
+                                </Text>
+                                <TextInput
+                                    style={styles.textInput}
+                                    value={convexOverrideInput}
+                                    onChangeText={setConvexOverrideInput}
+                                    placeholder={
+                                        buildConvexUrl ??
+                                        "https://your-deployment.convex.cloud"
+                                    }
+                                    placeholderTextColor="#999"
+                                    autoCapitalize="none"
+                                    autoCorrect={false}
+                                />
+                            </View>
+                            <Text style={styles.helpText}>
+                                {convexOverrideSaved
+                                    ? `Active override: ${convexOverrideSaved}`
+                                    : buildConvexUrl
+                                      ? `Build URL: ${buildConvexUrl}`
+                                      : "No build-time Convex URL configured."}
+                            </Text>
+                            <View style={styles.buttonRow}>
+                                <TouchableOpacity
+                                    style={styles.saveButton}
+                                    onPress={handleSaveConvexOverride}
+                                >
+                                    <Text style={styles.saveButtonText}>
+                                        Save Override
+                                    </Text>
+                                </TouchableOpacity>
+                                {convexOverrideSaved && (
+                                    <TouchableOpacity
+                                        style={styles.clearButton}
+                                        onPress={handleClearConvexOverride}
+                                    >
+                                        <Text style={styles.clearButtonText}>
+                                            Clear Override
+                                        </Text>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        </View>
+                    )}
 
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>About</Text>
