@@ -759,7 +759,7 @@ The mobile settings page should maintain parity with the web settings page. Key 
 2. **Sync** - Cloud sync status with enable/disable toggle
 3. **OpenRouter API** - API key validation with save/clear functionality
 4. **Theme** - Light/Dark/System toggle for color scheme
-5. **Image Storage** - Storage usage meter with progress bar showing attachments/sessions
+5. **Storage** - Cloud storage status and sync information (no local storage UI)
 6. **Skills** - List of user-created skills (read-only, full CRUD in chat)
 7. **Keybindings** - List of built-in keyboard shortcuts
 8. **About** - App version and description
@@ -785,30 +785,42 @@ await setTheme("dark");
 // - "system": Follow device system setting
 ```
 
-### Storage Usage Meter
+### Storage Section
 
-Storage usage is retrieved from the database and quota status from shared core:
+The mobile app shows a simplified Storage section in settings that focuses on cloud sync status rather than local storage management:
 
 ```typescript
-import {
-    getStorageUsage,
-    formatBytes,
-    LOCAL_IMAGE_QUOTA,
-    getLocalQuotaStatus,
-} from "@/lib/storage";
+// When cloud sync is enabled
+{syncState === "cloud-enabled" && (
+    <View style={styles.storageContainer}>
+        <Text style={styles.storageInfoText}>
+            Your attachments are stored in the cloud and sync across devices.
+        </Text>
+        <Text style={styles.storageComingSoon}>
+            Cloud storage management coming soon.
+        </Text>
+    </View>
+)}
 
-// Get detailed storage usage
-const usage = await getStorageUsage();
-// Returns: { attachments: number, messages: number, sessions: number }
-
-// Get quota status from shared core
-const quota = await getLocalQuotaStatus();
-// Returns: { used: number, limit: number }
-
-// Format for display
-const formattedSize = formatBytes(usage.attachments); // "2.5 MB"
-const percentage = (quota.used / quota.limit) * 100; // e.g., 45.2
+// When in local-only or cloud-disabled mode
+{syncState !== "cloud-enabled" && (
+    <View style={styles.storageContainer}>
+        <Text style={styles.storageInfoText}>
+            Your chats and attachments are stored only on this device.
+        </Text>
+        <Text style={styles.storageInfoSubtext}>
+            Enable cloud sync to access your data across devices.
+        </Text>
+    </View>
+)}
 ```
+
+### Key Points
+
+- Mobile settings do NOT expose local storage management UI
+- Cloud storage section shows status messages based on sync state
+- No local quota meters or storage stats are displayed in mobile settings
+- This keeps the mobile settings focused and simple
 
 ### Keybindings Section
 

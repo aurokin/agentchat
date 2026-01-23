@@ -26,12 +26,7 @@ import {
 import { validateApiKey } from "@shared/core/openrouter";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useAuthContext } from "../src/lib/convex/AuthContext";
-import {
-    getStorageUsage,
-    formatBytes,
-    LOCAL_IMAGE_QUOTA,
-    getLocalQuotaStatus,
-} from "../src/lib/storage";
+import { formatBytes } from "../src/lib/storage";
 
 type Keybinding = {
     key: string;
@@ -65,16 +60,6 @@ export default function SettingsScreen(): ReactElement {
     const [isValidating, setIsValidating] = useState(false);
     const [isValid, setIsValid] = useState<boolean | null>(null);
     const [currentTheme, setCurrentTheme] = useState<UserTheme>("system");
-    const [storageUsage, setStorageUsage] = useState<{
-        attachments: number;
-        messages: number;
-        sessions: number;
-    } | null>(null);
-    const [quotaStatus, setQuotaStatus] = useState<{
-        used: number;
-        limit: number;
-    } | null>(null);
-    const [isLoadingStorage, setIsLoadingStorage] = useState(true);
 
     useEffect(() => {
         const loadSettings = async () => {
@@ -95,24 +80,6 @@ export default function SettingsScreen(): ReactElement {
             }
         };
         loadSettings();
-    }, []);
-
-    useEffect(() => {
-        const loadStorage = async () => {
-            try {
-                const [usage, quota] = await Promise.all([
-                    getStorageUsage(),
-                    getLocalQuotaStatus(),
-                ]);
-                setStorageUsage(usage);
-                setQuotaStatus({ used: quota.used, limit: quota.limit });
-            } catch (error) {
-                console.error("Failed to load storage:", error);
-            } finally {
-                setIsLoadingStorage(false);
-            }
-        };
-        loadStorage();
     }, []);
 
     const handleSaveApiKey = async () => {
@@ -295,14 +262,6 @@ export default function SettingsScreen(): ReactElement {
             default:
                 return "Your chats are stored only on this device.";
         }
-    };
-
-    const getQuotaBarColor = () => {
-        if (!quotaStatus) return "#8E8E93";
-        const percentage = quotaStatus.used / quotaStatus.limit;
-        if (percentage > 0.9) return "#FF3B30";
-        if (percentage > 0.7) return "#FF9500";
-        return "#34C759";
     };
 
     return (
@@ -607,62 +566,31 @@ export default function SettingsScreen(): ReactElement {
                     </View>
 
                     <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Image Storage</Text>
-                        <Text style={styles.sectionDescription}>
-                            Manage storage used by image attachments
-                        </Text>
+                        <Text style={styles.sectionTitle}>Storage</Text>
 
-                        {isLoadingStorage ? (
-                            <ActivityIndicator style={styles.loading} />
-                        ) : storageUsage && quotaStatus ? (
+                        {syncState === "cloud-enabled" && (
                             <View style={styles.storageContainer}>
-                                <View style={styles.storageRow}>
-                                    <Text style={styles.storageLabel}>
-                                        Local Image Storage
-                                    </Text>
-                                    <Text style={styles.storageValue}>
-                                        {formatBytes(storageUsage.attachments)}{" "}
-                                        / {formatBytes(LOCAL_IMAGE_QUOTA)}
-                                    </Text>
-                                </View>
-                                <View style={styles.storageBar}>
-                                    <View
-                                        style={[
-                                            styles.storageBarFill,
-                                            {
-                                                width: `${Math.min(100, (quotaStatus.used / quotaStatus.limit) * 100)}%`,
-                                                backgroundColor:
-                                                    getQuotaBarColor(),
-                                            },
-                                        ]}
-                                    />
-                                </View>
-
-                                <View style={styles.statsRow}>
-                                    <View style={styles.statCard}>
-                                        <Text style={styles.statValue}>
-                                            {formatBytes(
-                                                storageUsage.attachments,
-                                            )}
-                                        </Text>
-                                        <Text style={styles.statLabel}>
-                                            Images
-                                        </Text>
-                                    </View>
-                                    <View style={styles.statCard}>
-                                        <Text style={styles.statValue}>
-                                            {storageUsage.sessions}
-                                        </Text>
-                                        <Text style={styles.statLabel}>
-                                            Conversations
-                                        </Text>
-                                    </View>
-                                </View>
+                                <Text style={styles.storageInfoText}>
+                                    Your attachments are stored in the cloud and
+                                    sync across devices.
+                                </Text>
+                                <Text style={styles.storageComingSoon}>
+                                    Cloud storage management coming soon.
+                                </Text>
                             </View>
-                        ) : (
-                            <Text style={styles.errorText}>
-                                Unable to load storage information
-                            </Text>
+                        )}
+
+                        {syncState !== "cloud-enabled" && (
+                            <View style={styles.storageContainer}>
+                                <Text style={styles.storageInfoText}>
+                                    Your chats and attachments are stored only
+                                    on this device.
+                                </Text>
+                                <Text style={styles.storageInfoSubtext}>
+                                    Enable cloud sync to access your data across
+                                    devices.
+                                </Text>
+                            </View>
                         )}
                     </View>
 
@@ -1148,5 +1076,19 @@ const styles = StyleSheet.create({
     keybindingDesc: {
         fontSize: 14,
         color: "#666",
+    },
+    storageInfoText: {
+        fontSize: 14,
+        color: "#333",
+        marginBottom: 8,
+    },
+    storageComingSoon: {
+        fontSize: 13,
+        color: "#888",
+        fontStyle: "italic",
+    },
+    storageInfoSubtext: {
+        fontSize: 13,
+        color: "#888",
     },
 });
