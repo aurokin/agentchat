@@ -91,7 +91,7 @@ export default function SettingsScreen(): ReactElement {
     const handleSignOut = async () => {
         Alert.alert(
             "Sign Out",
-            "Are you sure you want to sign out? Your local data will be preserved.",
+            "Are you sure you want to sign out? Your local data will be preserved. Cloud data will not be deleted.",
             [
                 { text: "Cancel", style: "cancel" },
                 {
@@ -99,10 +99,12 @@ export default function SettingsScreen(): ReactElement {
                     style: "destructive",
                     onPress: async () => {
                         await signOut();
-                        await setSyncState("local-only");
+                        if (syncState === "cloud-enabled") {
+                            await setSyncState("cloud-disabled");
+                        }
                         Alert.alert(
                             "Signed Out",
-                            "You have been signed out successfully.",
+                            "You have been signed out successfully. Cloud sync is disabled but your cloud data is preserved.",
                         );
                     },
                 },
