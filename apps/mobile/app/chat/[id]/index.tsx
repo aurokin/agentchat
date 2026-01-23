@@ -21,6 +21,10 @@ import type { Message } from "@shared/core/types";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Markdown from "react-native-markdown-display";
 
+const BrainIcon = ({ size }: { size: number }) => (
+    <Text style={{ fontSize: size, lineHeight: size }}>🧠</Text>
+);
+
 export default function ChatScreen(): ReactElement {
     const params = useLocalSearchParams();
     const router = useRouter();
@@ -40,6 +44,9 @@ export default function ChatScreen(): ReactElement {
 
     const flatListRef = useRef<FlatList<Message>>(null);
     const [replyText, setReplyText] = useState("");
+    const [expandedThinking, setExpandedThinking] = useState<
+        Record<string, boolean>
+    >({});
 
     useEffect(() => {
         if (chatId) {
@@ -158,6 +165,13 @@ export default function ChatScreen(): ReactElement {
         router.replace("/");
     };
 
+    const toggleThinking = (messageId: string) => {
+        setExpandedThinking((prev) => ({
+            ...prev,
+            [messageId]: !prev[messageId],
+        }));
+    };
+
     const chatMessages = messages[chatId] || [];
 
     const getMarkdownStyle = (role: string) => {
@@ -245,9 +259,25 @@ export default function ChatScreen(): ReactElement {
                 item.attachmentIds.length > 0 &&
                 renderAttachments(item.attachmentIds)}
             {item.thinking && (
-                <View style={styles.thinkingContainer}>
-                    <Text style={styles.thinkingLabel}>Thinking:</Text>
-                    <Text style={styles.thinkingText}>{item.thinking}</Text>
+                <View style={styles.thinkingPanel}>
+                    <TouchableOpacity
+                        style={styles.thinkingHeader}
+                        onPress={() => toggleThinking(item.id)}
+                        activeOpacity={0.7}
+                    >
+                        <Text style={styles.thinkingIcon}>
+                            {expandedThinking[item.id] ? "▼" : "▶"}
+                        </Text>
+                        <BrainIcon size={14} />
+                        <Text style={styles.thinkingLabel}>Reasoning</Text>
+                    </TouchableOpacity>
+                    {expandedThinking[item.id] && (
+                        <View style={styles.thinkingContent}>
+                            <Text style={styles.thinkingText}>
+                                {item.thinking}
+                            </Text>
+                        </View>
+                    )}
                 </View>
             )}
         </View>
@@ -390,22 +420,44 @@ const styles = StyleSheet.create({
     assistantMessageText: {
         color: "#000",
     },
-    thinkingContainer: {
+    thinkingPanel: {
         marginTop: 8,
-        paddingTop: 8,
-        borderTopWidth: 1,
-        borderTopColor: "rgba(0,0,0,0.1)",
+        borderWidth: 1,
+        borderColor: "rgba(255, 149, 0, 0.3)",
+        backgroundColor: "rgba(255, 149, 0, 0.1)",
+        borderRadius: 8,
+        overflow: "hidden",
+    },
+    thinkingHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        backgroundColor: "rgba(255, 149, 0, 0.05)",
+    },
+    thinkingIcon: {
+        fontSize: 10,
+        color: "#FF9500",
+        marginRight: 6,
+        width: 12,
     },
     thinkingLabel: {
         fontSize: 12,
         fontWeight: "600",
-        color: "#666",
-        marginBottom: 4,
+        color: "#FF9500",
+        textTransform: "uppercase" as const,
+        letterSpacing: 0.5,
+    },
+    thinkingContent: {
+        paddingHorizontal: 12,
+        paddingBottom: 12,
+        borderTopWidth: 1,
+        borderTopColor: "rgba(255, 149, 0, 0.2)",
     },
     thinkingText: {
         fontSize: 12,
-        color: "#888",
-        fontStyle: "italic",
+        color: "#666",
+        lineHeight: 18,
     },
     inputContainer: {
         borderTopWidth: 1,
