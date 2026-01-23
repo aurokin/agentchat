@@ -2,24 +2,29 @@ import React, { useEffect, useState, useRef, type ReactElement } from "react";
 import {
     View,
     Text,
-    TextInput,
     FlatList,
     TouchableOpacity,
     StyleSheet,
-    KeyboardAvoidingView,
-    Platform,
     ActivityIndicator,
     Image,
     Dimensions,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useChatContext } from "../../../src/contexts/ChatContext";
+import { useModelContext } from "../../../src/contexts/ModelContext";
+import { useSkillsContext } from "../../../src/contexts/SkillsContext";
 import { getApiKey } from "../../../src/lib/storage";
 import { getAttachment } from "../../../src/lib/db";
 import { sendMessage } from "@shared/core/openrouter";
-import type { Message } from "@shared/core/types";
+import {
+    modelSupportsReasoning,
+    modelSupportsSearch,
+} from "@shared/core/models";
+import type { Message, ThinkingLevel, SearchLevel } from "@shared/core/types";
+import type { Skill } from "@shared/core/skills";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Markdown from "react-native-markdown-display";
+import { MessageInput } from "../../../src/components/chat/MessageInput";
 
 const BrainIcon = ({ size }: { size: number }) => (
     <Text style={{ fontSize: size, lineHeight: size }}>🧠</Text>
@@ -34,9 +39,15 @@ export default function ChatScreen(): ReactElement {
         messages,
         selectChat,
         addMessage,
-        updateMessage,
         deleteChat,
+        updateChat,
     } = useChatContext();
+    const {
+        models,
+        selectedModel,
+        selectModel: setSelectedModel,
+    } = useModelContext();
+    const { skills, selectedSkill, setSelectedSkill } = useSkillsContext();
 
     const [inputText, setInputText] = useState("");
     const [isLoading, setIsLoading] = useState(false);
@@ -70,18 +81,51 @@ export default function ChatScreen(): ReactElement {
         }
     }, [messages, chatId]);
 
+    const currentModel = models.find((m) => m.id === currentChat?.modelId);
+    const reasoningSupported = modelSupportsReasoning(currentModel);
+    const searchSupported = modelSupportsSearch(currentModel);
+
+    const handleModelChange = async (modelId: string) => {
+        if (!currentChat) return;
+        await setSelectedModel(modelId);
+        const updatedChat = { ...currentChat, modelId };
+        await updateChat(updatedChat);
+    };
+
+    const handleThinkingChange = async (thinking: ThinkingLevel) => {
+        if (!currentChat) return;
+        const updatedChat = { ...currentChat, thinking };
+        await updateChat(updatedChat);
+    };
+
+    const handleSearchChange = async (searchLevel: SearchLevel) => {
+        if (!currentChat) return;
+        const updatedChat = { ...currentChat, searchLevel };
+        await updateChat(updatedChat);
+    };
+
     const handleSend = async () => {
         if (!inputText.trim() || isLoading || !currentChat) return;
 
         const userMessageText = inputText.trim();
         setInputText("");
 
+        const skillForMessage = selectedSkill;
+        const contextContent = skillForMessage
+            ? `${skillForMessage.prompt}\n\nUser: ${userMessageText}`
+            : userMessageText;
+
         const userMessage = await addMessage({
             sessionId: chatId,
             role: "user",
             content: userMessageText,
-            contextContent: userMessageText,
+            contextContent: contextContent,
+            skill: skillForMessage,
         });
+
+        if (skillForMessage) {
+            setSelectedSkill(null);
+        }
 
         setIsLoading(true);
 
@@ -102,7 +146,7 @@ export default function ChatScreen(): ReactElement {
             const chatMessages = messages[chatId] || [];
             const openRouterMessages = chatMessages.map((msg: Message) => ({
                 role: msg.role as "user" | "assistant" | "system",
-                content: msg.content,
+                content: msg.contextContent,
             }));
 
             let assistantContent = "";
@@ -112,7 +156,7 @@ export default function ChatScreen(): ReactElement {
                 apiKey,
                 [
                     ...openRouterMessages,
-                    { role: "user", content: userMessageText },
+                    { role: "user", content: contextContent },
                 ],
                 {
                     id: currentChat.id,
@@ -131,6 +175,13 @@ export default function ChatScreen(): ReactElement {
                 },
             );
 
+            const clonedSkill = skillForMessage
+                ? {
+                      ...skillForMessage,
+                      createdAt: Date.now(),
+                  }
+                : null;
+
             await addMessage({
                 sessionId: chatId,
                 role: "assistant",
@@ -144,6 +195,7 @@ export default function ChatScreen(): ReactElement {
                     "",
                 thinking: assistantThinking || undefined,
                 modelId: response.model,
+                skill: clonedSkill,
             });
         } catch (error) {
             const errorMessage =
@@ -243,6 +295,18 @@ export default function ChatScreen(): ReactElement {
         );
     };
 
+    const renderSkillInfo = (skill: Skill) => (
+        <View style={styles.skillPanel}>
+            <View style={styles.skillHeader}>
+                <Text style={styles.skillIcon}>✨</Text>
+                <Text style={styles.skillName}>{skill.name}</Text>
+            </View>
+            {skill.description && (
+                <Text style={styles.skillDescription}>{skill.description}</Text>
+            )}
+        </View>
+    );
+
     const renderMessage = ({ item }: { item: Message }) => (
         <View
             style={[
@@ -252,6 +316,7 @@ export default function ChatScreen(): ReactElement {
                     : styles.assistantMessage,
             ]}
         >
+            {item.skill && item.role === "user" && renderSkillInfo(item.skill)}
             <Markdown style={getMarkdownStyle(item.role)}>
                 {item.content}
             </Markdown>
@@ -330,38 +395,25 @@ export default function ChatScreen(): ReactElement {
                 }
             />
 
-            <KeyboardAvoidingView
-                behavior={Platform.OS === "ios" ? "padding" : "height"}
-                keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
-                style={styles.inputContainer}
-            >
-                <View style={styles.inputWrapper}>
-                    <TextInput
-                        style={styles.textInput}
-                        value={inputText}
-                        onChangeText={setInputText}
-                        placeholder="Type a message..."
-                        multiline
-                        maxLength={10000}
-                    />
-                    <TouchableOpacity
-                        style={[
-                            styles.sendButton,
-                            isLoading || !inputText.trim()
-                                ? styles.sendButtonDisabled
-                                : {},
-                        ]}
-                        onPress={handleSend}
-                        disabled={isLoading || !inputText.trim()}
-                    >
-                        {isLoading ? (
-                            <ActivityIndicator color="#fff" size="small" />
-                        ) : (
-                            <Text style={styles.sendButtonText}>Send</Text>
-                        )}
-                    </TouchableOpacity>
-                </View>
-            </KeyboardAvoidingView>
+            <MessageInput
+                inputText={inputText}
+                onInputChange={setInputText}
+                onSend={handleSend}
+                isLoading={isLoading}
+                disabled={!apiKey}
+                models={models}
+                selectedModelId={currentChat.modelId}
+                onModelChange={handleModelChange}
+                reasoningSupported={reasoningSupported}
+                thinkingLevel={currentChat.thinking}
+                onThinkingChange={handleThinkingChange}
+                searchSupported={searchSupported}
+                searchLevel={currentChat.searchLevel}
+                onSearchChange={handleSearchChange}
+                skills={skills}
+                selectedSkill={selectedSkill}
+                onSkillSelect={setSelectedSkill}
+            />
         </SafeAreaView>
     );
 }
@@ -459,42 +511,31 @@ const styles = StyleSheet.create({
         color: "#666",
         lineHeight: 18,
     },
-    inputContainer: {
-        borderTopWidth: 1,
-        borderTopColor: "#eee",
-        backgroundColor: "#fff",
+    skillPanel: {
+        marginBottom: 8,
+        padding: 8,
+        backgroundColor: "rgba(0, 122, 255, 0.1)",
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: "rgba(0, 122, 255, 0.2)",
     },
-    inputWrapper: {
+    skillHeader: {
         flexDirection: "row",
         alignItems: "center",
-        paddingHorizontal: 12,
-        paddingVertical: 8,
+        marginBottom: 4,
     },
-    textInput: {
-        flex: 1,
-        maxHeight: 120,
-        minHeight: 44,
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        borderRadius: 22,
-        backgroundColor: "#f0f0f0",
-        fontSize: 16,
-        marginRight: 8,
+    skillIcon: {
+        fontSize: 12,
+        marginRight: 4,
     },
-    sendButton: {
-        backgroundColor: "#007AFF",
-        paddingHorizontal: 20,
-        paddingVertical: 12,
-        borderRadius: 22,
-        justifyContent: "center",
-    },
-    sendButtonDisabled: {
-        backgroundColor: "#ccc",
-    },
-    sendButtonText: {
-        color: "#fff",
-        fontSize: 16,
+    skillName: {
+        fontSize: 12,
         fontWeight: "600",
+        color: "#007AFF",
+    },
+    skillDescription: {
+        fontSize: 11,
+        color: "#666",
     },
     attachmentsContainer: {
         marginTop: 8,
