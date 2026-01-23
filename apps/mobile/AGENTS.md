@@ -588,3 +588,80 @@ For clipboard images, use `createAttachmentFromUri()` which:
 - iOS typically stores copied images as file:// URIs
 - Android may vary depending on the source app
 - Always wrap clipboard operations in try-catch for error handling
+
+## Image Resizing and Compression
+
+The mobile app uses `expo-image-manipulator` to resize and compress images before storage.
+
+### Required Package
+
+Add to `package.json`:
+
+```json
+"expo-image-manipulator": "~13.0.6"
+```
+
+### Image Processing Module
+
+Use `lib/storage/image-processing.ts` for image processing:
+
+```typescript
+import { processImage, getMimeTypeFromUri } from "@/lib/storage";
+
+const result = await processImage(uri, "image/jpeg");
+
+// Result contains:
+- result.uri: Processed image file URI
+- result.width: New width after resizing
+- result.height: New height after resizing
+- result.size: File size in bytes (compressed)
+- result.base64Data: Base64-encoded data for storage
+```
+
+### Processing Configuration
+
+- **Max dimension**: 1920px (larger images are scaled down maintaining aspect ratio)
+- **Compression quality**: 0.8 (80%)
+- **Output format**: JPEG for most images, PNG for transparency
+
+### Attachment Picker Integration
+
+The `AttachmentPicker` component automatically processes images:
+
+```typescript
+import { processImage, getMimeTypeFromUri } from "../../lib/storage";
+
+async function createAttachmentFromAsset(
+    asset: ImagePicker.ImagePickerAsset,
+): Promise<Attachment> {
+    const uri = asset.uri;
+    const mimeType = asset.mimeType ?? getMimeTypeFromUri(uri);
+
+    const processed = await processImage(uri, mimeType);
+
+    return {
+        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        messageId: "",
+        type: "image",
+        mimeType: processed.uri.endsWith(".png") ? "image/png" : "image/jpeg",
+        data: `data:image/jpeg;base64,${processed.base64Data}`,
+        width: processed.width,
+        height: processed.height,
+        size: processed.size,
+        createdAt: Date.now(),
+    };
+}
+```
+
+### Benefits
+
+- Smaller file sizes for faster uploads and less storage usage
+- Consistent image dimensions for better memory management
+- Reduced bandwidth for cloud sync operations
+- Prevents very large images from causing performance issues
+
+### Related Files
+
+- Image processing: `src/lib/storage/image-processing.ts`
+- Attachment picker: `src/components/chat/AttachmentPicker.tsx`
+- Storage exports: `src/lib/storage/index.ts`

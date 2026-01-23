@@ -26,3 +26,9 @@ export {
     clearAllCredentials,
 } from "./credential-storage";
 export { getSyncState, setSyncState, clearSyncState } from "./sync-storage";
+export {
+    processImage,
+    isValidImageMimeType,
+    getMimeTypeFromUri,
+    type ImageProcessingResult,
+} from "./image-processing";
