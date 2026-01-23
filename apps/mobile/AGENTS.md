@@ -25,6 +25,93 @@ The mobile app uses `expo-sqlite` with `better-sqlite3` for offline-first storag
 - Use `INTEGER` for timestamps (Unix epoch milliseconds)
 - Use `FOREIGN KEY ... ON DELETE CASCADE` for message/attachment cleanup
 
+## File Storage (Attachments)
+
+Image attachments are stored as files in the app's document directory using `expo-file-system`.
+
+### File Storage Location
+
+- Directory: `${FileSystem.documentDirectory}attachments/`
+- File naming: `{attachmentId}.{mimeTypeExtension}` (e.g., `abc123.png`)
+- Files are stored with their file URIs referenced in SQLite
+
+### Storage Architecture
+
+1. **SQLite Metadata**: Attachments table stores file URI, dimensions, size, and metadata
+2. **File System**: Actual image blobs stored in `attachments/` directory
+3. **Pending Attachments**: Temporary base64 data during image selection before save
+
+### Attachment Storage Module
+
+Use `lib/storage/attachment-storage.ts` for attachment operations:
+
+```typescript
+import {
+    createPendingAttachment,
+    savePendingAttachment,
+    saveAttachments,
+    getAttachmentDataUri,
+    deleteAttachmentWithFile,
+    cleanupAttachmentOrphanedFiles,
+} from "@/lib/storage";
+
+// Create pending attachment from image picker result
+const pending = createPendingAttachment({
+    messageId,
+    base64Data,
+    mimeType: "image/png",
+    width: 1024,
+    height: 768,
+});
+
+// Save to file system and SQLite
+const attachment = await savePendingAttachment(pending, messageId);
+
+// Get data URI for display
+const dataUri = await getAttachmentDataUri(attachment);
+
+// Delete both file and database record
+await deleteAttachmentWithFile(attachmentId);
+
+// Clean up orphaned files not referenced in database
+await cleanupAttachmentOrphanedFiles();
+```
+
+### File Storage API
+
+Use `lib/storage/file-storage.ts` for low-level file operations:
+
+```typescript
+import * as fileStorage from "@/lib/storage";
+
+// Save base64 data to file
+const uri = await fileStorage.saveFile(base64Data, {
+    id: attachmentId,
+    mimeType: "image/png",
+    width: 1024,
+    height: 768,
+});
+
+// Read file back as base64
+const data = await fileStorage.readFile(uri);
+
+// Delete file
+await fileStorage.deleteFile(uri);
+
+// Calculate storage usage
+const size = await fileStorage.calculateAttachmentsDirSize();
+
+// Cleanup orphaned files
+const freedBytes = await fileStorage.cleanupOrphanedFiles(validUris);
+```
+
+### Important Notes
+
+- Always use `expo-file-system/legacy` imports for the legacy API (documentDirectory, EncodingType, etc.)
+- The legacy API exports: `documentDirectory`, `cacheDirectory`, `EncodingType`, `getInfoAsync`, `makeDirectoryAsync`, `readAsStringAsync`, `writeAsStringAsync`, `deleteAsync`, `readDirectoryAsync`
+- File URIs are stored in the `data` field of the Attachment type (which now contains file:// URIs)
+- When deleting attachments, delete both the database record AND the file
+
 ## Database Location
 
 - File: `routerchat.db` in app's document directory
@@ -61,6 +148,8 @@ Required packages in `package.json`:
 
 - `expo-sqlite`: SQLite database access
 - `better-sqlite3`: SQLite native bindings
+- `expo-file-system`: File system access for attachments
+- `uuid`: ID generation for attachments
 
 ## Testing
 
@@ -71,4 +160,6 @@ Run typecheck: `bun run typecheck`
 - Schema definition: `src/lib/db/schema.ts`
 - Database initialization: `src/lib/db/database.ts`
 - CRUD operations: `src/lib/db/operations.ts`
-- Exports: `src/lib/db/index.ts`
+- File storage: `src/lib/storage/file-storage.ts`
+- Attachment storage: `src/lib/storage/attachment-storage.ts`
+- Storage exports: `src/lib/storage/index.ts`
