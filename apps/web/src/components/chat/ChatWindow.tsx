@@ -23,8 +23,8 @@ import {
     type Attachment,
     type ImageMimeType,
     type ChatSession,
-    type Skill,
 } from "@/lib/types";
+import { type Skill, getSkillSelectionUpdate } from "@shared/core/skills";
 import * as storage from "@/lib/storage";
 import { generateUUID } from "@/lib/utils";
 import { Hexagon, Sparkles, AlertCircle, RefreshCw } from "lucide-react";
@@ -99,39 +99,6 @@ export function getChatTitleUpdate(
 
     const title = content.slice(0, 50) + (content.length > 50 ? "..." : "");
     return { ...chat, title };
-}
-
-export function getSkillSelectionUpdate({
-    messageCount,
-    defaultSkill,
-    selectedSkill,
-    selectedSkillMode,
-}: {
-    messageCount: number;
-    defaultSkill: Skill | null;
-    selectedSkill: Skill | null;
-    selectedSkillMode: "auto" | "manual";
-}): Skill | null | undefined {
-    if (messageCount > 0) {
-        if (selectedSkillMode === "auto" && selectedSkill) {
-            return null;
-        }
-        return undefined;
-    }
-
-    if (selectedSkillMode === "manual") {
-        return undefined;
-    }
-
-    if (defaultSkill && selectedSkill?.id !== defaultSkill.id) {
-        return defaultSkill;
-    }
-
-    if (!defaultSkill && selectedSkill) {
-        return null;
-    }
-
-    return undefined;
 }
 
 export function ChatWindow() {

@@ -1,3 +1,5 @@
+import type { Skill } from "@shared/core/skills";
+
 export interface Message {
     id: string;
     sessionId: string;
@@ -81,13 +83,11 @@ export function modelSupportsVision(
     );
 }
 
-export interface Skill {
-    id: string;
-    name: string;
-    description: string;
-    prompt: string;
-    createdAt: number;
-}
+export type {
+    Skill,
+    SkillSettings,
+    SkillSettingsUpdate,
+} from "@shared/core/skills";
 
 // Image attachment types
 export type ImageMimeType =
