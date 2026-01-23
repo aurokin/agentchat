@@ -29,6 +29,8 @@
 - TypeScript config extends `expo/tsconfig.base`
 - EAS config for dev builds is in `eas.json`
 - Bundle ID: `com.routerchat.app` (configured in `app.json`)
+- **Monorepo paths**: Use `@shared/*` alias in TypeScript to import from `packages/shared/src/*`
+- **Metro config**: Configure `metro.config.js` with `watchFolders` pointing to workspace root for monorepo support
 
 ## Required Parity Rules
 
