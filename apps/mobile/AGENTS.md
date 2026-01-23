@@ -348,7 +348,102 @@ When Convex is unavailable:
 
 Image attachments stored in FileSystem can be rendered in chat messages using React Native's `Image` component.
 
-### Attachment Rendering Pattern
+### Thumbnail Rendering with Metadata (Recommended)
+
+The recommended pattern shows smaller thumbnails with metadata (dimensions and file size):
+
+```typescript
+import { Image } from "react-native";
+import { getAttachment } from "../../../src/lib/db";
+
+const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+const renderAttachmentThumbnail = (attachment: Attachment) => {
+    const aspectRatio =
+        attachment.width && attachment.height
+            ? attachment.width / attachment.height
+            : 1;
+    const thumbnailSize = 80;
+    const thumbnailWidth = thumbnailSize;
+    const thumbnailHeight = thumbnailSize / aspectRatio;
+
+    return (
+        <View key={attachment.id} style={styles.attachmentThumbnailContainer}>
+            <Image
+                source={{ uri: attachment.data }}
+                style={[
+                    styles.attachmentThumbnail,
+                    { width: thumbnailWidth, height: thumbnailHeight },
+                ]}
+                resizeMode="cover"
+            />
+            <View style={styles.attachmentMetadata}>
+                <Text style={styles.attachmentDimension}>
+                    {attachment.width} × {attachment.height}
+                </Text>
+                <Text style={styles.attachmentSize}>
+                    {formatFileSize(attachment.size)}
+                </Text>
+            </View>
+        </View>
+    );
+};
+
+const renderAttachments = (attachmentIds: string[]) => {
+    if (!attachmentIds || attachmentIds.length === 0) return null;
+
+    const attachments = attachmentIds
+        .map((id) => getAttachment(id))
+        .filter((a): a is Attachment => a !== undefined);
+
+    if (attachments.length === 0) return null;
+
+    return (
+        <View style={styles.attachmentsContainer}>
+            {attachments.map(renderAttachmentThumbnail)}
+        </View>
+    );
+};
+```
+
+### Required Styles for Thumbnails
+
+```typescript
+attachmentsContainer: {
+    marginTop: 8,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+},
+attachmentThumbnailContainer: {
+    alignItems: "flex-start",
+    gap: 4,
+},
+attachmentThumbnail: {
+    borderRadius: 8,
+    backgroundColor: "rgba(0,0,0,0.05)",
+},
+attachmentMetadata: {
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+},
+attachmentDimension: {
+    fontSize: 10,
+    color: "#666",
+},
+attachmentSize: {
+    fontSize: 10,
+    color: "#999",
+},
+```
+
+### Full-Size Image Rendering (Legacy)
+
+For full-size image display (e.g., in image gallery), use this pattern:
 
 ```typescript
 import { Image, Dimensions } from "react-native";
@@ -356,7 +451,7 @@ import { getAttachment } from "../../../src/lib/db";
 
 const screenWidth = Dimensions.get("window").width;
 
-const renderAttachments = (attachmentIds: string[]) => {
+const renderFullSizeAttachments = (attachmentIds: string[]) => {
     if (!attachmentIds || attachmentIds.length === 0) return null;
 
     return (
@@ -398,23 +493,11 @@ const renderAttachments = (attachmentIds: string[]) => {
 ### Key Points
 
 - Use synchronous `getAttachment` from `lib/db` operations (not the async version in storage)
-- Calculate aspect ratio to preserve image dimensions
-- Limit max height to 300px for consistent chat message sizing
-- Use `resizeMode="contain"` to prevent image distortion
+- For thumbnails: Use 80px base size with `resizeMode="cover"` for consistent grid display
+- For full-size: Calculate aspect ratio to preserve image dimensions with max height of 300px
+- Use `resizeMode="contain"` to prevent image distortion for full-size images
+- Metadata (dimensions and size) helps users confirm attachments at a glance
 - Attachments render below message content and above thinking sections
-
-### Required Styles
-
-```typescript
-attachmentsContainer: {
-    marginTop: 8,
-    gap: 8,
-},
-attachmentImage: {
-    borderRadius: 8,
-    backgroundColor: "rgba(0,0,0,0.05)",
-},
-```
 
 ## Camera and Library Image Picker
 
