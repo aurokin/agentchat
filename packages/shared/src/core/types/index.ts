@@ -15,7 +15,7 @@ export interface Message {
     sessionId: string;
     role: "user" | "assistant" | "system";
     content: string;
-    contextContent?: string;
+    contextContent: string;
     thinking?: string;
     skill?: Skill | null;
     modelId?: string;
