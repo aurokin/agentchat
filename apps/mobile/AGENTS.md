@@ -343,3 +343,75 @@ When Convex is unavailable:
 - All features work without cloud sync
 - UI indicates cloud sync is not available
 - No errors thrown for cloud operations
+
+## Rendering Attachments in Chat Views
+
+Image attachments stored in FileSystem can be rendered in chat messages using React Native's `Image` component.
+
+### Attachment Rendering Pattern
+
+```typescript
+import { Image, Dimensions } from "react-native";
+import { getAttachment } from "../../../src/lib/db";
+
+const screenWidth = Dimensions.get("window").width;
+
+const renderAttachments = (attachmentIds: string[]) => {
+    if (!attachmentIds || attachmentIds.length === 0) return null;
+
+    return (
+        <View style={styles.attachmentsContainer}>
+            {attachmentIds.map((attachmentId) => {
+                const attachment = getAttachment(attachmentId);
+                if (!attachment) return null;
+
+                const aspectRatio = attachment.width && attachment.height
+                    ? attachment.width / attachment.height
+                    : 1;
+                const maxWidth = screenWidth - 80;
+                const maxHeight = 300;
+                let imageWidth = maxWidth;
+                let imageHeight = maxWidth / aspectRatio;
+
+                if (imageHeight > maxHeight) {
+                    imageHeight = maxHeight;
+                    imageWidth = maxHeight * aspectRatio;
+                }
+
+                return (
+                    <Image
+                        key={attachment.id}
+                        source={{ uri: attachment.data }}
+                        style={[
+                            styles.attachmentImage,
+                            { width: imageWidth, height: imageHeight },
+                        ]}
+                        resizeMode="contain"
+                    />
+                );
+            })}
+        </View>
+    );
+};
+```
+
+### Key Points
+
+- Use synchronous `getAttachment` from `lib/db` operations (not the async version in storage)
+- Calculate aspect ratio to preserve image dimensions
+- Limit max height to 300px for consistent chat message sizing
+- Use `resizeMode="contain"` to prevent image distortion
+- Attachments render below message content and above thinking sections
+
+### Required Styles
+
+```typescript
+attachmentsContainer: {
+    marginTop: 8,
+    gap: 8,
+},
+attachmentImage: {
+    borderRadius: 8,
+    backgroundColor: "rgba(0,0,0,0.05)",
+},
+```
