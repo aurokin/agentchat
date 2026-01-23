@@ -32,3 +32,11 @@ export {
     getMimeTypeFromUri,
     type ImageProcessingResult,
 } from "./image-processing";
+export {
+    getLocalQuotaStatus,
+    getLocalQuotaUsageString,
+    checkQuotaBeforeUpload,
+    formatBytes,
+    LOCAL_IMAGE_QUOTA,
+    type QuotaStatus,
+} from "../quota";
