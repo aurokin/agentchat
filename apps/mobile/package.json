@@ -2,16 +2,16 @@
     "name": "mobile",
     "version": "1.0.0",
     "main": "index.tsx",
-  "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "android:local": "eas-cli build --profile development --platform android --local",
-    "ios:local": "eas-cli build --profile development --platform ios --local",
-    "dev-client": "expo start --dev-client",
-    "web": "expo start --web",
-    "typecheck": "tsc --noEmit"
-  },
+    "scripts": {
+        "start": "expo start",
+        "android": "expo start --android",
+        "ios": "expo start --ios",
+        "android:local": "bunx eas-cli build --profile development --platform android --local",
+        "ios:local": "bunx eas-cli build --profile development --platform ios --local",
+        "dev-client": "expo start --dev-client",
+        "web": "expo start --web",
+        "typecheck": "tsc --noEmit"
+    },
     "dependencies": {
         "@convex-dev/auth": "^0.0.90",
         "better-sqlite3": "~11.3.0",
