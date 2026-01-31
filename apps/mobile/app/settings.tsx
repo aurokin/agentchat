@@ -1,4 +1,4 @@
-import React, { useState, useEffect, type ReactElement } from "react";
+import React, { useState, useEffect, useMemo, type ReactElement } from "react";
 import {
     View,
     Text,
@@ -18,10 +18,9 @@ import {
     getApiKey,
     setApiKey,
     clearApiKey,
-    getTheme,
-    setTheme,
     type UserTheme,
 } from "../src/lib/storage";
+import { useTheme, type ThemeColors } from "../src/contexts/ThemeContext";
 import { validateApiKey } from "@shared/core/openrouter";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { useAuthContext } from "../src/lib/convex/AuthContext";
@@ -56,12 +55,13 @@ export default function SettingsScreen(): ReactElement {
         configureConvex,
         clearConvexOverride,
     } = useAuthContext();
+    const { colors, userTheme, setUserTheme } = useTheme();
+    const styles = useMemo(() => createStyles(colors), [colors]);
 
     const [apiKey, setApiKeyValue] = useState("");
     const [isLoading, setIsLoading] = useState(true);
     const [isValidating, setIsValidating] = useState(false);
     const [isValid, setIsValid] = useState<boolean | null>(null);
-    const [currentTheme, setCurrentTheme] = useState<UserTheme>("system");
     const [convexOverrideInput, setConvexOverrideInput] = useState("");
     const [convexOverrideSaved, setConvexOverrideSaved] = useState<
         string | null
@@ -75,12 +75,8 @@ export default function SettingsScreen(): ReactElement {
     useEffect(() => {
         const loadSettings = async () => {
             try {
-                const [key, theme] = await Promise.all([
-                    getApiKey(),
-                    getTheme(),
-                ]);
+                const key = await getApiKey();
                 setApiKeyValue(key || "");
-                setCurrentTheme(theme);
                 const override = getConvexUrlOverride();
                 setConvexOverrideSaved(override);
                 setConvexOverrideInput(override ?? "");
@@ -301,8 +297,7 @@ export default function SettingsScreen(): ReactElement {
     };
 
     const handleThemeChange = async (theme: UserTheme) => {
-        setCurrentTheme(theme);
-        await setTheme(theme);
+        await setUserTheme(theme);
     };
 
     const getSyncStatusColor = () => {
@@ -343,7 +338,10 @@ export default function SettingsScreen(): ReactElement {
                         <Text style={styles.sectionTitle}>Account</Text>
 
                         {isAuthLoading ? (
-                            <ActivityIndicator style={styles.loading} />
+                            <ActivityIndicator
+                                style={styles.loading}
+                                color={colors.accent}
+                            />
                         ) : isAuthenticated && user ? (
                             <View style={styles.userInfo}>
                                 {user.image && (
@@ -378,7 +376,9 @@ export default function SettingsScreen(): ReactElement {
                                 disabled={isAuthLoading}
                             >
                                 {isAuthLoading ? (
-                                    <ActivityIndicator color="#fff" />
+                                    <ActivityIndicator
+                                        color={colors.textOnAccent}
+                                    />
                                 ) : (
                                     <>
                                         <Text style={styles.googleButtonText}>
@@ -485,7 +485,10 @@ export default function SettingsScreen(): ReactElement {
                         <Text style={styles.sectionTitle}>OpenRouter API</Text>
 
                         {isLoading ? (
-                            <ActivityIndicator style={styles.loading} />
+                            <ActivityIndicator
+                                style={styles.loading}
+                                color={colors.accent}
+                            />
                         ) : (
                             <>
                                 <View style={styles.inputContainer}>
@@ -497,7 +500,7 @@ export default function SettingsScreen(): ReactElement {
                                         value={apiKey}
                                         onChangeText={setApiKeyValue}
                                         placeholder="sk-..."
-                                        placeholderTextColor="#999"
+                                        placeholderTextColor={colors.textFaint}
                                         secureTextEntry
                                         autoCapitalize="none"
                                         autoCorrect={false}
@@ -507,7 +510,10 @@ export default function SettingsScreen(): ReactElement {
                                 {apiKey.length > 0 && (
                                     <View style={styles.validationContainer}>
                                         {isValidating ? (
-                                            <ActivityIndicator size="small" />
+                                            <ActivityIndicator
+                                                size="small"
+                                                color={colors.accent}
+                                            />
                                         ) : isValid === true ? (
                                             <Text style={styles.validText}>
                                                 ✓ Valid API key
@@ -568,7 +574,7 @@ export default function SettingsScreen(): ReactElement {
                             <TouchableOpacity
                                 style={[
                                     styles.themeOption,
-                                    currentTheme === "light" &&
+                                    userTheme === "light" &&
                                         styles.themeOptionSelected,
                                 ]}
                                 onPress={() => handleThemeChange("light")}
@@ -577,7 +583,7 @@ export default function SettingsScreen(): ReactElement {
                                 <Text
                                     style={[
                                         styles.themeLabel,
-                                        currentTheme === "light" &&
+                                        userTheme === "light" &&
                                             styles.themeLabelSelected,
                                     ]}
                                 >
@@ -588,7 +594,7 @@ export default function SettingsScreen(): ReactElement {
                             <TouchableOpacity
                                 style={[
                                     styles.themeOption,
-                                    currentTheme === "dark" &&
+                                    userTheme === "dark" &&
                                         styles.themeOptionSelected,
                                 ]}
                                 onPress={() => handleThemeChange("dark")}
@@ -597,7 +603,7 @@ export default function SettingsScreen(): ReactElement {
                                 <Text
                                     style={[
                                         styles.themeLabel,
-                                        currentTheme === "dark" &&
+                                        userTheme === "dark" &&
                                             styles.themeLabelSelected,
                                     ]}
                                 >
@@ -608,7 +614,7 @@ export default function SettingsScreen(): ReactElement {
                             <TouchableOpacity
                                 style={[
                                     styles.themeOption,
-                                    currentTheme === "system" &&
+                                    userTheme === "system" &&
                                         styles.themeOptionSelected,
                                 ]}
                                 onPress={() => handleThemeChange("system")}
@@ -617,7 +623,7 @@ export default function SettingsScreen(): ReactElement {
                                 <Text
                                     style={[
                                         styles.themeLabel,
-                                        currentTheme === "system" &&
+                                        userTheme === "system" &&
                                             styles.themeLabelSelected,
                                     ]}
                                 >
@@ -736,7 +742,7 @@ export default function SettingsScreen(): ReactElement {
                                         buildConvexUrl ??
                                         "https://your-deployment.convex.cloud"
                                     }
-                                    placeholderTextColor="#999"
+                                    placeholderTextColor={colors.textFaint}
                                     autoCapitalize="none"
                                     autoCorrect={false}
                                 />
@@ -787,423 +793,428 @@ export default function SettingsScreen(): ReactElement {
     );
 }
 
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: "#fff",
-    },
-    header: {
-        flexDirection: "row",
-        alignItems: "center",
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: "#eee",
-    },
-    backButton: {
-        fontSize: 16,
-        color: "#007AFF",
-    },
-    headerTitle: {
-        flex: 1,
-        fontSize: 18,
-        fontWeight: "600",
-        textAlign: "center",
-    },
-    headerSpacer: {
-        width: 60,
-    },
-    scrollContent: {
-        flex: 1,
-    },
-    section: {
-        padding: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: "#eee",
-    },
-    sectionTitle: {
-        fontSize: 14,
-        fontWeight: "600",
-        color: "#666",
-        marginBottom: 4,
-        textTransform: "uppercase",
-    },
-    sectionDescription: {
-        fontSize: 14,
-        color: "#888",
-        marginBottom: 12,
-    },
-    settingItem: {
-        marginBottom: 8,
-    },
-    settingInfo: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-    },
-    settingLabel: {
-        fontSize: 16,
-        color: "#000",
-    },
-    settingValue: {
-        fontSize: 16,
-        color: "#666",
-    },
-    settingDescription: {
-        fontSize: 14,
-        color: "#888",
-        marginTop: 4,
-    },
-    inputContainer: {
-        marginBottom: 12,
-    },
-    inputLabel: {
-        fontSize: 14,
-        fontWeight: "500",
-        marginBottom: 8,
-        color: "#333",
-    },
-    textInput: {
-        borderWidth: 1,
-        borderColor: "#ddd",
-        borderRadius: 8,
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        fontSize: 16,
-        backgroundColor: "#f9f9f9",
-    },
-    validationContainer: {
-        marginBottom: 12,
-    },
-    validText: {
-        color: "#34C759",
-        fontSize: 14,
-    },
-    invalidText: {
-        color: "#FF3B30",
-        fontSize: 14,
-    },
-    buttonRow: {
-        flexDirection: "row",
-        gap: 12,
-    },
-    saveButton: {
-        backgroundColor: "#007AFF",
-        paddingHorizontal: 20,
-        paddingVertical: 12,
-        borderRadius: 8,
-        flex: 1,
-        alignItems: "center",
-    },
-    saveButtonText: {
-        color: "#fff",
-        fontSize: 16,
-        fontWeight: "600",
-    },
-    clearButton: {
-        backgroundColor: "#FF3B30",
-        paddingHorizontal: 20,
-        paddingVertical: 12,
-        borderRadius: 8,
-    },
-    clearButtonText: {
-        color: "#fff",
-        fontSize: 16,
-        fontWeight: "600",
-    },
-    helpText: {
-        fontSize: 14,
-        color: "#666",
-        marginTop: 12,
-    },
-    linkText: {
-        color: "#007AFF",
-        textDecorationLine: "underline",
-    },
-    loading: {
-        paddingVertical: 20,
-    },
-    appName: {
-        fontSize: 18,
-        fontWeight: "600",
-        marginBottom: 4,
-    },
-    version: {
-        fontSize: 14,
-        color: "#666",
-    },
-    userInfo: {
-        flexDirection: "row",
-        alignItems: "center",
-        marginBottom: 16,
-    },
-    userAvatar: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        marginRight: 12,
-    },
-    userDetails: {
-        flex: 1,
-    },
-    userName: {
-        fontSize: 16,
-        fontWeight: "600",
-        color: "#000",
-    },
-    userEmail: {
-        fontSize: 14,
-        color: "#666",
-        marginTop: 2,
-    },
-    notSignedIn: {
-        fontSize: 14,
-        color: "#666",
-        marginBottom: 16,
-    },
-    googleButton: {
-        backgroundColor: "#4285F4",
-        paddingHorizontal: 20,
-        paddingVertical: 12,
-        borderRadius: 8,
-        alignItems: "center",
-    },
-    googleButtonText: {
-        color: "#fff",
-        fontSize: 16,
-        fontWeight: "600",
-    },
-    cloudWarning: {
-        backgroundColor: "#FFF3CD",
-        padding: 12,
-        borderRadius: 8,
-        marginTop: 12,
-    },
-    cloudWarningText: {
-        fontSize: 14,
-        color: "#856404",
-    },
-    syncStatusCard: {
-        backgroundColor: "#f5f5f5",
-        borderRadius: 12,
-        padding: 16,
-        marginBottom: 12,
-    },
-    syncStatusHeader: {
-        flexDirection: "row",
-        alignItems: "center",
-        marginBottom: 16,
-    },
-    syncStatusIndicator: {
-        width: 12,
-        height: 12,
-        borderRadius: 6,
-        marginRight: 12,
-    },
-    syncStatusInfo: {
-        flex: 1,
-    },
-    syncStatusTitle: {
-        fontSize: 16,
-        fontWeight: "600",
-        color: "#000",
-        marginBottom: 4,
-    },
-    syncStatusDescription: {
-        fontSize: 14,
-        color: "#666",
-    },
-    enableSyncButton: {
-        backgroundColor: "#007AFF",
-        paddingHorizontal: 20,
-        paddingVertical: 12,
-        borderRadius: 8,
-        alignItems: "center",
-    },
-    enableSyncButtonText: {
-        color: "#fff",
-        fontSize: 16,
-        fontWeight: "600",
-    },
-    disableSyncButton: {
-        backgroundColor: "#FF3B30",
-        paddingHorizontal: 20,
-        paddingVertical: 12,
-        borderRadius: 8,
-        alignItems: "center",
-    },
-    disableSyncButtonText: {
-        color: "#fff",
-        fontSize: 16,
-        fontWeight: "600",
-    },
-    syncWarning: {
-        backgroundColor: "#FFF3CD",
-        padding: 12,
-        borderRadius: 8,
-    },
-    syncWarningText: {
-        fontSize: 14,
-        color: "#856404",
-    },
-    themeContainer: {
-        flexDirection: "row",
-        gap: 12,
-    },
-    themeOption: {
-        flex: 1,
-        padding: 16,
-        borderRadius: 12,
-        borderWidth: 2,
-        borderColor: "#ddd",
-        alignItems: "center",
-        backgroundColor: "#f9f9f9",
-    },
-    themeOptionSelected: {
-        borderColor: "#007AFF",
-        backgroundColor: "#e6f0ff",
-    },
-    themeIcon: {
-        fontSize: 24,
-        marginBottom: 8,
-    },
-    themeLabel: {
-        fontSize: 14,
-        fontWeight: "500",
-        color: "#333",
-    },
-    themeLabelSelected: {
-        color: "#007AFF",
-        fontWeight: "600",
-    },
-    storageContainer: {
-        marginTop: 8,
-    },
-    storageRow: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        marginBottom: 8,
-    },
-    storageLabel: {
-        fontSize: 14,
-        color: "#666",
-    },
-    storageValue: {
-        fontSize: 14,
-        fontWeight: "600",
-        color: "#000",
-    },
-    storageBar: {
-        height: 8,
-        backgroundColor: "#e0e0e0",
-        borderRadius: 4,
-        overflow: "hidden",
-        marginBottom: 16,
-    },
-    storageBarFill: {
-        height: "100%",
-        borderRadius: 4,
-    },
-    statsRow: {
-        flexDirection: "row",
-        gap: 12,
-    },
-    statCard: {
-        flex: 1,
-        padding: 12,
-        backgroundColor: "#f5f5f5",
-        borderRadius: 8,
-        alignItems: "center",
-    },
-    statValue: {
-        fontSize: 18,
-        fontWeight: "600",
-        color: "#000",
-    },
-    statLabel: {
-        fontSize: 12,
-        color: "#666",
-        marginTop: 4,
-    },
-    errorText: {
-        fontSize: 14,
-        color: "#FF3B30",
-    },
-    emptySkills: {
-        padding: 24,
-        backgroundColor: "#f5f5f5",
-        borderRadius: 8,
-        alignItems: "center",
-        borderStyle: "dashed",
-        borderWidth: 1,
-        borderColor: "#ccc",
-    },
-    emptySkillsText: {
-        fontSize: 14,
-        color: "#666",
-        marginBottom: 4,
-    },
-    emptySkillsSubtext: {
-        fontSize: 12,
-        color: "#999",
-    },
-    skillsList: {
-        gap: 8,
-    },
-    skillCard: {
-        padding: 12,
-        backgroundColor: "#f5f5f5",
-        borderRadius: 8,
-    },
-    skillName: {
-        fontSize: 16,
-        fontWeight: "500",
-        color: "#000",
-    },
-    skillDescription: {
-        fontSize: 14,
-        color: "#666",
-        marginTop: 4,
-    },
-    moreSkills: {
-        fontSize: 14,
-        color: "#007AFF",
-        textAlign: "center",
-        marginTop: 8,
-    },
-    keybindingsList: {
-        gap: 8,
-    },
-    keybindingRow: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        paddingVertical: 8,
-        borderBottomWidth: 1,
-        borderBottomColor: "#eee",
-    },
-    keybindingKey: {
-        fontSize: 14,
-        fontWeight: "600",
-        color: "#007AFF",
-        fontFamily: "monospace",
-    },
-    keybindingDesc: {
-        fontSize: 14,
-        color: "#666",
-    },
-    storageInfoText: {
-        fontSize: 14,
-        color: "#333",
-        marginBottom: 8,
-    },
-    storageComingSoon: {
-        fontSize: 13,
-        color: "#888",
-        fontStyle: "italic",
-    },
-    storageInfoSubtext: {
-        fontSize: 13,
-        color: "#888",
-    },
-});
+const createStyles = (colors: ThemeColors) =>
+    StyleSheet.create({
+        container: {
+            flex: 1,
+            backgroundColor: colors.background,
+        },
+        header: {
+            flexDirection: "row",
+            alignItems: "center",
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.border,
+            backgroundColor: colors.surface,
+        },
+        backButton: {
+            fontSize: 16,
+            color: colors.accent,
+        },
+        headerTitle: {
+            flex: 1,
+            fontSize: 18,
+            fontWeight: "600",
+            textAlign: "center",
+            color: colors.text,
+        },
+        headerSpacer: {
+            width: 60,
+        },
+        scrollContent: {
+            flex: 1,
+        },
+        section: {
+            padding: 16,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.border,
+        },
+        sectionTitle: {
+            fontSize: 14,
+            fontWeight: "600",
+            color: colors.textSubtle,
+            marginBottom: 4,
+            textTransform: "uppercase",
+        },
+        sectionDescription: {
+            fontSize: 14,
+            color: colors.textMuted,
+            marginBottom: 12,
+        },
+        settingItem: {
+            marginBottom: 8,
+        },
+        settingInfo: {
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
+        },
+        settingLabel: {
+            fontSize: 16,
+            color: colors.text,
+        },
+        settingValue: {
+            fontSize: 16,
+            color: colors.textMuted,
+        },
+        settingDescription: {
+            fontSize: 14,
+            color: colors.textMuted,
+            marginTop: 4,
+        },
+        inputContainer: {
+            marginBottom: 12,
+        },
+        inputLabel: {
+            fontSize: 14,
+            fontWeight: "500",
+            marginBottom: 8,
+            color: colors.text,
+        },
+        textInput: {
+            borderWidth: 1,
+            borderColor: colors.inputBorder,
+            borderRadius: 8,
+            paddingHorizontal: 12,
+            paddingVertical: 10,
+            fontSize: 16,
+            backgroundColor: colors.inputBackground,
+            color: colors.text,
+        },
+        validationContainer: {
+            marginBottom: 12,
+        },
+        validText: {
+            color: colors.success,
+            fontSize: 14,
+        },
+        invalidText: {
+            color: colors.danger,
+            fontSize: 14,
+        },
+        buttonRow: {
+            flexDirection: "row",
+            gap: 12,
+        },
+        saveButton: {
+            backgroundColor: colors.accent,
+            paddingHorizontal: 20,
+            paddingVertical: 12,
+            borderRadius: 8,
+            flex: 1,
+            alignItems: "center",
+        },
+        saveButtonText: {
+            color: colors.textOnAccent,
+            fontSize: 16,
+            fontWeight: "600",
+        },
+        clearButton: {
+            backgroundColor: colors.danger,
+            paddingHorizontal: 20,
+            paddingVertical: 12,
+            borderRadius: 8,
+        },
+        clearButtonText: {
+            color: colors.textOnAccent,
+            fontSize: 16,
+            fontWeight: "600",
+        },
+        helpText: {
+            fontSize: 14,
+            color: colors.textMuted,
+            marginTop: 12,
+        },
+        linkText: {
+            color: colors.link,
+            textDecorationLine: "underline",
+        },
+        loading: {
+            paddingVertical: 20,
+        },
+        appName: {
+            fontSize: 18,
+            fontWeight: "600",
+            marginBottom: 4,
+            color: colors.text,
+        },
+        version: {
+            fontSize: 14,
+            color: colors.textMuted,
+        },
+        userInfo: {
+            flexDirection: "row",
+            alignItems: "center",
+            marginBottom: 16,
+        },
+        userAvatar: {
+            width: 48,
+            height: 48,
+            borderRadius: 24,
+            marginRight: 12,
+        },
+        userDetails: {
+            flex: 1,
+        },
+        userName: {
+            fontSize: 16,
+            fontWeight: "600",
+            color: colors.text,
+        },
+        userEmail: {
+            fontSize: 14,
+            color: colors.textMuted,
+            marginTop: 2,
+        },
+        notSignedIn: {
+            fontSize: 14,
+            color: colors.textMuted,
+            marginBottom: 16,
+        },
+        googleButton: {
+            backgroundColor: "#4285F4",
+            paddingHorizontal: 20,
+            paddingVertical: 12,
+            borderRadius: 8,
+            alignItems: "center",
+        },
+        googleButtonText: {
+            color: colors.textOnAccent,
+            fontSize: 16,
+            fontWeight: "600",
+        },
+        cloudWarning: {
+            backgroundColor: colors.warningSoft,
+            padding: 12,
+            borderRadius: 8,
+            marginTop: 12,
+        },
+        cloudWarningText: {
+            fontSize: 14,
+            color: colors.warning,
+        },
+        syncStatusCard: {
+            backgroundColor: colors.surfaceMuted,
+            borderRadius: 12,
+            padding: 16,
+            marginBottom: 12,
+        },
+        syncStatusHeader: {
+            flexDirection: "row",
+            alignItems: "center",
+            marginBottom: 16,
+        },
+        syncStatusIndicator: {
+            width: 12,
+            height: 12,
+            borderRadius: 6,
+            marginRight: 12,
+        },
+        syncStatusInfo: {
+            flex: 1,
+        },
+        syncStatusTitle: {
+            fontSize: 16,
+            fontWeight: "600",
+            color: colors.text,
+            marginBottom: 4,
+        },
+        syncStatusDescription: {
+            fontSize: 14,
+            color: colors.textMuted,
+        },
+        enableSyncButton: {
+            backgroundColor: colors.accent,
+            paddingHorizontal: 20,
+            paddingVertical: 12,
+            borderRadius: 8,
+            alignItems: "center",
+        },
+        enableSyncButtonText: {
+            color: colors.textOnAccent,
+            fontSize: 16,
+            fontWeight: "600",
+        },
+        disableSyncButton: {
+            backgroundColor: colors.danger,
+            paddingHorizontal: 20,
+            paddingVertical: 12,
+            borderRadius: 8,
+            alignItems: "center",
+        },
+        disableSyncButtonText: {
+            color: colors.textOnAccent,
+            fontSize: 16,
+            fontWeight: "600",
+        },
+        syncWarning: {
+            backgroundColor: colors.warningSoft,
+            padding: 12,
+            borderRadius: 8,
+        },
+        syncWarningText: {
+            fontSize: 14,
+            color: colors.warning,
+        },
+        themeContainer: {
+            flexDirection: "row",
+            gap: 12,
+        },
+        themeOption: {
+            flex: 1,
+            padding: 16,
+            borderRadius: 12,
+            borderWidth: 2,
+            borderColor: colors.border,
+            alignItems: "center",
+            backgroundColor: colors.surfaceMuted,
+        },
+        themeOptionSelected: {
+            borderColor: colors.accent,
+            backgroundColor: colors.accentSoft,
+        },
+        themeIcon: {
+            fontSize: 24,
+            marginBottom: 8,
+        },
+        themeLabel: {
+            fontSize: 14,
+            fontWeight: "500",
+            color: colors.text,
+        },
+        themeLabelSelected: {
+            color: colors.accent,
+            fontWeight: "600",
+        },
+        storageContainer: {
+            marginTop: 8,
+        },
+        storageRow: {
+            flexDirection: "row",
+            justifyContent: "space-between",
+            marginBottom: 8,
+        },
+        storageLabel: {
+            fontSize: 14,
+            color: colors.textMuted,
+        },
+        storageValue: {
+            fontSize: 14,
+            fontWeight: "600",
+            color: colors.text,
+        },
+        storageBar: {
+            height: 8,
+            backgroundColor: colors.borderMuted,
+            borderRadius: 4,
+            overflow: "hidden",
+            marginBottom: 16,
+        },
+        storageBarFill: {
+            height: "100%",
+            borderRadius: 4,
+        },
+        statsRow: {
+            flexDirection: "row",
+            gap: 12,
+        },
+        statCard: {
+            flex: 1,
+            padding: 12,
+            backgroundColor: colors.surfaceMuted,
+            borderRadius: 8,
+            alignItems: "center",
+        },
+        statValue: {
+            fontSize: 18,
+            fontWeight: "600",
+            color: colors.text,
+        },
+        statLabel: {
+            fontSize: 12,
+            color: colors.textMuted,
+            marginTop: 4,
+        },
+        errorText: {
+            fontSize: 14,
+            color: colors.danger,
+        },
+        emptySkills: {
+            padding: 24,
+            backgroundColor: colors.surfaceMuted,
+            borderRadius: 8,
+            alignItems: "center",
+            borderStyle: "dashed",
+            borderWidth: 1,
+            borderColor: colors.border,
+        },
+        emptySkillsText: {
+            fontSize: 14,
+            color: colors.textMuted,
+            marginBottom: 4,
+        },
+        emptySkillsSubtext: {
+            fontSize: 12,
+            color: colors.textFaint,
+        },
+        skillsList: {
+            gap: 8,
+        },
+        skillCard: {
+            padding: 12,
+            backgroundColor: colors.surfaceMuted,
+            borderRadius: 8,
+        },
+        skillName: {
+            fontSize: 16,
+            fontWeight: "500",
+            color: colors.text,
+        },
+        skillDescription: {
+            fontSize: 14,
+            color: colors.textMuted,
+            marginTop: 4,
+        },
+        moreSkills: {
+            fontSize: 14,
+            color: colors.accent,
+            textAlign: "center",
+            marginTop: 8,
+        },
+        keybindingsList: {
+            gap: 8,
+        },
+        keybindingRow: {
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
+            paddingVertical: 8,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.borderMuted,
+        },
+        keybindingKey: {
+            fontSize: 14,
+            fontWeight: "600",
+            color: colors.accent,
+            fontFamily: "monospace",
+        },
+        keybindingDesc: {
+            fontSize: 14,
+            color: colors.textMuted,
+        },
+        storageInfoText: {
+            fontSize: 14,
+            color: colors.text,
+            marginBottom: 8,
+        },
+        storageComingSoon: {
+            fontSize: 13,
+            color: colors.textMuted,
+            fontStyle: "italic",
+        },
+        storageInfoSubtext: {
+            fontSize: 13,
+            color: colors.textMuted,
+        },
+    });

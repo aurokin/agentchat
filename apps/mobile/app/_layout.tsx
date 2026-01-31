@@ -1,6 +1,8 @@
 import React, { type ReactElement, useEffect, useState } from "react";
 import { Stack, useRouter } from "expo-router";
+import { StatusBar } from "react-native";
 import { AppProvider, useAppContext } from "../src/contexts/AppContext";
+import { ThemeProvider, useTheme } from "../src/contexts/ThemeContext";
 import { ChatProvider } from "../src/contexts/ChatContext";
 import { AuthProvider } from "../src/lib/convex/AuthContext";
 import { ModelProvider } from "../src/contexts/ModelContext";
@@ -35,24 +37,38 @@ function OnboardingWrapper({
     return <>{children}</>;
 }
 
+function ThemedStatusBar(): React.ReactElement {
+    const { scheme, colors } = useTheme();
+
+    return (
+        <StatusBar
+            barStyle={scheme === "dark" ? "light-content" : "dark-content"}
+            backgroundColor={colors.background}
+        />
+    );
+}
+
 export default function Layout(): ReactElement {
     return (
-        <AuthProvider>
-            <ModelProvider>
-                <SkillsProvider>
-                    <AppProvider>
-                        <ChatProvider>
-                            <OnboardingWrapper>
-                                <Stack
-                                    screenOptions={{
-                                        headerShown: false,
-                                    }}
-                                />
-                            </OnboardingWrapper>
-                        </ChatProvider>
-                    </AppProvider>
-                </SkillsProvider>
-            </ModelProvider>
-        </AuthProvider>
+        <ThemeProvider>
+            <ThemedStatusBar />
+            <AuthProvider>
+                <ModelProvider>
+                    <SkillsProvider>
+                        <AppProvider>
+                            <ChatProvider>
+                                <OnboardingWrapper>
+                                    <Stack
+                                        screenOptions={{
+                                            headerShown: false,
+                                        }}
+                                    />
+                                </OnboardingWrapper>
+                            </ChatProvider>
+                        </AppProvider>
+                    </SkillsProvider>
+                </ModelProvider>
+            </AuthProvider>
+        </ThemeProvider>
     );
 }

@@ -1,4 +1,10 @@
-import React, { useEffect, useState, useRef, type ReactElement } from "react";
+import React, {
+    useEffect,
+    useState,
+    useRef,
+    useMemo,
+    type ReactElement,
+} from "react";
 import {
     View,
     Text,
@@ -13,6 +19,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useChatContext } from "../../../src/contexts/ChatContext";
 import { useModelContext } from "../../../src/contexts/ModelContext";
 import { useSkillsContext } from "../../../src/contexts/SkillsContext";
+import { useTheme, type ThemeColors } from "../../../src/contexts/ThemeContext";
 import { getApiKey } from "../../../src/lib/storage";
 import { getAttachment, saveAttachment } from "../../../src/lib/db";
 import { sendMessage } from "@shared/core/openrouter";
@@ -54,6 +61,8 @@ export default function ChatScreen(): ReactElement {
         selectModel: setSelectedModel,
     } = useModelContext();
     const { skills, selectedSkill, setSelectedSkill } = useSkillsContext();
+    const { colors } = useTheme();
+    const styles = useMemo(() => createStyles(colors), [colors]);
 
     const [inputText, setInputText] = useState("");
     const [isLoading, setIsLoading] = useState(false);
@@ -314,31 +323,37 @@ export default function ChatScreen(): ReactElement {
     const chatMessages = messages[chatId] || [];
 
     const getMarkdownStyle = (role: string) => {
-        const baseStyle = {
+        const isUser = role === "user";
+        return {
             body: {
                 fontSize: 16,
                 lineHeight: 22,
-                color: role === "user" ? "#fff" : "#000",
+                color: isUser ? colors.textOnAccent : colors.text,
             },
             code: {
-                backgroundColor: "rgba(0,0,0,0.1)",
+                backgroundColor: isUser
+                    ? colors.codeBackgroundOnAccent
+                    : colors.codeBackground,
+                color: isUser ? colors.textOnAccent : colors.text,
                 paddingHorizontal: 4,
                 paddingVertical: 2,
                 borderRadius: 4,
-                fontFamily: role === "user" ? undefined : "monospace",
+                fontFamily: isUser ? undefined : "monospace",
             },
             codeblock: {
-                backgroundColor: "rgba(0,0,0,0.1)",
+                backgroundColor: isUser
+                    ? colors.codeBackgroundOnAccent
+                    : colors.codeBackground,
+                color: isUser ? colors.textOnAccent : colors.text,
                 padding: 12,
                 borderRadius: 8,
-                fontFamily: role === "user" ? undefined : "monospace",
+                fontFamily: isUser ? undefined : "monospace",
             },
             link: {
-                color: role === "user" ? "#8ecfff" : "#007AFF",
+                color: isUser ? colors.linkOnAccent : colors.link,
                 textDecorationLine: "underline" as const,
             },
         };
-        return baseStyle;
     };
 
     const formatFileSize = (bytes: number): string => {
@@ -455,7 +470,7 @@ export default function ChatScreen(): ReactElement {
     if (!currentChat) {
         return (
             <SafeAreaView style={styles.container}>
-                <ActivityIndicator size="large" />
+                <ActivityIndicator size="large" color={colors.accent} />
             </SafeAreaView>
         );
     }
@@ -532,153 +547,156 @@ export default function ChatScreen(): ReactElement {
     );
 }
 
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: "#fff",
-    },
-    header: {
-        flexDirection: "row",
-        alignItems: "center",
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: "#eee",
-    },
-    backButton: {
-        fontSize: 16,
-        color: "#007AFF",
-        marginRight: 12,
-    },
-    headerTitle: {
-        flex: 1,
-        fontSize: 17,
-        fontWeight: "600",
-    },
-    deleteButton: {
-        fontSize: 16,
-        color: "#FF3B30",
-    },
-    listContent: {
-        padding: 16,
-    },
-    messageContainer: {
-        maxWidth: "85%",
-        padding: 12,
-        borderRadius: 16,
-        marginBottom: 8,
-    },
-    userMessage: {
-        alignSelf: "flex-end",
-        backgroundColor: "#007AFF",
-    },
-    assistantMessage: {
-        alignSelf: "flex-start",
-        backgroundColor: "#f0f0f0",
-    },
-    messageText: {
-        fontSize: 16,
-        lineHeight: 22,
-    },
-    userMessageText: {
-        color: "#fff",
-    },
-    assistantMessageText: {
-        color: "#000",
-    },
-    thinkingPanel: {
-        marginTop: 8,
-        borderWidth: 1,
-        borderColor: "rgba(255, 149, 0, 0.3)",
-        backgroundColor: "rgba(255, 149, 0, 0.1)",
-        borderRadius: 8,
-        overflow: "hidden",
-    },
-    thinkingHeader: {
-        flexDirection: "row",
-        alignItems: "center",
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        backgroundColor: "rgba(255, 149, 0, 0.05)",
-    },
-    thinkingIcon: {
-        fontSize: 10,
-        color: "#FF9500",
-        marginRight: 6,
-        width: 12,
-    },
-    thinkingLabel: {
-        fontSize: 12,
-        fontWeight: "600",
-        color: "#FF9500",
-        textTransform: "uppercase" as const,
-        letterSpacing: 0.5,
-    },
-    thinkingContent: {
-        paddingHorizontal: 12,
-        paddingBottom: 12,
-        borderTopWidth: 1,
-        borderTopColor: "rgba(255, 149, 0, 0.2)",
-    },
-    thinkingText: {
-        fontSize: 12,
-        color: "#666",
-        lineHeight: 18,
-    },
-    skillPanel: {
-        marginBottom: 8,
-        padding: 8,
-        backgroundColor: "rgba(0, 122, 255, 0.1)",
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: "rgba(0, 122, 255, 0.2)",
-    },
-    skillHeader: {
-        flexDirection: "row",
-        alignItems: "center",
-        marginBottom: 4,
-    },
-    skillIcon: {
-        fontSize: 12,
-        marginRight: 4,
-    },
-    skillName: {
-        fontSize: 12,
-        fontWeight: "600",
-        color: "#007AFF",
-    },
-    skillDescription: {
-        fontSize: 11,
-        color: "#666",
-    },
-    attachmentsContainer: {
-        marginTop: 8,
-        flexDirection: "row",
-        flexWrap: "wrap",
-        gap: 8,
-    },
-    attachmentThumbnailContainer: {
-        alignItems: "flex-start",
-        gap: 4,
-    },
-    attachmentThumbnail: {
-        borderRadius: 8,
-        backgroundColor: "rgba(0,0,0,0.05)",
-    },
-    attachmentMetadata: {
-        paddingHorizontal: 4,
-        paddingVertical: 2,
-    },
-    attachmentDimension: {
-        fontSize: 10,
-        color: "#666",
-    },
-    attachmentSize: {
-        fontSize: 10,
-        color: "#999",
-    },
-    attachmentImage: {
-        borderRadius: 8,
-        backgroundColor: "rgba(0,0,0,0.05)",
-    },
-});
+const createStyles = (colors: ThemeColors) =>
+    StyleSheet.create({
+        container: {
+            flex: 1,
+            backgroundColor: colors.background,
+        },
+        header: {
+            flexDirection: "row",
+            alignItems: "center",
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.border,
+            backgroundColor: colors.surface,
+        },
+        backButton: {
+            fontSize: 16,
+            color: colors.accent,
+            marginRight: 12,
+        },
+        headerTitle: {
+            flex: 1,
+            fontSize: 17,
+            fontWeight: "600",
+            color: colors.text,
+        },
+        deleteButton: {
+            fontSize: 16,
+            color: colors.danger,
+        },
+        listContent: {
+            padding: 16,
+        },
+        messageContainer: {
+            maxWidth: "85%",
+            padding: 12,
+            borderRadius: 16,
+            marginBottom: 8,
+        },
+        userMessage: {
+            alignSelf: "flex-end",
+            backgroundColor: colors.accent,
+        },
+        assistantMessage: {
+            alignSelf: "flex-start",
+            backgroundColor: colors.surfaceMuted,
+        },
+        messageText: {
+            fontSize: 16,
+            lineHeight: 22,
+        },
+        userMessageText: {
+            color: colors.textOnAccent,
+        },
+        assistantMessageText: {
+            color: colors.text,
+        },
+        thinkingPanel: {
+            marginTop: 8,
+            borderWidth: 1,
+            borderColor: colors.warningBorder,
+            backgroundColor: colors.warningSoft,
+            borderRadius: 8,
+            overflow: "hidden",
+        },
+        thinkingHeader: {
+            flexDirection: "row",
+            alignItems: "center",
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            backgroundColor: colors.warningSoft,
+        },
+        thinkingIcon: {
+            fontSize: 10,
+            color: colors.warning,
+            marginRight: 6,
+            width: 12,
+        },
+        thinkingLabel: {
+            fontSize: 12,
+            fontWeight: "600",
+            color: colors.warning,
+            textTransform: "uppercase" as const,
+            letterSpacing: 0.5,
+        },
+        thinkingContent: {
+            paddingHorizontal: 12,
+            paddingBottom: 12,
+            borderTopWidth: 1,
+            borderTopColor: colors.warningBorder,
+        },
+        thinkingText: {
+            fontSize: 12,
+            color: colors.textMuted,
+            lineHeight: 18,
+        },
+        skillPanel: {
+            marginBottom: 8,
+            padding: 8,
+            backgroundColor: colors.accentSoft,
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: colors.accentBorder,
+        },
+        skillHeader: {
+            flexDirection: "row",
+            alignItems: "center",
+            marginBottom: 4,
+        },
+        skillIcon: {
+            fontSize: 12,
+            marginRight: 4,
+        },
+        skillName: {
+            fontSize: 12,
+            fontWeight: "600",
+            color: colors.accent,
+        },
+        skillDescription: {
+            fontSize: 11,
+            color: colors.textMuted,
+        },
+        attachmentsContainer: {
+            marginTop: 8,
+            flexDirection: "row",
+            flexWrap: "wrap",
+            gap: 8,
+        },
+        attachmentThumbnailContainer: {
+            alignItems: "flex-start",
+            gap: 4,
+        },
+        attachmentThumbnail: {
+            borderRadius: 8,
+            backgroundColor: colors.surfaceSubtle,
+        },
+        attachmentMetadata: {
+            paddingHorizontal: 4,
+            paddingVertical: 2,
+        },
+        attachmentDimension: {
+            fontSize: 10,
+            color: colors.textMuted,
+        },
+        attachmentSize: {
+            fontSize: 10,
+            color: colors.textSubtle,
+        },
+        attachmentImage: {
+            borderRadius: 8,
+            backgroundColor: colors.surfaceSubtle,
+        },
+    });

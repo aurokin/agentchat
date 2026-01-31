@@ -1,4 +1,10 @@
-import React, { useState, useRef, useEffect, type ReactElement } from "react";
+import React, {
+    useState,
+    useRef,
+    useEffect,
+    useMemo,
+    type ReactElement,
+} from "react";
 import {
     View,
     Text,
@@ -9,6 +15,7 @@ import {
     TextInput,
 } from "react-native";
 import type { OpenRouterModel } from "@shared/core/models";
+import { useTheme, type ThemeColors } from "../../contexts/ThemeContext";
 
 interface ModelSelectorProps {
     models: OpenRouterModel[];
@@ -26,6 +33,8 @@ export function ModelSelector({
     const [isOpen, setIsOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const selectedModel = models.find((m) => m.id === selectedModelId);
+    const { colors } = useTheme();
+    const styles = useMemo(() => createStyles(colors), [colors]);
 
     const filteredModels = searchQuery
         ? models.filter(
@@ -84,6 +93,7 @@ export function ModelSelector({
                                 placeholder="Search models..."
                                 value={searchQuery}
                                 onChangeText={setSearchQuery}
+                                placeholderTextColor={colors.textFaint}
                             />
                         </View>
 
@@ -133,79 +143,81 @@ export function ModelSelector({
     );
 }
 
-const styles = StyleSheet.create({
-    container: {
-        zIndex: 100,
-    },
-    trigger: {
-        flexDirection: "row",
-        alignItems: "center",
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        backgroundColor: "#f0f0f0",
-        borderRadius: 8,
-        minWidth: 120,
-    },
-    disabled: {
-        opacity: 0.5,
-    },
-    triggerText: {
-        fontSize: 14,
-        color: "#333",
-        flex: 1,
-    },
-    overlay: {
-        flex: 1,
-        backgroundColor: "rgba(0,0,0,0.5)",
-        justifyContent: "center",
-        alignItems: "center",
-    },
-    modal: {
-        backgroundColor: "#fff",
-        borderRadius: 12,
-        width: "85%",
-        maxHeight: "70%",
-        overflow: "hidden",
-    },
-    searchContainer: {
-        padding: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: "#eee",
-    },
-    searchInput: {
-        backgroundColor: "#f5f5f5",
-        borderRadius: 8,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        fontSize: 14,
-    },
-    list: {
-        maxHeight: 400,
-    },
-    providerHeader: {
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        backgroundColor: "#f9f9f9",
-        fontSize: 12,
-        fontWeight: "600",
-        color: "#666",
-        textTransform: "uppercase",
-    },
-    option: {
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: "#f0f0f0",
-    },
-    optionSelected: {
-        backgroundColor: "#e6f0ff",
-    },
-    optionText: {
-        fontSize: 14,
-        color: "#333",
-    },
-    optionTextSelected: {
-        color: "#007AFF",
-        fontWeight: "600",
-    },
-});
+const createStyles = (colors: ThemeColors) =>
+    StyleSheet.create({
+        container: {
+            zIndex: 100,
+        },
+        trigger: {
+            flexDirection: "row",
+            alignItems: "center",
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            backgroundColor: colors.surfaceSubtle,
+            borderRadius: 8,
+            minWidth: 120,
+        },
+        disabled: {
+            opacity: 0.5,
+        },
+        triggerText: {
+            fontSize: 14,
+            color: colors.text,
+            flex: 1,
+        },
+        overlay: {
+            flex: 1,
+            backgroundColor: colors.overlay,
+            justifyContent: "center",
+            alignItems: "center",
+        },
+        modal: {
+            backgroundColor: colors.surface,
+            borderRadius: 12,
+            width: "85%",
+            maxHeight: "70%",
+            overflow: "hidden",
+        },
+        searchContainer: {
+            padding: 12,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.border,
+        },
+        searchInput: {
+            backgroundColor: colors.inputBackground,
+            color: colors.text,
+            borderRadius: 8,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            fontSize: 14,
+        },
+        list: {
+            maxHeight: 400,
+        },
+        providerHeader: {
+            paddingHorizontal: 16,
+            paddingVertical: 8,
+            backgroundColor: colors.surfaceMuted,
+            fontSize: 12,
+            fontWeight: "600",
+            color: colors.textMuted,
+            textTransform: "uppercase",
+        },
+        option: {
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.borderMuted,
+        },
+        optionSelected: {
+            backgroundColor: colors.accentSoft,
+        },
+        optionText: {
+            fontSize: 14,
+            color: colors.text,
+        },
+        optionTextSelected: {
+            color: colors.accent,
+            fontWeight: "600",
+        },
+    });

@@ -66,7 +66,8 @@
 
 - Use Bun for scripts and installs (`bun install`, `bun dev`, `bun run <script>`)
 - Use `bunx <package>` instead of `npx <package>`
-- Run the health check before finishing: `cd apps/web && bun run health`
+- Web health check before finishing: `cd apps/web && bun run health`
+- Mobile health check before finishing: `cd apps/mobile && bun run typecheck`
 - Tests live in `__tests__` folders beside code; use `bun test`
 - The health check test output logs "Encryption is not configured" from Convex tests; this is expected.
 

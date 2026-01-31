@@ -1,4 +1,4 @@
-import React, { useState, useEffect, type ReactElement } from "react";
+import React, { useState, useEffect, useMemo, type ReactElement } from "react";
 import {
     View,
     Text,
@@ -22,6 +22,7 @@ import { SearchToggle } from "./SearchToggle";
 import { SkillSelector } from "./SkillSelector";
 import { AttachmentPicker } from "./AttachmentPicker";
 import { getLocalQuotaStatus, formatBytes } from "../../lib/storage";
+import { useTheme, type ThemeColors } from "../../contexts/ThemeContext";
 
 interface MessageInputProps {
     inputText: string;
@@ -76,6 +77,8 @@ export function MessageInput({
         used: number;
         limit: number;
     } | null>(null);
+    const { colors } = useTheme();
+    const styles = useMemo(() => createStyles(colors), [colors]);
 
     useEffect(() => {
         const loadQuota = async () => {
@@ -149,10 +152,10 @@ export function MessageInput({
                                 {
                                     width: `${Math.min(quotaStatus.percentage * 100, 100)}%`,
                                     backgroundColor: quotaStatus.isExceeded
-                                        ? "#FF3B30"
+                                        ? colors.danger
                                         : quotaStatus.isWarning80
-                                          ? "#FF9500"
-                                          : "#34C759",
+                                          ? colors.warning
+                                          : colors.success,
                                 },
                             ]}
                         />
@@ -218,6 +221,7 @@ export function MessageInput({
                             ? "Add a caption..."
                             : "Type a message..."
                     }
+                    placeholderTextColor={colors.textFaint}
                     multiline
                     maxLength={10000}
                     editable={!disabled}
@@ -232,7 +236,10 @@ export function MessageInput({
                     activeOpacity={0.7}
                 >
                     {isLoading ? (
-                        <ActivityIndicator color="#fff" size="small" />
+                        <ActivityIndicator
+                            color={colors.textOnAccent}
+                            size="small"
+                        />
                     ) : (
                         <Text style={styles.sendButtonText}>Send</Text>
                     )}
@@ -242,115 +249,118 @@ export function MessageInput({
     );
 }
 
-const styles = StyleSheet.create({
-    container: {
-        borderTopWidth: 1,
-        borderTopColor: "#eee",
-        backgroundColor: "#fff",
-    },
-    attachmentsContainer: {
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderBottomWidth: 1,
-        borderBottomColor: "#f5f5f5",
-    },
-    attachmentsList: {
-        gap: 8,
-    },
-    attachmentThumbnailContainer: {
-        position: "relative",
-        marginRight: 8,
-    },
-    attachmentThumbnail: {
-        borderRadius: 8,
-        backgroundColor: "#f0f0f0",
-    },
-    removeAttachmentButton: {
-        position: "absolute",
-        top: -6,
-        right: -6,
-        width: 20,
-        height: 20,
-        borderRadius: 10,
-        backgroundColor: "#FF3B30",
-        justifyContent: "center",
-        alignItems: "center",
-    },
-    removeAttachmentText: {
-        color: "#fff",
-        fontSize: 14,
-        fontWeight: "bold",
-        lineHeight: 18,
-    },
-    controlsRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        gap: 8,
-        borderBottomWidth: 1,
-        borderBottomColor: "#f5f5f5",
-    },
-    spacer: {
-        flex: 1,
-    },
-    inputWrapper: {
-        flexDirection: "row",
-        alignItems: "center",
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-    },
-    textInput: {
-        flex: 1,
-        maxHeight: 120,
-        minHeight: 44,
-        paddingHorizontal: 16,
-        paddingVertical: 10,
-        borderRadius: 22,
-        backgroundColor: "#f0f0f0",
-        fontSize: 16,
-        marginRight: 8,
-    },
-    sendButton: {
-        backgroundColor: "#007AFF",
-        paddingHorizontal: 20,
-        paddingVertical: 12,
-        borderRadius: 22,
-        justifyContent: "center",
-    },
-    sendButtonDisabled: {
-        backgroundColor: "#ccc",
-    },
-    sendButtonText: {
-        color: "#fff",
-        fontSize: 16,
-        fontWeight: "600",
-    },
-    quotaContainer: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        backgroundColor: "#f8f8f8",
-        borderBottomWidth: 1,
-        borderBottomColor: "#eee",
-    },
-    quotaBarBackground: {
-        height: 4,
-        backgroundColor: "#e0e0e0",
-        borderRadius: 2,
-        overflow: "hidden",
-        marginBottom: 4,
-    },
-    quotaBarFill: {
-        height: "100%",
-        borderRadius: 2,
-    },
-    quotaText: {
-        fontSize: 11,
-        color: "#666",
-        textAlign: "center",
-    },
-    quotaTextDanger: {
-        color: "#FF3B30",
-        fontWeight: "600",
-    },
-});
+const createStyles = (colors: ThemeColors) =>
+    StyleSheet.create({
+        container: {
+            borderTopWidth: 1,
+            borderTopColor: colors.border,
+            backgroundColor: colors.surface,
+        },
+        attachmentsContainer: {
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.borderMuted,
+            backgroundColor: colors.surfaceMuted,
+        },
+        attachmentsList: {
+            gap: 8,
+        },
+        attachmentThumbnailContainer: {
+            position: "relative",
+            marginRight: 8,
+        },
+        attachmentThumbnail: {
+            borderRadius: 8,
+            backgroundColor: colors.surfaceSubtle,
+        },
+        removeAttachmentButton: {
+            position: "absolute",
+            top: -6,
+            right: -6,
+            width: 20,
+            height: 20,
+            borderRadius: 10,
+            backgroundColor: colors.danger,
+            justifyContent: "center",
+            alignItems: "center",
+        },
+        removeAttachmentText: {
+            color: colors.textOnAccent,
+            fontSize: 14,
+            fontWeight: "bold",
+            lineHeight: 18,
+        },
+        controlsRow: {
+            flexDirection: "row",
+            alignItems: "center",
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            gap: 8,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.borderMuted,
+        },
+        spacer: {
+            flex: 1,
+        },
+        inputWrapper: {
+            flexDirection: "row",
+            alignItems: "center",
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+        },
+        textInput: {
+            flex: 1,
+            maxHeight: 120,
+            minHeight: 44,
+            paddingHorizontal: 16,
+            paddingVertical: 10,
+            borderRadius: 22,
+            backgroundColor: colors.inputBackground,
+            color: colors.text,
+            fontSize: 16,
+            marginRight: 8,
+        },
+        sendButton: {
+            backgroundColor: colors.accent,
+            paddingHorizontal: 20,
+            paddingVertical: 12,
+            borderRadius: 22,
+            justifyContent: "center",
+        },
+        sendButtonDisabled: {
+            backgroundColor: colors.border,
+        },
+        sendButtonText: {
+            color: colors.textOnAccent,
+            fontSize: 16,
+            fontWeight: "600",
+        },
+        quotaContainer: {
+            paddingHorizontal: 12,
+            paddingVertical: 6,
+            backgroundColor: colors.surfaceMuted,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.border,
+        },
+        quotaBarBackground: {
+            height: 4,
+            backgroundColor: colors.borderMuted,
+            borderRadius: 2,
+            overflow: "hidden",
+            marginBottom: 4,
+        },
+        quotaBarFill: {
+            height: "100%",
+            borderRadius: 2,
+        },
+        quotaText: {
+            fontSize: 11,
+            color: colors.textMuted,
+            textAlign: "center",
+        },
+        quotaTextDanger: {
+            color: colors.danger,
+            fontWeight: "600",
+        },
+    });

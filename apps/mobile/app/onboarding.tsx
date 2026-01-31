@@ -1,4 +1,4 @@
-import React, { type ReactElement, useState } from "react";
+import React, { type ReactElement, useMemo, useState } from "react";
 import {
     View,
     Text,
@@ -8,6 +8,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import { useTheme, type ThemeColors } from "../src/contexts/ThemeContext";
 
 interface OnboardingScreenProps {
     onComplete: () => Promise<void>;
@@ -18,6 +19,8 @@ export default function OnboardingScreen({
 }: OnboardingScreenProps): ReactElement {
     const router = useRouter();
     const [currentStep, setCurrentStep] = useState(0);
+    const { colors } = useTheme();
+    const styles = useMemo(() => createStyles(colors), [colors]);
 
     const handleGetStarted = async () => {
         await onComplete();
@@ -126,94 +129,96 @@ export default function OnboardingScreen({
     );
 }
 
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: "#fff",
-    },
-    scrollContent: {
-        flex: 1,
-    },
-    content: {
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-        paddingHorizontal: 24,
-        paddingVertical: 32,
-    },
-    progressContainer: {
-        flexDirection: "row",
-        justifyContent: "center",
-        alignItems: "center",
-        marginBottom: 32,
-    },
-    progressDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: "#E0E0E0",
-        marginHorizontal: 4,
-    },
-    progressDotActive: {
-        backgroundColor: "#007AFF",
-    },
-    title: {
-        fontSize: 28,
-        fontWeight: "bold",
-        textAlign: "center",
-        marginBottom: 12,
-        color: "#000",
-    },
-    subtitle: {
-        fontSize: 18,
-        textAlign: "center",
-        color: "#666",
-        marginBottom: 24,
-    },
-    featureList: {
-        width: "100%",
-        marginBottom: 32,
-    },
-    featureItem: {
-        paddingVertical: 8,
-    },
-    featureText: {
-        fontSize: 16,
-        color: "#333",
-        lineHeight: 24,
-    },
-    buttonContainer: {
-        flexDirection: "row",
-        justifyContent: "center",
-        alignItems: "center",
-        width: "100%",
-        marginTop: 16,
-    },
-    button: {
-        backgroundColor: "#007AFF",
-        paddingHorizontal: 32,
-        paddingVertical: 14,
-        borderRadius: 8,
-        flex: 1,
-        alignItems: "center",
-    },
-    buttonFullWidth: {
-        flex: 0,
-        width: "100%",
-    },
-    backButton: {
-        paddingHorizontal: 24,
-        paddingVertical: 14,
-        marginRight: 12,
-    },
-    backButtonText: {
-        color: "#666",
-        fontSize: 16,
-        fontWeight: "600",
-    },
-    buttonText: {
-        color: "#fff",
-        fontSize: 18,
-        fontWeight: "600",
-    },
-});
+const createStyles = (colors: ThemeColors) =>
+    StyleSheet.create({
+        container: {
+            flex: 1,
+            backgroundColor: colors.background,
+        },
+        scrollContent: {
+            flex: 1,
+        },
+        content: {
+            flex: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            paddingHorizontal: 24,
+            paddingVertical: 32,
+        },
+        progressContainer: {
+            flexDirection: "row",
+            justifyContent: "center",
+            alignItems: "center",
+            marginBottom: 32,
+        },
+        progressDot: {
+            width: 8,
+            height: 8,
+            borderRadius: 4,
+            backgroundColor: colors.border,
+            marginHorizontal: 4,
+        },
+        progressDotActive: {
+            backgroundColor: colors.accent,
+        },
+        title: {
+            fontSize: 28,
+            fontWeight: "bold",
+            textAlign: "center",
+            marginBottom: 12,
+            color: colors.text,
+        },
+        subtitle: {
+            fontSize: 18,
+            textAlign: "center",
+            color: colors.textMuted,
+            marginBottom: 24,
+        },
+        featureList: {
+            width: "100%",
+            marginBottom: 32,
+        },
+        featureItem: {
+            paddingVertical: 8,
+        },
+        featureText: {
+            fontSize: 16,
+            color: colors.text,
+            lineHeight: 24,
+        },
+        buttonContainer: {
+            flexDirection: "row",
+            justifyContent: "center",
+            alignItems: "center",
+            width: "100%",
+            marginTop: 16,
+        },
+        button: {
+            backgroundColor: colors.accent,
+            paddingHorizontal: 32,
+            paddingVertical: 14,
+            borderRadius: 8,
+            alignItems: "center",
+            flex: 1,
+        },
+        buttonFullWidth: {
+            flex: 1,
+        },
+        backButton: {
+            paddingHorizontal: 24,
+            paddingVertical: 14,
+            alignItems: "center",
+            flex: 1,
+            marginRight: 12,
+        },
+        backButtonText: {
+            color: colors.textMuted,
+            fontSize: 16,
+            fontWeight: "600",
+        },
+        buttonText: {
+            color: colors.textOnAccent,
+            fontSize: 18,
+            fontWeight: "600",
+        },
+    });
