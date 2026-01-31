@@ -66,6 +66,9 @@
 
 - Use Bun for scripts and installs (`bun install`, `bun dev`, `bun run <script>`)
 - Use `bunx <package>` instead of `npx <package>`
+- Always run the health task for each app you modify before finishing:
+    - Web: `cd apps/web && bun run health`
+    - Mobile: `cd apps/mobile && bun run typecheck`
 - Web health check before finishing: `cd apps/web && bun run health`
 - Mobile health check before finishing: `cd apps/mobile && bun run typecheck`
 - Tests live in `__tests__` folders beside code; use `bun test`
