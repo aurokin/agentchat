@@ -77,6 +77,7 @@ export default function ChatScreen(): ReactElement {
         messages,
         selectChat,
         addMessage,
+        updateMessage,
         deleteChat,
         updateChat,
     } = useChatContext();
@@ -97,7 +98,9 @@ export default function ChatScreen(): ReactElement {
 
     const flatListRef = useRef<FlatList<Message>>(null);
     const isAtBottomRef = useRef(true);
-    const [replyText, setReplyText] = useState("");
+    const [streamingMessageId, setStreamingMessageId] = useState<string | null>(
+        null,
+    );
     const [expandedThinking, setExpandedThinking] = useState<
         Record<string, boolean>
     >({});
@@ -284,6 +287,9 @@ export default function ChatScreen(): ReactElement {
         }
 
         setIsLoading(true);
+        setStreamingMessageId(null);
+
+        let streamingMessage: Message | null = null;
 
         try {
             if (!apiKey) {
@@ -314,8 +320,40 @@ export default function ChatScreen(): ReactElement {
                 content: msg.contextContent,
             }));
 
+            const clonedSkill = skillForMessage
+                ? {
+                      ...skillForMessage,
+                      createdAt: Date.now(),
+                  }
+                : null;
+
+            streamingMessage = await addMessage({
+                sessionId: chatId,
+                role: "assistant",
+                content: "",
+                contextContent: "",
+                thinking: undefined,
+                modelId: currentChat.modelId,
+                skill: clonedSkill,
+                thinkingLevel: effectiveThinking,
+                searchLevel: effectiveSearchLevel,
+            });
+            setStreamingMessageId(streamingMessage.id);
+
             let assistantContent = "";
             let assistantThinking = "";
+
+            const updateStreamingMessage = (nextContent: string) => {
+                if (!streamingMessage) return;
+                const updated: Message = {
+                    ...streamingMessage,
+                    content: nextContent,
+                    contextContent: nextContent,
+                    thinking: assistantThinking || undefined,
+                };
+                streamingMessage = updated;
+                void updateMessage(updated);
+            };
 
             const response = await sendMessage(
                 apiKey,
@@ -336,48 +374,49 @@ export default function ChatScreen(): ReactElement {
                     } else {
                         assistantContent += chunk;
                     }
-                    setReplyText(assistantContent);
+                    updateStreamingMessage(assistantContent);
                 },
             );
 
-            const clonedSkill = skillForMessage
-                ? {
-                      ...skillForMessage,
-                      createdAt: Date.now(),
-                  }
-                : null;
+            const finalContent =
+                assistantContent || response.choices[0]?.message?.content || "";
+            const finalThinking =
+                assistantThinking || response.choices[0]?.message?.thinking;
 
-            await addMessage({
-                sessionId: chatId,
-                role: "assistant",
-                content:
-                    assistantContent ||
-                    response.choices[0]?.message?.content ||
-                    "",
-                contextContent:
-                    assistantContent ||
-                    response.choices[0]?.message?.content ||
-                    "",
-                thinking: assistantThinking || undefined,
-                modelId: response.model,
-                skill: clonedSkill,
-                thinkingLevel: effectiveThinking,
-                searchLevel: effectiveSearchLevel,
-            });
+            if (streamingMessage) {
+                const updated: Message = {
+                    ...streamingMessage,
+                    content: finalContent,
+                    contextContent: finalContent,
+                    thinking: finalThinking || undefined,
+                    modelId: response.model ?? streamingMessage.modelId,
+                };
+                streamingMessage = updated;
+                await updateMessage(updated);
+            }
         } catch (error) {
             const errorMessage =
                 error instanceof Error ? error.message : "Unknown error";
-            await addMessage({
-                sessionId: chatId,
-                role: "assistant",
-                content: `Error: ${errorMessage}`,
-                contextContent: `Error: ${errorMessage}`,
-                thinkingLevel: effectiveThinking,
-                searchLevel: effectiveSearchLevel,
-            });
+            if (streamingMessage) {
+                await updateMessage({
+                    ...streamingMessage,
+                    content: `Error: ${errorMessage}`,
+                    contextContent: `Error: ${errorMessage}`,
+                    thinking: undefined,
+                });
+            } else {
+                await addMessage({
+                    sessionId: chatId,
+                    role: "assistant",
+                    content: `Error: ${errorMessage}`,
+                    contextContent: `Error: ${errorMessage}`,
+                    thinkingLevel: effectiveThinking,
+                    searchLevel: effectiveSearchLevel,
+                });
+            }
         } finally {
             setIsLoading(false);
-            setReplyText("");
+            setStreamingMessageId(null);
         }
     };
 
@@ -431,10 +470,6 @@ export default function ChatScreen(): ReactElement {
     };
 
     const chatMessages = messages[chatId] || [];
-    const streamingThinkingLevel =
-        currentChat && reasoningSupported ? currentChat.thinking : "none";
-    const streamingSearchLevel =
-        currentChat && searchSupported ? currentChat.searchLevel : "none";
 
     const getMarkdownStyle = () => {
         return {
@@ -612,6 +647,13 @@ export default function ChatScreen(): ReactElement {
 
     const renderMessage = ({ item }: { item: Message }) => {
         const isUser = item.role === "user";
+        const isStreamingMessage = isLoading && streamingMessageId === item.id;
+        const showThinkingIndicator =
+            isStreamingMessage && !item.content && Boolean(item.thinking);
+        const hideContentWhileReasoning =
+            isStreamingMessage && Boolean(item.thinking) && !item.content;
+        const showGenerating =
+            isStreamingMessage && !item.content && !item.thinking;
         const hasSearchBadge =
             item.searchLevel !== undefined && item.searchLevel !== "none";
         const hasThinkingBadge =
@@ -649,6 +691,13 @@ export default function ChatScreen(): ReactElement {
                             </Text>
                             <BrainIcon size={14} />
                             <Text style={styles.thinkingLabel}>Reasoning</Text>
+                            {showThinkingIndicator && (
+                                <ActivityIndicator
+                                    size="small"
+                                    color={colors.warning}
+                                    style={styles.thinkingIndicator}
+                                />
+                            )}
                         </TouchableOpacity>
                         {expandedThinking[item.id] && (
                             <View style={styles.thinkingContent}>
@@ -659,103 +708,116 @@ export default function ChatScreen(): ReactElement {
                         )}
                     </View>
                 )}
-                <View
-                    style={[
-                        styles.messageContainer,
-                        isUser ? styles.userMessage : styles.assistantMessage,
-                    ]}
-                >
-                    <Markdown style={getMarkdownStyle()}>
-                        {item.content}
-                    </Markdown>
-                    {item.attachmentIds &&
-                        item.attachmentIds.length > 0 &&
-                        renderAttachments(item.attachmentIds)}
+                {!hideContentWhileReasoning && (
                     <View
                         style={[
-                            styles.messageMetaRow,
+                            styles.messageContainer,
                             isUser
-                                ? styles.messageMetaRowUser
-                                : styles.messageMetaRowAssistant,
+                                ? styles.userMessage
+                                : styles.assistantMessage,
                         ]}
                     >
-                        <Text
+                        {showGenerating ? (
+                            <View style={styles.generatingRow}>
+                                <ActivityIndicator
+                                    size="small"
+                                    color={colors.textMuted}
+                                />
+                                <Text style={styles.generatingText}>
+                                    Generating...
+                                </Text>
+                            </View>
+                        ) : item.content ? (
+                            <Markdown style={getMarkdownStyle()}>
+                                {item.content}
+                            </Markdown>
+                        ) : !isUser ? (
+                            <Text style={styles.emptyMessageText}>...</Text>
+                        ) : null}
+                        {item.attachmentIds &&
+                            item.attachmentIds.length > 0 &&
+                            renderAttachments(item.attachmentIds)}
+                    </View>
+                )}
+                <View
+                    style={[
+                        styles.messageMetaRow,
+                        isUser
+                            ? styles.messageMetaRowUser
+                            : styles.messageMetaRowAssistant,
+                    ]}
+                >
+                    <Text
+                        style={[
+                            styles.messageMetaText,
+                            isUser && styles.messageMetaTextUser,
+                        ]}
+                    >
+                        {formatMessageTime(item.createdAt)}
+                    </Text>
+                    {showDivider && <View style={styles.messageMetaDivider} />}
+                    {hasSearchBadge && (
+                        <View
                             style={[
-                                styles.messageMetaText,
-                                isUser && styles.messageMetaTextUser,
+                                styles.messageBadge,
+                                isUser
+                                    ? styles.searchBadgeUser
+                                    : styles.searchBadge,
                             ]}
                         >
-                            {formatMessageTime(item.createdAt)}
-                        </Text>
-                        {showDivider && (
-                            <View style={styles.messageMetaDivider} />
-                        )}
-                        {hasSearchBadge && (
-                            <View
+                            <Text
                                 style={[
-                                    styles.messageBadge,
+                                    styles.messageBadgeText,
                                     isUser
-                                        ? styles.searchBadgeUser
-                                        : styles.searchBadge,
+                                        ? styles.searchBadgeTextUser
+                                        : styles.searchBadgeText,
                                 ]}
                             >
-                                <Text
-                                    style={[
-                                        styles.messageBadgeText,
-                                        isUser
-                                            ? styles.searchBadgeTextUser
-                                            : styles.searchBadgeText,
-                                    ]}
-                                >
-                                    {getSearchBadgeLabel(
-                                        item.searchLevel as SearchLevel,
-                                    )}
-                                </Text>
-                            </View>
-                        )}
-                        {hasThinkingBadge && (
-                            <View
+                                {getSearchBadgeLabel(
+                                    item.searchLevel as SearchLevel,
+                                )}
+                            </Text>
+                        </View>
+                    )}
+                    {hasThinkingBadge && (
+                        <View
+                            style={[styles.messageBadge, styles.thinkingBadge]}
+                        >
+                            <Text
                                 style={[
-                                    styles.messageBadge,
-                                    styles.thinkingBadge,
+                                    styles.messageBadgeText,
+                                    styles.thinkingBadgeText,
                                 ]}
                             >
-                                <Text
-                                    style={[
-                                        styles.messageBadgeText,
-                                        styles.thinkingBadgeText,
-                                    ]}
-                                >
-                                    {item.thinkingLevel?.toUpperCase()}
-                                </Text>
-                            </View>
-                        )}
-                        {hasModelBadge && (
-                            <TouchableOpacity
-                                style={[styles.messageBadge, styles.modelBadge]}
-                                activeOpacity={0.7}
-                                onPress={() =>
-                                    Alert.alert("Model", modelDisplayName)
-                                }
+                                {item.thinkingLevel?.toUpperCase()}
+                            </Text>
+                        </View>
+                    )}
+                    {hasModelBadge && (
+                        <TouchableOpacity
+                            style={[styles.messageBadge, styles.modelBadge]}
+                            activeOpacity={0.7}
+                            onPress={() =>
+                                Alert.alert("Model", modelDisplayName)
+                            }
+                        >
+                            <Feather
+                                name="cpu"
+                                size={12}
+                                color={colors.textMuted}
+                                style={styles.modelBadgeIcon}
+                            />
+                            <Text
+                                style={[
+                                    styles.messageBadgeText,
+                                    styles.modelBadgeText,
+                                ]}
+                                numberOfLines={1}
                             >
-                                <Feather
-                                    name="cpu"
-                                    size={12}
-                                    color={colors.textMuted}
-                                    style={styles.modelBadgeIcon}
-                                />
-                                <Text
-                                    style={[
-                                        styles.messageBadgeText,
-                                        styles.modelBadgeText,
-                                    ]}
-                                    numberOfLines={1}
-                                >
-                                    {modelDisplayName}
-                                </Text>
-                            </TouchableOpacity>
-                        )}
-                    </View>
+                                {modelDisplayName}
+                            </Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
             </View>
         );
@@ -812,24 +874,7 @@ export default function ChatScreen(): ReactElement {
             >
                 <FlatList
                     ref={flatListRef}
-                    data={[
-                        ...chatMessages,
-                        ...(replyText
-                            ? [
-                                  {
-                                      id: "streaming",
-                                      sessionId: chatId,
-                                      role: "assistant" as const,
-                                      content: replyText,
-                                      contextContent: replyText,
-                                      modelId: currentChat.modelId,
-                                      thinkingLevel: streamingThinkingLevel,
-                                      searchLevel: streamingSearchLevel,
-                                      createdAt: Date.now(),
-                                  },
-                              ]
-                            : []),
-                    ]}
+                    data={chatMessages}
                     keyExtractor={(item) => item.id}
                     renderItem={renderMessage}
                     contentContainerStyle={styles.listContent}
@@ -925,7 +970,15 @@ const createStyles = (colors: ThemeColors) =>
             maxWidth: "85%",
             padding: 12,
             borderRadius: 16,
-            marginBottom: 8,
+        },
+        generatingRow: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+        },
+        generatingText: {
+            fontSize: 14,
+            color: colors.textMuted,
         },
         messageGroup: {
             alignSelf: "stretch",
@@ -946,6 +999,11 @@ const createStyles = (colors: ThemeColors) =>
             alignSelf: "flex-start",
             backgroundColor: colors.surfaceMuted,
         },
+        emptyMessageText: {
+            fontSize: 14,
+            color: colors.textMuted,
+            fontStyle: "italic",
+        },
         messageText: {
             fontSize: 16,
             lineHeight: 22,
@@ -961,6 +1019,7 @@ const createStyles = (colors: ThemeColors) =>
             alignItems: "center",
             gap: 6,
             marginTop: 6,
+            marginBottom: 8,
             flexWrap: "wrap",
         },
         messageMetaRowUser: {
@@ -1049,6 +1108,9 @@ const createStyles = (colors: ThemeColors) =>
             paddingHorizontal: 12,
             paddingVertical: 8,
             backgroundColor: colors.warningSoft,
+        },
+        thinkingIndicator: {
+            marginLeft: "auto",
         },
         thinkingIcon: {
             fontSize: 10,
