@@ -12,6 +12,7 @@ import {
     Dimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { Feather } from "@expo/vector-icons";
 import { useAppContext } from "../src/contexts/AppContext";
 import { useSkillsContext } from "../src/contexts/SkillsContext";
 import {
@@ -342,8 +343,16 @@ export default function SettingsScreen(): ReactElement {
         <SafeAreaProvider>
             <SafeAreaView style={styles.container}>
                 <View style={styles.header}>
-                    <TouchableOpacity onPress={() => router.replace("/")}>
-                        <Text style={styles.backButton}>← Back</Text>
+                    <TouchableOpacity
+                        onPress={() => router.replace("/")}
+                        style={styles.backButton}
+                        accessibilityLabel="Back"
+                    >
+                        <Feather
+                            name="arrow-left"
+                            size={20}
+                            color={colors.accent}
+                        />
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>Settings</Text>
                     <View style={styles.headerSpacer} />
@@ -879,8 +888,9 @@ const createStyles = (colors: ThemeColors) =>
             backgroundColor: colors.surface,
         },
         backButton: {
-            fontSize: 16,
-            color: colors.accent,
+            width: 60,
+            justifyContent: "center",
+            alignItems: "flex-start",
         },
         headerTitle: {
             flex: 1,

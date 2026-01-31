@@ -14,6 +14,8 @@ import {
     ActivityIndicator,
     Image,
     Alert,
+    KeyboardAvoidingView,
+    Platform,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useChatContext } from "../../../src/contexts/ChatContext";
@@ -62,8 +64,9 @@ export default function ChatScreen(): ReactElement {
     } = useChatContext();
     const {
         models,
-        selectedModel,
         selectModel: setSelectedModel,
+        favoriteModels,
+        toggleFavoriteModel,
     } = useModelContext();
     const { skills, selectedSkill, setSelectedSkill } = useSkillsContext();
     const { colors } = useTheme();
@@ -605,14 +608,17 @@ export default function ChatScreen(): ReactElement {
 
     if (!currentChat) {
         return (
-            <SafeAreaView style={styles.container}>
+            <SafeAreaView
+                style={styles.container}
+                edges={["top", "left", "right"]}
+            >
                 <ActivityIndicator size="large" color={colors.accent} />
             </SafeAreaView>
         );
     }
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
             <View style={styles.header}>
                 <TouchableOpacity
                     onPress={() => router.replace("/")}
@@ -635,56 +641,65 @@ export default function ChatScreen(): ReactElement {
                 </TouchableOpacity>
             </View>
 
-            <FlatList
-                ref={flatListRef}
-                data={[
-                    ...chatMessages,
-                    ...(replyText
-                        ? [
-                              {
-                                  id: "streaming",
-                                  sessionId: chatId,
-                                  role: "assistant" as const,
-                                  content: replyText,
-                                  contextContent: replyText,
-                                  modelId: currentChat.modelId,
-                                  thinkingLevel: streamingThinkingLevel,
-                                  searchLevel: streamingSearchLevel,
-                                  createdAt: Date.now(),
-                              },
-                          ]
-                        : []),
-                ]}
-                keyExtractor={(item) => item.id}
-                renderItem={renderMessage}
-                contentContainerStyle={styles.listContent}
-                onContentSizeChange={() =>
-                    flatListRef.current?.scrollToEnd?.({ animated: true })
-                }
-            />
+            <KeyboardAvoidingView
+                behavior={Platform.OS === "ios" ? "padding" : "height"}
+                style={styles.content}
+            >
+                <FlatList
+                    ref={flatListRef}
+                    data={[
+                        ...chatMessages,
+                        ...(replyText
+                            ? [
+                                  {
+                                      id: "streaming",
+                                      sessionId: chatId,
+                                      role: "assistant" as const,
+                                      content: replyText,
+                                      contextContent: replyText,
+                                      modelId: currentChat.modelId,
+                                      thinkingLevel: streamingThinkingLevel,
+                                      searchLevel: streamingSearchLevel,
+                                      createdAt: Date.now(),
+                                  },
+                              ]
+                            : []),
+                    ]}
+                    keyExtractor={(item) => item.id}
+                    renderItem={renderMessage}
+                    contentContainerStyle={styles.listContent}
+                    style={styles.list}
+                    keyboardShouldPersistTaps="handled"
+                    onContentSizeChange={() =>
+                        flatListRef.current?.scrollToEnd?.({ animated: true })
+                    }
+                />
 
-            <MessageInput
-                inputText={inputText}
-                onInputChange={setInputText}
-                onSend={handleSend}
-                isLoading={isLoading}
-                disabled={!apiKey}
-                models={models}
-                selectedModelId={currentChat.modelId}
-                onModelChange={handleModelChange}
-                reasoningSupported={reasoningSupported}
-                thinkingLevel={currentChat.thinking}
-                onThinkingChange={handleThinkingChange}
-                searchSupported={searchSupported}
-                searchLevel={currentChat.searchLevel}
-                onSearchChange={handleSearchChange}
-                skills={skills}
-                selectedSkill={selectedSkill}
-                onSkillSelect={setSelectedSkill}
-                attachments={attachments}
-                onAttachmentsChange={handleAttachmentsSelected}
-                onRemoveAttachment={handleRemoveAttachment}
-            />
+                <MessageInput
+                    inputText={inputText}
+                    onInputChange={setInputText}
+                    onSend={handleSend}
+                    isLoading={isLoading}
+                    disabled={!apiKey}
+                    models={models}
+                    selectedModelId={currentChat.modelId}
+                    onModelChange={handleModelChange}
+                    favoriteModels={favoriteModels}
+                    onToggleFavoriteModel={toggleFavoriteModel}
+                    reasoningSupported={reasoningSupported}
+                    thinkingLevel={currentChat.thinking}
+                    onThinkingChange={handleThinkingChange}
+                    searchSupported={searchSupported}
+                    searchLevel={currentChat.searchLevel}
+                    onSearchChange={handleSearchChange}
+                    skills={skills}
+                    selectedSkill={selectedSkill}
+                    onSkillSelect={setSelectedSkill}
+                    attachments={attachments}
+                    onAttachmentsChange={handleAttachmentsSelected}
+                    onRemoveAttachment={handleRemoveAttachment}
+                />
+            </KeyboardAvoidingView>
 
             <AttachmentGallery
                 visible={galleryVisible}
@@ -728,6 +743,12 @@ const createStyles = (colors: ThemeColors) =>
         },
         listContent: {
             padding: 16,
+        },
+        content: {
+            flex: 1,
+        },
+        list: {
+            flex: 1,
         },
         messageContainer: {
             maxWidth: "85%",

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, type ReactElement } from "react";
+import React, { useState, useMemo, useEffect, type ReactElement } from "react";
 import {
     View,
     Text,
@@ -6,10 +6,11 @@ import {
     TouchableOpacity,
     StyleSheet,
     ActivityIndicator,
-    KeyboardAvoidingView,
+    Keyboard,
     Platform,
     Image,
     FlatList,
+    ScrollView,
 } from "react-native";
 import type { OpenRouterModel } from "@shared/core/models";
 import type { ThinkingLevel, SearchLevel } from "@shared/core/types";
@@ -22,6 +23,8 @@ import { SkillSelector } from "./SkillSelector";
 import { AttachmentPicker } from "./AttachmentPicker";
 import { useTheme, type ThemeColors } from "../../contexts/ThemeContext";
 import { modelSupportsVision } from "../../contexts/ModelContext";
+import { Feather } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface MessageInputProps {
     inputText: string;
@@ -32,6 +35,8 @@ interface MessageInputProps {
     models: OpenRouterModel[];
     selectedModelId: string | null;
     onModelChange: (modelId: string) => void;
+    favoriteModels: string[];
+    onToggleFavoriteModel: (modelId: string) => void;
     reasoningSupported: boolean;
     thinkingLevel: ThinkingLevel;
     onThinkingChange: (value: ThinkingLevel) => void;
@@ -55,6 +60,8 @@ export function MessageInput({
     models,
     selectedModelId,
     onModelChange,
+    favoriteModels,
+    onToggleFavoriteModel,
     reasoningSupported,
     thinkingLevel,
     onThinkingChange,
@@ -69,14 +76,39 @@ export function MessageInput({
     onRemoveAttachment,
 }: MessageInputProps): ReactElement {
     const { colors } = useTheme();
-    const styles = useMemo(() => createStyles(colors), [colors]);
+    const insets = useSafeAreaInsets();
+    const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+    const bottomPadding = isKeyboardVisible ? 8 : 8 + insets.bottom;
+    const styles = useMemo(
+        () => createStyles(colors, bottomPadding),
+        [colors, bottomPadding],
+    );
 
     const canSend =
-        (inputText.trim().length > 0 || attachments.length > 0) && !disabled;
+        (inputText.trim().length > 0 || attachments.length > 0) &&
+        !disabled &&
+        !isLoading;
     const visionSupported = useMemo(() => {
         if (!selectedModelId) return false;
         return modelSupportsVision(selectedModelId, models);
     }, [selectedModelId, models]);
+
+    useEffect(() => {
+        const showEvent =
+            Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+        const hideEvent =
+            Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+        const showSubscription = Keyboard.addListener(showEvent, () => {
+            setIsKeyboardVisible(true);
+        });
+        const hideSubscription = Keyboard.addListener(hideEvent, () => {
+            setIsKeyboardVisible(false);
+        });
+        return () => {
+            showSubscription.remove();
+            hideSubscription.remove();
+        };
+    }, []);
 
     const renderAttachmentThumbnail = ({ item }: { item: Attachment }) => {
         const aspectRatio =
@@ -106,11 +138,7 @@ export function MessageInput({
     };
 
     return (
-        <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
-            style={styles.container}
-        >
+        <View style={styles.container}>
             {attachments.length > 0 && (
                 <View style={styles.attachmentsContainer}>
                     <FlatList
@@ -124,17 +152,19 @@ export function MessageInput({
                 </View>
             )}
 
-            <View style={styles.controlsRow}>
-                {visionSupported && (
-                    <AttachmentPicker
-                        onAttachmentsSelected={onAttachmentsChange}
-                        disabled={isLoading || disabled}
-                    />
-                )}
+            <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                style={styles.controlsContainer}
+                contentContainerStyle={styles.controlsRow}
+            >
                 <ModelSelector
                     models={models}
                     selectedModelId={selectedModelId}
                     onModelChange={onModelChange}
+                    favoriteModels={favoriteModels}
+                    onToggleFavoriteModel={onToggleFavoriteModel}
                     disabled={isLoading}
                 />
                 <SkillSelector
@@ -143,7 +173,6 @@ export function MessageInput({
                     onSelectSkill={onSkillSelect}
                     disabled={isLoading}
                 />
-                <View style={styles.spacer} />
                 {searchSupported && (
                     <SearchToggle
                         value={searchLevel}
@@ -158,9 +187,9 @@ export function MessageInput({
                         disabled={isLoading}
                     />
                 )}
-            </View>
+            </ScrollView>
 
-            <View style={styles.inputWrapper}>
+            <View style={styles.inputRow}>
                 <TextInput
                     style={styles.textInput}
                     value={inputText}
@@ -173,8 +202,14 @@ export function MessageInput({
                     placeholderTextColor={colors.textFaint}
                     multiline
                     maxLength={10000}
-                    editable={!disabled}
+                    editable={!isLoading}
                 />
+                {visionSupported && (
+                    <AttachmentPicker
+                        onAttachmentsSelected={onAttachmentsChange}
+                        disabled={isLoading}
+                    />
+                )}
                 <TouchableOpacity
                     style={[
                         styles.sendButton,
@@ -190,15 +225,23 @@ export function MessageInput({
                             size="small"
                         />
                     ) : (
-                        <Text style={styles.sendButtonText}>Send</Text>
+                        <Feather
+                            name="send"
+                            size={18}
+                            color={
+                                canSend
+                                    ? colors.textOnAccent
+                                    : colors.textSubtle
+                            }
+                        />
                     )}
                 </TouchableOpacity>
             </View>
-        </KeyboardAvoidingView>
+        </View>
     );
 }
 
-const createStyles = (colors: ThemeColors) =>
+const createStyles = (colors: ThemeColors, bottomPadding: number) =>
     StyleSheet.create({
         container: {
             borderTopWidth: 1,
@@ -240,23 +283,24 @@ const createStyles = (colors: ThemeColors) =>
             fontWeight: "bold",
             lineHeight: 18,
         },
+        controlsContainer: {
+            borderBottomWidth: 1,
+            borderBottomColor: colors.borderMuted,
+        },
         controlsRow: {
             flexDirection: "row",
             alignItems: "center",
             paddingHorizontal: 12,
             paddingVertical: 8,
             gap: 8,
-            borderBottomWidth: 1,
-            borderBottomColor: colors.borderMuted,
         },
-        spacer: {
-            flex: 1,
-        },
-        inputWrapper: {
+        inputRow: {
             flexDirection: "row",
             alignItems: "center",
             paddingHorizontal: 12,
-            paddingVertical: 8,
+            paddingTop: 8,
+            paddingBottom: bottomPadding,
+            gap: 8,
         },
         textInput: {
             flex: 1,
@@ -268,21 +312,16 @@ const createStyles = (colors: ThemeColors) =>
             backgroundColor: colors.inputBackground,
             color: colors.text,
             fontSize: 16,
-            marginRight: 8,
         },
         sendButton: {
             backgroundColor: colors.accent,
-            paddingHorizontal: 20,
-            paddingVertical: 12,
-            borderRadius: 22,
+            width: 40,
+            height: 40,
+            borderRadius: 20,
+            alignItems: "center",
             justifyContent: "center",
         },
         sendButtonDisabled: {
             backgroundColor: colors.border,
-        },
-        sendButtonText: {
-            color: colors.textOnAccent,
-            fontSize: 16,
-            fontWeight: "600",
         },
     });

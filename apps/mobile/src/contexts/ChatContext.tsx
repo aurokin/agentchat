@@ -20,6 +20,8 @@ import {
     getDefaultSearchLevel,
     setDefaultSearchLevel as persistDefaultSearchLevel,
 } from "../lib/storage";
+import { APP_DEFAULT_MODEL } from "@shared/core/models";
+import { useModelContext } from "./ModelContext";
 
 interface ChatContextValue {
     chats: ChatSession[];
@@ -47,7 +49,6 @@ interface ChatContextValue {
 
 const ChatContext = createContext<ChatContextValue | null>(null);
 
-const DEFAULT_MODEL = "anthropic/claude-3-5-sonnet-20241022";
 const DEFAULT_THINKING: ThinkingLevel = "none";
 const DEFAULT_SEARCH_LEVEL: SearchLevel = "none";
 
@@ -71,11 +72,22 @@ export function ChatProvider({
     const [messages, setMessages] = useState<Record<string, Message[]>>({});
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [defaultModel] = useState(DEFAULT_MODEL);
     const [defaultThinking, setDefaultThinkingState] =
         useState<ThinkingLevel>(DEFAULT_THINKING);
     const [defaultSearchLevel, setDefaultSearchLevelState] =
         useState<SearchLevel>(DEFAULT_SEARCH_LEVEL);
+    const { selectedModel, selectModel, models } = useModelContext();
+    const validatedSelectedModel =
+        selectedModel && models.some((model) => model.id === selectedModel)
+            ? selectedModel
+            : null;
+    const appDefaultAvailable = models.some(
+        (model) => model.id === APP_DEFAULT_MODEL,
+    );
+    const defaultModelId =
+        validatedSelectedModel ??
+        (appDefaultAvailable ? APP_DEFAULT_MODEL : models[0]?.id) ??
+        APP_DEFAULT_MODEL;
 
     const adapter = getSqliteStorageAdapter();
 
@@ -100,7 +112,7 @@ export function ChatProvider({
             const chat: ChatSession = {
                 id: chatId,
                 title: title || "New Chat",
-                modelId: modelId || defaultModel,
+                modelId: modelId || defaultModelId,
                 thinking: defaultThinking,
                 searchLevel: defaultSearchLevel,
                 createdAt: now,
@@ -115,7 +127,7 @@ export function ChatProvider({
 
             return chat;
         },
-        [defaultModel, defaultThinking, defaultSearchLevel],
+        [defaultModelId, defaultThinking, defaultSearchLevel],
     );
 
     const selectChat = useCallback(
@@ -200,9 +212,12 @@ export function ChatProvider({
         [currentChat],
     );
 
-    const setDefaultModel = useCallback((modelId: string) => {
-        // This would persist to settings in a full implementation
-    }, []);
+    const setDefaultModel = useCallback(
+        (modelId: string) => {
+            void selectModel(modelId);
+        },
+        [selectModel],
+    );
 
     const setDefaultThinking = useCallback((thinking: ThinkingLevel) => {
         setDefaultThinkingState(thinking);
@@ -244,7 +259,7 @@ export function ChatProvider({
                 messages,
                 isLoading,
                 error,
-                defaultModel,
+                defaultModel: defaultModelId,
                 defaultThinking,
                 defaultSearchLevel,
                 loadChats,

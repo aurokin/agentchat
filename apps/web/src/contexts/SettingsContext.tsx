@@ -16,6 +16,7 @@ import type {
     SearchLevel,
     Skill,
 } from "@/lib/types";
+import { APP_DEFAULT_MODEL } from "@shared/core/models";
 import { v4 as uuid } from "uuid";
 import * as storage from "@/lib/storage";
 import { fetchModels } from "@/lib/openrouter";
@@ -56,8 +57,6 @@ const defaultSettings: UserSettings = {
 };
 
 const SettingsContext = createContext<SettingsContextType | null>(null);
-
-const APP_DEFAULT_MODEL = "minimax/minimax-m2.1";
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
     const [settings, setSettings] = useState<UserSettings>(defaultSettings);

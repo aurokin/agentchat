@@ -6,9 +6,18 @@ import React, {
     useEffect,
     type ReactNode,
 } from "react";
-import { type OpenRouterModel, SupportedParameter } from "@shared/core/models";
+import {
+    APP_DEFAULT_MODEL,
+    type OpenRouterModel,
+    SupportedParameter,
+} from "@shared/core/models";
 import { fetchModels } from "@shared/core/openrouter";
-import * as SecureStore from "expo-secure-store";
+import {
+    getDefaultModel,
+    setDefaultModel,
+    getFavoriteModels,
+    setFavoriteModels,
+} from "../lib/storage";
 
 interface ModelContextValue {
     models: OpenRouterModel[];
@@ -17,6 +26,8 @@ interface ModelContextValue {
     selectedModel: string | null;
     selectModel: (modelId: string) => Promise<void>;
     refreshModels: () => Promise<void>;
+    favoriteModels: string[];
+    toggleFavoriteModel: (modelId: string) => void;
 }
 
 const ModelContext = createContext<ModelContextValue | null>(null);
@@ -33,8 +44,6 @@ interface ModelProviderProps {
     children: ReactNode;
 }
 
-const SELECTED_MODEL_KEY = "routerchat-selected-model";
-
 export function ModelProvider({
     children,
 }: ModelProviderProps): React.ReactElement {
@@ -42,11 +51,12 @@ export function ModelProvider({
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [selectedModel, setSelectedModel] = useState<string | null>(null);
+    const [favoriteModels, setFavoriteModelsState] = useState<string[]>([]);
     const [hasLoadedSelectedModel, setHasLoadedSelectedModel] = useState(false);
 
     const loadSelectedModel = useCallback(async () => {
         try {
-            const modelId = await SecureStore.getItemAsync(SELECTED_MODEL_KEY);
+            const modelId = await getDefaultModel();
             if (modelId) {
                 setSelectedModel(modelId);
             }
@@ -54,6 +64,15 @@ export function ModelProvider({
             console.error("Failed to load selected model");
         } finally {
             setHasLoadedSelectedModel(true);
+        }
+    }, []);
+
+    const loadFavoriteModels = useCallback(async () => {
+        try {
+            const storedFavorites = await getFavoriteModels();
+            setFavoriteModelsState(storedFavorites);
+        } catch {
+            console.error("Failed to load favorite models");
         }
     }, []);
 
@@ -65,17 +84,20 @@ export function ModelProvider({
             const fetchedModels = await fetchModels();
             setModels(fetchedModels);
 
-            if (!selectedModel && fetchedModels.length > 0) {
-                const defaultModel = fetchedModels.find(
-                    (m) => m.id === "anthropic/claude-3-5-sonnet-20241022",
-                );
-                if (defaultModel) {
-                    await SecureStore.setItemAsync(
-                        SELECTED_MODEL_KEY,
-                        defaultModel.id,
-                    );
-                    setSelectedModel(defaultModel.id);
-                }
+            const modelIds = fetchedModels.map((model) => model.id);
+            let nextSelectedModel: string | null = null;
+
+            if (selectedModel && modelIds.includes(selectedModel)) {
+                nextSelectedModel = selectedModel;
+            } else if (modelIds.includes(APP_DEFAULT_MODEL)) {
+                nextSelectedModel = APP_DEFAULT_MODEL;
+            } else if (fetchedModels.length > 0) {
+                nextSelectedModel = fetchedModels[0].id;
+            }
+
+            if (nextSelectedModel && nextSelectedModel !== selectedModel) {
+                await setDefaultModel(nextSelectedModel);
+                setSelectedModel(nextSelectedModel);
             }
         } catch (err) {
             const message =
@@ -88,16 +110,28 @@ export function ModelProvider({
 
     const selectModel = useCallback(async (modelId: string) => {
         try {
-            await SecureStore.setItemAsync(SELECTED_MODEL_KEY, modelId);
+            await setDefaultModel(modelId);
             setSelectedModel(modelId);
         } catch {
             console.error("Failed to save selected model");
         }
     }, []);
 
+    const toggleFavoriteModel = useCallback((modelId: string) => {
+        setFavoriteModelsState((prev) => {
+            const isFavorite = prev.includes(modelId);
+            const nextFavorites = isFavorite
+                ? prev.filter((id) => id !== modelId)
+                : [...prev, modelId];
+            void setFavoriteModels(nextFavorites);
+            return nextFavorites;
+        });
+    }, []);
+
     useEffect(() => {
         loadSelectedModel();
-    }, [loadSelectedModel]);
+        loadFavoriteModels();
+    }, [loadSelectedModel, loadFavoriteModels]);
 
     useEffect(() => {
         if (hasLoadedSelectedModel) {
@@ -114,6 +148,8 @@ export function ModelProvider({
                 selectedModel,
                 selectModel,
                 refreshModels,
+                favoriteModels,
+                toggleFavoriteModel,
             }}
         >
             {children}

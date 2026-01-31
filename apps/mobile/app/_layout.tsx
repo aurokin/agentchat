@@ -1,6 +1,7 @@
 import React, { type ReactElement, useEffect, useState } from "react";
 import { Stack, useRouter } from "expo-router";
 import { StatusBar } from "react-native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AppProvider, useAppContext } from "../src/contexts/AppContext";
 import { ThemeProvider, useTheme } from "../src/contexts/ThemeContext";
 import { ChatProvider } from "../src/contexts/ChatContext";
@@ -50,25 +51,27 @@ function ThemedStatusBar(): React.ReactElement {
 
 export default function Layout(): ReactElement {
     return (
-        <ThemeProvider>
-            <ThemedStatusBar />
-            <AuthProvider>
-                <ModelProvider>
-                    <SkillsProvider>
-                        <AppProvider>
-                            <ChatProvider>
-                                <OnboardingWrapper>
-                                    <Stack
-                                        screenOptions={{
-                                            headerShown: false,
-                                        }}
-                                    />
-                                </OnboardingWrapper>
-                            </ChatProvider>
-                        </AppProvider>
-                    </SkillsProvider>
-                </ModelProvider>
-            </AuthProvider>
-        </ThemeProvider>
+        <SafeAreaProvider>
+            <ThemeProvider>
+                <ThemedStatusBar />
+                <AuthProvider>
+                    <ModelProvider>
+                        <SkillsProvider>
+                            <AppProvider>
+                                <ChatProvider>
+                                    <OnboardingWrapper>
+                                        <Stack
+                                            screenOptions={{
+                                                headerShown: false,
+                                            }}
+                                        />
+                                    </OnboardingWrapper>
+                                </ChatProvider>
+                            </AppProvider>
+                        </SkillsProvider>
+                    </ModelProvider>
+                </AuthProvider>
+            </ThemeProvider>
+        </SafeAreaProvider>
     );
 }

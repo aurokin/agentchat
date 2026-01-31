@@ -13,14 +13,24 @@ import {
     FlatList,
     Modal,
     TextInput,
+    type GestureResponderEvent,
 } from "react-native";
 import type { OpenRouterModel } from "@shared/core/models";
+import { MaterialIcons } from "@expo/vector-icons";
 import { useTheme, type ThemeColors } from "../../contexts/ThemeContext";
+import {
+    filterModels,
+    splitFavoriteModels,
+    groupModelsByProvider,
+    getProviderOrder,
+} from "./model-selector-utils";
 
 interface ModelSelectorProps {
     models: OpenRouterModel[];
     selectedModelId: string | null;
     onModelChange: (modelId: string) => void;
+    favoriteModels: string[];
+    onToggleFavoriteModel: (modelId: string) => void;
     disabled?: boolean;
 }
 
@@ -28,39 +38,103 @@ export function ModelSelector({
     models,
     selectedModelId,
     onModelChange,
+    favoriteModels,
+    onToggleFavoriteModel,
     disabled,
 }: ModelSelectorProps): ReactElement {
     const [isOpen, setIsOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
-    const selectedModel = models.find((m) => m.id === selectedModelId);
     const { colors } = useTheme();
     const styles = useMemo(() => createStyles(colors), [colors]);
+    const searchInputRef = useRef<TextInput>(null);
 
-    const filteredModels = searchQuery
-        ? models.filter(
-              (m) =>
-                  m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                  m.id.toLowerCase().includes(searchQuery.toLowerCase()),
-          )
-        : models;
+    useEffect(() => {
+        if (isOpen && searchInputRef.current) {
+            const timeoutId = setTimeout(() => {
+                searchInputRef.current?.focus();
+            }, 50);
+            return () => clearTimeout(timeoutId);
+        }
+        if (!isOpen) {
+            setSearchQuery("");
+        }
+    }, [isOpen]);
 
-    const groupedModels = filteredModels.reduce(
-        (acc, model) => {
-            const provider = model.provider || "Other";
-            if (!acc[provider]) {
-                acc[provider] = [];
-            }
-            acc[provider].push(model);
-            return acc;
-        },
-        {} as Record<string, OpenRouterModel[]>,
+    const filteredModels = useMemo(
+        () => filterModels(models, searchQuery),
+        [models, searchQuery],
     );
 
-    const providers = Object.keys(groupedModels).sort((a, b) => {
-        if (a === "Other") return 1;
-        if (b === "Other") return -1;
-        return a.localeCompare(b);
-    });
+    const { favoriteModelList, otherModels } = useMemo(
+        () => splitFavoriteModels(filteredModels, favoriteModels),
+        [filteredModels, favoriteModels],
+    );
+
+    const groupedModels = useMemo(
+        () => groupModelsByProvider(otherModels),
+        [otherModels],
+    );
+    const providerOrder = useMemo(
+        () => getProviderOrder(otherModels),
+        [otherModels],
+    );
+
+    const sections = useMemo(() => {
+        const results: {
+            key: string;
+            title: string;
+            models: OpenRouterModel[];
+            isFavorites?: boolean;
+        }[] = [];
+
+        if (favoriteModelList.length > 0) {
+            results.push({
+                key: "favorites",
+                title: "Favorites",
+                models: favoriteModelList,
+                isFavorites: true,
+            });
+        }
+
+        for (const provider of providerOrder) {
+            const providerModels = groupedModels[provider];
+            if (providerModels && providerModels.length > 0) {
+                results.push({
+                    key: provider,
+                    title: provider,
+                    models: providerModels,
+                });
+            }
+        }
+
+        return results;
+    }, [favoriteModelList, groupedModels, providerOrder]);
+
+    const selectedModelDisplay = useMemo(() => {
+        if (!selectedModelId) return "Select Model";
+        const model = models.find((m) => m.id === selectedModelId);
+        if (model) return model.name;
+        return selectedModelId.split("/").pop() || selectedModelId;
+    }, [models, selectedModelId]);
+
+    const showEmptyState = models.length === 0;
+    const showNoResults =
+        models.length > 0 &&
+        filteredModels.length === 0 &&
+        searchQuery.trim().length > 0;
+
+    const handleSelect = (modelId: string) => {
+        onModelChange(modelId);
+        setIsOpen(false);
+    };
+
+    const handleToggleFavorite = (
+        event: GestureResponderEvent,
+        modelId: string,
+    ) => {
+        event.stopPropagation();
+        onToggleFavoriteModel(modelId);
+    };
 
     return (
         <View style={styles.container}>
@@ -71,7 +145,7 @@ export function ModelSelector({
                 activeOpacity={0.7}
             >
                 <Text style={styles.triggerText} numberOfLines={1}>
-                    {selectedModel?.name || "Select Model"}
+                    {selectedModelDisplay}
                 </Text>
             </TouchableOpacity>
 
@@ -89,6 +163,7 @@ export function ModelSelector({
                     <View style={styles.modal}>
                         <View style={styles.searchContainer}>
                             <TextInput
+                                ref={searchInputRef}
                                 style={styles.searchInput}
                                 placeholder="Search models..."
                                 value={searchQuery}
@@ -97,45 +172,122 @@ export function ModelSelector({
                             />
                         </View>
 
-                        <FlatList
-                            data={providers}
-                            keyExtractor={(provider) => provider}
-                            renderItem={({ item: provider }) => (
-                                <View>
-                                    <Text style={styles.providerHeader}>
-                                        {provider}
-                                    </Text>
-                                    {groupedModels[provider].map((model) => (
-                                        <TouchableOpacity
-                                            key={model.id}
-                                            style={[
-                                                styles.option,
-                                                selectedModelId === model.id &&
-                                                    styles.optionSelected,
-                                            ]}
-                                            onPress={() => {
-                                                onModelChange(model.id);
-                                                setIsOpen(false);
-                                                setSearchQuery("");
-                                            }}
-                                        >
-                                            <Text
-                                                style={[
-                                                    styles.optionText,
-                                                    selectedModelId ===
-                                                        model.id &&
-                                                        styles.optionTextSelected,
-                                                ]}
-                                                numberOfLines={1}
+                        {showEmptyState ? (
+                            <View style={styles.emptyState}>
+                                <Text style={styles.emptyText}>
+                                    No models available
+                                </Text>
+                                <Text style={styles.emptySubtext}>
+                                    Failed to load models
+                                </Text>
+                            </View>
+                        ) : showNoResults ? (
+                            <View style={styles.emptyState}>
+                                <Text style={styles.emptyText}>
+                                    No models found
+                                </Text>
+                                <Text style={styles.emptySubtext}>
+                                    Try a different search term
+                                </Text>
+                            </View>
+                        ) : (
+                            <FlatList
+                                data={sections}
+                                keyExtractor={(section) => section.key}
+                                renderItem={({ item: section }) => (
+                                    <View>
+                                        {section.isFavorites ? (
+                                            <View
+                                                style={styles.favoritesHeader}
                                             >
-                                                {model.name}
+                                                <MaterialIcons
+                                                    name="star"
+                                                    size={12}
+                                                    color={colors.accent}
+                                                />
+                                                <Text
+                                                    style={
+                                                        styles.favoritesHeaderText
+                                                    }
+                                                >
+                                                    Favorites
+                                                </Text>
+                                            </View>
+                                        ) : (
+                                            <Text style={styles.providerHeader}>
+                                                {section.title}
                                             </Text>
-                                        </TouchableOpacity>
-                                    ))}
-                                </View>
-                            )}
-                            style={styles.list}
-                        />
+                                        )}
+                                        {section.models.map((model) => {
+                                            const isFavorite =
+                                                favoriteModels.includes(
+                                                    model.id,
+                                                );
+                                            return (
+                                                <TouchableOpacity
+                                                    key={model.id}
+                                                    style={[
+                                                        styles.option,
+                                                        selectedModelId ===
+                                                            model.id &&
+                                                            styles.optionSelected,
+                                                    ]}
+                                                    onPress={() =>
+                                                        handleSelect(model.id)
+                                                    }
+                                                >
+                                                    <View
+                                                        style={
+                                                            styles.optionContent
+                                                        }
+                                                    >
+                                                        <TouchableOpacity
+                                                            style={
+                                                                styles.favoriteButton
+                                                            }
+                                                            onPress={(event) =>
+                                                                handleToggleFavorite(
+                                                                    event,
+                                                                    model.id,
+                                                                )
+                                                            }
+                                                            activeOpacity={0.7}
+                                                        >
+                                                            <MaterialIcons
+                                                                name={
+                                                                    isFavorite
+                                                                        ? "star"
+                                                                        : "star-border"
+                                                                }
+                                                                size={16}
+                                                                color={
+                                                                    isFavorite
+                                                                        ? colors.accent
+                                                                        : colors.textFaint
+                                                                }
+                                                            />
+                                                        </TouchableOpacity>
+                                                        <Text
+                                                            style={[
+                                                                styles.optionText,
+                                                                selectedModelId ===
+                                                                    model.id &&
+                                                                    styles.optionTextSelected,
+                                                            ]}
+                                                            numberOfLines={1}
+                                                        >
+                                                            {model.name}
+                                                        </Text>
+                                                    </View>
+                                                </TouchableOpacity>
+                                            );
+                                        })}
+                                    </View>
+                                )}
+                                style={styles.list}
+                                keyboardShouldPersistTaps="handled"
+                            />
+                        )}
                     </View>
                 </TouchableOpacity>
             </Modal>
@@ -203,6 +355,22 @@ const createStyles = (colors: ThemeColors) =>
             color: colors.textMuted,
             textTransform: "uppercase",
         },
+        favoritesHeader: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+            paddingHorizontal: 16,
+            paddingVertical: 8,
+            backgroundColor: colors.accentSoft,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.border,
+        },
+        favoritesHeaderText: {
+            fontSize: 12,
+            fontWeight: "600",
+            color: colors.accent,
+            textTransform: "uppercase",
+        },
         option: {
             paddingHorizontal: 16,
             paddingVertical: 12,
@@ -212,12 +380,34 @@ const createStyles = (colors: ThemeColors) =>
         optionSelected: {
             backgroundColor: colors.accentSoft,
         },
+        optionContent: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+        },
+        favoriteButton: {
+            padding: 2,
+        },
         optionText: {
             fontSize: 14,
             color: colors.text,
+            flex: 1,
         },
         optionTextSelected: {
             color: colors.accent,
             fontWeight: "600",
+        },
+        emptyState: {
+            padding: 24,
+            alignItems: "center",
+        },
+        emptyText: {
+            fontSize: 14,
+            color: colors.textSubtle,
+        },
+        emptySubtext: {
+            fontSize: 12,
+            color: colors.textFaint,
+            marginTop: 4,
         },
     });

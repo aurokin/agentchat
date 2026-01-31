@@ -15,6 +15,7 @@ import type {
     ThinkingLevel,
     SearchLevel,
 } from "@/lib/types";
+import { APP_DEFAULT_MODEL } from "@shared/core/models";
 import { useStorageAdapter } from "@/contexts/SyncContext";
 import * as storage from "@/lib/storage";
 import { v4 as uuid } from "uuid";
@@ -101,8 +102,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
     const createChat = useCallback(
         async (title?: string, modelId?: string): Promise<ChatSession> => {
-            const defaultModel =
-                storage.getDefaultModel() || "minimax/minimax-m2.1";
+            const defaultModel = storage.getDefaultModel() || APP_DEFAULT_MODEL;
             const defaultThinking = storage.getDefaultThinking();
             const defaultSearchLevel = storage.getDefaultSearchLevel();
             const chat: ChatSession = {

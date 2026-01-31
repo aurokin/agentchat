@@ -374,7 +374,12 @@ function MessageItem({
                                     remarkPlugins={[remarkGfm]}
                                     rehypePlugins={[rehypeHighlight, rehypeRaw]}
                                     components={{
-                                        a: ({ children, ...props }) => (
+                                        a: ({
+                                            children,
+                                            node: _node,
+                                            ref: _ref,
+                                            ...props
+                                        }) => (
                                             <a
                                                 {...props}
                                                 {...externalLinkProps}

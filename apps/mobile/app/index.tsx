@@ -7,6 +7,7 @@ import {
     StyleSheet,
     ActivityIndicator,
 } from "react-native";
+import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useChatContext } from "../src/contexts/ChatContext";
 import { useAppContext } from "../src/contexts/AppContext";
@@ -80,10 +81,12 @@ export default function HomeScreen(): React.ReactElement {
             <View style={styles.header}>
                 <Text style={styles.title}>RouterChat</Text>
                 <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel="Settings"
                     style={styles.settingsButton}
                     onPress={() => router.push("/settings")}
                 >
-                    <Text style={styles.settingsButtonText}>Settings</Text>
+                    <Feather name="settings" size={22} color={colors.accent} />
                 </TouchableOpacity>
             </View>
 
@@ -175,10 +178,6 @@ const createStyles = (colors: ThemeColors) =>
         },
         settingsButton: {
             padding: 8,
-        },
-        settingsButtonText: {
-            fontSize: 16,
-            color: colors.accent,
         },
         loadingText: {
             marginTop: 12,

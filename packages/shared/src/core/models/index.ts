@@ -1,3 +1,5 @@
+export const APP_DEFAULT_MODEL = "minimax/minimax-m2.1";
+
 export interface OpenRouterModel {
     id: string;
     name: string;

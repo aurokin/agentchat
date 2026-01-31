@@ -40,6 +40,10 @@ export {
     setDefaultThinking,
     getDefaultSearchLevel,
     setDefaultSearchLevel,
+    getDefaultModel,
+    setDefaultModel,
+    getFavoriteModels,
+    setFavoriteModels,
 } from "./user-settings-storage";
 export {
     processImage,
