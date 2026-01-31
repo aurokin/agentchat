@@ -30,20 +30,6 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { useAuthContext } from "../src/lib/convex/AuthContext";
 import { getConvexUrlOverride, getEnvConvexUrl } from "../src/lib/convex";
 
-type Keybinding = {
-    key: string;
-    description: string;
-};
-
-const KEYBINDINGS: Keybinding[] = [
-    { key: "Cmd/Ctrl + ,", description: "Open settings" },
-    { key: "Cmd/Ctrl + K", description: "Focus model selector" },
-    { key: "Cmd/Ctrl + /", description: "Show keyboard shortcuts" },
-    { key: "Escape", description: "Close modal/dropdown" },
-    { key: "Enter", description: "Send message" },
-    { key: "Shift + Enter", description: "New line in message" },
-];
-
 export default function SettingsScreen(): ReactElement {
     const router = useRouter();
     const { syncState, setSyncState, initializeApp } = useAppContext();
@@ -808,25 +794,6 @@ export default function SettingsScreen(): ReactElement {
                         )}
                     </View>
 
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Keybindings</Text>
-                        <Text style={styles.sectionDescription}>
-                            Built-in shortcuts
-                        </Text>
-                        <View style={styles.keybindingsList}>
-                            {KEYBINDINGS.map((kb, index) => (
-                                <View key={index} style={styles.keybindingRow}>
-                                    <Text style={styles.keybindingKey}>
-                                        {kb.key}
-                                    </Text>
-                                    <Text style={styles.keybindingDesc}>
-                                        {kb.description}
-                                    </Text>
-                                </View>
-                            ))}
-                        </View>
-                    </View>
-
                     {__DEV__ && (
                         <View style={styles.section}>
                             <Text style={styles.sectionTitle}>Developer</Text>
@@ -1284,27 +1251,6 @@ const createStyles = (colors: ThemeColors) =>
             color: colors.accent,
             textAlign: "center",
             marginTop: 8,
-        },
-        keybindingsList: {
-            gap: 8,
-        },
-        keybindingRow: {
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "center",
-            paddingVertical: 8,
-            borderBottomWidth: 1,
-            borderBottomColor: colors.borderMuted,
-        },
-        keybindingKey: {
-            fontSize: 14,
-            fontWeight: "600",
-            color: colors.accent,
-            fontFamily: "monospace",
-        },
-        keybindingDesc: {
-            fontSize: 14,
-            color: colors.textMuted,
         },
         storageInfoText: {
             fontSize: 14,
