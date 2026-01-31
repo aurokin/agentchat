@@ -16,6 +16,9 @@ import {
     Alert,
     KeyboardAvoidingView,
     Platform,
+    ScrollView,
+    type NativeScrollEvent,
+    type NativeSyntheticEvent,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useChatContext } from "../../../src/contexts/ChatContext";
@@ -32,6 +35,7 @@ import { sendMessage } from "@shared/core/openrouter";
 import {
     modelSupportsReasoning,
     modelSupportsSearch,
+    type OpenRouterModel,
 } from "@shared/core/models";
 import type {
     ChatSession,
@@ -92,10 +96,14 @@ export default function ChatScreen(): ReactElement {
     const [attachments, setAttachments] = useState<Attachment[]>([]);
 
     const flatListRef = useRef<FlatList<Message>>(null);
+    const isAtBottomRef = useRef(true);
     const [replyText, setReplyText] = useState("");
     const [expandedThinking, setExpandedThinking] = useState<
         Record<string, boolean>
     >({});
+    const [expandedSkill, setExpandedSkill] = useState<Record<string, boolean>>(
+        {},
+    );
     const [galleryVisible, setGalleryVisible] = useState(false);
     const [galleryAttachments, setGalleryAttachments] = useState<Attachment[]>(
         [],
@@ -385,6 +393,13 @@ export default function ChatScreen(): ReactElement {
         }));
     };
 
+    const toggleSkill = (messageId: string) => {
+        setExpandedSkill((prev) => ({
+            ...prev,
+            [messageId]: !prev[messageId],
+        }));
+    };
+
     const openGallery = (attachmentId: string, attachments: Attachment[]) => {
         const index = attachments.findIndex((a) => a.id === attachmentId);
         if (index >= 0) {
@@ -421,35 +436,30 @@ export default function ChatScreen(): ReactElement {
     const streamingSearchLevel =
         currentChat && searchSupported ? currentChat.searchLevel : "none";
 
-    const getMarkdownStyle = (role: string) => {
-        const isUser = role === "user";
+    const getMarkdownStyle = () => {
         return {
             body: {
                 fontSize: 16,
                 lineHeight: 22,
-                color: isUser ? colors.textOnAccent : colors.text,
+                color: colors.text,
             },
             code: {
-                backgroundColor: isUser
-                    ? colors.codeBackgroundOnAccent
-                    : colors.codeBackground,
-                color: isUser ? colors.textOnAccent : colors.text,
+                backgroundColor: colors.codeBackground,
+                color: colors.text,
                 paddingHorizontal: 4,
                 paddingVertical: 2,
                 borderRadius: 4,
-                fontFamily: isUser ? undefined : "monospace",
+                fontFamily: "monospace",
             },
             codeblock: {
-                backgroundColor: isUser
-                    ? colors.codeBackgroundOnAccent
-                    : colors.codeBackground,
-                color: isUser ? colors.textOnAccent : colors.text,
+                backgroundColor: colors.codeBackground,
+                color: colors.text,
                 padding: 12,
                 borderRadius: 8,
-                fontFamily: isUser ? undefined : "monospace",
+                fontFamily: "monospace",
             },
             link: {
-                color: isUser ? colors.linkOnAccent : colors.link,
+                color: colors.link,
                 textDecorationLine: "underline" as const,
             },
         };
@@ -513,17 +523,67 @@ export default function ChatScreen(): ReactElement {
         );
     };
 
-    const renderSkillInfo = (skill: Skill) => (
-        <View style={styles.skillPanel}>
-            <View style={styles.skillHeader}>
-                <Text style={styles.skillIcon}>✨</Text>
-                <Text style={styles.skillName}>{skill.name}</Text>
+    const renderSkillInfo = (skill: Skill, messageId: string) => {
+        const isExpanded = expandedSkill[messageId];
+
+        return (
+            <View style={[styles.skillPanel, styles.skillPanelOutside]}>
+                <TouchableOpacity
+                    style={[
+                        styles.skillHeader,
+                        isExpanded && styles.skillHeaderExpanded,
+                    ]}
+                    onPress={() => toggleSkill(messageId)}
+                    activeOpacity={0.7}
+                >
+                    <Text
+                        style={[
+                            styles.skillName,
+                            isExpanded && styles.skillNameExpanded,
+                        ]}
+                        numberOfLines={1}
+                    >
+                        {skill.name}
+                    </Text>
+                    <View style={styles.skillHeaderIcons}>
+                        <Text style={styles.skillIcon}>✨</Text>
+                        <Text style={styles.skillChevron}>
+                            {isExpanded ? "▼" : "◀"}
+                        </Text>
+                    </View>
+                </TouchableOpacity>
+                {isExpanded && (
+                    <View style={styles.skillContent}>
+                        {skill.description && (
+                            <Text
+                                style={[
+                                    styles.skillDescription,
+                                    isExpanded &&
+                                        styles.skillDescriptionExpanded,
+                                ]}
+                            >
+                                {skill.description}
+                            </Text>
+                        )}
+                        <View style={styles.skillPromptBox}>
+                            <ScrollView
+                                style={styles.skillPromptScroll}
+                                contentContainerStyle={
+                                    styles.skillPromptContent
+                                }
+                                nestedScrollEnabled
+                                showsVerticalScrollIndicator
+                            >
+                                <Text style={styles.skillPromptText}>
+                                    {skill.prompt}
+                                </Text>
+                            </ScrollView>
+                        </View>
+                    </View>
+                )}
             </View>
-            {skill.description && (
-                <Text style={styles.skillDescription}>{skill.description}</Text>
-            )}
-        </View>
-    );
+        );
+    };
 
     const formatMessageTime = (timestamp: number): string => {
         return new Date(timestamp).toLocaleTimeString([], {
@@ -539,13 +599,26 @@ export default function ChatScreen(): ReactElement {
         return "WEB";
     };
 
+    const getModelDisplayName = (
+        modelId: string | undefined,
+        modelList: OpenRouterModel[],
+    ): string => {
+        if (!modelId) return "Unknown model";
+        const model = modelList.find((entry) => entry.id === modelId);
+        if (model?.name) return model.name;
+        const parts = modelId.split("/");
+        return parts.length > 1 ? parts[1] : modelId;
+    };
+
     const renderMessage = ({ item }: { item: Message }) => {
         const isUser = item.role === "user";
         const hasSearchBadge =
             item.searchLevel !== undefined && item.searchLevel !== "none";
         const hasThinkingBadge =
             item.thinkingLevel !== undefined && item.thinkingLevel !== "none";
-        const showDivider = hasSearchBadge || hasThinkingBadge;
+        const hasModelBadge = Boolean(item.modelId);
+        const showDivider = hasSearchBadge || hasThinkingBadge || hasModelBadge;
+        const modelDisplayName = getModelDisplayName(item.modelId, models);
 
         return (
             <View
@@ -556,6 +629,9 @@ export default function ChatScreen(): ReactElement {
                         : styles.messageGroupAssistant,
                 ]}
             >
+                {item.skill && item.role === "user"
+                    ? renderSkillInfo(item.skill, item.id)
+                    : null}
                 {item.thinking && (
                     <View
                         style={[
@@ -589,10 +665,7 @@ export default function ChatScreen(): ReactElement {
                         isUser ? styles.userMessage : styles.assistantMessage,
                     ]}
                 >
-                    {item.skill &&
-                        item.role === "user" &&
-                        renderSkillInfo(item.skill)}
-                    <Markdown style={getMarkdownStyle(item.role)}>
+                    <Markdown style={getMarkdownStyle()}>
                         {item.content}
                     </Markdown>
                     {item.attachmentIds &&
@@ -606,7 +679,12 @@ export default function ChatScreen(): ReactElement {
                                 : styles.messageMetaRowAssistant,
                         ]}
                     >
-                        <Text style={styles.messageMetaText}>
+                        <Text
+                            style={[
+                                styles.messageMetaText,
+                                isUser && styles.messageMetaTextUser,
+                            ]}
+                        >
                             {formatMessageTime(item.createdAt)}
                         </Text>
                         {showDivider && (
@@ -616,13 +694,17 @@ export default function ChatScreen(): ReactElement {
                             <View
                                 style={[
                                     styles.messageBadge,
-                                    styles.searchBadge,
+                                    isUser
+                                        ? styles.searchBadgeUser
+                                        : styles.searchBadge,
                                 ]}
                             >
                                 <Text
                                     style={[
                                         styles.messageBadgeText,
-                                        styles.searchBadgeText,
+                                        isUser
+                                            ? styles.searchBadgeTextUser
+                                            : styles.searchBadgeText,
                                     ]}
                                 >
                                     {getSearchBadgeLabel(
@@ -648,10 +730,45 @@ export default function ChatScreen(): ReactElement {
                                 </Text>
                             </View>
                         )}
+                        {hasModelBadge && (
+                            <TouchableOpacity
+                                style={[styles.messageBadge, styles.modelBadge]}
+                                activeOpacity={0.7}
+                                onPress={() =>
+                                    Alert.alert("Model", modelDisplayName)
+                                }
+                            >
+                                <Feather
+                                    name="cpu"
+                                    size={12}
+                                    color={colors.textMuted}
+                                    style={styles.modelBadgeIcon}
+                                />
+                                <Text
+                                    style={[
+                                        styles.messageBadgeText,
+                                        styles.modelBadgeText,
+                                    ]}
+                                    numberOfLines={1}
+                                >
+                                    {modelDisplayName}
+                                </Text>
+                            </TouchableOpacity>
+                        )}
                     </View>
                 </View>
             </View>
         );
+    };
+
+    const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+        const { layoutMeasurement, contentOffset, contentSize } =
+            event.nativeEvent;
+        const paddingToBottom = 24;
+        const isAtBottom =
+            layoutMeasurement.height + contentOffset.y >=
+            contentSize.height - paddingToBottom;
+        isAtBottomRef.current = isAtBottom;
     };
 
     if (!currentChat) {
@@ -718,9 +835,15 @@ export default function ChatScreen(): ReactElement {
                     contentContainerStyle={styles.listContent}
                     style={styles.list}
                     keyboardShouldPersistTaps="handled"
-                    onContentSizeChange={() =>
-                        flatListRef.current?.scrollToEnd?.({ animated: true })
-                    }
+                    onScroll={handleScroll}
+                    scrollEventThrottle={16}
+                    onContentSizeChange={() => {
+                        if (isAtBottomRef.current) {
+                            flatListRef.current?.scrollToEnd?.({
+                                animated: true,
+                            });
+                        }
+                    }}
                 />
 
                 <MessageInput
@@ -815,7 +938,9 @@ const createStyles = (colors: ThemeColors) =>
         },
         userMessage: {
             alignSelf: "flex-end",
-            backgroundColor: colors.accent,
+            backgroundColor: colors.accentSoft,
+            borderWidth: 1,
+            borderColor: colors.accentBorder,
         },
         assistantMessage: {
             alignSelf: "flex-start",
@@ -836,6 +961,7 @@ const createStyles = (colors: ThemeColors) =>
             alignItems: "center",
             gap: 6,
             marginTop: 6,
+            flexWrap: "wrap",
         },
         messageMetaRowUser: {
             justifyContent: "flex-end",
@@ -846,6 +972,9 @@ const createStyles = (colors: ThemeColors) =>
         messageMetaText: {
             fontSize: 11,
             color: colors.textSubtle,
+        },
+        messageMetaTextUser: {
+            color: colors.textMuted,
         },
         messageMetaDivider: {
             width: 1,
@@ -871,12 +1000,35 @@ const createStyles = (colors: ThemeColors) =>
         searchBadgeText: {
             color: colors.accent,
         },
+        searchBadgeUser: {
+            backgroundColor: colors.surface,
+            borderColor: colors.accentBorder,
+        },
+        searchBadgeTextUser: {
+            color: colors.accent,
+        },
         thinkingBadge: {
             backgroundColor: colors.warningSoft,
             borderColor: colors.warningBorder,
         },
         thinkingBadgeText: {
             color: colors.warning,
+        },
+        modelBadge: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 4,
+            backgroundColor: colors.surfaceSubtle,
+            borderColor: colors.border,
+            maxWidth: 140,
+        },
+        modelBadgeIcon: {
+            marginTop: 1,
+        },
+        modelBadgeText: {
+            color: colors.textMuted,
+            textTransform: "none" as const,
+            fontWeight: "500",
         },
         thinkingPanel: {
             marginTop: 8,
@@ -923,30 +1075,84 @@ const createStyles = (colors: ThemeColors) =>
             lineHeight: 18,
         },
         skillPanel: {
-            marginBottom: 8,
-            padding: 8,
-            backgroundColor: colors.accentSoft,
-            borderRadius: 8,
+            marginTop: 8,
             borderWidth: 1,
             borderColor: colors.accentBorder,
+            backgroundColor: colors.accentSoft,
+            borderRadius: 8,
+            overflow: "hidden",
+        },
+        skillPanelOutside: {
+            marginTop: 0,
+            marginBottom: 8,
+            maxWidth: "85%",
         },
         skillHeader: {
             flexDirection: "row",
             alignItems: "center",
-            marginBottom: 4,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            backgroundColor: colors.accentSoft,
         },
-        skillIcon: {
-            fontSize: 12,
-            marginRight: 4,
+        skillHeaderExpanded: {
+            justifyContent: "flex-end",
         },
         skillName: {
             fontSize: 12,
             fontWeight: "600",
             color: colors.accent,
+            flexShrink: 1,
+            marginRight: 8,
+        },
+        skillNameExpanded: {
+            textAlign: "right",
+        },
+        skillHeaderIcons: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 4,
+        },
+        skillIcon: {
+            fontSize: 12,
+            color: colors.accent,
+        },
+        skillChevron: {
+            fontSize: 12,
+            color: colors.accent,
+        },
+        skillContent: {
+            paddingHorizontal: 12,
+            paddingTop: 8,
+            paddingBottom: 12,
+            borderTopWidth: 1,
+            borderTopColor: colors.accentBorder,
         },
         skillDescription: {
             fontSize: 11,
             color: colors.textMuted,
+            marginBottom: 8,
+        },
+        skillDescriptionExpanded: {
+            textAlign: "right",
+        },
+        skillPromptBox: {
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.surfaceSubtle,
+            borderRadius: 6,
+            overflow: "hidden",
+        },
+        skillPromptScroll: {
+            maxHeight: 160,
+        },
+        skillPromptContent: {
+            padding: 8,
+        },
+        skillPromptText: {
+            fontSize: 11,
+            lineHeight: 16,
+            color: colors.text,
+            fontFamily: "monospace",
         },
         attachmentsContainer: {
             marginTop: 8,
