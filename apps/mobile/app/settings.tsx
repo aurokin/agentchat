@@ -973,7 +973,7 @@ const createStyles = (colors: ThemeColors) =>
             marginBottom: 16,
         },
         googleButton: {
-            backgroundColor: "#4285F4",
+            backgroundColor: colors.accent,
             paddingHorizontal: 20,
             paddingVertical: 12,
             borderRadius: 8,
