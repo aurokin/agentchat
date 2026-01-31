@@ -27,11 +27,20 @@ import { useSkillsContext } from "../../../src/contexts/SkillsContext";
 import { useTheme, type ThemeColors } from "../../../src/contexts/ThemeContext";
 import {
     getApiKey,
+    loadAttachmentData,
+    saveAttachments,
+    setDefaultModel,
     setDefaultThinking,
     setDefaultSearchLevel,
 } from "../../../src/lib/storage";
-import { getAttachment, saveAttachment } from "../../../src/lib/db";
-import { sendMessage } from "@shared/core/openrouter";
+import { getAttachment, getAttachmentsByMessage } from "../../../src/lib/db";
+import {
+    sendMessage,
+    buildMessageContent,
+    OpenRouterApiErrorImpl,
+    type OpenRouterMessage,
+    type MessageContent,
+} from "@shared/core/openrouter";
 import {
     modelSupportsReasoning,
     modelSupportsSearch,
@@ -43,17 +52,24 @@ import type {
     ThinkingLevel,
     SearchLevel,
     Attachment,
+    PendingAttachment,
 } from "@shared/core/types";
-import type { Skill } from "@shared/core/skills";
+import { type Skill, getSkillSelectionUpdate } from "@shared/core/skills";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import Markdown from "react-native-markdown-display";
 import { MessageInput } from "../../../src/components/chat/MessageInput";
 import { AttachmentGallery } from "../../../src/components/chat/AttachmentGallery";
+import { v4 as uuidv4 } from "uuid";
 
 const BrainIcon = ({ size }: { size: number }) => (
     <Text style={{ fontSize: size, lineHeight: size }}>🧠</Text>
 );
+
+interface ErrorState {
+    message: string;
+    isRetryable: boolean;
+}
 
 const getChatTitleUpdate = (
     chat: ChatSession | null,
@@ -87,14 +103,25 @@ export default function ChatScreen(): ReactElement {
         favoriteModels,
         toggleFavoriteModel,
     } = useModelContext();
-    const { skills, selectedSkill, setSelectedSkill } = useSkillsContext();
+    const {
+        skills,
+        selectedSkill,
+        defaultSkill,
+        selectedSkillMode,
+        setSelectedSkill,
+        setDefaultSkill,
+    } = useSkillsContext();
     const { colors } = useTheme();
     const styles = useMemo(() => createStyles(colors), [colors]);
 
     const [inputText, setInputText] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [apiKey, setApiKey] = useState<string | null>(null);
-    const [attachments, setAttachments] = useState<Attachment[]>([]);
+    const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
+    const [error, setError] = useState<ErrorState | null>(null);
+    const [retryPayload, setRetryPayload] = useState<{
+        content: string;
+    } | null>(null);
 
     const flatListRef = useRef<FlatList<Message>>(null);
     const isAtBottomRef = useRef(true);
@@ -138,6 +165,27 @@ export default function ChatScreen(): ReactElement {
     const currentModel = models.find((m) => m.id === currentChat?.modelId);
     const reasoningSupported = modelSupportsReasoning(currentModel);
     const searchSupported = modelSupportsSearch(currentModel);
+    const chatMessages = messages[chatId] || [];
+
+    useEffect(() => {
+        if (!currentChat) return;
+        const nextSkill = getSkillSelectionUpdate({
+            messageCount: chatMessages.length,
+            defaultSkill,
+            selectedSkill,
+            selectedSkillMode,
+        });
+        if (nextSkill !== undefined) {
+            setSelectedSkill(nextSkill, { mode: "auto" });
+        }
+    }, [
+        chatMessages.length,
+        currentChat,
+        defaultSkill,
+        selectedSkill,
+        selectedSkillMode,
+        setSelectedSkill,
+    ]);
 
     useEffect(() => {
         if (!currentChat || !currentModel) return;
@@ -198,7 +246,7 @@ export default function ChatScreen(): ReactElement {
         await updateChat(updatedChat);
     };
 
-    const handleAttachmentsSelected = (newAttachments: Attachment[]) => {
+    const handleAttachmentsSelected = (newAttachments: PendingAttachment[]) => {
         setAttachments((prev) => [...prev, ...newAttachments]);
     };
 
@@ -206,135 +254,197 @@ export default function ChatScreen(): ReactElement {
         setAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
     };
 
-    const handleSend = async () => {
+    const getAttachmentBase64 = async (
+        attachment: Attachment,
+    ): Promise<string | null> => {
+        if (attachment.data.startsWith("data:")) {
+            return attachment.data.split(",")[1] ?? "";
+        }
         if (
-            (!inputText.trim() && attachments.length === 0) ||
-            isLoading ||
-            !currentChat
-        )
-            return;
-
-        const userMessageText = inputText.trim();
-        const messageCount = messages[chatId]?.length ?? 0;
-        setInputText("");
-        setAttachments([]);
-
-        const effectiveThinking = reasoningSupported
-            ? currentChat.thinking
-            : "none";
-        const effectiveSearchLevel = searchSupported
-            ? currentChat.searchLevel
-            : "none";
-
-        const skillForMessage = selectedSkill;
-        const contextContent = skillForMessage
-            ? `${skillForMessage.prompt}\n\nUser: ${userMessageText}`
-            : userMessageText;
-
-        const attachmentIds: string[] = [];
-
-        if (attachments.length > 0) {
-            const savedAttachments = await Promise.all(
-                attachments.map(async (attachment) => {
-                    const savedAttachment = {
-                        ...attachment,
-                        messageId: "", // Will be updated after message is created
-                    };
-                    const id = saveAttachment(savedAttachment);
-                    attachmentIds.push(id);
-                    return savedAttachment;
-                }),
-            );
+            attachment.data.startsWith("file:") ||
+            attachment.data.startsWith("/")
+        ) {
+            try {
+                return await loadAttachmentData(attachment);
+            } catch {
+                return null;
+            }
         }
+        return attachment.data;
+    };
 
-        const userMessage = await addMessage({
-            sessionId: chatId,
-            role: "user",
-            content: userMessageText,
-            contextContent: contextContent,
-            skill: skillForMessage,
-            modelId: currentChat.modelId,
-            thinkingLevel: effectiveThinking,
-            searchLevel: effectiveSearchLevel,
-            attachmentIds: attachmentIds.length > 0 ? attachmentIds : undefined,
-        });
+    const buildOpenRouterMessages = async (
+        messageList: Message[],
+    ): Promise<OpenRouterMessage[]> => {
+        const openRouterMessages: OpenRouterMessage[] = [];
 
-        if (attachmentIds.length > 0) {
-            await Promise.all(
-                attachmentIds.map((id) => {
-                    const attachment = getAttachment(id);
-                    if (attachment) {
-                        saveAttachment({
-                            ...attachment,
-                            messageId: userMessage.id,
-                        });
+        for (const message of messageList) {
+            let content: MessageContent = message.contextContent;
+
+            if (message.attachmentIds && message.attachmentIds.length > 0) {
+                const attachments = getAttachmentsByMessage(message.id);
+                if (attachments.length > 0) {
+                    const attachmentsWithData = (
+                        await Promise.all(
+                            attachments.map(async (attachment) => {
+                                const data =
+                                    await getAttachmentBase64(attachment);
+                                if (!data) return null;
+                                return { ...attachment, data };
+                            }),
+                        )
+                    ).filter((attachment): attachment is Attachment =>
+                        Boolean(attachment),
+                    );
+
+                    if (attachmentsWithData.length > 0) {
+                        content = buildMessageContent(
+                            message.contextContent,
+                            attachmentsWithData,
+                        );
                     }
-                }),
-            );
+                }
+            }
+
+            openRouterMessages.push({
+                role: message.role,
+                content,
+            });
         }
 
-        if (skillForMessage) {
-            setSelectedSkill(null);
+        return openRouterMessages;
+    };
+
+    const handleSendMessage = async (
+        content: string,
+        pendingAttachments?: PendingAttachment[],
+    ) => {
+        const chatSnapshot = currentChat;
+        const messagesSnapshot = [...chatMessages];
+
+        if (!apiKey) {
+            setError({
+                message: "Please add your OpenRouter API key in Settings",
+                isRetryable: false,
+            });
+            setRetryPayload(null);
+            return;
         }
 
-        const updatedChat = getChatTitleUpdate(
-            currentChat,
-            userMessageText,
-            messageCount,
-        );
-        if (updatedChat) {
-            await updateChat(updatedChat);
+        if (!chatSnapshot) {
+            setError({ message: "No chat selected", isRetryable: false });
+            setRetryPayload(null);
+            return;
         }
 
         setIsLoading(true);
+        setError(null);
+        setRetryPayload(null);
         setStreamingMessageId(null);
 
-        let streamingMessage: Message | null = null;
+        const skillForMessage = selectedSkill;
+        if (skillForMessage) {
+            setDefaultSkill(skillForMessage);
+        }
 
         try {
-            if (!apiKey) {
-                await addMessage({
-                    sessionId: chatId,
-                    role: "assistant",
-                    content:
-                        "Please set your OpenRouter API key in Settings to send messages.",
-                    contextContent:
-                        "Please set your OpenRouter API key in Settings to send messages.",
-                    thinkingLevel: effectiveThinking,
-                    searchLevel: effectiveSearchLevel,
-                });
-                setIsLoading(false);
-                return;
+            const activeModel = models.find(
+                (model) => model.id === chatSnapshot.modelId,
+            );
+            const supportsReasoning = modelSupportsReasoning(activeModel);
+            const supportsSearch = modelSupportsSearch(activeModel);
+
+            await setDefaultModel(chatSnapshot.modelId);
+            if (supportsReasoning) {
+                await setDefaultThinking(chatSnapshot.thinking);
+            }
+            if (supportsSearch) {
+                await setDefaultSearchLevel(chatSnapshot.searchLevel);
             }
 
-            if (reasoningSupported) {
-                await setDefaultThinking(effectiveThinking);
-            }
-            if (searchSupported) {
-                await setDefaultSearchLevel(effectiveSearchLevel);
-            }
+            const effectiveThinking = supportsReasoning
+                ? chatSnapshot.thinking
+                : "none";
+            const effectiveSearchLevel =
+                supportsSearch && chatSnapshot.searchLevel !== "none"
+                    ? chatSnapshot.searchLevel
+                    : "none";
 
-            const chatMessages = messages[chatId] || [];
-            const openRouterMessages = chatMessages.map((msg: Message) => ({
-                role: msg.role as "user" | "assistant" | "system",
-                content: msg.contextContent,
-            }));
+            const contextContent = skillForMessage
+                ? `${skillForMessage.prompt}\n\nUser: ${content}`
+                : content;
 
             const clonedSkill = skillForMessage
-                ? {
-                      ...skillForMessage,
-                      createdAt: Date.now(),
-                  }
+                ? { ...skillForMessage, createdAt: Date.now() }
                 : null;
 
-            streamingMessage = await addMessage({
-                sessionId: chatId,
+            const messageId = uuidv4();
+            let attachmentIds: string[] | undefined;
+
+            if (pendingAttachments && pendingAttachments.length > 0) {
+                const saved = await saveAttachments(
+                    pendingAttachments,
+                    messageId,
+                );
+                attachmentIds = saved.map((attachment) => attachment.id);
+            }
+
+            await addMessage({
+                id: messageId,
+                sessionId: chatSnapshot.id,
+                role: "user",
+                content: content,
+                contextContent: contextContent,
+                skill: clonedSkill,
+                modelId: chatSnapshot.modelId,
+                thinkingLevel: effectiveThinking,
+                searchLevel: effectiveSearchLevel,
+                attachmentIds,
+            });
+
+            setSelectedSkill(null, { mode: "auto" });
+
+            const updatedChat = getChatTitleUpdate(
+                chatSnapshot,
+                content,
+                messagesSnapshot.length,
+            );
+            if (updatedChat) {
+                await updateChat(updatedChat);
+            }
+
+            const openRouterMessages =
+                await buildOpenRouterMessages(messagesSnapshot);
+
+            const newUserAttachments = pendingAttachments?.length
+                ? pendingAttachments.map((attachment) => ({
+                      id: attachment.id,
+                      messageId,
+                      type: "image" as const,
+                      mimeType: attachment.mimeType,
+                      data: attachment.data,
+                      width: attachment.width,
+                      height: attachment.height,
+                      size: attachment.size,
+                      createdAt: Date.now(),
+                  }))
+                : undefined;
+
+            openRouterMessages.push({
+                role: "user",
+                content: newUserAttachments
+                    ? buildMessageContent(contextContent, newUserAttachments)
+                    : contextContent,
+            });
+
+            let streamingMessage: Message | null = await addMessage({
+                sessionId: chatSnapshot.id,
                 role: "assistant",
                 content: "",
                 contextContent: "",
                 thinking: undefined,
-                modelId: currentChat.modelId,
-                skill: clonedSkill,
+                modelId: chatSnapshot.modelId,
+                skill: null,
                 thinkingLevel: effectiveThinking,
                 searchLevel: effectiveSearchLevel,
             });
@@ -357,19 +467,16 @@ export default function ChatScreen(): ReactElement {
 
             const response = await sendMessage(
                 apiKey,
-                [
-                    ...openRouterMessages,
-                    { role: "user", content: contextContent },
-                ],
+                openRouterMessages,
                 {
-                    id: currentChat.id,
-                    modelId: currentChat.modelId,
+                    id: chatSnapshot.id,
+                    modelId: chatSnapshot.modelId,
                     thinking: effectiveThinking,
                     searchLevel: effectiveSearchLevel,
                 },
-                currentModel,
+                activeModel,
                 (chunk: string, thinking?: string) => {
-                    if (thinking) {
+                    if (thinking !== undefined) {
                         assistantThinking += thinking;
                     } else {
                         assistantContent += chunk;
@@ -394,25 +501,22 @@ export default function ChatScreen(): ReactElement {
                 streamingMessage = updated;
                 await updateMessage(updated);
             }
-        } catch (error) {
-            const errorMessage =
-                error instanceof Error ? error.message : "Unknown error";
-            if (streamingMessage) {
-                await updateMessage({
-                    ...streamingMessage,
-                    content: `Error: ${errorMessage}`,
-                    contextContent: `Error: ${errorMessage}`,
-                    thinking: undefined,
+        } catch (err) {
+            if (err instanceof OpenRouterApiErrorImpl) {
+                setError({
+                    message: err.message,
+                    isRetryable: err.isRetryable,
                 });
+                if (err.isRetryable) {
+                    setRetryPayload({ content });
+                }
             } else {
-                await addMessage({
-                    sessionId: chatId,
-                    role: "assistant",
-                    content: `Error: ${errorMessage}`,
-                    contextContent: `Error: ${errorMessage}`,
-                    thinkingLevel: effectiveThinking,
-                    searchLevel: effectiveSearchLevel,
-                });
+                const message =
+                    err instanceof Error
+                        ? err.message
+                        : "Failed to send message";
+                setError({ message, isRetryable: true });
+                setRetryPayload({ content });
             }
         } finally {
             setIsLoading(false);
@@ -420,7 +524,52 @@ export default function ChatScreen(): ReactElement {
         }
     };
 
+    const handleSend = async () => {
+        if (
+            (!inputText.trim() && attachments.length === 0) ||
+            isLoading ||
+            !currentChat
+        )
+            return;
+
+        const content = inputText.trim();
+        const pending = attachments;
+        setInputText("");
+        setAttachments([]);
+
+        await handleSendMessage(content, pending);
+    };
+
+    const handleRetry = async () => {
+        if (!retryPayload || isLoading) return;
+        const { content } = retryPayload;
+        setRetryPayload(null);
+        setError(null);
+        await handleSendMessage(content);
+    };
+
     const handleDeleteChat = async () => {
+        if (chatMessages.length > 0) {
+            Alert.alert(
+                "Delete Chat",
+                "This chat has messages. Delete it and all attachments?",
+                [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                        text: "Delete",
+                        style: "destructive",
+                        onPress: () => {
+                            void (async () => {
+                                await deleteChat(chatId);
+                                router.replace("/");
+                            })();
+                        },
+                    },
+                ],
+            );
+            return;
+        }
+
         await deleteChat(chatId);
         router.replace("/");
     };
@@ -468,8 +617,6 @@ export default function ChatScreen(): ReactElement {
 
         return allAttachments;
     };
-
-    const chatMessages = messages[chatId] || [];
 
     const getMarkdownStyle = () => {
         return {
@@ -542,7 +689,10 @@ export default function ChatScreen(): ReactElement {
         );
     };
 
-    const renderAttachments = (attachmentIds: string[]) => {
+    const renderAttachments = (
+        attachmentIds: string[],
+        containerStyle?: object,
+    ) => {
         if (!attachmentIds || attachmentIds.length === 0) return null;
 
         const attachments = attachmentIds
@@ -552,7 +702,7 @@ export default function ChatScreen(): ReactElement {
         if (attachments.length === 0) return null;
 
         return (
-            <View style={styles.attachmentsContainer}>
+            <View style={[styles.attachmentsContainer, containerStyle]}>
                 {attachments.map(renderAttachmentThumbnail)}
             </View>
         );
@@ -661,6 +811,8 @@ export default function ChatScreen(): ReactElement {
         const hasModelBadge = Boolean(item.modelId);
         const showDivider = hasSearchBadge || hasThinkingBadge || hasModelBadge;
         const modelDisplayName = getModelDisplayName(item.modelId, models);
+        const hasAttachments =
+            item.attachmentIds !== undefined && item.attachmentIds.length > 0;
 
         return (
             <View
@@ -673,6 +825,12 @@ export default function ChatScreen(): ReactElement {
             >
                 {item.skill && item.role === "user"
                     ? renderSkillInfo(item.skill, item.id)
+                    : null}
+                {isUser && hasAttachments
+                    ? renderAttachments(
+                          item.attachmentIds as string[],
+                          styles.attachmentsBeforeContent,
+                      )
                     : null}
                 {item.thinking && (
                     <View
@@ -734,9 +892,9 @@ export default function ChatScreen(): ReactElement {
                         ) : !isUser ? (
                             <Text style={styles.emptyMessageText}>...</Text>
                         ) : null}
-                        {item.attachmentIds &&
-                            item.attachmentIds.length > 0 &&
-                            renderAttachments(item.attachmentIds)}
+                        {!isUser &&
+                            hasAttachments &&
+                            renderAttachments(item.attachmentIds as string[])}
                     </View>
                 )}
                 <View
@@ -868,6 +1026,32 @@ export default function ChatScreen(): ReactElement {
                 </TouchableOpacity>
             </View>
 
+            {error && (
+                <View style={styles.errorBanner}>
+                    <Feather
+                        name="alert-circle"
+                        size={16}
+                        color={colors.danger}
+                    />
+                    <Text style={styles.errorBannerText}>{error.message}</Text>
+                    {error.isRetryable && (
+                        <TouchableOpacity
+                            style={styles.retryButton}
+                            onPress={handleRetry}
+                            disabled={isLoading}
+                            activeOpacity={0.7}
+                        >
+                            <Feather
+                                name="refresh-cw"
+                                size={14}
+                                color={colors.danger}
+                            />
+                            <Text style={styles.retryText}>Retry</Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
+            )}
+
             <KeyboardAvoidingView
                 behavior={Platform.OS === "ios" ? "padding" : "height"}
                 style={styles.content}
@@ -896,7 +1080,6 @@ export default function ChatScreen(): ReactElement {
                     onInputChange={setInputText}
                     onSend={handleSend}
                     isLoading={isLoading}
-                    disabled={!apiKey}
                     models={models}
                     selectedModelId={currentChat.modelId}
                     onModelChange={handleModelChange}
@@ -910,10 +1093,13 @@ export default function ChatScreen(): ReactElement {
                     onSearchChange={handleSearchChange}
                     skills={skills}
                     selectedSkill={selectedSkill}
-                    onSkillSelect={setSelectedSkill}
+                    onSkillSelect={(skill) =>
+                        setSelectedSkill(skill, { mode: "manual" })
+                    }
                     attachments={attachments}
                     onAttachmentsChange={handleAttachmentsSelected}
                     onRemoveAttachment={handleRemoveAttachment}
+                    sessionId={chatId}
                 />
             </KeyboardAvoidingView>
 
@@ -956,6 +1142,37 @@ const createStyles = (colors: ThemeColors) =>
         },
         deleteButton: {
             marginLeft: 8,
+        },
+        errorBanner: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            paddingHorizontal: 16,
+            paddingVertical: 10,
+            backgroundColor: colors.dangerSoft,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.danger,
+        },
+        errorBannerText: {
+            flex: 1,
+            fontSize: 13,
+            color: colors.danger,
+        },
+        retryButton: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 4,
+            paddingHorizontal: 8,
+            paddingVertical: 4,
+            borderRadius: 6,
+            borderWidth: 1,
+            borderColor: colors.danger,
+            backgroundColor: colors.dangerSoft,
+        },
+        retryText: {
+            fontSize: 12,
+            fontWeight: "600",
+            color: colors.danger,
         },
         listContent: {
             padding: 16,
@@ -1221,6 +1438,10 @@ const createStyles = (colors: ThemeColors) =>
             flexDirection: "row",
             flexWrap: "wrap",
             gap: 8,
+        },
+        attachmentsBeforeContent: {
+            marginTop: 0,
+            marginBottom: 8,
         },
         attachmentThumbnailContainer: {
             alignItems: "flex-start",

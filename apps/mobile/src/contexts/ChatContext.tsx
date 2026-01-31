@@ -39,7 +39,7 @@ interface ChatContextValue {
     updateChat: (chat: ChatSession) => Promise<void>;
     loadMessages: (chatId: string) => Promise<void>;
     addMessage: (
-        message: Omit<Message, "id" | "createdAt">,
+        message: Omit<Message, "createdAt" | "id"> & { id?: string },
     ) => Promise<Message>;
     updateMessage: (message: Message) => Promise<void>;
     setDefaultModel: (modelId: string) => void;
@@ -171,13 +171,13 @@ export function ChatProvider({
 
     const addMessage = useCallback(
         async (
-            messageData: Omit<Message, "id" | "createdAt">,
+            messageData: Omit<Message, "createdAt" | "id"> & { id?: string },
         ): Promise<Message> => {
             if (!currentChat) throw new Error("No current chat");
 
             const message: Message = {
                 ...messageData,
-                id: uuidv4(),
+                id: messageData.id ?? uuidv4(),
                 createdAt: Date.now(),
             };
 

@@ -15,7 +15,7 @@ import {
 import type { OpenRouterModel } from "@shared/core/models";
 import type { ThinkingLevel, SearchLevel } from "@shared/core/types";
 import type { Skill } from "@shared/core/skills";
-import type { Attachment } from "@shared/core/types";
+import type { PendingAttachment } from "@shared/core/types";
 import { ModelSelector } from "./ModelSelector";
 import { ThinkingToggle } from "./ThinkingToggle";
 import { SearchToggle } from "./SearchToggle";
@@ -46,9 +46,10 @@ interface MessageInputProps {
     skills: Skill[];
     selectedSkill: Skill | null;
     onSkillSelect: (skill: Skill | null) => void;
-    attachments: Attachment[];
-    onAttachmentsChange: (attachments: Attachment[]) => void;
+    attachments: PendingAttachment[];
+    onAttachmentsChange: (attachments: PendingAttachment[]) => void;
     onRemoveAttachment: (attachmentId: string) => void;
+    sessionId?: string;
 }
 
 export function MessageInput({
@@ -74,6 +75,7 @@ export function MessageInput({
     attachments,
     onAttachmentsChange,
     onRemoveAttachment,
+    sessionId,
 }: MessageInputProps): ReactElement {
     const { colors } = useTheme();
     const insets = useSafeAreaInsets();
@@ -110,7 +112,11 @@ export function MessageInput({
         };
     }, []);
 
-    const renderAttachmentThumbnail = ({ item }: { item: Attachment }) => {
+    const renderAttachmentThumbnail = ({
+        item,
+    }: {
+        item: PendingAttachment;
+    }) => {
         const aspectRatio =
             item.width && item.height ? item.width / item.height : 1;
         const thumbnailWidth = 60;
@@ -119,7 +125,7 @@ export function MessageInput({
         return (
             <View style={styles.attachmentThumbnailContainer}>
                 <Image
-                    source={{ uri: item.data }}
+                    source={{ uri: item.preview }}
                     style={[
                         styles.attachmentThumbnail,
                         { width: thumbnailWidth, height: thumbnailHeight },
@@ -208,6 +214,7 @@ export function MessageInput({
                     <AttachmentPicker
                         onAttachmentsSelected={onAttachmentsChange}
                         disabled={isLoading}
+                        sessionId={sessionId}
                     />
                 )}
                 <TouchableOpacity
