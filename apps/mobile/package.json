@@ -6,8 +6,8 @@
         "start": "expo start",
         "android": "expo start --android",
         "ios": "expo start --ios",
-        "android:local": "bunx eas-cli build --profile development --platform android --local --output=./build",
-        "ios:local": "bunx eas-cli build --profile development --platform ios --local --output=./build",
+        "android:local": "mkdir -p build/android && TIMESTAMP=$(date +%Y%m%d-%H%M%S) && bunx eas-cli build --profile development --platform android --local --output=./build/android/routerchat-dev-${TIMESTAMP}.apk",
+        "ios:local": "mkdir -p build/ios && TIMESTAMP=$(date +%Y%m%d-%H%M%S) && bunx eas-cli build --profile development --platform ios --local --output=./build/ios/routerchat-dev-simulator-${TIMESTAMP}.tar.gz",
         "dev-client": "expo start --dev-client",
         "web": "expo start --web",
         "typecheck": "tsc --noEmit"

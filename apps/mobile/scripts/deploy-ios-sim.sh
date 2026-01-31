@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BUILD_DIR="${1:-$(pwd)/build}"
+DEFAULT_BUILD_DIR="$(pwd)/build/ios"
+FALLBACK_BUILD_DIR="$(pwd)/build"
+BUILD_DIR="${1:-$DEFAULT_BUILD_DIR}"
+
+if [[ -z "${1-}" && ! -d "$BUILD_DIR" && -d "$FALLBACK_BUILD_DIR" ]]; then
+    BUILD_DIR="$FALLBACK_BUILD_DIR"
+fi
 
 if [[ ! -d "$BUILD_DIR" ]]; then
     echo "Build directory not found: $BUILD_DIR" >&2
