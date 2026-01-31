@@ -4,11 +4,10 @@ import {
     Text,
     TouchableOpacity,
     StyleSheet,
-    SafeAreaView,
     ScrollView,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 interface OnboardingScreenProps {
     onComplete: () => Promise<void>;

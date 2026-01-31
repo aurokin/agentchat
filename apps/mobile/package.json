@@ -6,8 +6,8 @@
         "start": "expo start",
         "android": "expo start --android",
         "ios": "expo start --ios",
-        "android:local": "bunx eas-cli build --profile development --platform android --local",
-        "ios:local": "bunx eas-cli build --profile development --platform ios --local",
+        "android:local": "bunx eas-cli build --profile development --platform android --local --output=./build",
+        "ios:local": "bunx eas-cli build --profile development --platform ios --local --output=./build",
         "dev-client": "expo start --dev-client",
         "web": "expo start --web",
         "typecheck": "tsc --noEmit"

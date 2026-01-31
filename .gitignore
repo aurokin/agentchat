@@ -8,6 +8,7 @@ dist
 .next
 
 # mobile build artifacts
+apps/mobile/build/
 *.apk
 *.aab
 *.ipa

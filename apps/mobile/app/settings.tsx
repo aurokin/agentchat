@@ -5,7 +5,6 @@ import {
     TextInput,
     TouchableOpacity,
     StyleSheet,
-    SafeAreaView,
     ActivityIndicator,
     ScrollView,
     Alert,
@@ -24,7 +23,7 @@ import {
     type UserTheme,
 } from "../src/lib/storage";
 import { validateApiKey } from "@shared/core/openrouter";
-import { SafeAreaProvider } from "react-native-safe-area-context";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { useAuthContext } from "../src/lib/convex/AuthContext";
 import { getConvexUrlOverride, getEnvConvexUrl } from "../src/lib/convex";
 import { formatBytes } from "../src/lib/storage";
