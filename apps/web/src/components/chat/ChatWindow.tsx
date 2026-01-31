@@ -25,6 +25,7 @@ import {
     type ChatSession,
 } from "@/lib/types";
 import { type Skill, getSkillSelectionUpdate } from "@shared/core/skills";
+import { trimTrailingEmptyLines } from "@shared/core/text";
 import * as storage from "@/lib/storage";
 import { generateUUID } from "@/lib/utils";
 import { Hexagon, Sparkles, AlertCircle, RefreshCw } from "lucide-react";
@@ -513,6 +514,14 @@ export function ChatWindow() {
                     });
                 },
             );
+
+            const trimmedResponse = trimTrailingEmptyLines(fullResponse) ?? "";
+            const trimmedThinking = trimTrailingEmptyLines(fullThinking);
+            updateMessage(assistantMessage.id, {
+                content: trimmedResponse,
+                contextContent: trimmedResponse,
+                thinking: trimmedThinking || undefined,
+            });
         } catch (err) {
             if (err instanceof OpenRouterApiError) {
                 setError({

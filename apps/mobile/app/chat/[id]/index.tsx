@@ -55,6 +55,7 @@ import type {
     PendingAttachment,
 } from "@shared/core/types";
 import { type Skill, getSkillSelectionUpdate } from "@shared/core/skills";
+import { trimTrailingEmptyLines } from "@shared/core/text";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import Markdown from "react-native-markdown-display";
@@ -546,13 +547,15 @@ export default function ChatScreen(): ReactElement {
                 assistantContent || response.choices[0]?.message?.content || "";
             const finalThinking =
                 assistantThinking || response.choices[0]?.message?.thinking;
+            const trimmedContent = trimTrailingEmptyLines(finalContent) ?? "";
+            const trimmedThinking = trimTrailingEmptyLines(finalThinking);
 
             if (streamingMessage) {
                 const updated: Message = {
                     ...streamingMessage,
-                    content: finalContent,
-                    contextContent: finalContent,
-                    thinking: finalThinking || undefined,
+                    content: trimmedContent,
+                    contextContent: trimmedContent,
+                    thinking: trimmedThinking || undefined,
                     modelId: response.model ?? streamingMessage.modelId,
                 };
                 streamingMessage = updated;
@@ -1404,8 +1407,8 @@ const createStyles = (colors: ThemeColors) =>
             overflow: "hidden",
         },
         thinkingPanelOutside: {
-            marginTop: 0,
-            marginBottom: 8,
+            marginTop: 6,
+            marginBottom: 4,
             maxWidth: "85%",
         },
         thinkingHeader: {
@@ -1433,14 +1436,15 @@ const createStyles = (colors: ThemeColors) =>
         },
         thinkingContent: {
             paddingHorizontal: 12,
-            paddingBottom: 12,
+            paddingTop: 8,
+            paddingBottom: 8,
             borderTopWidth: 1,
             borderTopColor: colors.warningBorder,
         },
         thinkingText: {
-            fontSize: 12,
+            fontSize: 13,
             color: colors.textMuted,
-            lineHeight: 18,
+            lineHeight: 19,
         },
         skillPanel: {
             marginTop: 8,
@@ -1451,8 +1455,8 @@ const createStyles = (colors: ThemeColors) =>
             overflow: "hidden",
         },
         skillPanelOutside: {
-            marginTop: 0,
-            marginBottom: 8,
+            marginTop: 6,
+            marginBottom: 4,
             maxWidth: "85%",
         },
         skillHeader: {
@@ -1466,7 +1470,7 @@ const createStyles = (colors: ThemeColors) =>
             justifyContent: "flex-end",
         },
         skillName: {
-            fontSize: 12,
+            fontSize: 13,
             fontWeight: "600",
             color: colors.accent,
             flexShrink: 1,
@@ -1490,15 +1494,16 @@ const createStyles = (colors: ThemeColors) =>
         },
         skillContent: {
             paddingHorizontal: 12,
-            paddingTop: 8,
-            paddingBottom: 12,
+            paddingTop: 10,
+            paddingBottom: 8,
             borderTopWidth: 1,
             borderTopColor: colors.accentBorder,
         },
         skillDescription: {
-            fontSize: 11,
+            fontSize: 12,
+            lineHeight: 16,
             color: colors.textMuted,
-            marginBottom: 8,
+            marginBottom: 6,
         },
         skillDescriptionExpanded: {
             textAlign: "right",
@@ -1517,8 +1522,8 @@ const createStyles = (colors: ThemeColors) =>
             padding: 8,
         },
         skillPromptText: {
-            fontSize: 11,
-            lineHeight: 16,
+            fontSize: 12,
+            lineHeight: 18,
             color: colors.text,
             fontFamily: "monospace",
         },
