@@ -7,6 +7,16 @@ dist
 *.tgz
 .next
 
+# mobile build artifacts
+*.apk
+*.aab
+*.ipa
+*.app
+*.xcarchive
+*.dSYM
+*.dSYMs
+*.tar.gz
+
 # code coverage
 coverage
 *.lcov

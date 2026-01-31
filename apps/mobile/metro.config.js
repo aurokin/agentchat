@@ -7,7 +7,7 @@ const workspaceRoot = path.resolve(projectRoot, "../..");
 /** @type {import('expo/metro-config').MetroConfig} */
 const config = getDefaultConfig(projectRoot);
 
-config.watchFolders = [workspaceRoot];
+config.watchFolders = [...config.watchFolders, workspaceRoot];
 config.resolver.sourceExts = [...config.resolver.sourceExts, "mjs"];
 
 module.exports = config;
