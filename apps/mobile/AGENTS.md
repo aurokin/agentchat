@@ -1,5 +1,9 @@
 # Mobile App Database Patterns
 
+## Streaming
+
+- React Native uses XHR streaming for OpenRouter (fetch buffers); see `packages/shared/src/core/openrouter/index.ts`
+
 ## SQLite Schema
 
 The mobile app uses `expo-sqlite` with `better-sqlite3` for offline-first storage. The schema mirrors the web's IndexedDB schema in `apps/web/src/lib/db.ts`.

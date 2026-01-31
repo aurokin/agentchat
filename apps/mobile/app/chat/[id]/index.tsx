@@ -71,6 +71,16 @@ interface ErrorState {
     isRetryable: boolean;
 }
 
+interface StreamingDraft {
+    id: string;
+    content: string;
+    thinking: string;
+    hasReceivedChunk: boolean;
+    isThinkingStreaming: boolean;
+}
+
+const THINKING_STREAM_TIMEOUT_MS = 800;
+
 const getChatTitleUpdate = (
     chat: ChatSession | null,
     content: string,
@@ -128,6 +138,12 @@ export default function ChatScreen(): ReactElement {
     const [streamingMessageId, setStreamingMessageId] = useState<string | null>(
         null,
     );
+    const [streamingDraft, setStreamingDraft] = useState<StreamingDraft | null>(
+        null,
+    );
+    const thinkingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+        null,
+    );
     const [expandedThinking, setExpandedThinking] = useState<
         Record<string, boolean>
     >({});
@@ -152,6 +168,14 @@ export default function ChatScreen(): ReactElement {
             setApiKey(key);
         };
         loadApiKey();
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            if (thinkingTimeoutRef.current) {
+                clearTimeout(thinkingTimeoutRef.current);
+            }
+        };
     }, []);
 
     useEffect(() => {
@@ -321,6 +345,9 @@ export default function ChatScreen(): ReactElement {
     ) => {
         const chatSnapshot = currentChat;
         const messagesSnapshot = [...chatMessages];
+        let streamingMessage: Message | null = null;
+        let assistantContent = "";
+        let assistantThinking = "";
 
         if (!apiKey) {
             setError({
@@ -341,6 +368,7 @@ export default function ChatScreen(): ReactElement {
         setError(null);
         setRetryPayload(null);
         setStreamingMessageId(null);
+        setStreamingDraft(null);
 
         const skillForMessage = selectedSkill;
         if (skillForMessage) {
@@ -437,7 +465,7 @@ export default function ChatScreen(): ReactElement {
                     : contextContent,
             });
 
-            let streamingMessage: Message | null = await addMessage({
+            streamingMessage = await addMessage({
                 sessionId: chatSnapshot.id,
                 role: "assistant",
                 content: "",
@@ -449,20 +477,48 @@ export default function ChatScreen(): ReactElement {
                 searchLevel: effectiveSearchLevel,
             });
             setStreamingMessageId(streamingMessage.id);
+            setStreamingDraft({
+                id: streamingMessage.id,
+                content: "",
+                thinking: "",
+                hasReceivedChunk: false,
+                isThinkingStreaming: false,
+            });
 
-            let assistantContent = "";
-            let assistantThinking = "";
+            const streamingId = streamingMessage.id;
+            const updateDraft = (
+                updater: (draft: StreamingDraft) => StreamingDraft,
+            ) => {
+                setStreamingDraft((prev) => {
+                    if (!prev || prev.id !== streamingId) return prev;
+                    return updater(prev);
+                });
+            };
 
-            const updateStreamingMessage = (nextContent: string) => {
-                if (!streamingMessage) return;
-                const updated: Message = {
-                    ...streamingMessage,
-                    content: nextContent,
-                    contextContent: nextContent,
-                    thinking: assistantThinking || undefined,
-                };
-                streamingMessage = updated;
-                void updateMessage(updated);
+            const markThinkingStreaming = (delta: string) => {
+                updateDraft((draft) => ({
+                    ...draft,
+                    thinking: draft.thinking + delta,
+                    hasReceivedChunk: true,
+                    isThinkingStreaming: true,
+                }));
+                if (thinkingTimeoutRef.current) {
+                    clearTimeout(thinkingTimeoutRef.current);
+                }
+                thinkingTimeoutRef.current = setTimeout(() => {
+                    setStreamingDraft((prev) => {
+                        if (!prev || prev.id !== streamingId) return prev;
+                        return { ...prev, isThinkingStreaming: false };
+                    });
+                }, THINKING_STREAM_TIMEOUT_MS);
+            };
+
+            const appendContent = (delta: string) => {
+                updateDraft((draft) => ({
+                    ...draft,
+                    content: draft.content + delta,
+                    hasReceivedChunk: true,
+                }));
             };
 
             const response = await sendMessage(
@@ -478,10 +534,11 @@ export default function ChatScreen(): ReactElement {
                 (chunk: string, thinking?: string) => {
                     if (thinking !== undefined) {
                         assistantThinking += thinking;
+                        markThinkingStreaming(thinking);
                     } else {
                         assistantContent += chunk;
+                        appendContent(chunk);
                     }
-                    updateStreamingMessage(assistantContent);
                 },
             );
 
@@ -502,6 +559,16 @@ export default function ChatScreen(): ReactElement {
                 await updateMessage(updated);
             }
         } catch (err) {
+            if (streamingMessage && (assistantContent || assistantThinking)) {
+                const updated: Message = {
+                    ...streamingMessage,
+                    content: assistantContent,
+                    contextContent: assistantContent,
+                    thinking: assistantThinking || undefined,
+                };
+                streamingMessage = updated;
+                await updateMessage(updated);
+            }
             if (err instanceof OpenRouterApiErrorImpl) {
                 setError({
                     message: err.message,
@@ -521,6 +588,11 @@ export default function ChatScreen(): ReactElement {
         } finally {
             setIsLoading(false);
             setStreamingMessageId(null);
+            setStreamingDraft(null);
+            if (thinkingTimeoutRef.current) {
+                clearTimeout(thinkingTimeoutRef.current);
+                thinkingTimeoutRef.current = null;
+            }
         }
     };
 
@@ -798,12 +870,24 @@ export default function ChatScreen(): ReactElement {
     const renderMessage = ({ item }: { item: Message }) => {
         const isUser = item.role === "user";
         const isStreamingMessage = isLoading && streamingMessageId === item.id;
+        const draft =
+            isStreamingMessage && streamingDraft?.id === item.id
+                ? streamingDraft
+                : null;
+        const displayContent = draft ? draft.content : item.content;
+        const displayThinking = draft
+            ? draft.thinking || item.thinking
+            : item.thinking;
+        const hasReceivedChunk = draft
+            ? draft.hasReceivedChunk
+            : Boolean(item.content || item.thinking);
         const showThinkingIndicator =
-            isStreamingMessage && !item.content && Boolean(item.thinking);
+            isStreamingMessage &&
+            Boolean(displayThinking) &&
+            (draft?.isThinkingStreaming ?? !displayContent);
         const hideContentWhileReasoning =
-            isStreamingMessage && Boolean(item.thinking) && !item.content;
-        const showGenerating =
-            isStreamingMessage && !item.content && !item.thinking;
+            isStreamingMessage && Boolean(displayThinking) && !displayContent;
+        const showGenerating = isStreamingMessage && !hasReceivedChunk;
         const hasSearchBadge =
             item.searchLevel !== undefined && item.searchLevel !== "none";
         const hasThinkingBadge =
@@ -832,7 +916,7 @@ export default function ChatScreen(): ReactElement {
                           styles.attachmentsBeforeContent,
                       )
                     : null}
-                {item.thinking && (
+                {displayThinking && (
                     <View
                         style={[
                             styles.thinkingPanel,
@@ -860,7 +944,7 @@ export default function ChatScreen(): ReactElement {
                         {expandedThinking[item.id] && (
                             <View style={styles.thinkingContent}>
                                 <Text style={styles.thinkingText}>
-                                    {item.thinking}
+                                    {displayThinking}
                                 </Text>
                             </View>
                         )}
@@ -885,9 +969,9 @@ export default function ChatScreen(): ReactElement {
                                     Generating...
                                 </Text>
                             </View>
-                        ) : item.content ? (
+                        ) : displayContent ? (
                             <Markdown style={getMarkdownStyle()}>
-                                {item.content}
+                                {displayContent}
                             </Markdown>
                         ) : !isUser ? (
                             <Text style={styles.emptyMessageText}>...</Text>
@@ -1059,6 +1143,11 @@ export default function ChatScreen(): ReactElement {
                 <FlatList
                     ref={flatListRef}
                     data={chatMessages}
+                    extraData={{
+                        streamingDraft,
+                        streamingMessageId,
+                        isLoading,
+                    }}
                     keyExtractor={(item) => item.id}
                     renderItem={renderMessage}
                     contentContainerStyle={styles.listContent}
