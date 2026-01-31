@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, type ReactElement } from "react";
+import React, { useState, useMemo, type ReactElement } from "react";
 import {
     View,
     Text,
@@ -10,7 +10,6 @@ import {
     Platform,
     Image,
     FlatList,
-    Dimensions,
 } from "react-native";
 import type { OpenRouterModel } from "@shared/core/models";
 import type { ThinkingLevel, SearchLevel } from "@shared/core/types";
@@ -21,8 +20,8 @@ import { ThinkingToggle } from "./ThinkingToggle";
 import { SearchToggle } from "./SearchToggle";
 import { SkillSelector } from "./SkillSelector";
 import { AttachmentPicker } from "./AttachmentPicker";
-import { getLocalQuotaStatus, formatBytes } from "../../lib/storage";
 import { useTheme, type ThemeColors } from "../../contexts/ThemeContext";
+import { modelSupportsVision } from "../../contexts/ModelContext";
 
 interface MessageInputProps {
     inputText: string;
@@ -69,33 +68,15 @@ export function MessageInput({
     onAttachmentsChange,
     onRemoveAttachment,
 }: MessageInputProps): ReactElement {
-    const [quotaStatus, setQuotaStatus] = useState<{
-        percentage: number;
-        isWarning80: boolean;
-        isWarning95: boolean;
-        isExceeded: boolean;
-        used: number;
-        limit: number;
-    } | null>(null);
     const { colors } = useTheme();
     const styles = useMemo(() => createStyles(colors), [colors]);
 
-    useEffect(() => {
-        const loadQuota = async () => {
-            try {
-                const status = await getLocalQuotaStatus();
-                setQuotaStatus(status);
-            } catch {
-                // Ignore quota errors
-            }
-        };
-        loadQuota();
-    }, [attachments.length]);
-
     const canSend =
         (inputText.trim().length > 0 || attachments.length > 0) && !disabled;
-
-    const screenWidth = Dimensions.get("window").width;
+    const visionSupported = useMemo(() => {
+        if (!selectedModelId) return false;
+        return modelSupportsVision(selectedModelId, models);
+    }, [selectedModelId, models]);
 
     const renderAttachmentThumbnail = ({ item }: { item: Attachment }) => {
         const aspectRatio =
@@ -143,45 +124,13 @@ export function MessageInput({
                 </View>
             )}
 
-            {quotaStatus && (
-                <View style={styles.quotaContainer}>
-                    <View style={styles.quotaBarBackground}>
-                        <View
-                            style={[
-                                styles.quotaBarFill,
-                                {
-                                    width: `${Math.min(quotaStatus.percentage * 100, 100)}%`,
-                                    backgroundColor: quotaStatus.isExceeded
-                                        ? colors.danger
-                                        : quotaStatus.isWarning80
-                                          ? colors.warning
-                                          : colors.success,
-                                },
-                            ]}
-                        />
-                    </View>
-                    <Text
-                        style={[
-                            styles.quotaText,
-                            quotaStatus.isExceeded && styles.quotaTextDanger,
-                        ]}
-                    >
-                        {formatBytes(quotaStatus.used)} /{" "}
-                        {formatBytes(quotaStatus.limit)} used
-                        {quotaStatus.isExceeded
-                            ? " - Storage full"
-                            : quotaStatus.isWarning95
-                              ? " - Near limit"
-                              : ""}
-                    </Text>
-                </View>
-            )}
-
             <View style={styles.controlsRow}>
-                <AttachmentPicker
-                    onAttachmentsSelected={onAttachmentsChange}
-                    disabled={isLoading || disabled}
-                />
+                {visionSupported && (
+                    <AttachmentPicker
+                        onAttachmentsSelected={onAttachmentsChange}
+                        disabled={isLoading || disabled}
+                    />
+                )}
                 <ModelSelector
                     models={models}
                     selectedModelId={selectedModelId}
@@ -334,33 +283,6 @@ const createStyles = (colors: ThemeColors) =>
         sendButtonText: {
             color: colors.textOnAccent,
             fontSize: 16,
-            fontWeight: "600",
-        },
-        quotaContainer: {
-            paddingHorizontal: 12,
-            paddingVertical: 6,
-            backgroundColor: colors.surfaceMuted,
-            borderBottomWidth: 1,
-            borderBottomColor: colors.border,
-        },
-        quotaBarBackground: {
-            height: 4,
-            backgroundColor: colors.borderMuted,
-            borderRadius: 2,
-            overflow: "hidden",
-            marginBottom: 4,
-        },
-        quotaBarFill: {
-            height: "100%",
-            borderRadius: 2,
-        },
-        quotaText: {
-            fontSize: 11,
-            color: colors.textMuted,
-            textAlign: "center",
-        },
-        quotaTextDanger: {
-            color: colors.danger,
             fontWeight: "600",
         },
     });

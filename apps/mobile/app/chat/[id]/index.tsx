@@ -35,6 +35,7 @@ import type {
 } from "@shared/core/types";
 import type { Skill } from "@shared/core/skills";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Feather } from "@expo/vector-icons";
 import Markdown from "react-native-markdown-display";
 import { MessageInput } from "../../../src/components/chat/MessageInput";
 import { AttachmentGallery } from "../../../src/components/chat/AttachmentGallery";
@@ -478,14 +479,24 @@ export default function ChatScreen(): ReactElement {
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.replace("/")}>
-                    <Text style={styles.backButton}>← Chats</Text>
+                <TouchableOpacity
+                    onPress={() => router.replace("/")}
+                    style={[styles.iconButton, styles.backButton]}
+                >
+                    <Feather
+                        name="arrow-left"
+                        size={20}
+                        color={colors.accent}
+                    />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle} numberOfLines={1}>
                     {currentChat.title}
                 </Text>
-                <TouchableOpacity onPress={handleDeleteChat}>
-                    <Text style={styles.deleteButton}>Delete</Text>
+                <TouchableOpacity
+                    onPress={handleDeleteChat}
+                    style={[styles.iconButton, styles.deleteButton]}
+                >
+                    <Feather name="trash-2" size={20} color={colors.danger} />
                 </TouchableOpacity>
             </View>
 
@@ -562,10 +573,11 @@ const createStyles = (colors: ThemeColors) =>
             borderBottomColor: colors.border,
             backgroundColor: colors.surface,
         },
+        iconButton: {
+            padding: 4,
+        },
         backButton: {
-            fontSize: 16,
-            color: colors.accent,
-            marginRight: 12,
+            marginRight: 8,
         },
         headerTitle: {
             flex: 1,
@@ -574,8 +586,7 @@ const createStyles = (colors: ThemeColors) =>
             color: colors.text,
         },
         deleteButton: {
-            fontSize: 16,
-            color: colors.danger,
+            marginLeft: 8,
         },
         listContent: {
             padding: 16,

@@ -8,7 +8,6 @@ import React, {
 } from "react";
 import { type OpenRouterModel, SupportedParameter } from "@shared/core/models";
 import { fetchModels } from "@shared/core/openrouter";
-import { getApiKey } from "../lib/storage";
 import * as SecureStore from "expo-secure-store";
 
 interface ModelContextValue {
@@ -43,6 +42,7 @@ export function ModelProvider({
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [selectedModel, setSelectedModel] = useState<string | null>(null);
+    const [hasLoadedSelectedModel, setHasLoadedSelectedModel] = useState(false);
 
     const loadSelectedModel = useCallback(async () => {
         try {
@@ -52,6 +52,8 @@ export function ModelProvider({
             }
         } catch {
             console.error("Failed to load selected model");
+        } finally {
+            setHasLoadedSelectedModel(true);
         }
     }, []);
 
@@ -60,13 +62,6 @@ export function ModelProvider({
         setError(null);
 
         try {
-            const apiKey = await getApiKey();
-            if (!apiKey) {
-                setError("API key required to fetch models");
-                setIsLoading(false);
-                return;
-            }
-
             const fetchedModels = await fetchModels();
             setModels(fetchedModels);
 
@@ -105,10 +100,10 @@ export function ModelProvider({
     }, [loadSelectedModel]);
 
     useEffect(() => {
-        if (selectedModel !== null) {
+        if (hasLoadedSelectedModel) {
             refreshModels();
         }
-    }, [selectedModel, refreshModels]);
+    }, [hasLoadedSelectedModel, refreshModels]);
 
     return (
         <ModelContext.Provider
