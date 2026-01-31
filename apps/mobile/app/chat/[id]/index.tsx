@@ -34,6 +34,7 @@ import {
     modelSupportsSearch,
 } from "@shared/core/models";
 import type {
+    ChatSession,
     Message,
     ThinkingLevel,
     SearchLevel,
@@ -49,6 +50,19 @@ import { AttachmentGallery } from "../../../src/components/chat/AttachmentGaller
 const BrainIcon = ({ size }: { size: number }) => (
     <Text style={{ fontSize: size, lineHeight: size }}>🧠</Text>
 );
+
+const getChatTitleUpdate = (
+    chat: ChatSession | null,
+    content: string,
+    messageCount: number,
+): ChatSession | null => {
+    if (!chat || chat.title !== "New Chat" || messageCount !== 0) {
+        return null;
+    }
+
+    const title = content.slice(0, 50) + (content.length > 50 ? "..." : "");
+    return { ...chat, title };
+};
 
 export default function ChatScreen(): ReactElement {
     const params = useLocalSearchParams();
@@ -190,6 +204,7 @@ export default function ChatScreen(): ReactElement {
             return;
 
         const userMessageText = inputText.trim();
+        const messageCount = messages[chatId]?.length ?? 0;
         setInputText("");
         setAttachments([]);
 
@@ -249,6 +264,15 @@ export default function ChatScreen(): ReactElement {
 
         if (skillForMessage) {
             setSelectedSkill(null);
+        }
+
+        const updatedChat = getChatTitleUpdate(
+            currentChat,
+            userMessageText,
+            messageCount,
+        );
+        if (updatedChat) {
+            await updateChat(updatedChat);
         }
 
         setIsLoading(true);
@@ -526,21 +550,19 @@ export default function ChatScreen(): ReactElement {
         return (
             <View
                 style={[
-                    styles.messageContainer,
-                    isUser ? styles.userMessage : styles.assistantMessage,
+                    styles.messageGroup,
+                    isUser
+                        ? styles.messageGroupUser
+                        : styles.messageGroupAssistant,
                 ]}
             >
-                {item.skill &&
-                    item.role === "user" &&
-                    renderSkillInfo(item.skill)}
-                <Markdown style={getMarkdownStyle(item.role)}>
-                    {item.content}
-                </Markdown>
-                {item.attachmentIds &&
-                    item.attachmentIds.length > 0 &&
-                    renderAttachments(item.attachmentIds)}
                 {item.thinking && (
-                    <View style={styles.thinkingPanel}>
+                    <View
+                        style={[
+                            styles.thinkingPanel,
+                            styles.thinkingPanelOutside,
+                        ]}
+                    >
                         <TouchableOpacity
                             style={styles.thinkingHeader}
                             onPress={() => toggleThinking(item.id)}
@@ -563,44 +585,70 @@ export default function ChatScreen(): ReactElement {
                 )}
                 <View
                     style={[
-                        styles.messageMetaRow,
-                        isUser
-                            ? styles.messageMetaRowUser
-                            : styles.messageMetaRowAssistant,
+                        styles.messageContainer,
+                        isUser ? styles.userMessage : styles.assistantMessage,
                     ]}
                 >
-                    <Text style={styles.messageMetaText}>
-                        {formatMessageTime(item.createdAt)}
-                    </Text>
-                    {showDivider && <View style={styles.messageMetaDivider} />}
-                    {hasSearchBadge && (
-                        <View style={[styles.messageBadge, styles.searchBadge]}>
-                            <Text
+                    {item.skill &&
+                        item.role === "user" &&
+                        renderSkillInfo(item.skill)}
+                    <Markdown style={getMarkdownStyle(item.role)}>
+                        {item.content}
+                    </Markdown>
+                    {item.attachmentIds &&
+                        item.attachmentIds.length > 0 &&
+                        renderAttachments(item.attachmentIds)}
+                    <View
+                        style={[
+                            styles.messageMetaRow,
+                            isUser
+                                ? styles.messageMetaRowUser
+                                : styles.messageMetaRowAssistant,
+                        ]}
+                    >
+                        <Text style={styles.messageMetaText}>
+                            {formatMessageTime(item.createdAt)}
+                        </Text>
+                        {showDivider && (
+                            <View style={styles.messageMetaDivider} />
+                        )}
+                        {hasSearchBadge && (
+                            <View
                                 style={[
-                                    styles.messageBadgeText,
-                                    styles.searchBadgeText,
+                                    styles.messageBadge,
+                                    styles.searchBadge,
                                 ]}
                             >
-                                {getSearchBadgeLabel(
-                                    item.searchLevel as SearchLevel,
-                                )}
-                            </Text>
-                        </View>
-                    )}
-                    {hasThinkingBadge && (
-                        <View
-                            style={[styles.messageBadge, styles.thinkingBadge]}
-                        >
-                            <Text
+                                <Text
+                                    style={[
+                                        styles.messageBadgeText,
+                                        styles.searchBadgeText,
+                                    ]}
+                                >
+                                    {getSearchBadgeLabel(
+                                        item.searchLevel as SearchLevel,
+                                    )}
+                                </Text>
+                            </View>
+                        )}
+                        {hasThinkingBadge && (
+                            <View
                                 style={[
-                                    styles.messageBadgeText,
-                                    styles.thinkingBadgeText,
+                                    styles.messageBadge,
+                                    styles.thinkingBadge,
                                 ]}
                             >
-                                {item.thinkingLevel?.toUpperCase()}
-                            </Text>
-                        </View>
-                    )}
+                                <Text
+                                    style={[
+                                        styles.messageBadgeText,
+                                        styles.thinkingBadgeText,
+                                    ]}
+                                >
+                                    {item.thinkingLevel?.toUpperCase()}
+                                </Text>
+                            </View>
+                        )}
+                    </View>
                 </View>
             </View>
         );
@@ -756,6 +804,15 @@ const createStyles = (colors: ThemeColors) =>
             borderRadius: 16,
             marginBottom: 8,
         },
+        messageGroup: {
+            alignSelf: "stretch",
+        },
+        messageGroupUser: {
+            alignItems: "flex-end",
+        },
+        messageGroupAssistant: {
+            alignItems: "flex-start",
+        },
         userMessage: {
             alignSelf: "flex-end",
             backgroundColor: colors.accent,
@@ -828,6 +885,11 @@ const createStyles = (colors: ThemeColors) =>
             backgroundColor: colors.warningSoft,
             borderRadius: 8,
             overflow: "hidden",
+        },
+        thinkingPanelOutside: {
+            marginTop: 0,
+            marginBottom: 8,
+            maxWidth: "85%",
         },
         thinkingHeader: {
             flexDirection: "row",
