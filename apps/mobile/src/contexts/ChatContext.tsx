@@ -14,6 +14,12 @@ import type {
     SearchLevel,
 } from "@shared/core/types";
 import { v4 as uuidv4 } from "uuid";
+import {
+    getDefaultThinking,
+    setDefaultThinking as persistDefaultThinking,
+    getDefaultSearchLevel,
+    setDefaultSearchLevel as persistDefaultSearchLevel,
+} from "../lib/storage";
 
 interface ChatContextValue {
     chats: ChatSession[];
@@ -42,7 +48,7 @@ interface ChatContextValue {
 const ChatContext = createContext<ChatContextValue | null>(null);
 
 const DEFAULT_MODEL = "anthropic/claude-3-5-sonnet-20241022";
-const DEFAULT_THINKING: ThinkingLevel = "medium";
+const DEFAULT_THINKING: ThinkingLevel = "none";
 const DEFAULT_SEARCH_LEVEL: SearchLevel = "none";
 
 export function useChatContext(): ChatContextValue {
@@ -66,8 +72,10 @@ export function ChatProvider({
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [defaultModel] = useState(DEFAULT_MODEL);
-    const [defaultThinking] = useState<ThinkingLevel>(DEFAULT_THINKING);
-    const [defaultSearchLevel] = useState<SearchLevel>(DEFAULT_SEARCH_LEVEL);
+    const [defaultThinking, setDefaultThinkingState] =
+        useState<ThinkingLevel>(DEFAULT_THINKING);
+    const [defaultSearchLevel, setDefaultSearchLevelState] =
+        useState<SearchLevel>(DEFAULT_SEARCH_LEVEL);
 
     const adapter = getSqliteStorageAdapter();
 
@@ -197,16 +205,36 @@ export function ChatProvider({
     }, []);
 
     const setDefaultThinking = useCallback((thinking: ThinkingLevel) => {
-        // This would persist to settings in a full implementation
+        setDefaultThinkingState(thinking);
+        void persistDefaultThinking(thinking);
     }, []);
 
     const setDefaultSearchLevel = useCallback((searchLevel: SearchLevel) => {
-        // This would persist to settings in a full implementation
+        setDefaultSearchLevelState(searchLevel);
+        void persistDefaultSearchLevel(searchLevel);
     }, []);
 
     useEffect(() => {
         loadChats();
     }, [loadChats]);
+
+    useEffect(() => {
+        let isMounted = true;
+        const loadDefaults = async () => {
+            const [thinking, search] = await Promise.all([
+                getDefaultThinking(),
+                getDefaultSearchLevel(),
+            ]);
+            if (isMounted) {
+                setDefaultThinkingState(thinking);
+                setDefaultSearchLevelState(search);
+            }
+        };
+        loadDefaults();
+        return () => {
+            isMounted = false;
+        };
+    }, []);
 
     return (
         <ChatContext.Provider

@@ -20,7 +20,11 @@ import { useChatContext } from "../../../src/contexts/ChatContext";
 import { useModelContext } from "../../../src/contexts/ModelContext";
 import { useSkillsContext } from "../../../src/contexts/SkillsContext";
 import { useTheme, type ThemeColors } from "../../../src/contexts/ThemeContext";
-import { getApiKey } from "../../../src/lib/storage";
+import {
+    getApiKey,
+    setDefaultThinking,
+    setDefaultSearchLevel,
+} from "../../../src/lib/storage";
 import { getAttachment, saveAttachment } from "../../../src/lib/db";
 import { sendMessage } from "@shared/core/openrouter";
 import {
@@ -107,10 +111,50 @@ export default function ChatScreen(): ReactElement {
     const reasoningSupported = modelSupportsReasoning(currentModel);
     const searchSupported = modelSupportsSearch(currentModel);
 
+    useEffect(() => {
+        if (!currentChat || !currentModel) return;
+        const nextThinking = reasoningSupported ? currentChat.thinking : "none";
+        const nextSearchLevel = searchSupported
+            ? currentChat.searchLevel
+            : "none";
+        if (
+            nextThinking !== currentChat.thinking ||
+            nextSearchLevel !== currentChat.searchLevel
+        ) {
+            void updateChat({
+                ...currentChat,
+                thinking: nextThinking,
+                searchLevel: nextSearchLevel,
+            });
+        }
+    }, [
+        currentChat,
+        currentModel,
+        reasoningSupported,
+        searchSupported,
+        updateChat,
+    ]);
+
     const handleModelChange = async (modelId: string) => {
         if (!currentChat) return;
         await setSelectedModel(modelId);
-        const updatedChat = { ...currentChat, modelId };
+        const nextModel = models.find((model) => model.id === modelId);
+        const nextThinking = nextModel
+            ? modelSupportsReasoning(nextModel)
+                ? currentChat.thinking
+                : "none"
+            : currentChat.thinking;
+        const nextSearchLevel = nextModel
+            ? modelSupportsSearch(nextModel)
+                ? currentChat.searchLevel
+                : "none"
+            : currentChat.searchLevel;
+        const updatedChat = {
+            ...currentChat,
+            modelId,
+            thinking: nextThinking,
+            searchLevel: nextSearchLevel,
+        };
         await updateChat(updatedChat);
     };
 
@@ -146,6 +190,13 @@ export default function ChatScreen(): ReactElement {
         setInputText("");
         setAttachments([]);
 
+        const effectiveThinking = reasoningSupported
+            ? currentChat.thinking
+            : "none";
+        const effectiveSearchLevel = searchSupported
+            ? currentChat.searchLevel
+            : "none";
+
         const skillForMessage = selectedSkill;
         const contextContent = skillForMessage
             ? `${skillForMessage.prompt}\n\nUser: ${userMessageText}`
@@ -173,6 +224,9 @@ export default function ChatScreen(): ReactElement {
             content: userMessageText,
             contextContent: contextContent,
             skill: skillForMessage,
+            modelId: currentChat.modelId,
+            thinkingLevel: effectiveThinking,
+            searchLevel: effectiveSearchLevel,
             attachmentIds: attachmentIds.length > 0 ? attachmentIds : undefined,
         });
 
@@ -205,9 +259,18 @@ export default function ChatScreen(): ReactElement {
                         "Please set your OpenRouter API key in Settings to send messages.",
                     contextContent:
                         "Please set your OpenRouter API key in Settings to send messages.",
+                    thinkingLevel: effectiveThinking,
+                    searchLevel: effectiveSearchLevel,
                 });
                 setIsLoading(false);
                 return;
+            }
+
+            if (reasoningSupported) {
+                await setDefaultThinking(effectiveThinking);
+            }
+            if (searchSupported) {
+                await setDefaultSearchLevel(effectiveSearchLevel);
             }
 
             const chatMessages = messages[chatId] || [];
@@ -228,10 +291,10 @@ export default function ChatScreen(): ReactElement {
                 {
                     id: currentChat.id,
                     modelId: currentChat.modelId,
-                    thinking: currentChat.thinking,
-                    searchLevel: currentChat.searchLevel,
+                    thinking: effectiveThinking,
+                    searchLevel: effectiveSearchLevel,
                 },
-                undefined,
+                currentModel,
                 (chunk: string, thinking?: string) => {
                     if (thinking) {
                         assistantThinking += thinking;
@@ -263,6 +326,8 @@ export default function ChatScreen(): ReactElement {
                 thinking: assistantThinking || undefined,
                 modelId: response.model,
                 skill: clonedSkill,
+                thinkingLevel: effectiveThinking,
+                searchLevel: effectiveSearchLevel,
             });
         } catch (error) {
             const errorMessage =
@@ -272,6 +337,8 @@ export default function ChatScreen(): ReactElement {
                 role: "assistant",
                 content: `Error: ${errorMessage}`,
                 contextContent: `Error: ${errorMessage}`,
+                thinkingLevel: effectiveThinking,
+                searchLevel: effectiveSearchLevel,
             });
         } finally {
             setIsLoading(false);
@@ -322,6 +389,10 @@ export default function ChatScreen(): ReactElement {
     };
 
     const chatMessages = messages[chatId] || [];
+    const streamingThinkingLevel =
+        currentChat && reasoningSupported ? currentChat.thinking : "none";
+    const streamingSearchLevel =
+        currentChat && searchSupported ? currentChat.searchLevel : "none";
 
     const getMarkdownStyle = (role: string) => {
         const isUser = role === "user";
@@ -427,46 +498,110 @@ export default function ChatScreen(): ReactElement {
         </View>
     );
 
-    const renderMessage = ({ item }: { item: Message }) => (
-        <View
-            style={[
-                styles.messageContainer,
-                item.role === "user"
-                    ? styles.userMessage
-                    : styles.assistantMessage,
-            ]}
-        >
-            {item.skill && item.role === "user" && renderSkillInfo(item.skill)}
-            <Markdown style={getMarkdownStyle(item.role)}>
-                {item.content}
-            </Markdown>
-            {item.attachmentIds &&
-                item.attachmentIds.length > 0 &&
-                renderAttachments(item.attachmentIds)}
-            {item.thinking && (
-                <View style={styles.thinkingPanel}>
-                    <TouchableOpacity
-                        style={styles.thinkingHeader}
-                        onPress={() => toggleThinking(item.id)}
-                        activeOpacity={0.7}
-                    >
-                        <Text style={styles.thinkingIcon}>
-                            {expandedThinking[item.id] ? "▼" : "▶"}
-                        </Text>
-                        <BrainIcon size={14} />
-                        <Text style={styles.thinkingLabel}>Reasoning</Text>
-                    </TouchableOpacity>
-                    {expandedThinking[item.id] && (
-                        <View style={styles.thinkingContent}>
-                            <Text style={styles.thinkingText}>
-                                {item.thinking}
+    const formatMessageTime = (timestamp: number): string => {
+        return new Date(timestamp).toLocaleTimeString([], {
+            hour: "numeric",
+            minute: "2-digit",
+        });
+    };
+
+    const getSearchBadgeLabel = (level: SearchLevel): string => {
+        if (level === "low") return "WEB-3";
+        if (level === "medium") return "WEB-6";
+        if (level === "high") return "WEB-10";
+        return "WEB";
+    };
+
+    const renderMessage = ({ item }: { item: Message }) => {
+        const isUser = item.role === "user";
+        const hasSearchBadge =
+            item.searchLevel !== undefined && item.searchLevel !== "none";
+        const hasThinkingBadge =
+            item.thinkingLevel !== undefined && item.thinkingLevel !== "none";
+        const showDivider = hasSearchBadge || hasThinkingBadge;
+
+        return (
+            <View
+                style={[
+                    styles.messageContainer,
+                    isUser ? styles.userMessage : styles.assistantMessage,
+                ]}
+            >
+                {item.skill &&
+                    item.role === "user" &&
+                    renderSkillInfo(item.skill)}
+                <Markdown style={getMarkdownStyle(item.role)}>
+                    {item.content}
+                </Markdown>
+                {item.attachmentIds &&
+                    item.attachmentIds.length > 0 &&
+                    renderAttachments(item.attachmentIds)}
+                {item.thinking && (
+                    <View style={styles.thinkingPanel}>
+                        <TouchableOpacity
+                            style={styles.thinkingHeader}
+                            onPress={() => toggleThinking(item.id)}
+                            activeOpacity={0.7}
+                        >
+                            <Text style={styles.thinkingIcon}>
+                                {expandedThinking[item.id] ? "▼" : "▶"}
+                            </Text>
+                            <BrainIcon size={14} />
+                            <Text style={styles.thinkingLabel}>Reasoning</Text>
+                        </TouchableOpacity>
+                        {expandedThinking[item.id] && (
+                            <View style={styles.thinkingContent}>
+                                <Text style={styles.thinkingText}>
+                                    {item.thinking}
+                                </Text>
+                            </View>
+                        )}
+                    </View>
+                )}
+                <View
+                    style={[
+                        styles.messageMetaRow,
+                        isUser
+                            ? styles.messageMetaRowUser
+                            : styles.messageMetaRowAssistant,
+                    ]}
+                >
+                    <Text style={styles.messageMetaText}>
+                        {formatMessageTime(item.createdAt)}
+                    </Text>
+                    {showDivider && <View style={styles.messageMetaDivider} />}
+                    {hasSearchBadge && (
+                        <View style={[styles.messageBadge, styles.searchBadge]}>
+                            <Text
+                                style={[
+                                    styles.messageBadgeText,
+                                    styles.searchBadgeText,
+                                ]}
+                            >
+                                {getSearchBadgeLabel(
+                                    item.searchLevel as SearchLevel,
+                                )}
+                            </Text>
+                        </View>
+                    )}
+                    {hasThinkingBadge && (
+                        <View
+                            style={[styles.messageBadge, styles.thinkingBadge]}
+                        >
+                            <Text
+                                style={[
+                                    styles.messageBadgeText,
+                                    styles.thinkingBadgeText,
+                                ]}
+                            >
+                                {item.thinkingLevel?.toUpperCase()}
                             </Text>
                         </View>
                     )}
                 </View>
-            )}
-        </View>
-    );
+            </View>
+        );
+    };
 
     if (!currentChat) {
         return (
@@ -512,6 +647,9 @@ export default function ChatScreen(): ReactElement {
                                   role: "assistant" as const,
                                   content: replyText,
                                   contextContent: replyText,
+                                  modelId: currentChat.modelId,
+                                  thinkingLevel: streamingThinkingLevel,
+                                  searchLevel: streamingSearchLevel,
                                   createdAt: Date.now(),
                               },
                           ]
@@ -614,6 +752,53 @@ const createStyles = (colors: ThemeColors) =>
         },
         assistantMessageText: {
             color: colors.text,
+        },
+        messageMetaRow: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+            marginTop: 6,
+        },
+        messageMetaRowUser: {
+            justifyContent: "flex-end",
+        },
+        messageMetaRowAssistant: {
+            justifyContent: "flex-start",
+        },
+        messageMetaText: {
+            fontSize: 11,
+            color: colors.textSubtle,
+        },
+        messageMetaDivider: {
+            width: 1,
+            height: 12,
+            backgroundColor: colors.border,
+        },
+        messageBadge: {
+            paddingHorizontal: 6,
+            paddingVertical: 2,
+            borderRadius: 6,
+            borderWidth: 1,
+        },
+        messageBadgeText: {
+            fontSize: 10,
+            fontWeight: "600",
+            letterSpacing: 0.4,
+            textTransform: "uppercase" as const,
+        },
+        searchBadge: {
+            backgroundColor: colors.accentSoft,
+            borderColor: colors.accentBorder,
+        },
+        searchBadgeText: {
+            color: colors.accent,
+        },
+        thinkingBadge: {
+            backgroundColor: colors.warningSoft,
+            borderColor: colors.warningBorder,
+        },
+        thinkingBadgeText: {
+            color: colors.warning,
         },
         thinkingPanel: {
             marginTop: 8,

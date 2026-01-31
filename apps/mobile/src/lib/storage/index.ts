@@ -36,6 +36,12 @@ export {
     type UserTheme,
 } from "./sync-storage";
 export {
+    getDefaultThinking,
+    setDefaultThinking,
+    getDefaultSearchLevel,
+    setDefaultSearchLevel,
+} from "./user-settings-storage";
+export {
     processImage,
     isValidImageMimeType,
     getMimeTypeFromUri,
