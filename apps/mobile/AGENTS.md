@@ -1103,3 +1103,47 @@ interface AttachmentGalleryProps {
 - Chat screen: `app/chat/[id]/index.tsx`
 - Database operations: `src/lib/db/operations.ts`
 - Shared types: `@shared/core/types`
+
+# Mobile App Sync Patterns
+
+## Storage Adapter
+
+The mobile app uses `SqliteStorageAdapter` to implement the shared `StorageAdapter` interface from `@shared/core/sync`. This allows the migration runner to work across platforms.
+
+### Adapter Pattern
+
+```typescript
+import type { StorageAdapter } from "@shared/core/sync";
+import * as db from "../db/operations";
+
+class SqliteStorageAdapter implements StorageAdapter {
+    async createChat(chat: ChatSession): Promise<string> {
+        db.createChat(chat);
+        return chat.id;
+    }
+    // ... implement all StorageAdapter methods
+}
+
+let adapterInstance: SqliteStorageAdapter | null = null;
+
+export function getSqliteStorageAdapter(): SqliteStorageAdapter {
+    if (!adapterInstance) {
+        adapterInstance = new SqliteStorageAdapter();
+    }
+    return adapterInstance;
+}
+```
+
+### Key Points
+
+- Wrap synchronous SQLite operations in async methods
+- Use the singleton pattern for the adapter instance
+- All methods return Promises to match the `StorageAdapter` interface
+- Import types from `@shared/core/*` for consistency
+
+## Related Files
+
+- Adapter: `src/lib/sync/sqlite-adapter.ts`
+- Database operations: `src/lib/db/operations.ts`
+- Schema: `src/lib/db/schema.ts`
+- Shared interface: `packages/shared/src/core/sync/index.ts`
