@@ -10,20 +10,16 @@ import {
     Alert,
     Image,
     Dimensions,
+    Linking,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
-import { useAppContext } from "../src/contexts/AppContext";
+import { useSync } from "../src/contexts/SyncContext";
 import { useSkillsContext } from "../src/contexts/SkillsContext";
 import {
-    getApiKey,
-    setApiKey,
-    clearApiKey,
-    getLocalQuotaStatus,
-    getStorageUsage,
     formatBytes,
+    getStorageUsage,
     type UserTheme,
-    type QuotaStatus,
 } from "../src/lib/storage";
 import { useTheme, type ThemeColors } from "../src/contexts/ThemeContext";
 import { validateApiKey } from "@shared/core/openrouter";
@@ -31,10 +27,27 @@ import type { Skill } from "@shared/core/skills";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { useAuthContext } from "../src/lib/convex/AuthContext";
 import { getConvexUrlOverride, getEnvConvexUrl } from "../src/lib/convex";
+import { useApiKey } from "../src/hooks/useApiKey";
+import { useSubscription } from "../src/hooks/useSubscription";
 
 export default function SettingsScreen(): ReactElement {
     const router = useRouter();
-    const { syncState, setSyncState, initializeApp } = useAppContext();
+    const {
+        syncState,
+        enableCloudSync,
+        disableCloudSync,
+        cloneToLocal,
+        clearCloudImages,
+        refreshQuotaStatus,
+        localQuotaStatus,
+        cloudQuotaStatus,
+        cloudStorageUsage,
+        isMigrating,
+        migrationProgress,
+        isCloning,
+        cloneProgress,
+        refreshSyncState,
+    } = useSync();
     const { skills, addSkill, updateSkill, deleteSkill } = useSkillsContext();
     const {
         user,
@@ -47,18 +60,27 @@ export default function SettingsScreen(): ReactElement {
         clearConvexOverride,
     } = useAuthContext();
     const { colors, userTheme, setUserTheme } = useTheme();
+    const {
+        status: subscription,
+        isLoading: isSubscriptionLoading,
+        openPortal,
+    } = useSubscription();
+    const {
+        apiKey: storedApiKey,
+        isLoading: isApiKeyLoading,
+        setApiKey: persistApiKey,
+        clearApiKey: removeApiKey,
+        isCloudSynced,
+    } = useApiKey();
     const styles = useMemo(() => createStyles(colors), [colors]);
 
     const [apiKey, setApiKeyValue] = useState("");
-    const [isLoading, setIsLoading] = useState(true);
     const [isValidating, setIsValidating] = useState(false);
     const [isValid, setIsValid] = useState<boolean | null>(null);
     const [convexOverrideInput, setConvexOverrideInput] = useState("");
     const [convexOverrideSaved, setConvexOverrideSaved] = useState<
         string | null
     >(null);
-    const [localQuotaStatus, setLocalQuotaStatus] =
-        useState<QuotaStatus | null>(null);
     const [storageUsage, setStorageUsage] = useState<{
         attachments: number;
         messages: number;
@@ -77,51 +99,41 @@ export default function SettingsScreen(): ReactElement {
         : "Cloud sync isn't configured for this build.";
 
     useEffect(() => {
-        const loadSettings = async () => {
-            try {
-                const key = await getApiKey();
-                setApiKeyValue(key || "");
-                const override = getConvexUrlOverride();
-                setConvexOverrideSaved(override);
-                setConvexOverrideInput(override ?? "");
-                if (key) {
-                    setIsValidating(true);
-                    try {
-                        const valid = await validateApiKey(key);
-                        setIsValid(valid);
-                    } finally {
-                        setIsValidating(false);
-                    }
-                }
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        loadSettings();
-    }, []);
+        if (isApiKeyLoading) return;
+        const override = getConvexUrlOverride();
+        setConvexOverrideSaved(override);
+        setConvexOverrideInput(override ?? "");
+
+        const key = storedApiKey ?? "";
+        setApiKeyValue(key);
+        if (key) {
+            setIsValidating(true);
+            validateApiKey(key)
+                .then((valid) => setIsValid(valid))
+                .finally(() => setIsValidating(false));
+        } else {
+            setIsValid(null);
+        }
+    }, [isApiKeyLoading, storedApiKey]);
 
     useEffect(() => {
         const loadStorage = async () => {
             try {
-                const [quotaStatus, usage] = await Promise.all([
-                    getLocalQuotaStatus(),
-                    getStorageUsage(),
-                ]);
-                setLocalQuotaStatus(quotaStatus);
+                const usage = await getStorageUsage();
                 setStorageUsage(usage);
+                await refreshQuotaStatus();
             } catch {
-                setLocalQuotaStatus(null);
                 setStorageUsage(null);
             } finally {
                 setIsStorageLoading(false);
             }
         };
         loadStorage();
-    }, []);
+    }, [refreshQuotaStatus]);
 
     const handleSaveApiKey = async () => {
         if (!apiKey.trim()) {
-            await clearApiKey();
+            await removeApiKey();
             setIsValid(null);
             Alert.alert("API Key Removed", "Your API key has been cleared.");
             return;
@@ -133,7 +145,7 @@ export default function SettingsScreen(): ReactElement {
             setIsValid(valid);
 
             if (valid) {
-                await setApiKey(apiKey.trim());
+                await persistApiKey(apiKey.trim());
                 Alert.alert(
                     "API Key Saved",
                     "Your OpenRouter API key has been saved.",
@@ -165,10 +177,12 @@ export default function SettingsScreen(): ReactElement {
                     text: "Sign Out",
                     style: "destructive",
                     onPress: async () => {
-                        await signOut();
                         if (syncState === "cloud-enabled") {
-                            await setSyncState("cloud-disabled");
+                            try {
+                                await disableCloudSync();
+                            } catch {}
                         }
+                        await signOut();
                         Alert.alert(
                             "Signed Out",
                             "You have been signed out successfully. Cloud sync is disabled but your cloud data is preserved.",
@@ -199,7 +213,7 @@ export default function SettingsScreen(): ReactElement {
     };
 
     const handleClearApiKey = async () => {
-        await clearApiKey();
+        await removeApiKey();
         setApiKeyValue("");
         setIsValid(null);
         Alert.alert("API Key Cleared", "Your API key has been removed.");
@@ -221,7 +235,7 @@ export default function SettingsScreen(): ReactElement {
             await configureConvex(nextUrl);
             setConvexOverrideSaved(nextUrl);
             setConvexOverrideInput(nextUrl);
-            await initializeApp();
+            await refreshSyncState();
             Alert.alert(
                 "Convex Override Saved",
                 "This build now uses the override Convex URL.",
@@ -243,7 +257,7 @@ export default function SettingsScreen(): ReactElement {
             await clearConvexOverride();
             setConvexOverrideSaved(null);
             setConvexOverrideInput("");
-            await initializeApp();
+            await refreshSyncState();
             Alert.alert(
                 "Convex Override Cleared",
                 "Using the build-time Convex URL.",
@@ -257,6 +271,13 @@ export default function SettingsScreen(): ReactElement {
     };
 
     const handleEnableCloudSync = async () => {
+        if (!isConvexAvailable) {
+            Alert.alert("Cloud Sync Not Configured", convexUnavailableMessage, [
+                { text: "OK" },
+            ]);
+            return;
+        }
+
         if (!isAuthenticated) {
             Alert.alert(
                 "Sign In Required",
@@ -281,8 +302,38 @@ export default function SettingsScreen(): ReactElement {
             return;
         }
 
+        if (isSubscriptionLoading) {
+            Alert.alert(
+                "Checking Subscription",
+                "Please wait while we verify your subscription.",
+            );
+            return;
+        }
+
+        if (subscription?.hasCloudSync === false) {
+            Alert.alert(
+                "Subscription Required",
+                "Cloud sync requires a RouterChat Pro subscription.",
+                openPortal
+                    ? [
+                          { text: "Cancel", style: "cancel" },
+                          {
+                              text: "Manage Subscription",
+                              onPress: async () => {
+                                  const portalUrl = await openPortal();
+                                  if (portalUrl) {
+                                      await Linking.openURL(portalUrl);
+                                  }
+                              },
+                          },
+                      ]
+                    : [{ text: "OK" }],
+            );
+            return;
+        }
+
         try {
-            await setSyncState("cloud-enabled");
+            await enableCloudSync();
             Alert.alert(
                 "Cloud Sync Enabled",
                 "Your chats will now sync across devices when connected to the internet.",
@@ -306,7 +357,7 @@ export default function SettingsScreen(): ReactElement {
                     style: "destructive",
                     onPress: async () => {
                         try {
-                            await setSyncState("cloud-disabled");
+                            await disableCloudSync();
                             Alert.alert(
                                 "Cloud Sync Disabled",
                                 "Your chats are now stored only on this device.",
@@ -315,6 +366,73 @@ export default function SettingsScreen(): ReactElement {
                             Alert.alert(
                                 "Error",
                                 "Failed to disable cloud sync. Please try again.",
+                            );
+                        }
+                    },
+                },
+            ],
+        );
+    };
+
+    const handleOpenPortal = async () => {
+        const portalUrl = await openPortal();
+        if (!portalUrl) {
+            Alert.alert(
+                "Portal Unavailable",
+                "Subscription management is not available right now.",
+            );
+            return;
+        }
+        await Linking.openURL(portalUrl);
+    };
+
+    const handleCloneToLocal = async () => {
+        Alert.alert(
+            "Clone Cloud Data",
+            "This will copy your cloud chats and attachments to this device.",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Clone",
+                    onPress: async () => {
+                        try {
+                            await cloneToLocal();
+                            Alert.alert(
+                                "Clone Complete",
+                                "Your cloud data has been copied to this device.",
+                            );
+                        } catch {
+                            Alert.alert(
+                                "Clone Failed",
+                                "Could not clone cloud data. Please try again.",
+                            );
+                        }
+                    },
+                },
+            ],
+        );
+    };
+
+    const handleClearCloudImages = async () => {
+        Alert.alert(
+            "Clear Cloud Images",
+            "This will delete all cloud attachments. Your chats will remain.",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Clear",
+                    style: "destructive",
+                    onPress: async () => {
+                        try {
+                            await clearCloudImages();
+                            Alert.alert(
+                                "Cloud Images Cleared",
+                                "Your cloud attachments have been removed.",
+                            );
+                        } catch {
+                            Alert.alert(
+                                "Clear Failed",
+                                "Could not clear cloud images. Please try again.",
                             );
                         }
                     },
@@ -396,6 +514,8 @@ export default function SettingsScreen(): ReactElement {
 
     const isSkillValid =
         skillName.trim().length > 0 && skillPrompt.trim().length > 0;
+    const hasCloudSync = subscription?.hasCloudSync ?? false;
+    const syncActionDisabled = isMigrating || isCloning;
 
     const getSyncStatusColor = () => {
         switch (syncState) {
@@ -533,6 +653,41 @@ export default function SettingsScreen(): ReactElement {
                                         >
                                             {getSyncStatusText()}
                                         </Text>
+                                        {isSubscriptionLoading && (
+                                            <Text style={styles.syncStatusMeta}>
+                                                Checking subscription...
+                                            </Text>
+                                        )}
+                                        {!isSubscriptionLoading &&
+                                            isAuthenticated &&
+                                            !hasCloudSync && (
+                                                <Text
+                                                    style={
+                                                        styles.syncStatusMeta
+                                                    }
+                                                >
+                                                    Cloud sync requires
+                                                    RouterChat Pro.
+                                                </Text>
+                                            )}
+                                        {isMigrating && migrationProgress && (
+                                            <Text style={styles.syncStatusMeta}>
+                                                Migrating...{" "}
+                                                {Math.round(
+                                                    migrationProgress.percentage,
+                                                )}
+                                                %
+                                            </Text>
+                                        )}
+                                        {isCloning && cloneProgress && (
+                                            <Text style={styles.syncStatusMeta}>
+                                                Cloning...{" "}
+                                                {Math.round(
+                                                    cloneProgress.percentage,
+                                                )}
+                                                %
+                                            </Text>
+                                        )}
                                     </View>
                                 </View>
 
@@ -540,6 +695,7 @@ export default function SettingsScreen(): ReactElement {
                                     <TouchableOpacity
                                         style={styles.enableSyncButton}
                                         onPress={handleEnableCloudSync}
+                                        disabled={syncActionDisabled}
                                     >
                                         <Text
                                             style={styles.enableSyncButtonText}
@@ -553,6 +709,7 @@ export default function SettingsScreen(): ReactElement {
                                     <TouchableOpacity
                                         style={styles.disableSyncButton}
                                         onPress={handleDisableCloudSync}
+                                        disabled={syncActionDisabled}
                                     >
                                         <Text
                                             style={styles.disableSyncButtonText}
@@ -566,11 +723,23 @@ export default function SettingsScreen(): ReactElement {
                                     <TouchableOpacity
                                         style={styles.enableSyncButton}
                                         onPress={handleEnableCloudSync}
+                                        disabled={syncActionDisabled}
                                     >
                                         <Text
                                             style={styles.enableSyncButtonText}
                                         >
                                             Re-enable Cloud Sync
+                                        </Text>
+                                    </TouchableOpacity>
+                                )}
+
+                                {isAuthenticated && !hasCloudSync && (
+                                    <TouchableOpacity
+                                        style={styles.portalButton}
+                                        onPress={handleOpenPortal}
+                                    >
+                                        <Text style={styles.portalButtonText}>
+                                            Manage Subscription
                                         </Text>
                                     </TouchableOpacity>
                                 )}
@@ -589,7 +758,7 @@ export default function SettingsScreen(): ReactElement {
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>OpenRouter API</Text>
 
-                        {isLoading ? (
+                        {isApiKeyLoading ? (
                             <ActivityIndicator
                                 style={styles.loading}
                                 color={colors.accent}
@@ -610,6 +779,11 @@ export default function SettingsScreen(): ReactElement {
                                         autoCapitalize="none"
                                         autoCorrect={false}
                                     />
+                                    {isCloudSynced && (
+                                        <Text style={styles.apiKeyStorageText}>
+                                            Stored in cloud sync
+                                        </Text>
+                                    )}
                                 </View>
 
                                 {apiKey.length > 0 && (
@@ -824,6 +998,88 @@ export default function SettingsScreen(): ReactElement {
                                             </View>
                                         </View>
                                     )}
+                                    {cloudQuotaStatus && (
+                                        <>
+                                            <View style={styles.storageRow}>
+                                                <Text
+                                                    style={styles.storageLabel}
+                                                >
+                                                    Cloud attachments
+                                                </Text>
+                                                <Text
+                                                    style={styles.storageValue}
+                                                >
+                                                    {formatBytes(
+                                                        cloudQuotaStatus.used,
+                                                    )}{" "}
+                                                    /{" "}
+                                                    {formatBytes(
+                                                        cloudQuotaStatus.limit,
+                                                    )}
+                                                </Text>
+                                            </View>
+                                            <View style={styles.storageBar}>
+                                                <View
+                                                    style={[
+                                                        styles.storageBarFill,
+                                                        {
+                                                            width: `${Math.min(cloudQuotaStatus.percentage * 100, 100)}%`,
+                                                            backgroundColor:
+                                                                cloudQuotaStatus.isExceeded
+                                                                    ? colors.danger
+                                                                    : cloudQuotaStatus.isWarning80
+                                                                      ? colors.warning
+                                                                      : colors.success,
+                                                        },
+                                                    ]}
+                                                />
+                                            </View>
+                                            {cloudStorageUsage && (
+                                                <View style={styles.statsRow}>
+                                                    <View
+                                                        style={styles.statCard}
+                                                    >
+                                                        <Text
+                                                            style={
+                                                                styles.statValue
+                                                            }
+                                                        >
+                                                            {
+                                                                cloudStorageUsage.sessionCount
+                                                            }
+                                                        </Text>
+                                                        <Text
+                                                            style={
+                                                                styles.statLabel
+                                                            }
+                                                        >
+                                                            Cloud Chats
+                                                        </Text>
+                                                    </View>
+                                                    <View
+                                                        style={styles.statCard}
+                                                    >
+                                                        <Text
+                                                            style={
+                                                                styles.statValue
+                                                            }
+                                                        >
+                                                            {
+                                                                cloudStorageUsage.messageCount
+                                                            }
+                                                        </Text>
+                                                        <Text
+                                                            style={
+                                                                styles.statLabel
+                                                            }
+                                                        >
+                                                            Cloud Messages
+                                                        </Text>
+                                                    </View>
+                                                </View>
+                                            )}
+                                        </>
+                                    )}
                                 </>
                             ) : null}
 
@@ -841,9 +1097,26 @@ export default function SettingsScreen(): ReactElement {
                             )}
 
                             {syncState === "cloud-enabled" && (
-                                <Text style={styles.storageComingSoon}>
-                                    Cloud storage management coming soon.
-                                </Text>
+                                <View style={styles.buttonRow}>
+                                    <TouchableOpacity
+                                        style={styles.saveButton}
+                                        onPress={handleCloneToLocal}
+                                        disabled={syncActionDisabled}
+                                    >
+                                        <Text style={styles.saveButtonText}>
+                                            Clone to Local
+                                        </Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={styles.clearButton}
+                                        onPress={handleClearCloudImages}
+                                        disabled={syncActionDisabled}
+                                    >
+                                        <Text style={styles.clearButtonText}>
+                                            Clear Cloud Images
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
                             )}
 
                             {syncState !== "cloud-enabled" && (
@@ -1221,6 +1494,11 @@ const createStyles = (colors: ThemeColors) =>
             marginBottom: 8,
             color: colors.text,
         },
+        apiKeyStorageText: {
+            marginTop: 6,
+            fontSize: 12,
+            color: colors.textMuted,
+        },
         textInput: {
             borderWidth: 1,
             borderColor: colors.inputBorder,
@@ -1373,6 +1651,11 @@ const createStyles = (colors: ThemeColors) =>
             fontSize: 14,
             color: colors.textMuted,
         },
+        syncStatusMeta: {
+            marginTop: 6,
+            fontSize: 13,
+            color: colors.textMuted,
+        },
         enableSyncButton: {
             backgroundColor: colors.accent,
             paddingHorizontal: 20,
@@ -1396,6 +1679,20 @@ const createStyles = (colors: ThemeColors) =>
             color: colors.textOnAccent,
             fontSize: 16,
             fontWeight: "600",
+        },
+        portalButton: {
+            marginTop: 12,
+            borderWidth: 1,
+            borderColor: colors.border,
+            borderRadius: 8,
+            paddingHorizontal: 16,
+            paddingVertical: 10,
+            alignItems: "center",
+        },
+        portalButtonText: {
+            fontSize: 14,
+            fontWeight: "600",
+            color: colors.text,
         },
         syncWarning: {
             backgroundColor: colors.warningSoft,

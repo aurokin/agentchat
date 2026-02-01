@@ -6,8 +6,10 @@ import { AppProvider, useAppContext } from "../src/contexts/AppContext";
 import { ThemeProvider, useTheme } from "../src/contexts/ThemeContext";
 import { ChatProvider } from "../src/contexts/ChatContext";
 import { AuthProvider } from "../src/lib/convex/AuthContext";
+import { ConvexProvider } from "../src/lib/convex";
 import { ModelProvider } from "../src/contexts/ModelContext";
 import { SkillsProvider } from "../src/contexts/SkillsContext";
+import { SyncProvider } from "../src/contexts/SyncContext";
 import OnboardingScreen from "./onboarding";
 
 function OnboardingWrapper({
@@ -54,23 +56,27 @@ export default function Layout(): ReactElement {
         <SafeAreaProvider>
             <ThemeProvider>
                 <ThemedStatusBar />
-                <AuthProvider>
-                    <ModelProvider>
-                        <SkillsProvider>
-                            <AppProvider>
-                                <ChatProvider>
-                                    <OnboardingWrapper>
-                                        <Stack
-                                            screenOptions={{
-                                                headerShown: false,
-                                            }}
-                                        />
-                                    </OnboardingWrapper>
-                                </ChatProvider>
-                            </AppProvider>
-                        </SkillsProvider>
-                    </ModelProvider>
-                </AuthProvider>
+                <ConvexProvider>
+                    <AuthProvider>
+                        <ModelProvider>
+                            <SyncProvider>
+                                <SkillsProvider>
+                                    <AppProvider>
+                                        <ChatProvider>
+                                            <OnboardingWrapper>
+                                                <Stack
+                                                    screenOptions={{
+                                                        headerShown: false,
+                                                    }}
+                                                />
+                                            </OnboardingWrapper>
+                                        </ChatProvider>
+                                    </AppProvider>
+                                </SkillsProvider>
+                            </SyncProvider>
+                        </ModelProvider>
+                    </AuthProvider>
+                </ConvexProvider>
             </ThemeProvider>
         </SafeAreaProvider>
     );

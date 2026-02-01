@@ -6,7 +6,7 @@ import React, {
     useEffect,
     type ReactNode,
 } from "react";
-import { getSqliteStorageAdapter } from "../lib/sync/sqlite-adapter";
+import { useStorageAdapter } from "./SyncContext";
 import type {
     ChatSession,
     Message,
@@ -89,7 +89,7 @@ export function ChatProvider({
         (appDefaultAvailable ? APP_DEFAULT_MODEL : models[0]?.id) ??
         APP_DEFAULT_MODEL;
 
-    const adapter = getSqliteStorageAdapter();
+    const adapter = useStorageAdapter();
 
     const loadChats = useCallback(async () => {
         setIsLoading(true);
@@ -102,7 +102,7 @@ export function ChatProvider({
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [adapter]);
 
     const createChat = useCallback(
         async (title?: string, modelId?: string): Promise<ChatSession> => {
@@ -127,7 +127,19 @@ export function ChatProvider({
 
             return chat;
         },
-        [defaultModelId, defaultThinking, defaultSearchLevel],
+        [adapter, defaultModelId, defaultThinking, defaultSearchLevel],
+    );
+
+    const loadMessages = useCallback(
+        async (chatId: string) => {
+            try {
+                const loadedMessages = await adapter.getMessagesByChat(chatId);
+                setMessages((prev) => ({ ...prev, [chatId]: loadedMessages }));
+            } catch {
+                console.error("Failed to load messages");
+            }
+        },
+        [adapter],
     );
 
     const selectChat = useCallback(
@@ -138,36 +150,33 @@ export function ChatProvider({
                 await loadMessages(chatId);
             }
         },
-        [chats],
+        [chats, loadMessages],
     );
 
-    const deleteChat = useCallback(async (chatId: string) => {
-        await adapter.deleteChat(chatId);
+    const deleteChat = useCallback(
+        async (chatId: string) => {
+            await adapter.deleteChat(chatId);
 
-        setChats((prev) => prev.filter((c) => c.id !== chatId));
-        setCurrentChat((prev) => (prev?.id === chatId ? null : prev));
-        setMessages((prev) => {
-            const next = { ...prev };
-            delete next[chatId];
-            return next;
-        });
-    }, []);
+            setChats((prev) => prev.filter((c) => c.id !== chatId));
+            setCurrentChat((prev) => (prev?.id === chatId ? null : prev));
+            setMessages((prev) => {
+                const next = { ...prev };
+                delete next[chatId];
+                return next;
+            });
+        },
+        [adapter],
+    );
 
-    const updateChat = useCallback(async (chat: ChatSession) => {
-        await adapter.updateChat(chat);
+    const updateChat = useCallback(
+        async (chat: ChatSession) => {
+            await adapter.updateChat(chat);
 
-        setChats((prev) => prev.map((c) => (c.id === chat.id ? chat : c)));
-        setCurrentChat((prev) => (prev?.id === chat.id ? chat : prev));
-    }, []);
-
-    const loadMessages = useCallback(async (chatId: string) => {
-        try {
-            const loadedMessages = await adapter.getMessagesByChat(chatId);
-            setMessages((prev) => ({ ...prev, [chatId]: loadedMessages }));
-        } catch {
-            console.error("Failed to load messages");
-        }
-    }, []);
+            setChats((prev) => prev.map((c) => (c.id === chat.id ? chat : c)));
+            setCurrentChat((prev) => (prev?.id === chat.id ? chat : prev));
+        },
+        [adapter],
+    );
 
     const addMessage = useCallback(
         async (
@@ -193,7 +202,7 @@ export function ChatProvider({
 
             return message;
         },
-        [currentChat],
+        [adapter, currentChat],
     );
 
     const updateMessage = useCallback(
@@ -209,7 +218,7 @@ export function ChatProvider({
                 }));
             }
         },
-        [currentChat],
+        [adapter, currentChat],
     );
 
     const setDefaultModel = useCallback(
@@ -230,8 +239,10 @@ export function ChatProvider({
     }, []);
 
     useEffect(() => {
+        setCurrentChat(null);
+        setMessages({});
         loadChats();
-    }, [loadChats]);
+    }, [adapter, loadChats]);
 
     useEffect(() => {
         let isMounted = true;

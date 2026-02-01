@@ -3,6 +3,7 @@ import React, {
     useState,
     useRef,
     useMemo,
+    useCallback,
     type ReactElement,
 } from "react";
 import {
@@ -27,14 +28,14 @@ import { useModelContext } from "../../../src/contexts/ModelContext";
 import { useSkillsContext } from "../../../src/contexts/SkillsContext";
 import { useTheme, type ThemeColors } from "../../../src/contexts/ThemeContext";
 import {
-    getApiKey,
     loadAttachmentData,
-    saveAttachments,
+    saveFile,
     setDefaultModel,
     setDefaultThinking,
     setDefaultSearchLevel,
 } from "../../../src/lib/storage";
-import { getAttachment, getAttachmentsByMessage } from "../../../src/lib/db";
+import { useApiKey } from "../../../src/hooks/useApiKey";
+import { useStorageAdapter } from "../../../src/contexts/SyncContext";
 import {
     sendMessage,
     buildMessageContent,
@@ -125,8 +126,12 @@ export default function ChatScreen(): ReactElement {
 
     const [inputText, setInputText] = useState("");
     const [isLoading, setIsLoading] = useState(false);
-    const [apiKey, setApiKey] = useState<string | null>(null);
+    const { apiKey } = useApiKey();
+    const storageAdapter = useStorageAdapter();
     const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
+    const [attachmentsById, setAttachmentsById] = useState<
+        Record<string, Attachment>
+    >({});
     const [error, setError] = useState<ErrorState | null>(null);
     const [retryPayload, setRetryPayload] = useState<{
         content: string;
@@ -163,14 +168,6 @@ export default function ChatScreen(): ReactElement {
     }, [chatId, selectChat]);
 
     useEffect(() => {
-        const loadApiKey = async () => {
-            const key = await getApiKey();
-            setApiKey(key);
-        };
-        loadApiKey();
-    }, []);
-
-    useEffect(() => {
         return () => {
             if (thinkingTimeoutRef.current) {
                 clearTimeout(thinkingTimeoutRef.current);
@@ -193,6 +190,37 @@ export default function ChatScreen(): ReactElement {
     const hasLoadedMessages = messages[chatId] !== undefined;
     const showSkeletons = !hasLoadedMessages;
     const showEmptyState = hasLoadedMessages && chatMessages.length === 0;
+
+    useEffect(() => {
+        let isMounted = true;
+        const loadAttachments = async () => {
+            const nextById: Record<string, Attachment> = {};
+
+            for (const message of chatMessages) {
+                if (
+                    !message.attachmentIds ||
+                    message.attachmentIds.length === 0
+                ) {
+                    continue;
+                }
+                const attachmentsForMessage =
+                    await storageAdapter.getAttachmentsByMessage(message.id);
+                for (const attachment of attachmentsForMessage) {
+                    nextById[attachment.id] = attachment;
+                }
+            }
+
+            if (isMounted) {
+                setAttachmentsById(nextById);
+            }
+        };
+
+        void loadAttachments();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [chatMessages, storageAdapter]);
 
     useEffect(() => {
         if (!currentChat) return;
@@ -287,10 +315,7 @@ export default function ChatScreen(): ReactElement {
         if (attachment.data.startsWith("data:")) {
             return attachment.data.split(",")[1] ?? "";
         }
-        if (
-            attachment.data.startsWith("file:") ||
-            attachment.data.startsWith("/")
-        ) {
+        if (attachment.data.startsWith("file://")) {
             try {
                 return await loadAttachmentData(attachment);
             } catch {
@@ -299,6 +324,38 @@ export default function ChatScreen(): ReactElement {
         }
         return attachment.data;
     };
+
+    const savePendingAttachmentsToStorage = useCallback(
+        async (pending: PendingAttachment[], messageId: string) => {
+            const createdAt = Date.now();
+            const saved: Attachment[] = [];
+
+            for (const pendingAttachment of pending) {
+                const fileUri = await saveFile(pendingAttachment.data, {
+                    id: pendingAttachment.id,
+                    mimeType: pendingAttachment.mimeType,
+                    width: pendingAttachment.width,
+                    height: pendingAttachment.height,
+                });
+
+                saved.push({
+                    id: pendingAttachment.id,
+                    messageId,
+                    type: "image",
+                    mimeType: pendingAttachment.mimeType,
+                    data: fileUri,
+                    width: pendingAttachment.width,
+                    height: pendingAttachment.height,
+                    size: pendingAttachment.size,
+                    createdAt,
+                });
+            }
+
+            await storageAdapter.saveAttachments(saved);
+            return saved;
+        },
+        [storageAdapter],
+    );
 
     const buildOpenRouterMessages = async (
         messageList: Message[],
@@ -309,11 +366,12 @@ export default function ChatScreen(): ReactElement {
             let content: MessageContent = message.contextContent;
 
             if (message.attachmentIds && message.attachmentIds.length > 0) {
-                const attachments = getAttachmentsByMessage(message.id);
+                const attachments =
+                    await storageAdapter.getAttachmentsByMessage(message.id);
                 if (attachments.length > 0) {
                     const attachmentsWithData = (
                         await Promise.all(
-                            attachments.map(async (attachment) => {
+                            attachments.map(async (attachment: Attachment) => {
                                 const data =
                                     await getAttachmentBase64(attachment);
                                 if (!data) return null;
@@ -413,7 +471,7 @@ export default function ChatScreen(): ReactElement {
             let attachmentIds: string[] | undefined;
 
             if (pendingAttachments && pendingAttachments.length > 0) {
-                const saved = await saveAttachments(
+                const saved = await savePendingAttachmentsToStorage(
                     pendingAttachments,
                     messageId,
                 );
@@ -692,7 +750,7 @@ export default function ChatScreen(): ReactElement {
                 message.attachmentIds.forEach((id) => {
                     if (!seenIds.has(id)) {
                         seenIds.add(id);
-                        const attachment = getAttachment(id);
+                        const attachment = attachmentsById[id];
                         if (attachment) {
                             allAttachments.push(attachment);
                         }
@@ -753,8 +811,8 @@ export default function ChatScreen(): ReactElement {
         if (!attachmentIds || attachmentIds.length === 0) return null;
 
         const attachments = attachmentIds
-            .map((id) => getAttachment(id))
-            .filter((a): a is Attachment => a !== undefined);
+            .map((id) => attachmentsById[id])
+            .filter((a): a is Attachment => Boolean(a && a.data));
 
         if (attachments.length === 0) return null;
 

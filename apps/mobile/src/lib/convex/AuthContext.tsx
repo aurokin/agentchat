@@ -1,18 +1,18 @@
 import React, {
     createContext,
     useContext,
-    useState,
-    useEffect,
     useCallback,
+    useMemo,
     type ReactNode,
 } from "react";
 import * as WebBrowser from "expo-web-browser";
-import { makeRedirectUri, useAuthRequest } from "expo-auth-session";
-import * as Google from "expo-auth-session/providers/google";
-import { ConvexReactClient } from "convex/react";
-import { getConvexClient, clearConvexClient } from "./client";
+import { makeRedirectUri } from "expo-auth-session";
+import { useConvexAuth, useQuery } from "convex/react";
+import { useAuthActions } from "@convex-dev/auth/react";
+import { api } from "../../../../web/convex/_generated/api";
 import { isConvexConfigured, setConvexUrl, clearConvexUrl } from "./config";
 import { clearAllCredentials } from "../storage";
+import { useIsConvexAvailable } from "./ConvexProvider";
 
 interface User {
     id: string;
@@ -49,101 +49,88 @@ interface AuthProviderProps {
 export function AuthProvider({
     children,
 }: AuthProviderProps): React.ReactElement {
-    const [user, setUser] = useState<User | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [isConvexAvailable, setIsConvexAvailable] = useState(false);
+    const isConvexAvailable = useIsConvexAvailable();
+    const { isAuthenticated, isLoading: isAuthLoading } = useConvexAuth();
+    const authActions = useAuthActions();
+    const userId = useQuery(
+        api.users.getCurrentUserId,
+        isAuthenticated ? {} : "skip",
+    );
+    const user = useQuery(api.users.get, userId ? { id: userId } : "skip");
 
-    const redirectUri = makeRedirectUri({
-        scheme: "routerchat",
-        path: "convex-auth",
-    });
+    const isUserLoading =
+        isAuthenticated && (userId === undefined || user === undefined);
+    const isLoading = isAuthLoading || isUserLoading;
 
-    const [request, response, promptAsync] = Google.useAuthRequest({
-        clientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID || "",
-        redirectUri,
-        scopes: ["openid", "profile", "email"],
-    });
-
-    const checkConvexAvailability = useCallback(() => {
-        const available = isConvexConfigured();
-        setIsConvexAvailable(available);
-    }, []);
+    const userValue = useMemo<User | null>(() => {
+        if (!user || !userId) return null;
+        return {
+            id: (user as any)._id ?? userId,
+            name: (user as any).name ?? undefined,
+            email: (user as any).email ?? undefined,
+            image: (user as any).image ?? undefined,
+        };
+    }, [user, userId]);
 
     const signIn = useCallback(async () => {
-        try {
-            const result = await promptAsync();
-            if (result.type !== "success") {
+        if (!authActions?.signIn) {
+            throw new Error("Convex auth is not configured");
+        }
+        if (!isConvexAvailable || !isConvexConfigured()) {
+            throw new Error("Convex is not configured");
+        }
+
+        const redirectUri = makeRedirectUri({
+            scheme: "routerchat",
+            path: "convex-auth",
+        });
+
+        const result = await authActions.signIn("google", {
+            redirectTo: redirectUri,
+            calledBy: "mobile",
+        } as any);
+
+        if (result?.redirect) {
+            const authSession = await WebBrowser.openAuthSessionAsync(
+                result.redirect.toString(),
+                redirectUri,
+            );
+
+            if (authSession.type !== "success" || !authSession.url) {
                 throw new Error("Sign in was cancelled or failed");
             }
-        } catch (error) {
-            console.error("Failed to start Google sign-in:", error);
-            throw error;
+
+            const url = new URL(authSession.url);
+            const code = url.searchParams.get("code");
+            if (!code) {
+                throw new Error("Missing auth code");
+            }
+
+            await authActions.signIn(undefined as any, { code } as any);
         }
-    }, [promptAsync]);
+    }, [authActions, isConvexAvailable]);
 
     const signOut = useCallback(async () => {
         try {
-            setUser(null);
-            clearConvexClient();
-            setIsConvexAvailable(false);
+            await authActions?.signOut?.();
+        } finally {
             await clearAllCredentials();
-        } catch (error) {
-            console.error("Failed to sign out:", error);
         }
-    }, []);
+    }, [authActions]);
 
-    const configureConvex = useCallback(
-        async (url: string) => {
-            await setConvexUrl(url);
-            clearConvexClient();
-            checkConvexAvailability();
-        },
-        [checkConvexAvailability],
-    );
+    const configureConvex = useCallback(async (url: string) => {
+        await setConvexUrl(url);
+    }, []);
 
     const clearConvexOverride = useCallback(async () => {
         await clearConvexUrl();
-        clearConvexClient();
-        checkConvexAvailability();
-    }, [checkConvexAvailability]);
-
-    useEffect(() => {
-        checkConvexAvailability();
-        setIsLoading(false);
-    }, [checkConvexAvailability]);
-
-    useEffect(() => {
-        const handleGoogleResponse = async () => {
-            if (response?.type === "success" && response.authentication) {
-                const accessToken = response.authentication.accessToken;
-
-                const convex = getConvexClient();
-                if (convex) {
-                    try {
-                        const userInfo = await (convex.query as any)(
-                            "auth:user",
-                            {
-                                token: accessToken,
-                            },
-                        );
-                        if (userInfo) {
-                            setUser(userInfo as User);
-                        }
-                    } catch (error) {
-                        console.error("Failed to get user info:", error);
-                    }
-                }
-            }
-        };
-
-        handleGoogleResponse();
-    }, [response]);
+    }, []);
 
     return (
         <AuthContext.Provider
             value={{
-                user,
-                isAuthenticated: user !== null,
+                user: userValue,
+                isAuthenticated,
                 isLoading,
                 isConvexAvailable,
                 signIn,
