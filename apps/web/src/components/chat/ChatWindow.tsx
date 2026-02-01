@@ -30,9 +30,14 @@ import {
     type ImageMimeType,
     type ChatSession,
 } from "@/lib/types";
+import { APP_DEFAULT_MODEL } from "@shared/core/models";
 import { type Skill, getSkillSelectionUpdate } from "@shared/core/skills";
+import {
+    applyModelCapabilities,
+    getLastUserSettings,
+    resolveInitialChatSettings,
+} from "@shared/core/defaults";
 import { trimTrailingEmptyLines } from "@shared/core/text";
-import * as storage from "@/lib/storage";
 import { generateUUID } from "@/lib/utils";
 import { Hexagon, Sparkles, AlertCircle, RefreshCw } from "lucide-react";
 
@@ -113,6 +118,7 @@ export function ChatWindow() {
     const {
         currentChat,
         messages,
+        isMessagesLoading,
         addMessage,
         updateMessage,
         updateChat,
@@ -120,11 +126,16 @@ export function ChatWindow() {
     } = useChat();
     const {
         apiKey,
+        defaultModel,
+        defaultThinking,
+        defaultSearchLevel,
+        setDefaultModel,
+        setDefaultThinking,
+        setDefaultSearchLevel,
         selectedSkill,
         defaultSkill,
         selectedSkillMode,
         setSelectedSkill,
-        setDefaultSkill,
         models,
         favoriteModels,
         skills,
@@ -145,17 +156,12 @@ export function ChatWindow() {
         skill: selectedSkill,
         mode: selectedSkillMode,
     });
-    const pendingManualSkillRef = useRef<Skill | null | undefined>(undefined);
+    const lastInitializedChatIdRef = useRef<string | null>(null);
 
     const updateSelectedSkill = useCallback(
         (skill: Skill | null, options?: { mode?: "auto" | "manual" }) => {
             const mode = options?.mode ?? "manual";
             lastSkillChangeRef.current = { skill, mode };
-            if (mode === "manual") {
-                pendingManualSkillRef.current = skill;
-            } else {
-                pendingManualSkillRef.current = undefined;
-            }
             setSelectedSkill(skill, { mode });
         },
         [setSelectedSkill],
@@ -168,15 +174,71 @@ export function ChatWindow() {
         };
     }, [selectedSkill, selectedSkillMode]);
 
-    const isNewChat =
-        currentChat?.createdAt !== undefined &&
-        currentChat.createdAt === currentChat.updatedAt;
+    useEffect(() => {
+        if (!currentChat) {
+            lastInitializedChatIdRef.current = null;
+        }
+    }, [currentChat]);
 
     useEffect(() => {
-        if (!currentChat) return;
-        if (!isNewChat && messages.length === 0) {
-            return;
+        if (!currentChat || isMessagesLoading) return;
+        if (lastInitializedChatIdRef.current === currentChat.id) return;
+        const messagesMatchChat =
+            messages.length === 0 ||
+            messages.every((message) => message.sessionId === currentChat.id);
+        if (!messagesMatchChat) return;
+
+        const fallbackModelId =
+            defaultModel || currentChat.modelId || APP_DEFAULT_MODEL;
+        const defaults = {
+            modelId: fallbackModelId,
+            thinking: defaultThinking,
+            searchLevel: defaultSearchLevel,
+        };
+        const lastUserSettings = getLastUserSettings(messages);
+        const resolvedSettings = resolveInitialChatSettings({
+            messageCount: messages.length,
+            defaults,
+            lastUser: lastUserSettings,
+        });
+        const modelForSettings = models.find(
+            (model) => model.id === resolvedSettings.modelId,
+        );
+        const constrainedSettings = applyModelCapabilities(resolvedSettings, {
+            supportsReasoning: modelForSettings
+                ? modelSupportsReasoning(modelForSettings)
+                : true,
+            supportsSearch: modelForSettings
+                ? modelSupportsSearch(modelForSettings)
+                : true,
+        });
+
+        if (
+            constrainedSettings.modelId !== currentChat.modelId ||
+            constrainedSettings.thinking !== currentChat.thinking ||
+            constrainedSettings.searchLevel !== currentChat.searchLevel
+        ) {
+            void updateChat({
+                ...currentChat,
+                modelId: constrainedSettings.modelId,
+                thinking: constrainedSettings.thinking,
+                searchLevel: constrainedSettings.searchLevel,
+            });
         }
+        lastInitializedChatIdRef.current = currentChat.id;
+    }, [
+        currentChat,
+        defaultModel,
+        defaultThinking,
+        defaultSearchLevel,
+        isMessagesLoading,
+        messages,
+        models,
+        updateChat,
+    ]);
+
+    useEffect(() => {
+        if (!currentChat || isMessagesLoading) return;
         const nextSkill = getSkillSelectionUpdate({
             messageCount: messages.length,
             defaultSkill,
@@ -189,7 +251,7 @@ export function ChatWindow() {
     }, [
         currentChat,
         defaultSkill,
-        isNewChat,
+        isMessagesLoading,
         messages.length,
         selectedSkill,
         selectedSkillMode,
@@ -251,7 +313,28 @@ export function ChatWindow() {
                 const nextModelId = availableFavorites[nextIndex];
                 if (nextModelId && nextModelId !== currentChat.modelId) {
                     event.preventDefault();
-                    void updateChat({ ...currentChat, modelId: nextModelId });
+                    const nextModel = models.find(
+                        (model) => model.id === nextModelId,
+                    );
+                    const supportsReasoning = nextModel
+                        ? modelSupportsReasoning(nextModel)
+                        : true;
+                    const supportsSearch = nextModel
+                        ? modelSupportsSearch(nextModel)
+                        : true;
+                    const nextThinking = supportsReasoning
+                        ? currentChat.thinking
+                        : "none";
+                    const nextSearchLevel = supportsSearch
+                        ? currentChat.searchLevel
+                        : "none";
+                    void updateChat({
+                        ...currentChat,
+                        modelId: nextModelId,
+                        thinking: nextThinking,
+                        searchLevel: nextSearchLevel,
+                    });
+                    setDefaultModel(nextModelId);
                 }
                 return;
             }
@@ -289,6 +372,7 @@ export function ChatWindow() {
                 if (!modelSupportsReasoning(currentModel)) return;
                 event.preventDefault();
                 void updateChat({ ...currentChat, thinking: "none" });
+                setDefaultThinking("none");
                 return;
             }
 
@@ -313,6 +397,7 @@ export function ChatWindow() {
                             ...currentChat,
                             thinking: nextLevel,
                         });
+                        setDefaultThinking(nextLevel);
                     }
                     return;
                 }
@@ -330,6 +415,7 @@ export function ChatWindow() {
                 if (!modelSupportsSearch(currentModel)) return;
                 event.preventDefault();
                 void updateChat({ ...currentChat, searchLevel: "none" });
+                setDefaultSearchLevel("none");
                 return;
             }
 
@@ -348,6 +434,7 @@ export function ChatWindow() {
                             ...currentChat,
                             searchLevel: nextLevel,
                         });
+                        setDefaultSearchLevel(nextLevel);
                     }
                 }
             }
@@ -361,6 +448,9 @@ export function ChatWindow() {
         models,
         router,
         selectedSkill,
+        setDefaultModel,
+        setDefaultThinking,
+        setDefaultSearchLevel,
         updateSelectedSkill,
         skills,
         updateChat,
@@ -392,10 +482,8 @@ export function ChatWindow() {
 
         const skillSnapshot = lastSkillChangeRef.current;
         let skillForMessage = selectedSkill;
-        let skillModeForMessage = selectedSkillMode;
         if (skillSnapshot.mode === "manual") {
             skillForMessage = skillSnapshot.skill;
-            skillModeForMessage = "manual";
         }
 
         try {
@@ -404,14 +492,6 @@ export function ChatWindow() {
             );
             const supportsReasoning = modelSupportsReasoning(currentModel);
             const supportsSearch = modelSupportsSearch(currentModel);
-
-            storage.setDefaultModel(chatSnapshot.modelId);
-            if (supportsReasoning) {
-                storage.setDefaultThinking(chatSnapshot.thinking);
-            }
-            if (supportsSearch) {
-                storage.setDefaultSearchLevel(chatSnapshot.searchLevel);
-            }
 
             const effectiveThinking = supportsReasoning
                 ? chatSnapshot.thinking
@@ -465,12 +545,6 @@ export function ChatWindow() {
                 attachmentIds,
                 chatId: chatSnapshot.id,
             });
-
-            if (pendingManualSkillRef.current !== undefined) {
-                const manualSkill = pendingManualSkillRef.current;
-                setDefaultSkill(manualSkill ?? null);
-                pendingManualSkillRef.current = undefined;
-            }
 
             updateSelectedSkill(null, { mode: "auto" });
 
@@ -612,17 +686,36 @@ export function ChatWindow() {
 
     const handleModelChange = async (modelId: string) => {
         if (!currentChat) return;
-        await updateChat({ ...currentChat, modelId });
+        const nextModel = models.find((model) => model.id === modelId);
+        const supportsReasoning = nextModel
+            ? modelSupportsReasoning(nextModel)
+            : true;
+        const supportsSearch = nextModel
+            ? modelSupportsSearch(nextModel)
+            : true;
+        const nextThinking = supportsReasoning ? currentChat.thinking : "none";
+        const nextSearchLevel = supportsSearch
+            ? currentChat.searchLevel
+            : "none";
+        await updateChat({
+            ...currentChat,
+            modelId,
+            thinking: nextThinking,
+            searchLevel: nextSearchLevel,
+        });
+        setDefaultModel(modelId);
     };
 
     const handleThinkingChange = async (value: ThinkingLevel) => {
         if (!currentChat) return;
         await updateChat({ ...currentChat, thinking: value });
+        setDefaultThinking(value);
     };
 
     const handleSearchChange = async (level: SearchLevel) => {
         if (!currentChat) return;
         await updateChat({ ...currentChat, searchLevel: level });
+        setDefaultSearchLevel(level);
     };
 
     if (!currentChat) {

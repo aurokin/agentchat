@@ -25,6 +25,7 @@ interface ChatContextType {
     currentChat: ChatSession | null;
     messages: Message[];
     loading: boolean;
+    isMessagesLoading: boolean;
     createChat: (title?: string, modelId?: string) => Promise<ChatSession>;
     selectChat: (chatId: string) => Promise<void>;
     deleteChat: (chatId: string) => Promise<void>;
@@ -59,6 +60,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     const [currentChat, setCurrentChat] = useState<ChatSession | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isMessagesLoading, setIsMessagesLoading] = useState(false);
     const currentChatIdRef = useRef<string | null>(null);
 
     useEffect(() => {
@@ -72,6 +74,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
             const activeChatId = currentChatIdRef.current;
             if (activeChatId) {
+                setIsMessagesLoading(true);
                 const refreshedChat =
                     await storageAdapter.getChat(activeChatId);
 
@@ -80,6 +83,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                         setCurrentChat(null);
                         setMessages([]);
                     }
+                    setIsMessagesLoading(false);
                 } else {
                     setCurrentChat(refreshedChat);
                     const chatMessages = await storageAdapter.getMessagesByChat(
@@ -88,7 +92,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                     if (currentChatIdRef.current === refreshedChat.id) {
                         setMessages(chatMessages);
                     }
+                    setIsMessagesLoading(false);
                 }
+            } else {
+                setIsMessagesLoading(false);
             }
         } finally {
             setLoading(false);
@@ -119,6 +126,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             setChats((prev) => [chat, ...prev]);
             setCurrentChat(chat);
             setMessages([]);
+            setIsMessagesLoading(false);
 
             return chat;
         },
@@ -130,10 +138,14 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             const chat = await storageAdapter.getChat(chatId);
             if (chat) {
                 setCurrentChat(chat);
+                setIsMessagesLoading(true);
                 const chatMessages =
                     await storageAdapter.getMessagesByChat(chatId);
                 setMessages(chatMessages);
+                setIsMessagesLoading(false);
+                return;
             }
+            setIsMessagesLoading(false);
         },
         [storageAdapter],
     );
@@ -146,6 +158,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             if (currentChat?.id === chatId) {
                 setCurrentChat(null);
                 setMessages([]);
+                setIsMessagesLoading(false);
             }
         },
         [currentChat, storageAdapter],
@@ -270,6 +283,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     const clearCurrentChat = useCallback(() => {
         setCurrentChat(null);
         setMessages([]);
+        setIsMessagesLoading(false);
     }, []);
 
     return (
@@ -279,6 +293,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 currentChat,
                 messages,
                 loading,
+                isMessagesLoading,
                 createChat,
                 selectChat,
                 deleteChat,

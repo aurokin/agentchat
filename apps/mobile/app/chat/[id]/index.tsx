@@ -27,13 +27,7 @@ import { useChatContext } from "../../../src/contexts/ChatContext";
 import { useModelContext } from "../../../src/contexts/ModelContext";
 import { useSkillsContext } from "../../../src/contexts/SkillsContext";
 import { useTheme, type ThemeColors } from "../../../src/contexts/ThemeContext";
-import {
-    loadAttachmentData,
-    saveFile,
-    setDefaultModel,
-    setDefaultThinking,
-    setDefaultSearchLevel,
-} from "../../../src/lib/storage";
+import { loadAttachmentData, saveFile } from "../../../src/lib/storage";
 import { useApiKey } from "../../../src/hooks/useApiKey";
 import { useStorageAdapter } from "../../../src/contexts/SyncContext";
 import {
@@ -57,6 +51,11 @@ import type {
     PendingAttachment,
 } from "@shared/core/types";
 import { type Skill, getSkillSelectionUpdate } from "@shared/core/skills";
+import {
+    applyModelCapabilities,
+    getLastUserSettings,
+    resolveInitialChatSettings,
+} from "@shared/core/defaults";
 import { trimTrailingEmptyLines } from "@shared/core/text";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -100,6 +99,11 @@ export default function ChatScreen(): ReactElement {
     const {
         currentChat,
         messages,
+        defaultModel,
+        defaultThinking,
+        defaultSearchLevel,
+        setDefaultThinking,
+        setDefaultSearchLevel,
         selectChat,
         addMessage,
         updateMessage,
@@ -119,7 +123,6 @@ export default function ChatScreen(): ReactElement {
         defaultSkill,
         selectedSkillMode,
         setSelectedSkill,
-        setDefaultSkill,
     } = useSkillsContext();
     const { colors } = useTheme();
     const styles = useMemo(() => createStyles(colors), [colors]);
@@ -167,17 +170,12 @@ export default function ChatScreen(): ReactElement {
         skill: selectedSkill,
         mode: selectedSkillMode,
     });
-    const pendingManualSkillRef = useRef<Skill | null | undefined>(undefined);
+    const lastInitializedChatIdRef = useRef<string | null>(null);
 
     const updateSelectedSkill = useCallback(
         (skill: Skill | null, options?: { mode?: "auto" | "manual" }) => {
             const mode = options?.mode ?? "manual";
             lastSkillChangeRef.current = { skill, mode };
-            if (mode === "manual") {
-                pendingManualSkillRef.current = skill;
-            } else {
-                pendingManualSkillRef.current = undefined;
-            }
             setSelectedSkill(skill, { mode });
         },
         [setSelectedSkill],
@@ -205,6 +203,12 @@ export default function ChatScreen(): ReactElement {
     }, [selectedSkill, selectedSkillMode]);
 
     useEffect(() => {
+        if (!currentChat) {
+            lastInitializedChatIdRef.current = null;
+        }
+    }, [currentChat]);
+
+    useEffect(() => {
         if (flatListRef.current && messages[chatId]) {
             setTimeout(() => {
                 flatListRef.current?.scrollToEnd?.({ animated: true });
@@ -219,9 +223,6 @@ export default function ChatScreen(): ReactElement {
     const hasLoadedMessages = messages[chatId] !== undefined;
     const showSkeletons = !hasLoadedMessages;
     const showEmptyState = hasLoadedMessages && chatMessages.length === 0;
-    const isNewChat =
-        currentChat?.createdAt !== undefined &&
-        currentChat.createdAt === currentChat.updatedAt;
 
     useEffect(() => {
         let isMounted = true;
@@ -255,10 +256,7 @@ export default function ChatScreen(): ReactElement {
     }, [chatMessages, storageAdapter]);
 
     useEffect(() => {
-        if (!currentChat) return;
-        if (!isNewChat && chatMessages.length === 0) {
-            return;
-        }
+        if (!currentChat || !hasLoadedMessages) return;
         const nextSkill = getSkillSelectionUpdate({
             messageCount: chatMessages.length,
             defaultSkill,
@@ -271,11 +269,61 @@ export default function ChatScreen(): ReactElement {
     }, [
         chatMessages.length,
         currentChat,
-        isNewChat,
+        hasLoadedMessages,
         defaultSkill,
         selectedSkill,
         selectedSkillMode,
         updateSelectedSkill,
+    ]);
+
+    useEffect(() => {
+        if (!currentChat || !hasLoadedMessages) return;
+        if (lastInitializedChatIdRef.current === currentChat.id) return;
+        const defaults = {
+            modelId: defaultModel,
+            thinking: defaultThinking,
+            searchLevel: defaultSearchLevel,
+        };
+        const lastUserSettings = getLastUserSettings(chatMessages);
+        const resolvedSettings = resolveInitialChatSettings({
+            messageCount: chatMessages.length,
+            defaults,
+            lastUser: lastUserSettings,
+        });
+        const modelForSettings = models.find(
+            (model) => model.id === resolvedSettings.modelId,
+        );
+        const constrainedSettings = applyModelCapabilities(resolvedSettings, {
+            supportsReasoning: modelForSettings
+                ? modelSupportsReasoning(modelForSettings)
+                : true,
+            supportsSearch: modelForSettings
+                ? modelSupportsSearch(modelForSettings)
+                : true,
+        });
+
+        if (
+            constrainedSettings.modelId !== currentChat.modelId ||
+            constrainedSettings.thinking !== currentChat.thinking ||
+            constrainedSettings.searchLevel !== currentChat.searchLevel
+        ) {
+            void updateChat({
+                ...currentChat,
+                modelId: constrainedSettings.modelId,
+                thinking: constrainedSettings.thinking,
+                searchLevel: constrainedSettings.searchLevel,
+            });
+        }
+        lastInitializedChatIdRef.current = currentChat.id;
+    }, [
+        chatMessages,
+        currentChat,
+        defaultModel,
+        defaultThinking,
+        defaultSearchLevel,
+        hasLoadedMessages,
+        models,
+        updateChat,
     ]);
 
     useEffect(() => {
@@ -327,12 +375,14 @@ export default function ChatScreen(): ReactElement {
 
     const handleThinkingChange = async (thinking: ThinkingLevel) => {
         if (!currentChat) return;
+        setDefaultThinking(thinking);
         const updatedChat = { ...currentChat, thinking };
         await updateChat(updatedChat);
     };
 
     const handleSearchChange = async (searchLevel: SearchLevel) => {
         if (!currentChat) return;
+        setDefaultSearchLevel(searchLevel);
         const updatedChat = { ...currentChat, searchLevel };
         await updateChat(updatedChat);
     };
@@ -469,10 +519,8 @@ export default function ChatScreen(): ReactElement {
 
         const skillSnapshot = lastSkillChangeRef.current;
         let skillForMessage = selectedSkill;
-        let skillModeForMessage = selectedSkillMode;
         if (skillSnapshot.mode === "manual") {
             skillForMessage = skillSnapshot.skill;
-            skillModeForMessage = "manual";
         }
 
         try {
@@ -521,12 +569,6 @@ export default function ChatScreen(): ReactElement {
                 searchLevel: effectiveSearchLevel,
                 attachmentIds,
             });
-
-            if (pendingManualSkillRef.current !== undefined) {
-                const manualSkill = pendingManualSkillRef.current;
-                setDefaultSkill(manualSkill ?? null);
-                pendingManualSkillRef.current = undefined;
-            }
 
             updateSelectedSkill(null, { mode: "auto" });
 
@@ -657,14 +699,6 @@ export default function ChatScreen(): ReactElement {
                 };
                 streamingMessage = updated;
                 await updateMessage(updated);
-            }
-
-            await setDefaultModel(chatSnapshot.modelId);
-            if (supportsReasoning) {
-                await setDefaultThinking(chatSnapshot.thinking);
-            }
-            if (supportsSearch) {
-                await setDefaultSearchLevel(chatSnapshot.searchLevel);
             }
         } catch (err) {
             if (streamingMessage && (assistantContent || assistantThinking)) {

@@ -322,6 +322,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         const mode = options?.mode ?? "manual";
         setSelectedSkillState(skill);
         setSelectedSkillMode(mode);
+        if (mode === "manual") {
+            setDefaultSkill(skill ?? null);
+        }
         void storageAdapter.upsertSkillSettings({
             selectedSkillId: skill?.id ?? null,
             selectedSkillMode: mode,

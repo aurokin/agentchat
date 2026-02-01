@@ -19,6 +19,7 @@ export {
     calculateMigrationProgress,
 } from "./core/sync";
 export * from "./core/skills";
+export * from "./core/defaults";
 export * from "./core/errors";
 export {
     ThinkingLevel,
