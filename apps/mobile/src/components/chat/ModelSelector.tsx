@@ -55,9 +55,6 @@ export function ModelSelector({
             }, 50);
             return () => clearTimeout(timeoutId);
         }
-        if (!isOpen) {
-            setSearchQuery("");
-        }
     }, [isOpen]);
 
     const filteredModels = useMemo(
@@ -126,6 +123,12 @@ export function ModelSelector({
     const handleSelect = (modelId: string) => {
         onModelChange(modelId);
         setIsOpen(false);
+        setSearchQuery("");
+    };
+
+    const handleClose = () => {
+        setIsOpen(false);
+        setSearchQuery("");
     };
 
     const handleToggleFavorite = (
@@ -153,12 +156,12 @@ export function ModelSelector({
                 visible={isOpen}
                 transparent
                 animationType="fade"
-                onRequestClose={() => setIsOpen(false)}
+                onRequestClose={handleClose}
             >
                 <TouchableOpacity
                     style={styles.overlay}
                     activeOpacity={1}
-                    onPress={() => setIsOpen(false)}
+                    onPress={handleClose}
                 >
                     <View style={styles.modal}>
                         <View style={styles.searchContainer}>

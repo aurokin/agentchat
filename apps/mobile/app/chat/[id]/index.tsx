@@ -69,6 +69,8 @@ interface ErrorState {
     isRetryable: boolean;
 }
 
+const EMPTY_MESSAGES: Message[] = [];
+
 interface StreamingDraft {
     id: string;
     content: string;
@@ -219,8 +221,11 @@ export default function ChatScreen(): ReactElement {
     const currentModel = models.find((m) => m.id === currentChat?.modelId);
     const reasoningSupported = modelSupportsReasoning(currentModel);
     const searchSupported = modelSupportsSearch(currentModel);
-    const chatMessages = messages[chatId] || [];
-    const hasLoadedMessages = messages[chatId] !== undefined;
+    const chatMessages = useMemo(() => {
+        if (!chatId) return EMPTY_MESSAGES;
+        return messages[chatId] ?? EMPTY_MESSAGES;
+    }, [chatId, messages]);
+    const hasLoadedMessages = Boolean(chatId && messages[chatId] !== undefined);
     const showSkeletons = !hasLoadedMessages;
     const showEmptyState = hasLoadedMessages && chatMessages.length === 0;
 
@@ -1398,6 +1403,7 @@ export default function ChatScreen(): ReactElement {
             </KeyboardAvoidingView>
 
             <AttachmentGallery
+                key={`${galleryVisible}-${galleryInitialIndex}-${galleryAttachments.length}`}
                 visible={galleryVisible}
                 attachments={galleryAttachments}
                 initialIndex={galleryInitialIndex}

@@ -1,5 +1,5 @@
-import React, { type ReactElement, useEffect, useState } from "react";
-import { Stack, useRouter } from "expo-router";
+import type { ReactElement, ReactNode } from "react";
+import { Stack } from "expo-router";
 import { StatusBar } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AppProvider, useAppContext } from "../src/contexts/AppContext";
@@ -15,25 +15,17 @@ import OnboardingScreen from "./onboarding";
 function OnboardingWrapper({
     children,
 }: {
-    children: React.ReactNode;
-}): React.ReactElement {
-    const router = useRouter();
+    children: ReactNode;
+}): ReactElement {
     const { isInitialized, hasCompletedOnboarding, completeOnboarding } =
         useAppContext();
-    const [showOnboarding, setShowOnboarding] = useState(false);
-
-    useEffect(() => {
-        if (isInitialized && !hasCompletedOnboarding) {
-            setShowOnboarding(true);
-        }
-    }, [isInitialized, hasCompletedOnboarding]);
+    const shouldShowOnboarding = isInitialized && !hasCompletedOnboarding;
 
     const handleOnboardingComplete = async () => {
         await completeOnboarding();
-        setShowOnboarding(false);
     };
 
-    if (showOnboarding) {
+    if (shouldShowOnboarding) {
         return <OnboardingScreen onComplete={handleOnboardingComplete} />;
     }
 
