@@ -546,6 +546,14 @@ export function ChatWindow() {
                 chatId: chatSnapshot.id,
             });
 
+            setDefaultModel(chatSnapshot.modelId);
+            if (supportsReasoning) {
+                setDefaultThinking(effectiveThinking);
+            }
+            if (supportsSearch) {
+                setDefaultSearchLevel(effectiveSearchLevel);
+            }
+
             updateSelectedSkill(null, { mode: "auto" });
 
             const updatedChat = getChatTitleUpdate(

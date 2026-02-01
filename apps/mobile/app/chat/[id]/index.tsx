@@ -570,6 +570,14 @@ export default function ChatScreen(): ReactElement {
                 attachmentIds,
             });
 
+            void setSelectedModel(chatSnapshot.modelId);
+            if (supportsReasoning) {
+                setDefaultThinking(effectiveThinking);
+            }
+            if (supportsSearch) {
+                setDefaultSearchLevel(effectiveSearchLevel);
+            }
+
             updateSelectedSkill(null, { mode: "auto" });
 
             const updatedChat = getChatTitleUpdate(
