@@ -23,13 +23,13 @@ import {
     type NativeSyntheticEvent,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useChatContext } from "../../../src/contexts/ChatContext";
-import { useModelContext } from "../../../src/contexts/ModelContext";
-import { useSkillsContext } from "../../../src/contexts/SkillsContext";
-import { useTheme, type ThemeColors } from "../../../src/contexts/ThemeContext";
-import { loadAttachmentData, saveFile } from "../../../src/lib/storage";
-import { useApiKey } from "../../../src/hooks/useApiKey";
-import { useStorageAdapter } from "../../../src/contexts/SyncContext";
+import { useChatContext } from "@/contexts/ChatContext";
+import { useModelContext } from "@/contexts/ModelContext";
+import { useSkillsContext } from "@/contexts/SkillsContext";
+import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
+import { loadAttachmentData, saveFile } from "@/lib/storage";
+import { useApiKey } from "@/hooks/useApiKey";
+import { useStorageAdapter } from "@/contexts/SyncContext";
 import {
     sendMessage,
     buildMessageContent,
@@ -59,9 +59,9 @@ import {
 import { trimTrailingEmptyLines } from "@shared/core/text";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
-import { MessageInput } from "../../../src/components/chat/MessageInput";
-import { AttachmentGallery } from "../../../src/components/chat/AttachmentGallery";
-import { MarkdownRenderer } from "../../../src/components/chat/MarkdownRenderer";
+import { MessageInput } from "@/components/chat/MessageInput";
+import { AttachmentGallery } from "@/components/chat/AttachmentGallery";
+import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { v4 as uuidv4 } from "uuid";
 
 interface ErrorState {

@@ -1,7 +1,7 @@
 import * as SecureStore from "expo-secure-store";
 import type { SyncState } from "@shared/core/sync";
-import type { SyncMetadata } from "../sync/types";
-import { DEFAULT_SYNC_METADATA } from "../sync/types";
+import type { SyncMetadata } from "@/lib/sync/types";
+import { DEFAULT_SYNC_METADATA } from "@/lib/sync/types";
 
 export type UserTheme = "light" | "dark" | "system";
 

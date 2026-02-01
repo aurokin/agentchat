@@ -6,7 +6,7 @@ import React, {
     useEffect,
     type ReactNode,
 } from "react";
-import { useStorageAdapter } from "./SyncContext";
+import { useStorageAdapter } from "@/contexts/SyncContext";
 import type {
     ChatSession,
     Message,
@@ -19,9 +19,9 @@ import {
     setDefaultThinking as persistDefaultThinking,
     getDefaultSearchLevel,
     setDefaultSearchLevel as persistDefaultSearchLevel,
-} from "../lib/storage";
+} from "@/lib/storage";
 import { APP_DEFAULT_MODEL } from "@shared/core/models";
-import { useModelContext } from "./ModelContext";
+import { useModelContext } from "@/contexts/ModelContext";
 
 interface ChatContextValue {
     chats: ChatSession[];

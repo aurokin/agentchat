@@ -5,7 +5,7 @@ import {
     modelSupportsSearch,
     modelSupportsReasoning,
     modelSupportsVision,
-} from "../types";
+} from "@/lib/types";
 
 describe("types.ts", () => {
     describe("modelSupportsSearch", () => {

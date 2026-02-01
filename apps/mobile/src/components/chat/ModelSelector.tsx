@@ -17,13 +17,13 @@ import {
 } from "react-native";
 import type { OpenRouterModel } from "@shared/core/models";
 import { MaterialIcons } from "@expo/vector-icons";
-import { useTheme, type ThemeColors } from "../../contexts/ThemeContext";
+import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
 import {
     filterModels,
     splitFavoriteModels,
     groupModelsByProvider,
     getProviderOrder,
-} from "./model-selector-utils";
+} from "@/components/chat/model-selector-utils";
 
 interface ModelSelectorProps {
     models: OpenRouterModel[];

@@ -10,9 +10,13 @@ import { makeRedirectUri } from "expo-auth-session";
 import { useConvexAuth, useQuery } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { api } from "../../../../web/convex/_generated/api";
-import { isConvexConfigured, setConvexUrl, clearConvexUrl } from "./config";
-import { clearAllCredentials } from "../storage";
-import { useIsConvexAvailable } from "./ConvexProvider";
+import {
+    isConvexConfigured,
+    setConvexUrl,
+    clearConvexUrl,
+} from "@/lib/convex/config";
+import { clearAllCredentials } from "@/lib/storage";
+import { useIsConvexAvailable } from "@/lib/convex/ConvexProvider";
 
 interface User {
     id: string;

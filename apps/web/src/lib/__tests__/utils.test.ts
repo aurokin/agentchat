@@ -1,5 +1,5 @@
 import { test, expect, describe } from "bun:test";
-import { cn, generateUUID } from "../utils";
+import { cn, generateUUID } from "@/lib/utils";
 
 describe("utils.ts", () => {
     describe("cn", () => {

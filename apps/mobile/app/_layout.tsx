@@ -2,14 +2,14 @@ import type { ReactElement, ReactNode } from "react";
 import { Stack } from "expo-router";
 import { StatusBar } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { AppProvider, useAppContext } from "../src/contexts/AppContext";
-import { ThemeProvider, useTheme } from "../src/contexts/ThemeContext";
-import { ChatProvider } from "../src/contexts/ChatContext";
-import { AuthProvider } from "../src/lib/convex/AuthContext";
-import { ConvexProvider } from "../src/lib/convex";
-import { ModelProvider } from "../src/contexts/ModelContext";
-import { SkillsProvider } from "../src/contexts/SkillsContext";
-import { SyncProvider } from "../src/contexts/SyncContext";
+import { AppProvider, useAppContext } from "@/contexts/AppContext";
+import { ThemeProvider, useTheme } from "@/contexts/ThemeContext";
+import { ChatProvider } from "@/contexts/ChatContext";
+import { AuthProvider } from "@/lib/convex/AuthContext";
+import { ConvexProvider } from "@/lib/convex";
+import { ModelProvider } from "@/contexts/ModelContext";
+import { SkillsProvider } from "@/contexts/SkillsContext";
+import { SyncProvider } from "@/contexts/SyncContext";
 import OnboardingScreen from "./onboarding";
 
 function OnboardingWrapper({

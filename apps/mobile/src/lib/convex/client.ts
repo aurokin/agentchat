@@ -1,5 +1,5 @@
 import { ConvexReactClient } from "convex/react";
-import { isConvexConfigured, getConvexUrl } from "./config";
+import { isConvexConfigured, getConvexUrl } from "@/lib/convex/config";
 
 let convexClient: ConvexReactClient | null = null;
 

@@ -9,5 +9,16 @@ const config = getDefaultConfig(projectRoot);
 
 config.watchFolders = [...config.watchFolders, workspaceRoot];
 config.resolver.sourceExts = [...config.resolver.sourceExts, "mjs"];
+config.resolver.alias = {
+    ...config.resolver.alias,
+    "^@/(.+)$": path.join(projectRoot, "src", "$1"),
+    "^@shared/(.+)$": path.join(
+        workspaceRoot,
+        "packages",
+        "shared",
+        "src",
+        "$1",
+    ),
+};
 
 module.exports = config;

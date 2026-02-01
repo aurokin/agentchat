@@ -17,7 +17,7 @@ import {
     setDefaultModel,
     getFavoriteModels,
     setFavoriteModels,
-} from "../lib/storage";
+} from "@/lib/storage";
 
 interface ModelContextValue {
     models: OpenRouterModel[];

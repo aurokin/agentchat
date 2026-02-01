@@ -1,4 +1,4 @@
-export * from "./file-storage";
+export * from "@/lib/storage/file-storage";
 export {
     createPendingAttachment,
     savePendingAttachment,
@@ -12,7 +12,7 @@ export {
     getAttachment,
     getAttachmentsByMessage,
     type PendingAttachment,
-} from "./attachment-storage";
+} from "@/lib/storage/attachment-storage";
 export {
     getApiKey,
     setApiKey,
@@ -24,7 +24,7 @@ export {
     setRefreshToken,
     clearRefreshToken,
     clearAllCredentials,
-} from "./credential-storage";
+} from "@/lib/storage/credential-storage";
 export {
     getSyncState,
     setSyncState,
@@ -43,7 +43,7 @@ export {
     getCloudSelectedSkillMode,
     setCloudSelectedSkillMode,
     type UserTheme,
-} from "./sync-storage";
+} from "@/lib/storage/sync-storage";
 export {
     getDefaultThinking,
     setDefaultThinking,
@@ -53,13 +53,13 @@ export {
     setDefaultModel,
     getFavoriteModels,
     setFavoriteModels,
-} from "./user-settings-storage";
+} from "@/lib/storage/user-settings-storage";
 export {
     processImage,
     isValidImageMimeType,
     getMimeTypeFromUri,
     type ImageProcessingResult,
-} from "./image-processing";
+} from "@/lib/storage/image-processing";
 export {
     getLocalQuotaStatus,
     getLocalQuotaUsageString,
@@ -68,4 +68,4 @@ export {
     formatBytes,
     LOCAL_IMAGE_QUOTA,
     type QuotaStatus,
-} from "../quota";
+} from "@/lib/quota";

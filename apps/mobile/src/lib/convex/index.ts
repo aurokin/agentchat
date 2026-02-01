@@ -1,6 +1,9 @@
-export { AuthProvider, useAuthContext } from "./AuthContext";
-export { ConvexProvider, useIsConvexAvailable } from "./ConvexProvider";
-export { getConvexClient } from "./client";
+export { AuthProvider, useAuthContext } from "@/lib/convex/AuthContext";
+export {
+    ConvexProvider,
+    useIsConvexAvailable,
+} from "@/lib/convex/ConvexProvider";
+export { getConvexClient } from "@/lib/convex/client";
 export {
     isConvexConfigured,
     getConvexUrl,
@@ -8,4 +11,4 @@ export {
     getEnvConvexUrl,
     setConvexUrl,
     clearConvexUrl,
-} from "./config";
+} from "@/lib/convex/config";

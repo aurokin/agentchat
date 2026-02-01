@@ -8,7 +8,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-import { useTheme, type ThemeColors } from "../src/contexts/ThemeContext";
+import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
 
 interface OnboardingScreenProps {
     onComplete: () => Promise<void>;

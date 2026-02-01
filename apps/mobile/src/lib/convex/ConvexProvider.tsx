@@ -2,7 +2,7 @@ import React, { createContext, useContext, useMemo } from "react";
 import { ConvexReactClient } from "convex/react";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import * as SecureStore from "expo-secure-store";
-import { getConvexUrl, isConvexConfigured } from "./config";
+import { getConvexUrl, isConvexConfigured } from "@/lib/convex/config";
 
 interface ConvexAvailabilityContextValue {
     isAvailable: boolean;

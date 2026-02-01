@@ -8,7 +8,7 @@ import React, {
 import {
     getHasCompletedOnboarding,
     setHasCompletedOnboarding,
-} from "../lib/storage";
+} from "@/lib/storage";
 
 interface AppContextValue {
     isInitialized: boolean;

@@ -1,5 +1,5 @@
 import { test, expect, describe } from "bun:test";
-import { getConversationActionMode } from "../conversationActions";
+import { getConversationActionMode } from "@/components/chat/conversationActions";
 
 describe("getConversationActionMode", () => {
     test("returns mobile mode when isMobile true", () => {

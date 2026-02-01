@@ -14,21 +14,17 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
-import { useSync } from "../src/contexts/SyncContext";
-import { useSkillsContext } from "../src/contexts/SkillsContext";
-import {
-    formatBytes,
-    getStorageUsage,
-    type UserTheme,
-} from "../src/lib/storage";
-import { useTheme, type ThemeColors } from "../src/contexts/ThemeContext";
+import { useSync } from "@/contexts/SyncContext";
+import { useSkillsContext } from "@/contexts/SkillsContext";
+import { formatBytes, getStorageUsage, type UserTheme } from "@/lib/storage";
+import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
 import { validateApiKey } from "@shared/core/openrouter";
 import type { Skill } from "@shared/core/skills";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-import { useAuthContext } from "../src/lib/convex/AuthContext";
-import { getConvexUrlOverride, getEnvConvexUrl } from "../src/lib/convex";
-import { useApiKey } from "../src/hooks/useApiKey";
-import { useSubscription } from "../src/hooks/useSubscription";
+import { useAuthContext } from "@/lib/convex/AuthContext";
+import { getConvexUrlOverride, getEnvConvexUrl } from "@/lib/convex";
+import { useApiKey } from "@/hooks/useApiKey";
+import { useSubscription } from "@/hooks/useSubscription";
 
 export default function SettingsScreen(): ReactElement {
     const router = useRouter();

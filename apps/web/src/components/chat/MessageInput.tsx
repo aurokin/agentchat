@@ -17,7 +17,7 @@ import { SearchToggle } from "./SearchToggle";
 import { AttachmentButton } from "./AttachmentButton";
 import { AttachmentPreview } from "./AttachmentPreview";
 import { StorageErrorModal } from "./StorageErrorModal";
-import { KeybindingsHelp } from "../keybindings/KeybindingsHelp";
+import { KeybindingsHelp } from "@/components/keybindings/KeybindingsHelp";
 import type {
     ThinkingLevel,
     SearchLevel,

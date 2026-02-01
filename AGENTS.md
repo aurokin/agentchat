@@ -32,6 +32,18 @@
 - **Monorepo paths**: Use `@shared/*` alias in TypeScript to import from `packages/shared/src/*`
 - **Metro config**: Configure `metro.config.js` with `watchFolders` pointing to workspace root for monorepo support
 
+## Absolute Imports
+
+- Prefer absolute imports when aliases are available.
+- Web aliases:
+    - `@/*` -> `apps/web/src/*`
+    - `@/convex/*` -> `apps/web/convex/*`
+    - `@shared/*` -> `packages/shared/src/*`
+- Mobile aliases:
+    - `@/*` -> `apps/mobile/src/*`
+    - `@shared/*` -> `packages/shared/src/*`
+- Keep alias definitions aligned across tsconfig, bundler (Next/Metro), and linting if enforced.
+
 ## Required Parity Rules
 
 - **Storage parity**: If you change data models, CRUD logic, or storage keys, update BOTH adapters:
@@ -68,9 +80,11 @@
 - Use `bunx <package>` instead of `npx <package>`
 - Always run the health task for each app you modify before finishing:
     - Web: `cd apps/web && bun run health`
-    - Mobile: `cd apps/mobile && bun run typecheck`
+    - Mobile: `cd apps/mobile && bun run health`
+    - Shared: `cd packages/shared && bun run health`
 - Web health check before finishing: `cd apps/web && bun run health`
-- Mobile health check before finishing: `cd apps/mobile && bun run typecheck`
+- Mobile health check before finishing: `cd apps/mobile && bun run health`
+- Shared health check before finishing: `cd packages/shared && bun run health`
 - Tests live in `__tests__` folders beside code; use `bun test`
 - The health check test output logs "Encryption is not configured" from Convex tests; this is expected.
 

@@ -3,7 +3,7 @@ import {
     isClipboardSupported,
     hasImageInClipboardEvent,
     readImageFromClipboardEvent,
-} from "../clipboard";
+} from "@/lib/clipboard";
 
 describe("clipboard", () => {
     describe("isClipboardSupported", () => {

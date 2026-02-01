@@ -6,7 +6,7 @@ import {
     atomOneDark,
     atomOneLight,
 } from "react-syntax-highlighter/dist/esm/styles/hljs";
-import { useTheme, type ThemeColors } from "../../contexts/ThemeContext";
+import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
 
 interface MarkdownRendererProps {
     content: string;

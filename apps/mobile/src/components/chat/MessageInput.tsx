@@ -16,16 +16,16 @@ import type { OpenRouterModel } from "@shared/core/models";
 import type { ThinkingLevel, SearchLevel } from "@shared/core/types";
 import type { Skill } from "@shared/core/skills";
 import type { PendingAttachment } from "@shared/core/types";
-import { ModelSelector } from "./ModelSelector";
-import { ThinkingToggle } from "./ThinkingToggle";
-import { SearchToggle } from "./SearchToggle";
-import { SkillSelector } from "./SkillSelector";
-import { AttachmentPicker } from "./AttachmentPicker";
-import { useTheme, type ThemeColors } from "../../contexts/ThemeContext";
-import { modelSupportsVision } from "../../contexts/ModelContext";
+import { ModelSelector } from "@/components/chat/ModelSelector";
+import { ThinkingToggle } from "@/components/chat/ThinkingToggle";
+import { SearchToggle } from "@/components/chat/SearchToggle";
+import { SkillSelector } from "@/components/chat/SkillSelector";
+import { AttachmentPicker } from "@/components/chat/AttachmentPicker";
+import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
+import { modelSupportsVision } from "@/contexts/ModelContext";
 import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { checkQuotaBeforeUpload } from "../../lib/storage";
+import { checkQuotaBeforeUpload } from "@/lib/storage";
 
 interface MessageInputProps {
     inputText: string;

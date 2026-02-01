@@ -5,7 +5,7 @@ import {
     splitFavoriteModels,
     groupModelsByProvider,
     getProviderOrder,
-} from "../model-selector-utils";
+} from "@/components/chat/model-selector-utils";
 
 describe("ModelSelector logic (mobile)", () => {
     const mockModels: OpenRouterModel[] = [

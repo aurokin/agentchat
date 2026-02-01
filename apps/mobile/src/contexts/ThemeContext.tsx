@@ -9,7 +9,7 @@ import React, {
     type ReactElement,
 } from "react";
 import { useColorScheme } from "react-native";
-import { getTheme, setTheme, type UserTheme } from "../lib/storage";
+import { getTheme, setTheme, type UserTheme } from "@/lib/storage";
 
 export type ThemeScheme = "light" | "dark";
 

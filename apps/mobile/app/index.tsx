@@ -9,9 +9,9 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useChatContext } from "../src/contexts/ChatContext";
-import { useAppContext } from "../src/contexts/AppContext";
-import { useTheme, type ThemeColors } from "../src/contexts/ThemeContext";
+import { useChatContext } from "@/contexts/ChatContext";
+import { useAppContext } from "@/contexts/AppContext";
+import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function HomeScreen(): React.ReactElement {
