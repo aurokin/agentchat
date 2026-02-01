@@ -432,9 +432,7 @@ export default function ChatScreen(): ReactElement {
         setStreamingDraft(null);
 
         const skillForMessage = selectedSkill;
-        if (skillForMessage) {
-            setDefaultSkill(skillForMessage);
-        }
+        const skillModeForMessage = selectedSkillMode;
 
         try {
             const activeModel = models.find(
@@ -442,14 +440,6 @@ export default function ChatScreen(): ReactElement {
             );
             const supportsReasoning = modelSupportsReasoning(activeModel);
             const supportsSearch = modelSupportsSearch(activeModel);
-
-            await setDefaultModel(chatSnapshot.modelId);
-            if (supportsReasoning) {
-                await setDefaultThinking(chatSnapshot.thinking);
-            }
-            if (supportsSearch) {
-                await setDefaultSearchLevel(chatSnapshot.searchLevel);
-            }
 
             const effectiveThinking = supportsReasoning
                 ? chatSnapshot.thinking
@@ -620,6 +610,22 @@ export default function ChatScreen(): ReactElement {
                 };
                 streamingMessage = updated;
                 await updateMessage(updated);
+            }
+
+            await setDefaultModel(chatSnapshot.modelId);
+            if (supportsReasoning) {
+                await setDefaultThinking(chatSnapshot.thinking);
+            }
+            if (supportsSearch) {
+                await setDefaultSearchLevel(chatSnapshot.searchLevel);
+            }
+
+            if (skillModeForMessage === "manual") {
+                if (skillForMessage) {
+                    setDefaultSkill(skillForMessage);
+                } else {
+                    setDefaultSkill(null);
+                }
             }
         } catch (err) {
             if (streamingMessage && (assistantContent || assistantThinking)) {
