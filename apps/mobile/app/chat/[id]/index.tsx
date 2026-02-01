@@ -153,6 +153,9 @@ export default function ChatScreen(): ReactElement {
     const thinkingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
         null,
     );
+    const inputSuppressionTimeoutRef = useRef<ReturnType<
+        typeof setTimeout
+    > | null>(null);
     const [expandedThinking, setExpandedThinking] = useState<
         Record<string, boolean>
     >({});
@@ -173,6 +176,7 @@ export default function ChatScreen(): ReactElement {
         mode: selectedSkillMode,
     });
     const lastInitializedChatIdRef = useRef<string | null>(null);
+    const suppressInputRef = useRef(false);
 
     const updateSelectedSkill = useCallback(
         (skill: Skill | null, options?: { mode?: "auto" | "manual" }) => {
@@ -193,6 +197,9 @@ export default function ChatScreen(): ReactElement {
         return () => {
             if (thinkingTimeoutRef.current) {
                 clearTimeout(thinkingTimeoutRef.current);
+            }
+            if (inputSuppressionTimeoutRef.current) {
+                clearTimeout(inputSuppressionTimeoutRef.current);
             }
         };
     }, []);
@@ -761,11 +768,24 @@ export default function ChatScreen(): ReactElement {
 
         const content = inputText.trim();
         const pending = attachments;
+        if (inputSuppressionTimeoutRef.current) {
+            clearTimeout(inputSuppressionTimeoutRef.current);
+        }
+        suppressInputRef.current = true;
         setInputText("");
         setAttachments([]);
+        inputSuppressionTimeoutRef.current = setTimeout(() => {
+            suppressInputRef.current = false;
+            inputSuppressionTimeoutRef.current = null;
+        }, 250);
 
         await handleSendMessage(content, pending);
     };
+
+    const handleInputChange = useCallback((text: string) => {
+        if (suppressInputRef.current) return;
+        setInputText(text);
+    }, []);
 
     const handleRetry = async () => {
         if (!retryPayload || isLoading) return;
@@ -1374,7 +1394,7 @@ export default function ChatScreen(): ReactElement {
 
                 <MessageInput
                     inputText={inputText}
-                    onInputChange={setInputText}
+                    onInputChange={handleInputChange}
                     onSend={handleSend}
                     isLoading={isLoading}
                     models={models}

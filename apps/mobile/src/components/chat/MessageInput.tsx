@@ -1,4 +1,10 @@
-import React, { useState, useMemo, useEffect, type ReactElement } from "react";
+import React, {
+    useState,
+    useMemo,
+    useEffect,
+    useRef,
+    type ReactElement,
+} from "react";
 import {
     View,
     Text,
@@ -92,6 +98,7 @@ export function MessageInput({
     const insets = useSafeAreaInsets();
     const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
     const [quotaWarning, setQuotaWarning] = useState<QuotaWarning | null>(null);
+    const inputRef = useRef<TextInput>(null);
     const bottomPadding = isKeyboardVisible ? 8 : 8 + insets.bottom;
     const styles = useMemo(
         () => createStyles(colors, bottomPadding),
@@ -189,6 +196,13 @@ export function MessageInput({
                 </TouchableOpacity>
             </View>
         );
+    };
+
+    const handleSendPress = () => {
+        if (!canSend) return;
+        inputRef.current?.clear();
+        Keyboard.dismiss();
+        onSend();
     };
 
     return (
@@ -315,6 +329,7 @@ export function MessageInput({
 
             <View style={styles.inputRow}>
                 <TextInput
+                    ref={inputRef}
                     style={styles.textInput}
                     value={inputText}
                     onChangeText={onInputChange}
@@ -342,7 +357,7 @@ export function MessageInput({
                         styles.sendButton,
                         !canSend && styles.sendButtonDisabled,
                     ]}
-                    onPress={onSend}
+                    onPress={handleSendPress}
                     disabled={!canSend}
                     activeOpacity={0.7}
                 >
