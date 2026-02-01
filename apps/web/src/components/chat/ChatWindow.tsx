@@ -1,6 +1,12 @@
 "use client";
 
-import { useState, useRef, useEffect, startTransition } from "react";
+import {
+    useState,
+    useRef,
+    useEffect,
+    useCallback,
+    startTransition,
+} from "react";
 import { useRouter } from "next/navigation";
 import { useChat } from "@/contexts/ChatContext";
 import { useSettings } from "@/contexts/SettingsContext";
@@ -132,9 +138,45 @@ export function ChatWindow() {
         contextContent: string;
     } | null>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
+    const lastSkillChangeRef = useRef<{
+        skill: Skill | null;
+        mode: "auto" | "manual";
+    }>({
+        skill: selectedSkill,
+        mode: selectedSkillMode,
+    });
+    const pendingManualSkillRef = useRef<Skill | null | undefined>(undefined);
+
+    const updateSelectedSkill = useCallback(
+        (skill: Skill | null, options?: { mode?: "auto" | "manual" }) => {
+            const mode = options?.mode ?? "manual";
+            lastSkillChangeRef.current = { skill, mode };
+            if (mode === "manual") {
+                pendingManualSkillRef.current = skill;
+            } else {
+                pendingManualSkillRef.current = undefined;
+            }
+            setSelectedSkill(skill, { mode });
+        },
+        [setSelectedSkill],
+    );
+
+    useEffect(() => {
+        lastSkillChangeRef.current = {
+            skill: selectedSkill,
+            mode: selectedSkillMode,
+        };
+    }, [selectedSkill, selectedSkillMode]);
+
+    const isNewChat =
+        currentChat?.createdAt !== undefined &&
+        currentChat.createdAt === currentChat.updatedAt;
 
     useEffect(() => {
         if (!currentChat) return;
+        if (!isNewChat && messages.length === 0) {
+            return;
+        }
         const nextSkill = getSkillSelectionUpdate({
             messageCount: messages.length,
             defaultSkill,
@@ -142,15 +184,16 @@ export function ChatWindow() {
             selectedSkillMode,
         });
         if (nextSkill !== undefined) {
-            setSelectedSkill(nextSkill, { mode: "auto" });
+            updateSelectedSkill(nextSkill, { mode: "auto" });
         }
     }, [
         currentChat,
         defaultSkill,
+        isNewChat,
         messages.length,
         selectedSkill,
         selectedSkillMode,
-        setSelectedSkill,
+        updateSelectedSkill,
     ]);
 
     useEffect(() => {
@@ -224,13 +267,13 @@ export function ChatWindow() {
                 const nextIndex =
                     (currentIndex + 1) % Math.max(skillSequence.length, 1);
                 const nextSkill = skillSequence[nextIndex] ?? null;
-                setSelectedSkill(nextSkill, { mode: "manual" });
+                updateSelectedSkill(nextSkill, { mode: "manual" });
                 return;
             }
 
             if (hasModifier && hasAlt && !event.shiftKey && code === "keyn") {
                 event.preventDefault();
-                setSelectedSkill(null, { mode: "manual" });
+                updateSelectedSkill(null, { mode: "manual" });
                 return;
             }
 
@@ -318,7 +361,7 @@ export function ChatWindow() {
         models,
         router,
         selectedSkill,
-        setSelectedSkill,
+        updateSelectedSkill,
         skills,
         updateChat,
     ]);
@@ -347,9 +390,12 @@ export function ChatWindow() {
         setError(null);
         setRetryChat(null);
 
-        const skillForMessage = selectedSkill;
-        if (skillForMessage) {
-            setDefaultSkill(skillForMessage);
+        const skillSnapshot = lastSkillChangeRef.current;
+        let skillForMessage = selectedSkill;
+        let skillModeForMessage = selectedSkillMode;
+        if (skillSnapshot.mode === "manual") {
+            skillForMessage = skillSnapshot.skill;
+            skillModeForMessage = "manual";
         }
 
         try {
@@ -420,7 +466,13 @@ export function ChatWindow() {
                 chatId: chatSnapshot.id,
             });
 
-            setSelectedSkill(null, { mode: "auto" });
+            if (pendingManualSkillRef.current !== undefined) {
+                const manualSkill = pendingManualSkillRef.current;
+                setDefaultSkill(manualSkill ?? null);
+                pendingManualSkillRef.current = undefined;
+            }
+
+            updateSelectedSkill(null, { mode: "auto" });
 
             const updatedChat = getChatTitleUpdate(
                 chatSnapshot,

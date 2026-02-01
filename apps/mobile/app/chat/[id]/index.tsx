@@ -160,6 +160,28 @@ export default function ChatScreen(): ReactElement {
     );
     const [galleryInitialIndex, setGalleryInitialIndex] = useState(0);
     const screenWidth = Dimensions.get("window").width;
+    const lastSkillChangeRef = useRef<{
+        skill: Skill | null;
+        mode: "auto" | "manual";
+    }>({
+        skill: selectedSkill,
+        mode: selectedSkillMode,
+    });
+    const pendingManualSkillRef = useRef<Skill | null | undefined>(undefined);
+
+    const updateSelectedSkill = useCallback(
+        (skill: Skill | null, options?: { mode?: "auto" | "manual" }) => {
+            const mode = options?.mode ?? "manual";
+            lastSkillChangeRef.current = { skill, mode };
+            if (mode === "manual") {
+                pendingManualSkillRef.current = skill;
+            } else {
+                pendingManualSkillRef.current = undefined;
+            }
+            setSelectedSkill(skill, { mode });
+        },
+        [setSelectedSkill],
+    );
 
     useEffect(() => {
         if (chatId) {
@@ -176,6 +198,13 @@ export default function ChatScreen(): ReactElement {
     }, []);
 
     useEffect(() => {
+        lastSkillChangeRef.current = {
+            skill: selectedSkill,
+            mode: selectedSkillMode,
+        };
+    }, [selectedSkill, selectedSkillMode]);
+
+    useEffect(() => {
         if (flatListRef.current && messages[chatId]) {
             setTimeout(() => {
                 flatListRef.current?.scrollToEnd?.({ animated: true });
@@ -190,6 +219,9 @@ export default function ChatScreen(): ReactElement {
     const hasLoadedMessages = messages[chatId] !== undefined;
     const showSkeletons = !hasLoadedMessages;
     const showEmptyState = hasLoadedMessages && chatMessages.length === 0;
+    const isNewChat =
+        currentChat?.createdAt !== undefined &&
+        currentChat.createdAt === currentChat.updatedAt;
 
     useEffect(() => {
         let isMounted = true;
@@ -224,6 +256,9 @@ export default function ChatScreen(): ReactElement {
 
     useEffect(() => {
         if (!currentChat) return;
+        if (!isNewChat && chatMessages.length === 0) {
+            return;
+        }
         const nextSkill = getSkillSelectionUpdate({
             messageCount: chatMessages.length,
             defaultSkill,
@@ -231,15 +266,16 @@ export default function ChatScreen(): ReactElement {
             selectedSkillMode,
         });
         if (nextSkill !== undefined) {
-            setSelectedSkill(nextSkill, { mode: "auto" });
+            updateSelectedSkill(nextSkill, { mode: "auto" });
         }
     }, [
         chatMessages.length,
         currentChat,
+        isNewChat,
         defaultSkill,
         selectedSkill,
         selectedSkillMode,
-        setSelectedSkill,
+        updateSelectedSkill,
     ]);
 
     useEffect(() => {
@@ -431,8 +467,13 @@ export default function ChatScreen(): ReactElement {
         setStreamingMessageId(null);
         setStreamingDraft(null);
 
-        const skillForMessage = selectedSkill;
-        const skillModeForMessage = selectedSkillMode;
+        const skillSnapshot = lastSkillChangeRef.current;
+        let skillForMessage = selectedSkill;
+        let skillModeForMessage = selectedSkillMode;
+        if (skillSnapshot.mode === "manual") {
+            skillForMessage = skillSnapshot.skill;
+            skillModeForMessage = "manual";
+        }
 
         try {
             const activeModel = models.find(
@@ -481,7 +522,13 @@ export default function ChatScreen(): ReactElement {
                 attachmentIds,
             });
 
-            setSelectedSkill(null, { mode: "auto" });
+            if (pendingManualSkillRef.current !== undefined) {
+                const manualSkill = pendingManualSkillRef.current;
+                setDefaultSkill(manualSkill ?? null);
+                pendingManualSkillRef.current = undefined;
+            }
+
+            updateSelectedSkill(null, { mode: "auto" });
 
             const updatedChat = getChatTitleUpdate(
                 chatSnapshot,
@@ -618,14 +665,6 @@ export default function ChatScreen(): ReactElement {
             }
             if (supportsSearch) {
                 await setDefaultSearchLevel(chatSnapshot.searchLevel);
-            }
-
-            if (skillModeForMessage === "manual") {
-                if (skillForMessage) {
-                    setDefaultSkill(skillForMessage);
-                } else {
-                    setDefaultSkill(null);
-                }
             }
         } catch (err) {
             if (streamingMessage && (assistantContent || assistantThinking)) {
@@ -1305,7 +1344,7 @@ export default function ChatScreen(): ReactElement {
                     skills={skills}
                     selectedSkill={selectedSkill}
                     onSkillSelect={(skill) =>
-                        setSelectedSkill(skill, { mode: "manual" })
+                        updateSelectedSkill(skill, { mode: "manual" })
                     }
                     attachments={attachments}
                     onAttachmentsChange={handleAttachmentsSelected}
