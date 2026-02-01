@@ -17,6 +17,7 @@ import {
     KeyboardAvoidingView,
     Platform,
     ScrollView,
+    Dimensions,
     type NativeScrollEvent,
     type NativeSyntheticEvent,
 } from "react-native";
@@ -57,15 +58,11 @@ import type {
 import { type Skill, getSkillSelectionUpdate } from "@shared/core/skills";
 import { trimTrailingEmptyLines } from "@shared/core/text";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
-import Markdown from "react-native-markdown-display";
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { MessageInput } from "../../../src/components/chat/MessageInput";
 import { AttachmentGallery } from "../../../src/components/chat/AttachmentGallery";
+import { MarkdownRenderer } from "../../../src/components/chat/MarkdownRenderer";
 import { v4 as uuidv4 } from "uuid";
-
-const BrainIcon = ({ size }: { size: number }) => (
-    <Text style={{ fontSize: size, lineHeight: size }}>🧠</Text>
-);
 
 interface ErrorState {
     message: string;
@@ -105,6 +102,7 @@ export default function ChatScreen(): ReactElement {
         selectChat,
         addMessage,
         updateMessage,
+        createChat,
         deleteChat,
         updateChat,
     } = useChatContext();
@@ -156,6 +154,7 @@ export default function ChatScreen(): ReactElement {
         [],
     );
     const [galleryInitialIndex, setGalleryInitialIndex] = useState(0);
+    const screenWidth = Dimensions.get("window").width;
 
     useEffect(() => {
         if (chatId) {
@@ -191,6 +190,9 @@ export default function ChatScreen(): ReactElement {
     const reasoningSupported = modelSupportsReasoning(currentModel);
     const searchSupported = modelSupportsSearch(currentModel);
     const chatMessages = messages[chatId] || [];
+    const hasLoadedMessages = messages[chatId] !== undefined;
+    const showSkeletons = !hasLoadedMessages;
+    const showEmptyState = hasLoadedMessages && chatMessages.length === 0;
 
     useEffect(() => {
         if (!currentChat) return;
@@ -649,6 +651,15 @@ export default function ChatScreen(): ReactElement {
         router.replace("/");
     };
 
+    const handleManageStorage = () => {
+        router.replace("/");
+    };
+
+    const handleStartNewChat = async () => {
+        const chat = await createChat();
+        router.replace(`/chat/${chat.id}`);
+    };
+
     const toggleThinking = (messageId: string) => {
         setExpandedThinking((prev) => ({
             ...prev,
@@ -691,35 +702,6 @@ export default function ChatScreen(): ReactElement {
         });
 
         return allAttachments;
-    };
-
-    const getMarkdownStyle = () => {
-        return {
-            body: {
-                fontSize: 16,
-                lineHeight: 22,
-                color: colors.text,
-            },
-            code: {
-                backgroundColor: colors.codeBackground,
-                color: colors.text,
-                paddingHorizontal: 4,
-                paddingVertical: 2,
-                borderRadius: 4,
-                fontFamily: "monospace",
-            },
-            codeblock: {
-                backgroundColor: colors.codeBackground,
-                color: colors.text,
-                padding: 12,
-                borderRadius: 8,
-                fontFamily: "monospace",
-            },
-            link: {
-                color: colors.link,
-                textDecorationLine: "underline" as const,
-            },
-        };
     };
 
     const formatFileSize = (bytes: number): string => {
@@ -806,10 +788,18 @@ export default function ChatScreen(): ReactElement {
                         {skill.name}
                     </Text>
                     <View style={styles.skillHeaderIcons}>
-                        <Text style={styles.skillIcon}>✨</Text>
-                        <Text style={styles.skillChevron}>
-                            {isExpanded ? "▼" : "◀"}
-                        </Text>
+                        <Feather
+                            name="award"
+                            size={12}
+                            color={colors.accent}
+                            style={styles.skillIcon}
+                        />
+                        <Feather
+                            name={isExpanded ? "chevron-down" : "chevron-left"}
+                            size={14}
+                            color={colors.accent}
+                            style={styles.skillChevron}
+                        />
                     </View>
                 </TouchableOpacity>
                 {isExpanded && (
@@ -931,10 +921,22 @@ export default function ChatScreen(): ReactElement {
                             onPress={() => toggleThinking(item.id)}
                             activeOpacity={0.7}
                         >
-                            <Text style={styles.thinkingIcon}>
-                                {expandedThinking[item.id] ? "▼" : "▶"}
-                            </Text>
-                            <BrainIcon size={14} />
+                            <Feather
+                                name={
+                                    expandedThinking[item.id]
+                                        ? "chevron-down"
+                                        : "chevron-right"
+                                }
+                                size={14}
+                                color={colors.warning}
+                                style={styles.thinkingChevron}
+                            />
+                            <MaterialCommunityIcons
+                                name="brain"
+                                size={14}
+                                color={colors.warning}
+                                style={styles.thinkingIcon}
+                            />
                             <Text style={styles.thinkingLabel}>Reasoning</Text>
                             {showThinkingIndicator && (
                                 <ActivityIndicator
@@ -973,9 +975,10 @@ export default function ChatScreen(): ReactElement {
                                 </Text>
                             </View>
                         ) : displayContent ? (
-                            <Markdown style={getMarkdownStyle()}>
-                                {displayContent}
-                            </Markdown>
+                            <MarkdownRenderer
+                                content={displayContent}
+                                isUser={isUser}
+                            />
                         ) : !isUser ? (
                             <Text style={styles.emptyMessageText}>...</Text>
                         ) : null}
@@ -1078,6 +1081,54 @@ export default function ChatScreen(): ReactElement {
         isAtBottomRef.current = isAtBottom;
     };
 
+    const renderListEmpty = () => {
+        if (showSkeletons) {
+            const skeletonItems = [
+                { align: "left", width: screenWidth * 0.68, height: 48 },
+                { align: "right", width: screenWidth * 0.6, height: 36 },
+                { align: "left", width: screenWidth * 0.52, height: 32 },
+                { align: "right", width: screenWidth * 0.74, height: 52 },
+            ];
+            return (
+                <View style={styles.skeletonContainer}>
+                    {skeletonItems.map((item, index) => (
+                        <View
+                            key={`skeleton-${index}`}
+                            style={[
+                                styles.skeletonBubble,
+                                item.align === "left"
+                                    ? styles.skeletonBubbleAssistant
+                                    : styles.skeletonBubbleUser,
+                                {
+                                    width: item.width,
+                                    height: item.height,
+                                },
+                            ]}
+                        />
+                    ))}
+                </View>
+            );
+        }
+
+        if (!showEmptyState) return null;
+
+        return (
+            <View style={styles.emptyStateContainer}>
+                <View style={styles.emptyStateIcon}>
+                    <Feather
+                        name="message-circle"
+                        size={20}
+                        color={colors.textMuted}
+                    />
+                </View>
+                <Text style={styles.emptyStateTitle}>No messages yet</Text>
+                <Text style={styles.emptyStateSubtitle}>
+                    Send a message to start the conversation.
+                </Text>
+            </View>
+        );
+    };
+
     if (!currentChat) {
         return (
             <SafeAreaView
@@ -1153,9 +1204,13 @@ export default function ChatScreen(): ReactElement {
                     }}
                     keyExtractor={(item) => item.id}
                     renderItem={renderMessage}
-                    contentContainerStyle={styles.listContent}
+                    contentContainerStyle={[
+                        styles.listContent,
+                        showEmptyState && styles.listContentEmpty,
+                    ]}
                     style={styles.list}
                     keyboardShouldPersistTaps="handled"
+                    ListEmptyComponent={renderListEmpty}
                     onScroll={handleScroll}
                     scrollEventThrottle={16}
                     onContentSizeChange={() => {
@@ -1192,6 +1247,8 @@ export default function ChatScreen(): ReactElement {
                     onAttachmentsChange={handleAttachmentsSelected}
                     onRemoveAttachment={handleRemoveAttachment}
                     sessionId={chatId}
+                    onManageStorage={handleManageStorage}
+                    onStartNewChat={handleStartNewChat}
                 />
             </KeyboardAvoidingView>
 
@@ -1269,11 +1326,56 @@ const createStyles = (colors: ThemeColors) =>
         listContent: {
             padding: 16,
         },
+        listContentEmpty: {
+            flexGrow: 1,
+            justifyContent: "center",
+            alignItems: "center",
+            paddingVertical: 32,
+        },
         content: {
             flex: 1,
         },
         list: {
             flex: 1,
+        },
+        skeletonContainer: {
+            gap: 12,
+            paddingTop: 8,
+        },
+        skeletonBubble: {
+            borderRadius: 16,
+            backgroundColor: colors.surfaceMuted,
+            borderWidth: 1,
+            borderColor: colors.borderMuted,
+        },
+        skeletonBubbleAssistant: {
+            alignSelf: "flex-start",
+        },
+        skeletonBubbleUser: {
+            alignSelf: "flex-end",
+        },
+        emptyStateContainer: {
+            alignItems: "center",
+            gap: 8,
+            paddingHorizontal: 24,
+        },
+        emptyStateIcon: {
+            width: 36,
+            height: 36,
+            borderRadius: 18,
+            backgroundColor: colors.surfaceMuted,
+            alignItems: "center",
+            justifyContent: "center",
+        },
+        emptyStateTitle: {
+            fontSize: 16,
+            fontWeight: "600",
+            color: colors.text,
+        },
+        emptyStateSubtitle: {
+            fontSize: 13,
+            color: colors.textMuted,
+            textAlign: "center",
         },
         messageContainer: {
             maxWidth: "85%",
@@ -1419,13 +1521,13 @@ const createStyles = (colors: ThemeColors) =>
             backgroundColor: colors.warningSoft,
         },
         thinkingIndicator: {
-            marginLeft: "auto",
+            marginLeft: 8,
+        },
+        thinkingChevron: {
+            marginRight: 6,
         },
         thinkingIcon: {
-            fontSize: 10,
-            color: colors.warning,
             marginRight: 6,
-            width: 12,
         },
         thinkingLabel: {
             fontSize: 12,
@@ -1485,12 +1587,10 @@ const createStyles = (colors: ThemeColors) =>
             gap: 4,
         },
         skillIcon: {
-            fontSize: 12,
-            color: colors.accent,
+            marginTop: 1,
         },
         skillChevron: {
-            fontSize: 12,
-            color: colors.accent,
+            marginTop: 1,
         },
         skillContent: {
             paddingHorizontal: 12,

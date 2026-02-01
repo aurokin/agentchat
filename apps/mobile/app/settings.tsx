@@ -684,7 +684,16 @@ export default function SettingsScreen(): ReactElement {
                                 ]}
                                 onPress={() => handleThemeChange("light")}
                             >
-                                <Text style={styles.themeIcon}>☀️</Text>
+                                <Feather
+                                    name="sun"
+                                    size={22}
+                                    color={
+                                        userTheme === "light"
+                                            ? colors.accent
+                                            : colors.textMuted
+                                    }
+                                    style={styles.themeIcon}
+                                />
                                 <Text
                                     style={[
                                         styles.themeLabel,
@@ -704,7 +713,16 @@ export default function SettingsScreen(): ReactElement {
                                 ]}
                                 onPress={() => handleThemeChange("dark")}
                             >
-                                <Text style={styles.themeIcon}>🌙</Text>
+                                <Feather
+                                    name="moon"
+                                    size={22}
+                                    color={
+                                        userTheme === "dark"
+                                            ? colors.accent
+                                            : colors.textMuted
+                                    }
+                                    style={styles.themeIcon}
+                                />
                                 <Text
                                     style={[
                                         styles.themeLabel,
@@ -724,7 +742,16 @@ export default function SettingsScreen(): ReactElement {
                                 ]}
                                 onPress={() => handleThemeChange("system")}
                             >
-                                <Text style={styles.themeIcon}>💻</Text>
+                                <Feather
+                                    name="monitor"
+                                    size={22}
+                                    color={
+                                        userTheme === "system"
+                                            ? colors.accent
+                                            : colors.textMuted
+                                    }
+                                    style={styles.themeIcon}
+                                />
                                 <Text
                                     style={[
                                         styles.themeLabel,
@@ -1397,7 +1424,6 @@ const createStyles = (colors: ThemeColors) =>
             backgroundColor: colors.accentSoft,
         },
         themeIcon: {
-            fontSize: 24,
             marginBottom: 8,
         },
         themeLabel: {
