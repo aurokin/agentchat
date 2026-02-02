@@ -1185,7 +1185,12 @@ export default function SettingsScreen(): ReactElement {
                                     )}
                                     {cloudQuotaStatus && (
                                         <>
-                                            <View style={styles.storageRow}>
+                                            <View
+                                                style={[
+                                                    styles.storageRow,
+                                                    styles.storageSectionSpacing,
+                                                ]}
+                                            >
                                                 <Text
                                                     style={styles.storageLabel}
                                                 >
@@ -1676,6 +1681,9 @@ const createStyles = (colors: ThemeColors) =>
             flexDirection: "row",
             justifyContent: "space-between",
             marginBottom: 8,
+        },
+        storageSectionSpacing: {
+            marginTop: 16,
         },
         storageLabel: {
             fontSize: 14,
