@@ -9,7 +9,6 @@ import {
     ScrollView,
     Alert,
     Image,
-    Dimensions,
     Linking,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -22,7 +21,6 @@ import { validateApiKey } from "@shared/core/openrouter";
 import type { Skill } from "@shared/core/skills";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { useAuthContext } from "@/lib/convex/AuthContext";
-import { getConvexUrlOverride, getEnvConvexUrl } from "@/lib/convex";
 import { useApiKey } from "@/hooks/useApiKey";
 import { useSubscription } from "@/hooks/useSubscription";
 
@@ -42,7 +40,6 @@ export default function SettingsScreen(): ReactElement {
         migrationProgress,
         isCloning,
         cloneProgress,
-        refreshSyncState,
     } = useSync();
     const { skills, addSkill, updateSkill, deleteSkill } = useSkillsContext();
     const {
@@ -52,8 +49,6 @@ export default function SettingsScreen(): ReactElement {
         signIn,
         signOut,
         isConvexAvailable,
-        configureConvex,
-        clearConvexOverride,
     } = useAuthContext();
     const { colors, userTheme, setUserTheme } = useTheme();
     const {
@@ -74,10 +69,6 @@ export default function SettingsScreen(): ReactElement {
     const [isValidating, setIsValidating] = useState(false);
     const [isValid, setIsValid] = useState<boolean | null>(null);
     const [isSigningIn, setIsSigningIn] = useState(false);
-    const [convexOverrideInput, setConvexOverrideInput] = useState("");
-    const [convexOverrideSaved, setConvexOverrideSaved] = useState<
-        string | null
-    >(null);
     const [storageUsage, setStorageUsage] = useState<{
         attachments: number;
         messages: number;
@@ -90,17 +81,11 @@ export default function SettingsScreen(): ReactElement {
     const [skillDescription, setSkillDescription] = useState("");
     const [skillPrompt, setSkillPrompt] = useState("");
 
-    const buildConvexUrl = getEnvConvexUrl();
-    const convexUnavailableMessage = __DEV__
-        ? "Cloud sync isn't configured for this build. Set a Convex URL in Developer settings."
-        : "Cloud sync isn't configured for this build.";
+    const convexUnavailableMessage =
+        "Cloud sync isn't configured for this build.";
 
     useEffect(() => {
         if (isApiKeyLoading) return;
-        const override = getConvexUrlOverride();
-        setConvexOverrideSaved(override);
-        setConvexOverrideInput(override ?? "");
-
         const key = storedApiKey ?? "";
         setApiKeyValue(key);
         if (key) {
@@ -231,57 +216,6 @@ export default function SettingsScreen(): ReactElement {
         setApiKeyValue("");
         setIsValid(null);
         Alert.alert("API Key Cleared", "Your API key has been removed.");
-    };
-
-    const handleSaveConvexOverride = async () => {
-        if (!__DEV__) {
-            return;
-        }
-        const nextUrl = convexOverrideInput.trim();
-        if (!nextUrl) {
-            Alert.alert(
-                "Convex URL Required",
-                "Enter a valid https:// Convex URL to save an override.",
-            );
-            return;
-        }
-        try {
-            await configureConvex(nextUrl);
-            setConvexOverrideSaved(nextUrl);
-            setConvexOverrideInput(nextUrl);
-            await refreshSyncState();
-            Alert.alert(
-                "Convex Override Saved",
-                "This build now uses the override Convex URL.",
-            );
-        } catch (error) {
-            const message =
-                error instanceof Error
-                    ? error.message
-                    : "Failed to save the Convex override.";
-            Alert.alert("Invalid Convex URL", message);
-        }
-    };
-
-    const handleClearConvexOverride = async () => {
-        if (!__DEV__) {
-            return;
-        }
-        try {
-            await clearConvexOverride();
-            setConvexOverrideSaved(null);
-            setConvexOverrideInput("");
-            await refreshSyncState();
-            Alert.alert(
-                "Convex Override Cleared",
-                "Using the build-time Convex URL.",
-            );
-        } catch {
-            Alert.alert(
-                "Error",
-                "Failed to clear the Convex override. Please try again.",
-            );
-        }
     };
 
     const handleEnableCloudSync = async () => {
@@ -643,135 +577,163 @@ export default function SettingsScreen(): ReactElement {
                         )}
                     </View>
 
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Sync</Text>
+                    {isAuthenticated && (
+                        <View style={styles.section}>
+                            <Text style={styles.sectionTitle}>Sync</Text>
 
-                        {isConvexAvailable && (
-                            <View style={styles.syncStatusCard}>
-                                <View style={styles.syncStatusHeader}>
-                                    <View
-                                        style={[
-                                            styles.syncStatusIndicator,
-                                            {
-                                                backgroundColor:
-                                                    getSyncStatusColor(),
-                                            },
-                                        ]}
-                                    />
-                                    <View style={styles.syncStatusInfo}>
-                                        <Text style={styles.syncStatusTitle}>
-                                            {syncState === "cloud-enabled"
-                                                ? "Cloud Sync Active"
-                                                : syncState === "cloud-disabled"
-                                                  ? "Cloud Sync Off"
-                                                  : "Local Only"}
-                                        </Text>
-                                        <Text
-                                            style={styles.syncStatusDescription}
-                                        >
-                                            {getSyncStatusText()}
-                                        </Text>
-                                        {isSubscriptionLoading && (
-                                            <Text style={styles.syncStatusMeta}>
-                                                Checking subscription...
+                            {isConvexAvailable && (
+                                <View style={styles.syncStatusCard}>
+                                    <View style={styles.syncStatusHeader}>
+                                        <View
+                                            style={[
+                                                styles.syncStatusIndicator,
+                                                {
+                                                    backgroundColor:
+                                                        getSyncStatusColor(),
+                                                },
+                                            ]}
+                                        />
+                                        <View style={styles.syncStatusInfo}>
+                                            <Text
+                                                style={styles.syncStatusTitle}
+                                            >
+                                                {syncState === "cloud-enabled"
+                                                    ? "Cloud Sync Active"
+                                                    : syncState ===
+                                                        "cloud-disabled"
+                                                      ? "Cloud Sync Off"
+                                                      : "Local Only"}
                                             </Text>
-                                        )}
-                                        {!isSubscriptionLoading &&
-                                            isAuthenticated &&
-                                            !hasCloudSync && (
+                                            <Text
+                                                style={
+                                                    styles.syncStatusDescription
+                                                }
+                                            >
+                                                {getSyncStatusText()}
+                                            </Text>
+                                            {isSubscriptionLoading && (
                                                 <Text
                                                     style={
                                                         styles.syncStatusMeta
                                                     }
                                                 >
-                                                    Cloud sync requires
-                                                    RouterChat Pro.
+                                                    Checking subscription...
                                                 </Text>
                                             )}
-                                        {isMigrating && migrationProgress && (
-                                            <Text style={styles.syncStatusMeta}>
-                                                Migrating...{" "}
-                                                {Math.round(
-                                                    migrationProgress.percentage,
+                                            {!isSubscriptionLoading &&
+                                                isAuthenticated &&
+                                                !hasCloudSync && (
+                                                    <Text
+                                                        style={
+                                                            styles.syncStatusMeta
+                                                        }
+                                                    >
+                                                        Cloud sync requires
+                                                        RouterChat Pro.
+                                                    </Text>
                                                 )}
-                                                %
-                                            </Text>
-                                        )}
-                                        {isCloning && cloneProgress && (
-                                            <Text style={styles.syncStatusMeta}>
-                                                Cloning...{" "}
-                                                {Math.round(
-                                                    cloneProgress.percentage,
+                                            {isMigrating &&
+                                                migrationProgress && (
+                                                    <Text
+                                                        style={
+                                                            styles.syncStatusMeta
+                                                        }
+                                                    >
+                                                        Migrating...{" "}
+                                                        {Math.round(
+                                                            migrationProgress.percentage,
+                                                        )}
+                                                        %
+                                                    </Text>
                                                 )}
-                                                %
-                                            </Text>
-                                        )}
+                                            {isCloning && cloneProgress && (
+                                                <Text
+                                                    style={
+                                                        styles.syncStatusMeta
+                                                    }
+                                                >
+                                                    Cloning...{" "}
+                                                    {Math.round(
+                                                        cloneProgress.percentage,
+                                                    )}
+                                                    %
+                                                </Text>
+                                            )}
+                                        </View>
                                     </View>
+
+                                    {syncState === "local-only" && (
+                                        <TouchableOpacity
+                                            style={styles.enableSyncButton}
+                                            onPress={handleEnableCloudSync}
+                                            disabled={syncActionDisabled}
+                                        >
+                                            <Text
+                                                style={
+                                                    styles.enableSyncButtonText
+                                                }
+                                            >
+                                                Enable Cloud Sync
+                                            </Text>
+                                        </TouchableOpacity>
+                                    )}
+
+                                    {syncState === "cloud-enabled" && (
+                                        <TouchableOpacity
+                                            style={styles.disableSyncButton}
+                                            onPress={handleDisableCloudSync}
+                                            disabled={syncActionDisabled}
+                                        >
+                                            <Text
+                                                style={
+                                                    styles.disableSyncButtonText
+                                                }
+                                            >
+                                                Disable Cloud Sync
+                                            </Text>
+                                        </TouchableOpacity>
+                                    )}
+
+                                    {syncState === "cloud-disabled" && (
+                                        <TouchableOpacity
+                                            style={styles.enableSyncButton}
+                                            onPress={handleEnableCloudSync}
+                                            disabled={syncActionDisabled}
+                                        >
+                                            <Text
+                                                style={
+                                                    styles.enableSyncButtonText
+                                                }
+                                            >
+                                                Re-enable Cloud Sync
+                                            </Text>
+                                        </TouchableOpacity>
+                                    )}
+
+                                    {isAuthenticated && !hasCloudSync && (
+                                        <TouchableOpacity
+                                            style={styles.portalButton}
+                                            onPress={handleOpenPortal}
+                                        >
+                                            <Text
+                                                style={styles.portalButtonText}
+                                            >
+                                                Manage Subscription
+                                            </Text>
+                                        </TouchableOpacity>
+                                    )}
                                 </View>
+                            )}
 
-                                {syncState === "local-only" && (
-                                    <TouchableOpacity
-                                        style={styles.enableSyncButton}
-                                        onPress={handleEnableCloudSync}
-                                        disabled={syncActionDisabled}
-                                    >
-                                        <Text
-                                            style={styles.enableSyncButtonText}
-                                        >
-                                            Enable Cloud Sync
-                                        </Text>
-                                    </TouchableOpacity>
-                                )}
-
-                                {syncState === "cloud-enabled" && (
-                                    <TouchableOpacity
-                                        style={styles.disableSyncButton}
-                                        onPress={handleDisableCloudSync}
-                                        disabled={syncActionDisabled}
-                                    >
-                                        <Text
-                                            style={styles.disableSyncButtonText}
-                                        >
-                                            Disable Cloud Sync
-                                        </Text>
-                                    </TouchableOpacity>
-                                )}
-
-                                {syncState === "cloud-disabled" && (
-                                    <TouchableOpacity
-                                        style={styles.enableSyncButton}
-                                        onPress={handleEnableCloudSync}
-                                        disabled={syncActionDisabled}
-                                    >
-                                        <Text
-                                            style={styles.enableSyncButtonText}
-                                        >
-                                            Re-enable Cloud Sync
-                                        </Text>
-                                    </TouchableOpacity>
-                                )}
-
-                                {isAuthenticated && !hasCloudSync && (
-                                    <TouchableOpacity
-                                        style={styles.portalButton}
-                                        onPress={handleOpenPortal}
-                                    >
-                                        <Text style={styles.portalButtonText}>
-                                            Manage Subscription
-                                        </Text>
-                                    </TouchableOpacity>
-                                )}
-                            </View>
-                        )}
-
-                        {!isConvexAvailable && (
-                            <View style={styles.syncWarning}>
-                                <Text style={styles.syncWarningText}>
-                                    {convexUnavailableMessage}
-                                </Text>
-                            </View>
-                        )}
-                    </View>
+                            {!isConvexAvailable && (
+                                <View style={styles.syncWarning}>
+                                    <Text style={styles.syncWarningText}>
+                                        {convexUnavailableMessage}
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
+                    )}
 
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>OpenRouter API</Text>
@@ -1362,59 +1324,6 @@ export default function SettingsScreen(): ReactElement {
                             </View>
                         )}
                     </View>
-
-                    {__DEV__ && (
-                        <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>Developer</Text>
-                            <Text style={styles.sectionDescription}>
-                                Override the Convex URL for local testing
-                            </Text>
-                            <View style={styles.inputContainer}>
-                                <Text style={styles.inputLabel}>
-                                    Convex URL Override
-                                </Text>
-                                <TextInput
-                                    style={styles.textInput}
-                                    value={convexOverrideInput}
-                                    onChangeText={setConvexOverrideInput}
-                                    placeholder={
-                                        buildConvexUrl ??
-                                        "https://your-deployment.convex.cloud"
-                                    }
-                                    placeholderTextColor={colors.textFaint}
-                                    autoCapitalize="none"
-                                    autoCorrect={false}
-                                />
-                            </View>
-                            <Text style={styles.helpText}>
-                                {convexOverrideSaved
-                                    ? `Active override: ${convexOverrideSaved}`
-                                    : buildConvexUrl
-                                      ? `Build URL: ${buildConvexUrl}`
-                                      : "No build-time Convex URL configured."}
-                            </Text>
-                            <View style={styles.buttonRow}>
-                                <TouchableOpacity
-                                    style={styles.saveButton}
-                                    onPress={handleSaveConvexOverride}
-                                >
-                                    <Text style={styles.saveButtonText}>
-                                        Save Override
-                                    </Text>
-                                </TouchableOpacity>
-                                {convexOverrideSaved && (
-                                    <TouchableOpacity
-                                        style={styles.clearButton}
-                                        onPress={handleClearConvexOverride}
-                                    >
-                                        <Text style={styles.clearButtonText}>
-                                            Clear Override
-                                        </Text>
-                                    </TouchableOpacity>
-                                )}
-                            </View>
-                        </View>
-                    )}
 
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>About</Text>
