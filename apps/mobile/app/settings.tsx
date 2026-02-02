@@ -197,9 +197,14 @@ export default function SettingsScreen(): ReactElement {
         } catch (error) {
             const rawMessage =
                 error instanceof Error ? error.message : String(error);
-            const isConnectionLost = rawMessage
-                .toLowerCase()
-                .includes("connection lost while action was in flight");
+            const normalizedMessage = rawMessage.toLowerCase();
+            const isConnectionLost =
+                normalizedMessage.includes(
+                    "connection lost while action was in flight",
+                ) ||
+                normalizedMessage.includes("stream end encountered") ||
+                normalizedMessage.includes("websocket") ||
+                normalizedMessage.includes("connection lost");
             const message = isConnectionLost
                 ? "Connection lost while signing in. Please try again."
                 : rawMessage ||

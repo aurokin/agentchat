@@ -114,24 +114,39 @@ export function AuthProvider({
                 throw new Error("Missing auth code");
             }
 
-            const maxAttempts = 2;
-            let attempt = 0;
-            while (true) {
+            const retryDelaysMs = [500, 1000, 2000, 4000, 8000];
+            const isRetryableAuthError = (message: string) => {
+                const normalized = message.toLowerCase();
+                return (
+                    normalized.includes(
+                        "connection lost while action was in flight",
+                    ) ||
+                    normalized.includes("stream end encountered") ||
+                    normalized.includes("websocket") ||
+                    normalized.includes("connection lost")
+                );
+            };
+
+            for (
+                let attempt = 0;
+                attempt <= retryDelaysMs.length;
+                attempt += 1
+            ) {
                 try {
                     await authActions.signIn(undefined as any, { code } as any);
                     break;
                 } catch (error) {
                     const message =
                         error instanceof Error ? error.message : String(error);
-                    const isConnectionLost = message
-                        .toLowerCase()
-                        .includes("connection lost while action was in flight");
-                    if (!isConnectionLost || attempt >= maxAttempts - 1) {
+                    if (!isRetryableAuthError(message)) {
                         throw error;
                     }
-                    attempt += 1;
+                    const delayMs = retryDelaysMs[attempt];
+                    if (delayMs === undefined) {
+                        throw error;
+                    }
                     await new Promise((resolve) =>
-                        setTimeout(resolve, 500 * (attempt + 1)),
+                        setTimeout(resolve, delayMs),
                     );
                 }
             }
