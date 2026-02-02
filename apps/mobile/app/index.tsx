@@ -1,4 +1,10 @@
-import React, { useEffect, useMemo } from "react";
+import React, {
+    useEffect,
+    useMemo,
+    useState,
+    useCallback,
+    useRef,
+} from "react";
 import {
     View,
     Text,
@@ -6,6 +12,8 @@ import {
     TouchableOpacity,
     StyleSheet,
     ActivityIndicator,
+    Alert,
+    type LayoutChangeEvent,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -13,14 +21,21 @@ import { useChatContext } from "@/contexts/ChatContext";
 import { useAppContext } from "@/contexts/AppContext";
 import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { getMessageCountByChat } from "@/lib/db/operations";
 
 export default function HomeScreen(): React.ReactElement {
     const router = useRouter();
-    const { chats, isLoading, error, loadChats, createChat, deleteChat } =
+    const { chats, isLoading, error, loadChats, createChat, deleteChats } =
         useChatContext();
     const { isInitialized } = useAppContext();
     const { colors } = useTheme();
     const styles = useMemo(() => createStyles(colors), [colors]);
+    const [isSelecting, setIsSelecting] = useState(false);
+    const [selectedChatIds, setSelectedChatIds] = useState<Set<string>>(
+        new Set(),
+    );
+    const longPressTriggeredRef = useRef(false);
+    const [headerHeight, setHeaderHeight] = useState<number | null>(null);
 
     useEffect(() => {
         if (isInitialized) {
@@ -37,9 +52,97 @@ export default function HomeScreen(): React.ReactElement {
         router.push(`/chat/${chatId}`);
     };
 
-    const handleDeleteChat = async (chatId: string) => {
-        await deleteChat(chatId);
+    const clearSelection = useCallback(() => {
+        setIsSelecting(false);
+        setSelectedChatIds(new Set());
+    }, []);
+
+    const toggleChatSelection = useCallback((chatId: string) => {
+        setSelectedChatIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(chatId)) {
+                next.delete(chatId);
+            } else {
+                next.add(chatId);
+            }
+            if (next.size === 0) {
+                setIsSelecting(false);
+            }
+            return next;
+        });
+    }, []);
+
+    const handleChatPress = (chatId: string) => {
+        if (longPressTriggeredRef.current) {
+            longPressTriggeredRef.current = false;
+            return;
+        }
+
+        if (isSelecting) {
+            toggleChatSelection(chatId);
+            return;
+        }
+
+        void handleSelectChat(chatId);
     };
+
+    const handleChatLongPress = (chatId: string) => {
+        longPressTriggeredRef.current = true;
+        if (!isSelecting) {
+            setIsSelecting(true);
+            setSelectedChatIds(new Set([chatId]));
+            return;
+        }
+
+        toggleChatSelection(chatId);
+    };
+
+    const handleDeleteSelected = useCallback(async () => {
+        if (selectedChatIds.size === 0) return;
+
+        const chatIds = Array.from(selectedChatIds);
+        const hasMessages = chatIds.some(
+            (chatId) => getMessageCountByChat(chatId) > 0,
+        );
+
+        const performDelete = async () => {
+            await deleteChats(chatIds);
+            clearSelection();
+        };
+
+        if (hasMessages) {
+            Alert.alert(
+                "Delete Chats",
+                `Delete ${chatIds.length} ${
+                    chatIds.length === 1 ? "chat" : "chats"
+                } and all attachments?`,
+                [
+                    { text: "Cancel", style: "cancel" },
+                    {
+                        text: "Delete",
+                        style: "destructive",
+                        onPress: () => {
+                            void performDelete();
+                        },
+                    },
+                ],
+            );
+            return;
+        }
+
+        await performDelete();
+    }, [selectedChatIds, deleteChats, clearSelection]);
+
+    const handleHeaderLayout = useCallback(
+        (event: LayoutChangeEvent) => {
+            if (isSelecting) return;
+            const nextHeight = event.nativeEvent.layout.height;
+            if (nextHeight !== headerHeight) {
+                setHeaderHeight(nextHeight);
+            }
+        },
+        [isSelecting, headerHeight],
+    );
 
     const formatDate = (timestamp: number): string => {
         const date = new Date(timestamp);
@@ -78,16 +181,80 @@ export default function HomeScreen(): React.ReactElement {
 
     return (
         <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-                <Text style={styles.title}>RouterChat</Text>
-                <TouchableOpacity
-                    accessibilityRole="button"
-                    accessibilityLabel="Settings"
-                    style={styles.settingsButton}
-                    onPress={() => router.push("/settings")}
+            <View
+                style={[
+                    styles.header,
+                    isSelecting && headerHeight
+                        ? { height: headerHeight }
+                        : null,
+                ]}
+                onLayout={handleHeaderLayout}
+            >
+                <Text
+                    style={styles.title}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
                 >
-                    <Feather name="settings" size={22} color={colors.accent} />
-                </TouchableOpacity>
+                    {isSelecting
+                        ? `${selectedChatIds.size} selected`
+                        : "RouterChat"}
+                </Text>
+                {isSelecting ? (
+                    <View style={styles.selectionActions}>
+                        <TouchableOpacity
+                            accessibilityRole="button"
+                            accessibilityLabel="Cancel selection"
+                            style={styles.selectionButton}
+                            onPress={clearSelection}
+                        >
+                            <Text
+                                style={styles.selectionButtonText}
+                                numberOfLines={1}
+                                ellipsizeMode="tail"
+                            >
+                                Cancel
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            accessibilityRole="button"
+                            accessibilityLabel={`Delete ${selectedChatIds.size} chats`}
+                            style={[
+                                styles.selectionButton,
+                                styles.deleteAction,
+                            ]}
+                            onPress={handleDeleteSelected}
+                        >
+                            <Feather
+                                name="trash-2"
+                                size={16}
+                                color={colors.danger}
+                            />
+                            <Text
+                                style={[
+                                    styles.selectionButtonText,
+                                    styles.deleteActionText,
+                                ]}
+                                numberOfLines={1}
+                                ellipsizeMode="tail"
+                            >
+                                Delete ({selectedChatIds.size})
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                ) : (
+                    <TouchableOpacity
+                        accessibilityRole="button"
+                        accessibilityLabel="Settings"
+                        style={styles.settingsButton}
+                        onPress={() => router.push("/settings")}
+                    >
+                        <Feather
+                            name="settings"
+                            size={22}
+                            color={colors.accent}
+                        />
+                    </TouchableOpacity>
+                )}
             </View>
 
             {error && (
@@ -117,32 +284,60 @@ export default function HomeScreen(): React.ReactElement {
                 <FlatList
                     data={chats}
                     keyExtractor={(item) => item.id}
-                    renderItem={({ item }) => (
-                        <TouchableOpacity
-                            style={styles.chatItem}
-                            onPress={() => handleSelectChat(item.id)}
-                            onLongPress={() => handleDeleteChat(item.id)}
-                        >
-                            <View style={styles.chatItemContent}>
-                                <Text
-                                    style={styles.chatTitle}
-                                    numberOfLines={1}
-                                >
-                                    {item.title}
-                                </Text>
-                                <Text style={styles.chatDate}>
-                                    {formatDate(item.updatedAt)}
-                                </Text>
-                            </View>
-                        </TouchableOpacity>
-                    )}
+                    renderItem={({ item }) => {
+                        const isSelected = selectedChatIds.has(item.id);
+                        return (
+                            <TouchableOpacity
+                                style={[
+                                    styles.chatItem,
+                                    isSelected && styles.chatItemSelected,
+                                ]}
+                                onPress={() => handleChatPress(item.id)}
+                                onLongPress={() => handleChatLongPress(item.id)}
+                                onPressOut={() => {
+                                    longPressTriggeredRef.current = false;
+                                }}
+                            >
+                                <View style={styles.chatItemRow}>
+                                    {isSelecting && (
+                                        <View style={styles.selectionIndicator}>
+                                            <Feather
+                                                name={
+                                                    isSelected
+                                                        ? "check-circle"
+                                                        : "circle"
+                                                }
+                                                size={20}
+                                                color={
+                                                    isSelected
+                                                        ? colors.accent
+                                                        : colors.textSubtle
+                                                }
+                                            />
+                                        </View>
+                                    )}
+                                    <View style={styles.chatItemContent}>
+                                        <Text
+                                            style={styles.chatTitle}
+                                            numberOfLines={1}
+                                        >
+                                            {item.title}
+                                        </Text>
+                                        <Text style={styles.chatDate}>
+                                            {formatDate(item.updatedAt)}
+                                        </Text>
+                                    </View>
+                                </View>
+                            </TouchableOpacity>
+                        );
+                    }}
                     contentContainerStyle={styles.listContent}
                     refreshing={isLoading}
                     onRefresh={loadChats}
                 />
             )}
 
-            {chats.length > 0 && (
+            {chats.length > 0 && !isSelecting && (
                 <TouchableOpacity style={styles.fab} onPress={handleCreateChat}>
                     <Text style={styles.fabText}>+</Text>
                 </TouchableOpacity>
@@ -175,9 +370,39 @@ const createStyles = (colors: ThemeColors) =>
             fontSize: 20,
             fontWeight: "bold",
             color: colors.text,
+            flexShrink: 1,
+            marginRight: 12,
         },
         settingsButton: {
             padding: 8,
+        },
+        selectionActions: {
+            flexDirection: "row",
+            alignItems: "center",
+        },
+        selectionButton: {
+            paddingHorizontal: 10,
+            paddingVertical: 6,
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.surface,
+        },
+        selectionButtonText: {
+            color: colors.textMuted,
+            fontSize: 14,
+            fontWeight: "600",
+        },
+        deleteAction: {
+            marginLeft: 8,
+            borderColor: colors.danger,
+            backgroundColor: colors.dangerSoft,
+            flexDirection: "row",
+            alignItems: "center",
+        },
+        deleteActionText: {
+            marginLeft: 6,
+            color: colors.danger,
         },
         loadingText: {
             marginTop: 12,
@@ -223,6 +448,21 @@ const createStyles = (colors: ThemeColors) =>
             borderRadius: 12,
             padding: 16,
             marginBottom: 12,
+        },
+        chatItemSelected: {
+            borderWidth: 1,
+            borderColor: colors.accentBorder,
+            backgroundColor: colors.accentSoft,
+        },
+        chatItemRow: {
+            flexDirection: "row",
+            alignItems: "center",
+        },
+        selectionIndicator: {
+            width: 24,
+            alignItems: "center",
+            justifyContent: "center",
+            marginRight: 12,
         },
         chatItemContent: {
             flex: 1,

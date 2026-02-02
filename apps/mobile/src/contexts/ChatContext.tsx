@@ -36,6 +36,7 @@ interface ChatContextValue {
     createChat: (title?: string, modelId?: string) => Promise<ChatSession>;
     selectChat: (chatId: string) => Promise<void>;
     deleteChat: (chatId: string) => Promise<void>;
+    deleteChats: (chatIds: string[]) => Promise<void>;
     updateChat: (chat: ChatSession) => Promise<void>;
     loadMessages: (chatId: string) => Promise<void>;
     addMessage: (
@@ -168,6 +169,30 @@ export function ChatProvider({
         [adapter],
     );
 
+    const deleteChats = useCallback(
+        async (chatIds: string[]) => {
+            if (chatIds.length === 0) return;
+
+            for (const chatId of chatIds) {
+                await adapter.deleteChat(chatId);
+            }
+
+            const chatIdSet = new Set(chatIds);
+            setChats((prev) => prev.filter((c) => !chatIdSet.has(c.id)));
+            setCurrentChat((prev) =>
+                prev && chatIdSet.has(prev.id) ? null : prev,
+            );
+            setMessages((prev) => {
+                const next = { ...prev };
+                for (const chatId of chatIds) {
+                    delete next[chatId];
+                }
+                return next;
+            });
+        },
+        [adapter],
+    );
+
     const updateChat = useCallback(
         async (chat: ChatSession) => {
             await adapter.updateChat(chat);
@@ -277,6 +302,7 @@ export function ChatProvider({
                 createChat,
                 selectChat,
                 deleteChat,
+                deleteChats,
                 updateChat,
                 loadMessages,
                 addMessage,
