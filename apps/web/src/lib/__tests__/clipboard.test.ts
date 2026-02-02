@@ -3,6 +3,8 @@ import {
     isClipboardSupported,
     hasImageInClipboardEvent,
     readImageFromClipboardEvent,
+    readClipboardImage,
+    hasClipboardImage,
 } from "@/lib/clipboard";
 
 describe("clipboard", () => {
@@ -14,6 +16,22 @@ describe("clipboard", () => {
             delete global.navigator;
 
             expect(isClipboardSupported()).toBe(false);
+
+            // @ts-ignore
+            global.navigator = originalNavigator;
+        });
+
+        test("isClipboardSupported returns true with clipboard read", () => {
+            const originalNavigator = global.navigator;
+            const mockNavigator = {
+                clipboard: {
+                    read: async () => [],
+                },
+            } as unknown as Navigator;
+            // @ts-ignore
+            global.navigator = mockNavigator;
+
+            expect(isClipboardSupported()).toBe(true);
 
             // @ts-ignore
             global.navigator = originalNavigator;
@@ -140,6 +158,95 @@ describe("clipboard", () => {
 
             const result = readImageFromClipboardEvent(mockEvent);
             expect(result).toBeNull();
+        });
+    });
+
+    describe("readClipboardImage", () => {
+        test("returns image from clipboard API", async () => {
+            const originalNavigator = global.navigator;
+            const blob = new Blob(["data"], { type: "image/png" });
+            const mockNavigator = {
+                clipboard: {
+                    read: async () => [
+                        {
+                            types: ["text/plain", "image/png"],
+                            getType: async () => blob,
+                        },
+                    ],
+                },
+            } as unknown as Navigator;
+            // @ts-ignore
+            global.navigator = mockNavigator;
+
+            const result = await readClipboardImage();
+            expect(result?.mimeType).toBe("image/png");
+            expect(result?.blob).toBe(blob);
+
+            // @ts-ignore
+            global.navigator = originalNavigator;
+        });
+
+        test("returns null when clipboard API fails", async () => {
+            const originalNavigator = global.navigator;
+            const mockNavigator = {
+                clipboard: {
+                    read: async () => {
+                        throw new Error("denied");
+                    },
+                },
+            } as unknown as Navigator;
+            // @ts-ignore
+            global.navigator = mockNavigator;
+
+            const result = await readClipboardImage();
+            expect(result).toBeNull();
+
+            // @ts-ignore
+            global.navigator = originalNavigator;
+        });
+    });
+
+    describe("hasClipboardImage", () => {
+        test("returns true when clipboard contains image", async () => {
+            const originalNavigator = global.navigator;
+            const mockNavigator = {
+                clipboard: {
+                    read: async () => [
+                        {
+                            types: ["image/jpeg"],
+                        },
+                    ],
+                },
+            } as unknown as Navigator;
+            // @ts-ignore
+            global.navigator = mockNavigator;
+
+            const result = await hasClipboardImage();
+            expect(result).toBe(true);
+
+            // @ts-ignore
+            global.navigator = originalNavigator;
+        });
+
+        test("returns false when no image type", async () => {
+            const originalNavigator = global.navigator;
+            const mockNavigator = {
+                clipboard: {
+                    read: async () => [
+                        {
+                            types: ["text/plain"],
+                        },
+                    ],
+                },
+            } as unknown as Navigator;
+            // @ts-ignore
+            global.navigator = mockNavigator;
+
+            const result = await hasClipboardImage();
+            expect(result).toBe(false);
+
+            // @ts-ignore
+            global.navigator = originalNavigator;
         });
     });
 });

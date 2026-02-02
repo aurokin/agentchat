@@ -18,6 +18,11 @@ import type {
     SearchLevel,
 } from "@/lib/types";
 import { APP_DEFAULT_MODEL } from "@shared/core/models";
+import {
+    mapConvexChatToLocal,
+    mapConvexMessageToLocal,
+    mergeByIdWithPending,
+} from "@shared/core/sync";
 import { useStorageAdapter, useSync } from "@/contexts/SyncContext";
 import * as storage from "@/lib/storage";
 import { v4 as uuid } from "uuid";
@@ -94,113 +99,6 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             : "skip",
     );
 
-    const mapCloudChat = useCallback(
-        (chat: {
-            _id: string;
-            localId?: string | null;
-            title: string;
-            modelId: string;
-            thinking: string;
-            searchLevel: string;
-            createdAt: number;
-            updatedAt: number;
-        }): ChatSession => {
-            return {
-                id: chat.localId ?? chat._id,
-                title: chat.title,
-                modelId: chat.modelId,
-                thinking: chat.thinking as ChatSession["thinking"],
-                searchLevel: chat.searchLevel as ChatSession["searchLevel"],
-                createdAt: chat.createdAt,
-                updatedAt: chat.updatedAt,
-            };
-        },
-        [],
-    );
-
-    const mapCloudMessage = useCallback(
-        (
-            msg: {
-                _id: string;
-                localId?: string | null;
-                role: Message["role"];
-                content: string;
-                contextContent: string;
-                thinking?: string | null;
-                skill?: Skill | null;
-                modelId?: string | null;
-                thinkingLevel?: string | null;
-                searchLevel?: string | null;
-                attachmentIds?: string[] | null;
-                createdAt: number;
-            },
-            chatLocalId: string,
-        ): Message => {
-            return {
-                id: msg.localId ?? msg._id,
-                sessionId: chatLocalId,
-                role: msg.role,
-                content: msg.content,
-                contextContent: msg.contextContent,
-                thinking: msg.thinking ?? undefined,
-                skill: msg.skill ?? null,
-                modelId: msg.modelId ?? undefined,
-                thinkingLevel:
-                    (msg.thinkingLevel as Message["thinkingLevel"]) ??
-                    undefined,
-                searchLevel:
-                    (msg.searchLevel as Message["searchLevel"]) ?? undefined,
-                attachmentIds: msg.attachmentIds ?? undefined,
-                createdAt: msg.createdAt,
-            };
-        },
-        [],
-    );
-
-    const mergeChats = useCallback(
-        (
-            cloudList: ChatSession[],
-            prev: ChatSession[],
-            pending: Set<string>,
-        ): ChatSession[] => {
-            const byId = new Map<string, ChatSession>();
-            for (const chat of cloudList) {
-                byId.set(chat.id, chat);
-            }
-            for (const chat of prev) {
-                if (pending.has(chat.id) && !byId.has(chat.id)) {
-                    byId.set(chat.id, chat);
-                }
-            }
-            return Array.from(byId.values()).sort(
-                (a, b) => b.updatedAt - a.updatedAt,
-            );
-        },
-        [],
-    );
-
-    const mergeMessages = useCallback(
-        (
-            cloudList: Message[],
-            prev: Message[],
-            pending: Set<string>,
-        ): Message[] => {
-            const byId = new Map<string, Message>();
-            for (const message of cloudList) {
-                byId.set(message.id, message);
-            }
-            for (const message of prev) {
-                if (pending.has(message.id) && !byId.has(message.id)) {
-                    byId.set(message.id, message);
-                }
-            }
-            return Array.from(byId.values()).sort(
-                (a, b) => a.createdAt - b.createdAt,
-            );
-        },
-        [],
-    );
-
     useEffect(() => {
         currentChatIdRef.current = currentChat?.id ?? null;
     }, [currentChat?.id]);
@@ -208,18 +106,25 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         if (!isCloudSyncActive || !cloudChats) return;
 
-        const mapped = cloudChats.map(mapCloudChat);
+        const mapped = cloudChats.map(mapConvexChatToLocal);
         const pending = pendingChatIdsRef.current;
         for (const chat of mapped) {
             pending.delete(chat.id);
         }
 
-        setChats((prev) => mergeChats(mapped, prev, pending));
+        setChats((prev) =>
+            mergeByIdWithPending(
+                mapped,
+                prev,
+                pending,
+                (a, b) => b.updatedAt - a.updatedAt,
+            ),
+        );
         setCurrentChat((prev) => {
             if (!prev) return prev;
             return mapped.find((chat) => chat.id === prev.id) ?? prev;
         });
-    }, [cloudChats, isCloudSyncActive, mapCloudChat, mergeChats]);
+    }, [cloudChats, isCloudSyncActive]);
 
     useEffect(() => {
         if (!isCloudSyncActive || !cloudCurrentChat || !cloudMessages) {
@@ -228,22 +133,23 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
         const chatLocalId = cloudCurrentChat.localId ?? cloudCurrentChat._id;
         const mapped = cloudMessages.map((msg) =>
-            mapCloudMessage(msg, chatLocalId),
+            mapConvexMessageToLocal(msg, chatLocalId),
         );
         const pending = pendingMessageIdsRef.current;
         for (const message of mapped) {
             pending.delete(message.id);
         }
 
-        setMessages((prev) => mergeMessages(mapped, prev, pending));
+        setMessages((prev) =>
+            mergeByIdWithPending(
+                mapped,
+                prev,
+                pending,
+                (a, b) => a.createdAt - b.createdAt,
+            ),
+        );
         setIsMessagesLoading(false);
-    }, [
-        cloudCurrentChat,
-        cloudMessages,
-        isCloudSyncActive,
-        mapCloudMessage,
-        mergeMessages,
-    ]);
+    }, [cloudCurrentChat, cloudMessages, isCloudSyncActive]);
 
     useEffect(() => {
         if (!isCloudSyncActive || !currentChatId) return;

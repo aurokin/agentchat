@@ -15,6 +15,11 @@ import type {
     ThinkingLevel,
     SearchLevel,
 } from "@shared/core/types";
+import {
+    mapConvexChatToLocal,
+    mapConvexMessageToLocal,
+    mergeByIdWithPending,
+} from "@shared/core/sync";
 import { v4 as uuidv4 } from "uuid";
 import {
     getDefaultThinking,
@@ -123,113 +128,6 @@ export function ChatProvider({
             : "skip",
     );
 
-    const mapCloudChat = useCallback(
-        (chat: {
-            _id: string;
-            localId?: string | null;
-            title: string;
-            modelId: string;
-            thinking: string;
-            searchLevel: string;
-            createdAt: number;
-            updatedAt: number;
-        }): ChatSession => {
-            return {
-                id: chat.localId ?? chat._id,
-                title: chat.title,
-                modelId: chat.modelId,
-                thinking: chat.thinking as ChatSession["thinking"],
-                searchLevel: chat.searchLevel as ChatSession["searchLevel"],
-                createdAt: chat.createdAt,
-                updatedAt: chat.updatedAt,
-            };
-        },
-        [],
-    );
-
-    const mapCloudMessage = useCallback(
-        (
-            msg: {
-                _id: string;
-                localId?: string | null;
-                role: Message["role"];
-                content: string;
-                contextContent: string;
-                thinking?: string | null;
-                skill?: any;
-                modelId?: string | null;
-                thinkingLevel?: string | null;
-                searchLevel?: string | null;
-                attachmentIds?: string[] | null;
-                createdAt: number;
-            },
-            chatLocalId: string,
-        ): Message => {
-            return {
-                id: msg.localId ?? msg._id,
-                sessionId: chatLocalId,
-                role: msg.role,
-                content: msg.content,
-                contextContent: msg.contextContent,
-                thinking: msg.thinking ?? undefined,
-                skill: (msg.skill as Message["skill"]) ?? null,
-                modelId: msg.modelId ?? undefined,
-                thinkingLevel:
-                    (msg.thinkingLevel as Message["thinkingLevel"]) ??
-                    undefined,
-                searchLevel:
-                    (msg.searchLevel as Message["searchLevel"]) ?? undefined,
-                attachmentIds: msg.attachmentIds ?? undefined,
-                createdAt: msg.createdAt,
-            };
-        },
-        [],
-    );
-
-    const mergeChats = useCallback(
-        (
-            cloudList: ChatSession[],
-            prev: ChatSession[],
-            pending: Set<string>,
-        ): ChatSession[] => {
-            const byId = new Map<string, ChatSession>();
-            for (const chat of cloudList) {
-                byId.set(chat.id, chat);
-            }
-            for (const chat of prev) {
-                if (pending.has(chat.id) && !byId.has(chat.id)) {
-                    byId.set(chat.id, chat);
-                }
-            }
-            return Array.from(byId.values()).sort(
-                (a, b) => b.updatedAt - a.updatedAt,
-            );
-        },
-        [],
-    );
-
-    const mergeMessages = useCallback(
-        (
-            cloudList: Message[],
-            prev: Message[],
-            pending: Set<string>,
-        ): Message[] => {
-            const byId = new Map<string, Message>();
-            for (const message of cloudList) {
-                byId.set(message.id, message);
-            }
-            for (const message of prev) {
-                if (pending.has(message.id) && !byId.has(message.id)) {
-                    byId.set(message.id, message);
-                }
-            }
-            return Array.from(byId.values()).sort(
-                (a, b) => a.createdAt - b.createdAt,
-            );
-        },
-        [],
-    );
-
     const loadChats = useCallback(async () => {
         setIsLoading(true);
         setError(null);
@@ -246,18 +144,25 @@ export function ChatProvider({
     useEffect(() => {
         if (!isCloudSyncActive || !cloudChats) return;
 
-        const mapped = cloudChats.map(mapCloudChat);
+        const mapped = cloudChats.map(mapConvexChatToLocal);
         const pending = pendingChatIdsRef.current;
         for (const chat of mapped) {
             pending.delete(chat.id);
         }
 
-        setChats((prev) => mergeChats(mapped, prev, pending));
+        setChats((prev) =>
+            mergeByIdWithPending(
+                mapped,
+                prev,
+                pending,
+                (a, b) => b.updatedAt - a.updatedAt,
+            ),
+        );
         setCurrentChat((prev) => {
             if (!prev) return prev;
             return mapped.find((chat) => chat.id === prev.id) ?? prev;
         });
-    }, [cloudChats, isCloudSyncActive, mapCloudChat, mergeChats]);
+    }, [cloudChats, isCloudSyncActive]);
 
     useEffect(() => {
         if (!isCloudSyncActive || !cloudCurrentChat || !cloudMessages) {
@@ -266,7 +171,7 @@ export function ChatProvider({
 
         const chatLocalId = cloudCurrentChat.localId ?? cloudCurrentChat._id;
         const mapped = cloudMessages.map((msg) =>
-            mapCloudMessage(msg, chatLocalId),
+            mapConvexMessageToLocal(msg, chatLocalId),
         );
         const pending = pendingMessageIdsRef.current;
         for (const message of mapped) {
@@ -275,19 +180,14 @@ export function ChatProvider({
 
         setMessages((prev) => ({
             ...prev,
-            [chatLocalId]: mergeMessages(
+            [chatLocalId]: mergeByIdWithPending(
                 mapped,
                 prev[chatLocalId] ?? [],
                 pending,
+                (a, b) => a.createdAt - b.createdAt,
             ),
         }));
-    }, [
-        cloudCurrentChat,
-        cloudMessages,
-        isCloudSyncActive,
-        mapCloudMessage,
-        mergeMessages,
-    ]);
+    }, [cloudCurrentChat, cloudMessages, isCloudSyncActive]);
 
     const createChat = useCallback(
         async (title?: string, modelId?: string): Promise<ChatSession> => {

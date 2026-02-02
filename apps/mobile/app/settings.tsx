@@ -920,207 +920,6 @@ export default function SettingsScreen(): ReactElement {
                     </View>
 
                     <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Storage</Text>
-
-                        <View style={styles.storageContainer}>
-                            {isStorageLoading ? (
-                                <ActivityIndicator
-                                    style={styles.loading}
-                                    color={colors.accent}
-                                />
-                            ) : localQuotaStatus ? (
-                                <>
-                                    <View style={styles.storageRow}>
-                                        <Text style={styles.storageLabel}>
-                                            Local attachments
-                                        </Text>
-                                        <Text style={styles.storageValue}>
-                                            {formatBytes(localQuotaStatus.used)}{" "}
-                                            /{" "}
-                                            {formatBytes(
-                                                localQuotaStatus.limit,
-                                            )}
-                                        </Text>
-                                    </View>
-                                    <View style={styles.storageBar}>
-                                        <View
-                                            style={[
-                                                styles.storageBarFill,
-                                                {
-                                                    width: `${Math.min(localQuotaStatus.percentage * 100, 100)}%`,
-                                                    backgroundColor:
-                                                        localQuotaStatus.isExceeded
-                                                            ? colors.danger
-                                                            : localQuotaStatus.isWarning80
-                                                              ? colors.warning
-                                                              : colors.success,
-                                                },
-                                            ]}
-                                        />
-                                    </View>
-                                    {storageUsage && (
-                                        <View style={styles.statsRow}>
-                                            <View style={styles.statCard}>
-                                                <Text style={styles.statValue}>
-                                                    {storageUsage.sessions}
-                                                </Text>
-                                                <Text style={styles.statLabel}>
-                                                    Chats
-                                                </Text>
-                                            </View>
-                                            <View style={styles.statCard}>
-                                                <Text style={styles.statValue}>
-                                                    {storageUsage.messages}
-                                                </Text>
-                                                <Text style={styles.statLabel}>
-                                                    Messages
-                                                </Text>
-                                            </View>
-                                        </View>
-                                    )}
-                                    {cloudQuotaStatus && (
-                                        <>
-                                            <View style={styles.storageRow}>
-                                                <Text
-                                                    style={styles.storageLabel}
-                                                >
-                                                    Cloud attachments
-                                                </Text>
-                                                <Text
-                                                    style={styles.storageValue}
-                                                >
-                                                    {formatBytes(
-                                                        cloudQuotaStatus.used,
-                                                    )}{" "}
-                                                    /{" "}
-                                                    {formatBytes(
-                                                        cloudQuotaStatus.limit,
-                                                    )}
-                                                </Text>
-                                            </View>
-                                            <View style={styles.storageBar}>
-                                                <View
-                                                    style={[
-                                                        styles.storageBarFill,
-                                                        {
-                                                            width: `${Math.min(cloudQuotaStatus.percentage * 100, 100)}%`,
-                                                            backgroundColor:
-                                                                cloudQuotaStatus.isExceeded
-                                                                    ? colors.danger
-                                                                    : cloudQuotaStatus.isWarning80
-                                                                      ? colors.warning
-                                                                      : colors.success,
-                                                        },
-                                                    ]}
-                                                />
-                                            </View>
-                                            {cloudStorageUsage && (
-                                                <View style={styles.statsRow}>
-                                                    <View
-                                                        style={styles.statCard}
-                                                    >
-                                                        <Text
-                                                            style={
-                                                                styles.statValue
-                                                            }
-                                                        >
-                                                            {
-                                                                cloudStorageUsage.sessionCount
-                                                            }
-                                                        </Text>
-                                                        <Text
-                                                            style={
-                                                                styles.statLabel
-                                                            }
-                                                        >
-                                                            Cloud Chats
-                                                        </Text>
-                                                    </View>
-                                                    <View
-                                                        style={styles.statCard}
-                                                    >
-                                                        <Text
-                                                            style={
-                                                                styles.statValue
-                                                            }
-                                                        >
-                                                            {
-                                                                cloudStorageUsage.messageCount
-                                                            }
-                                                        </Text>
-                                                        <Text
-                                                            style={
-                                                                styles.statLabel
-                                                            }
-                                                        >
-                                                            Cloud Messages
-                                                        </Text>
-                                                    </View>
-                                                </View>
-                                            )}
-                                        </>
-                                    )}
-                                </>
-                            ) : null}
-
-                            {syncState === "cloud-enabled" && (
-                                <Text
-                                    style={[
-                                        styles.storageInfoText,
-                                        localQuotaStatus &&
-                                            styles.storageInfoSpacing,
-                                    ]}
-                                >
-                                    Your attachments are stored in the cloud and
-                                    sync across devices.
-                                </Text>
-                            )}
-
-                            {syncState === "cloud-enabled" && (
-                                <View style={styles.buttonRow}>
-                                    <TouchableOpacity
-                                        style={styles.saveButton}
-                                        onPress={handleCloneToLocal}
-                                        disabled={syncActionDisabled}
-                                    >
-                                        <Text style={styles.saveButtonText}>
-                                            Clone to Local
-                                        </Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={styles.clearButton}
-                                        onPress={handleClearCloudImages}
-                                        disabled={syncActionDisabled}
-                                    >
-                                        <Text style={styles.clearButtonText}>
-                                            Clear Cloud Images
-                                        </Text>
-                                    </TouchableOpacity>
-                                </View>
-                            )}
-
-                            {syncState !== "cloud-enabled" && (
-                                <>
-                                    <Text
-                                        style={[
-                                            styles.storageInfoText,
-                                            localQuotaStatus &&
-                                                styles.storageInfoSpacing,
-                                        ]}
-                                    >
-                                        Your chats and attachments are stored
-                                        only on this device.
-                                    </Text>
-                                    <Text style={styles.storageInfoSubtext}>
-                                        Enable cloud sync to access your data
-                                        across devices.
-                                    </Text>
-                                </>
-                            )}
-                        </View>
-                    </View>
-
-                    <View style={styles.section}>
                         <View style={styles.sectionHeaderRow}>
                             <Text style={styles.sectionTitle}>Skills</Text>
                             <TouchableOpacity
@@ -1323,6 +1122,207 @@ export default function SettingsScreen(): ReactElement {
                                 ))}
                             </View>
                         )}
+                    </View>
+
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Storage</Text>
+
+                        <View style={styles.storageContainer}>
+                            {isStorageLoading ? (
+                                <ActivityIndicator
+                                    style={styles.loading}
+                                    color={colors.accent}
+                                />
+                            ) : localQuotaStatus ? (
+                                <>
+                                    <View style={styles.storageRow}>
+                                        <Text style={styles.storageLabel}>
+                                            Local attachments
+                                        </Text>
+                                        <Text style={styles.storageValue}>
+                                            {formatBytes(localQuotaStatus.used)}{" "}
+                                            /{" "}
+                                            {formatBytes(
+                                                localQuotaStatus.limit,
+                                            )}
+                                        </Text>
+                                    </View>
+                                    <View style={styles.storageBar}>
+                                        <View
+                                            style={[
+                                                styles.storageBarFill,
+                                                {
+                                                    width: `${Math.min(localQuotaStatus.percentage * 100, 100)}%`,
+                                                    backgroundColor:
+                                                        localQuotaStatus.isExceeded
+                                                            ? colors.danger
+                                                            : localQuotaStatus.isWarning80
+                                                              ? colors.warning
+                                                              : colors.success,
+                                                },
+                                            ]}
+                                        />
+                                    </View>
+                                    {storageUsage && (
+                                        <View style={styles.statsRow}>
+                                            <View style={styles.statCard}>
+                                                <Text style={styles.statValue}>
+                                                    {storageUsage.sessions}
+                                                </Text>
+                                                <Text style={styles.statLabel}>
+                                                    Chats
+                                                </Text>
+                                            </View>
+                                            <View style={styles.statCard}>
+                                                <Text style={styles.statValue}>
+                                                    {storageUsage.messages}
+                                                </Text>
+                                                <Text style={styles.statLabel}>
+                                                    Messages
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    )}
+                                    {cloudQuotaStatus && (
+                                        <>
+                                            <View style={styles.storageRow}>
+                                                <Text
+                                                    style={styles.storageLabel}
+                                                >
+                                                    Cloud attachments
+                                                </Text>
+                                                <Text
+                                                    style={styles.storageValue}
+                                                >
+                                                    {formatBytes(
+                                                        cloudQuotaStatus.used,
+                                                    )}{" "}
+                                                    /{" "}
+                                                    {formatBytes(
+                                                        cloudQuotaStatus.limit,
+                                                    )}
+                                                </Text>
+                                            </View>
+                                            <View style={styles.storageBar}>
+                                                <View
+                                                    style={[
+                                                        styles.storageBarFill,
+                                                        {
+                                                            width: `${Math.min(cloudQuotaStatus.percentage * 100, 100)}%`,
+                                                            backgroundColor:
+                                                                cloudQuotaStatus.isExceeded
+                                                                    ? colors.danger
+                                                                    : cloudQuotaStatus.isWarning80
+                                                                      ? colors.warning
+                                                                      : colors.success,
+                                                        },
+                                                    ]}
+                                                />
+                                            </View>
+                                            {cloudStorageUsage && (
+                                                <View style={styles.statsRow}>
+                                                    <View
+                                                        style={styles.statCard}
+                                                    >
+                                                        <Text
+                                                            style={
+                                                                styles.statValue
+                                                            }
+                                                        >
+                                                            {
+                                                                cloudStorageUsage.sessionCount
+                                                            }
+                                                        </Text>
+                                                        <Text
+                                                            style={
+                                                                styles.statLabel
+                                                            }
+                                                        >
+                                                            Cloud Chats
+                                                        </Text>
+                                                    </View>
+                                                    <View
+                                                        style={styles.statCard}
+                                                    >
+                                                        <Text
+                                                            style={
+                                                                styles.statValue
+                                                            }
+                                                        >
+                                                            {
+                                                                cloudStorageUsage.messageCount
+                                                            }
+                                                        </Text>
+                                                        <Text
+                                                            style={
+                                                                styles.statLabel
+                                                            }
+                                                        >
+                                                            Cloud Messages
+                                                        </Text>
+                                                    </View>
+                                                </View>
+                                            )}
+                                        </>
+                                    )}
+                                </>
+                            ) : null}
+
+                            {syncState === "cloud-enabled" && (
+                                <Text
+                                    style={[
+                                        styles.storageInfoText,
+                                        localQuotaStatus &&
+                                            styles.storageInfoSpacing,
+                                    ]}
+                                >
+                                    Your attachments are stored in the cloud and
+                                    sync across devices.
+                                </Text>
+                            )}
+
+                            {syncState === "cloud-enabled" && (
+                                <View style={styles.buttonRow}>
+                                    <TouchableOpacity
+                                        style={styles.saveButton}
+                                        onPress={handleCloneToLocal}
+                                        disabled={syncActionDisabled}
+                                    >
+                                        <Text style={styles.saveButtonText}>
+                                            Clone to Local
+                                        </Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={styles.clearButton}
+                                        onPress={handleClearCloudImages}
+                                        disabled={syncActionDisabled}
+                                    >
+                                        <Text style={styles.clearButtonText}>
+                                            Clear Cloud Images
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+
+                            {syncState !== "cloud-enabled" && (
+                                <>
+                                    <Text
+                                        style={[
+                                            styles.storageInfoText,
+                                            localQuotaStatus &&
+                                                styles.storageInfoSpacing,
+                                        ]}
+                                    >
+                                        Your chats and attachments are stored
+                                        only on this device.
+                                    </Text>
+                                    <Text style={styles.storageInfoSubtext}>
+                                        Enable cloud sync to access your data
+                                        across devices.
+                                    </Text>
+                                </>
+                            )}
+                        </View>
                     </View>
 
                     <View style={styles.section}>
