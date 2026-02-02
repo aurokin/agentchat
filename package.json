@@ -7,9 +7,6 @@
         "packages/*"
     ],
     "scripts": {
-        "dev": "cd apps/web && bun run dev",
-        "build": "cd apps/web && bun run build",
-        "start": "cd apps/web && bun run start",
         "format": "prettier --write \"apps/**/*.{js,jsx,ts,tsx,json,css,md}\" \"packages/**/*.{js,jsx,ts,tsx,json,css,md}\"",
         "format:check": "prettier --check \"apps/**/*.{js,jsx,ts,tsx,json,css,md}\" \"packages/**/*.{js,jsx,ts,tsx,json,css,md}\"",
         "lint": "bun --cwd apps/web run lint && bun --cwd apps/mobile run lint && bun --cwd packages/shared run lint",
