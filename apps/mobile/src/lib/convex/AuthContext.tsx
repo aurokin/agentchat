@@ -94,6 +94,10 @@ export function AuthProvider({
             calledBy: "mobile",
         } as any);
 
+        if (!result?.redirect) {
+            throw new Error("Sign in could not be started.");
+        }
+
         if (result?.redirect) {
             const authSession = await WebBrowser.openAuthSessionAsync(
                 result.redirect.toString(),

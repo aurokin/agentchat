@@ -73,6 +73,7 @@ export default function SettingsScreen(): ReactElement {
     const [apiKey, setApiKeyValue] = useState("");
     const [isValidating, setIsValidating] = useState(false);
     const [isValid, setIsValid] = useState<boolean | null>(null);
+    const [isSigningIn, setIsSigningIn] = useState(false);
     const [convexOverrideInput, setConvexOverrideInput] = useState("");
     const [convexOverrideSaved, setConvexOverrideSaved] = useState<
         string | null
@@ -189,6 +190,21 @@ export default function SettingsScreen(): ReactElement {
         );
     };
 
+    const performSignIn = async () => {
+        setIsSigningIn(true);
+        try {
+            await signIn();
+        } catch (error) {
+            const message =
+                error instanceof Error && error.message
+                    ? error.message
+                    : "Could not sign in with Google. Please try again.";
+            Alert.alert("Sign In Failed", message, [{ text: "OK" }]);
+        } finally {
+            setIsSigningIn(false);
+        }
+    };
+
     const handleGoogleSignIn = async () => {
         if (!isConvexAvailable) {
             Alert.alert("Cloud Sync Not Configured", convexUnavailableMessage, [
@@ -197,15 +213,7 @@ export default function SettingsScreen(): ReactElement {
             return;
         }
 
-        try {
-            await signIn();
-        } catch (error) {
-            Alert.alert(
-                "Sign In Failed",
-                "Could not sign in with Google. Please try again.",
-                [{ text: "OK" }],
-            );
-        }
+        await performSignIn();
     };
 
     const handleClearApiKey = async () => {
@@ -283,14 +291,7 @@ export default function SettingsScreen(): ReactElement {
                     {
                         text: "Sign In",
                         onPress: async () => {
-                            try {
-                                await signIn();
-                            } catch {
-                                Alert.alert(
-                                    "Sign In Failed",
-                                    "Could not sign in. Please try again.",
-                                );
-                            }
+                            await performSignIn();
                         },
                     },
                 ],
@@ -512,6 +513,7 @@ export default function SettingsScreen(): ReactElement {
         skillName.trim().length > 0 && skillPrompt.trim().length > 0;
     const hasCloudSync = subscription?.hasCloudSync ?? false;
     const syncActionDisabled = isMigrating || isCloning;
+    const isGoogleButtonBusy = isAuthLoading || isSigningIn;
 
     const getSyncStatusColor = () => {
         switch (syncState) {
@@ -588,26 +590,36 @@ export default function SettingsScreen(): ReactElement {
 
                         {isConvexAvailable && (
                             <TouchableOpacity
-                                style={styles.googleButton}
+                                style={[
+                                    styles.googleButton,
+                                    isGoogleButtonBusy &&
+                                        styles.googleButtonDisabled,
+                                ]}
                                 onPress={
                                     isAuthenticated
                                         ? handleSignOut
                                         : handleGoogleSignIn
                                 }
-                                disabled={isAuthLoading}
+                                disabled={isGoogleButtonBusy}
                             >
-                                {isAuthLoading ? (
-                                    <ActivityIndicator
-                                        color={colors.textOnAccent}
-                                    />
-                                ) : (
-                                    <>
+                                {isGoogleButtonBusy ? (
+                                    <View style={styles.googleButtonContent}>
+                                        <ActivityIndicator
+                                            color={colors.textOnAccent}
+                                            style={styles.googleButtonSpinner}
+                                        />
                                         <Text style={styles.googleButtonText}>
-                                            {isAuthenticated
-                                                ? "Sign Out"
-                                                : "Sign in with Google"}
+                                            {isSigningIn
+                                                ? "Signing in..."
+                                                : "Loading..."}
                                         </Text>
-                                    </>
+                                    </View>
+                                ) : (
+                                    <Text style={styles.googleButtonText}>
+                                        {isAuthenticated
+                                            ? "Sign Out"
+                                            : "Sign in with Google"}
+                                    </Text>
                                 )}
                             </TouchableOpacity>
                         )}
@@ -1601,6 +1613,16 @@ const createStyles = (colors: ThemeColors) =>
             paddingVertical: 12,
             borderRadius: 8,
             alignItems: "center",
+        },
+        googleButtonDisabled: {
+            opacity: 0.7,
+        },
+        googleButtonContent: {
+            flexDirection: "row",
+            alignItems: "center",
+        },
+        googleButtonSpinner: {
+            marginRight: 8,
         },
         googleButtonText: {
             color: colors.textOnAccent,
