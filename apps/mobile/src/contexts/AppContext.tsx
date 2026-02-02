@@ -5,6 +5,7 @@ import React, {
     useSyncExternalStore,
     type ReactNode,
 } from "react";
+import { createOnboardingStore } from "@/contexts/onboarding-store";
 import {
     getHasCompletedOnboarding,
     setHasCompletedOnboarding,
@@ -15,11 +16,6 @@ interface AppContextValue {
     hasCompletedOnboarding: boolean;
     initializeApp: () => Promise<void>;
     completeOnboarding: () => Promise<void>;
-}
-
-interface OnboardingSnapshot {
-    isInitialized: boolean;
-    hasCompletedOnboarding: boolean;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -36,63 +32,10 @@ interface AppProviderProps {
     children: ReactNode;
 }
 
-const onboardingStore = (() => {
-    let snapshot: OnboardingSnapshot = {
-        isInitialized: false,
-        hasCompletedOnboarding: false,
-    };
-    const listeners = new Set<() => void>();
-    let initPromise: Promise<void> | null = null;
-
-    const notify = () => {
-        listeners.forEach((listener) => listener());
-    };
-
-    const initialize = async () => {
-        try {
-            const onboardingCompleted = await getHasCompletedOnboarding();
-            snapshot = {
-                isInitialized: true,
-                hasCompletedOnboarding: onboardingCompleted,
-            };
-        } catch {
-            snapshot = { ...snapshot, isInitialized: true };
-        }
-        notify();
-    };
-
-    const ensureInitialized = () => {
-        if (!initPromise) {
-            initPromise = initialize();
-        }
-        return initPromise;
-    };
-
-    return {
-        subscribe(listener: () => void) {
-            listeners.add(listener);
-            void ensureInitialized();
-            return () => {
-                listeners.delete(listener);
-            };
-        },
-        getSnapshot() {
-            return snapshot;
-        },
-        getServerSnapshot() {
-            return snapshot;
-        },
-        async refresh() {
-            initPromise = null;
-            await ensureInitialized();
-        },
-        async completeOnboarding() {
-            snapshot = { isInitialized: true, hasCompletedOnboarding: true };
-            notify();
-            await setHasCompletedOnboarding();
-        },
-    };
-})();
+const onboardingStore = createOnboardingStore({
+    getHasCompletedOnboarding,
+    setHasCompletedOnboarding,
+});
 
 export function AppProvider({
     children,
