@@ -195,10 +195,15 @@ export default function SettingsScreen(): ReactElement {
         try {
             await signIn();
         } catch (error) {
-            const message =
-                error instanceof Error && error.message
-                    ? error.message
-                    : "Could not sign in with Google. Please try again.";
+            const rawMessage =
+                error instanceof Error ? error.message : String(error);
+            const isConnectionLost = rawMessage
+                .toLowerCase()
+                .includes("connection lost while action was in flight");
+            const message = isConnectionLost
+                ? "Connection lost while signing in. Please try again."
+                : rawMessage ||
+                  "Could not sign in with Google. Please try again.";
             Alert.alert("Sign In Failed", message, [{ text: "OK" }]);
         } finally {
             setIsSigningIn(false);

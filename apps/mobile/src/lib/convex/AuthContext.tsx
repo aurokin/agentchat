@@ -114,7 +114,27 @@ export function AuthProvider({
                 throw new Error("Missing auth code");
             }
 
-            await authActions.signIn(undefined as any, { code } as any);
+            const maxAttempts = 2;
+            let attempt = 0;
+            while (true) {
+                try {
+                    await authActions.signIn(undefined as any, { code } as any);
+                    break;
+                } catch (error) {
+                    const message =
+                        error instanceof Error ? error.message : String(error);
+                    const isConnectionLost = message
+                        .toLowerCase()
+                        .includes("connection lost while action was in flight");
+                    if (!isConnectionLost || attempt >= maxAttempts - 1) {
+                        throw error;
+                    }
+                    attempt += 1;
+                    await new Promise((resolve) =>
+                        setTimeout(resolve, 500 * (attempt + 1)),
+                    );
+                }
+            }
         }
     }, [authActions, isConvexAvailable]);
 
