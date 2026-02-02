@@ -51,13 +51,20 @@ export function useIsDesktop(): boolean {
     return useMediaQuery("(min-width: 1024px)");
 }
 
+export function getBreakpointFromFlags(
+    isMobile: boolean,
+    isTablet: boolean,
+): "mobile" | "tablet" | "desktop" {
+    if (isMobile) return "mobile";
+    if (isTablet) return "tablet";
+    return "desktop";
+}
+
 export function useBreakpoint(): "mobile" | "tablet" | "desktop" {
     const isMobile = useIsMobile();
     const isTablet = useIsTablet();
 
-    if (isMobile) return "mobile";
-    if (isTablet) return "tablet";
-    return "desktop";
+    return getBreakpointFromFlags(isMobile, isTablet);
 }
 
 export function useTouchDevice(): boolean {

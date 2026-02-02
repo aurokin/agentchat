@@ -27,6 +27,23 @@ import type {
  *
  * Uses Convex's built-in "skip" functionality to handle unavailability.
  */
+export function getEffectiveQueryArgs<Query extends FunctionReference<"query">>(
+    isAvailable: boolean,
+    args: FunctionArgs<Query> | "skip",
+): FunctionArgs<Query> | "skip" {
+    return (isAvailable && args !== "skip" ? args : "skip") as
+        | FunctionArgs<Query>
+        | "skip";
+}
+
+export function selectSafeCallback<Args extends unknown[], Return>(
+    isAvailable: boolean,
+    realFn: (...args: Args) => Return,
+    noopFn: (...args: Args) => Return,
+): (...args: Args) => Return {
+    return isAvailable ? realFn : noopFn;
+}
+
 export function useQuerySafe<Query extends FunctionReference<"query">>(
     query: Query,
     args: FunctionArgs<Query> | "skip",
@@ -36,9 +53,7 @@ export function useQuerySafe<Query extends FunctionReference<"query">>(
     // When not available, use "skip" to prevent the query from running
     // The type assertion is needed because TypeScript can't infer that
     // "skip" is a valid value for the args parameter in all cases
-    const effectiveArgs = (isAvailable && args !== "skip" ? args : "skip") as
-        | FunctionArgs<Query>
-        | "skip";
+    const effectiveArgs = getEffectiveQueryArgs(isAvailable, args);
 
     // Always call useQuery to satisfy React's rules of hooks
     const result = useQuery(query, effectiveArgs);
@@ -63,7 +78,7 @@ export function useMutationSafe<Mutation extends FunctionReference<"mutation">>(
     const noop = useCallback(async () => null, []);
 
     return useMemo(
-        () => (isAvailable ? mutate : noop),
+        () => selectSafeCallback(isAvailable, mutate, noop),
         [isAvailable, mutate, noop],
     );
 }
@@ -78,5 +93,8 @@ export function useActionSafe<Action extends FunctionReference<"action">>(
     const act = useAction(action);
     const noop = useCallback(async () => null, []);
 
-    return useMemo(() => (isAvailable ? act : noop), [isAvailable, act, noop]);
+    return useMemo(
+        () => selectSafeCallback(isAvailable, act, noop),
+        [isAvailable, act, noop],
+    );
 }
