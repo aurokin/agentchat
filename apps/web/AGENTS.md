@@ -1,1 +1,5 @@
-When modifying apps/web/convex/\*, run: cd apps/web && bunx convex codegen
+# Web Agent Instructions
+
+Read `../../AGENTS.md` before making changes.
+
+For web-specific guidelines, see `../../docs/agents/web.md`.
