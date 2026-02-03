@@ -121,6 +121,8 @@ cd apps/web && bun health
 cd apps/web && bun run build
 ```
 
+Agent instructions live in `AGENTS.md` and the linked docs under `docs/agents/`.
+
 ## Architecture Notes
 
 - **Direct API calls**: OpenRouter API calls are made directly from the client
