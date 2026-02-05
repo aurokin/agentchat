@@ -2,4 +2,4 @@
 
 When modifying `packages/convex/convex/*`, run:
 
-- `bun --cwd packages/convex run codegen`
+- `bun run --cwd packages/convex codegen`

@@ -5,16 +5,16 @@
     "main": "src/index.ts",
     "types": "src/index.ts",
     "scripts": {
-        "typecheck": "tsc --noEmit",
-        "lint": "eslint .",
         "format": "prettier --write \"src/**/*.{js,jsx,ts,tsx,json,css,md}\" \"*.{js,jsx,ts,tsx,json,css,md}\"",
         "format:check": "prettier --check \"src/**/*.{js,jsx,ts,tsx,json,css,md}\" \"*.{js,jsx,ts,tsx,json,css,md}\"",
+        "typecheck": "tsc --noEmit",
+        "lint": "eslint .",
         "test": "bun test",
         "health": "bun run format && bun run typecheck && bun run lint && bun run test"
     },
     "devDependencies": {
         "eslint": "^9.39.2",
-        "typescript": "^5.0.0",
+        "typescript": "^5.9.3",
         "typescript-eslint": "^8.53.1"
     }
 }

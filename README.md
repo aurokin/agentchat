@@ -120,6 +120,24 @@ cd apps/web && bun health
 cd apps/web && bun run build
 ```
 
+### Multi-app development (from repo root)
+
+Use these scripts when you want Convex and app dev servers running together:
+
+```bash
+# Convex + web
+bun run dev:web
+
+# Convex + mobile dev client
+bun run dev:mobile
+
+# Convex + web + mobile dev client
+bun run dev:all
+
+# Default dev script (same as dev:all)
+bun run dev
+```
+
 Agent instructions live in `AGENTS.md` and the linked docs under `docs/agents/`.
 
 ## Architecture Notes
