@@ -9,7 +9,7 @@ import * as WebBrowser from "expo-web-browser";
 import { makeRedirectUri } from "expo-auth-session";
 import { useConvexAuth, useQuery } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
-import { api } from "../../../../web/convex/_generated/api";
+import { api } from "@convex/_generated/api";
 import {
     isConvexConfigured,
     setConvexUrl,

@@ -14,7 +14,7 @@ RouterChat is a monorepo with the primary app in `apps/web`.
 
 - `apps/web`: Next.js app, UI, client logic
 - `apps/mobile`: Expo app (React Native), uses Expo Router
-- `convex`: Cloud sync, auth, billing, encryption utilities
+- `packages/convex`: Convex backend (schema, auth, sync, billing, encryption)
 - `src/lib/sync`: Storage adapters and sync state
 - `src/lib/db.ts`, `src/lib/storage.ts`: IndexedDB/local storage helpers
 

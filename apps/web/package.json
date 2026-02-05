@@ -4,7 +4,7 @@
     "private": true,
     "scripts": {
         "dev": "next dev --turbopack --hostname 0.0.0.0 --port 4040",
-        "convex:dev": "bunx convex dev",
+        "convex:dev": "bun --cwd ../../packages/convex run dev",
         "build": "next build",
         "start": "next start",
         "lint": "eslint .",
@@ -14,7 +14,6 @@
         "health": "bun run format && bun run typecheck && bun run lint && bun test"
     },
     "dependencies": {
-        "@auth/core": "0.37.0",
         "@convex-dev/auth": "^0.0.90",
         "@vercel/analytics": "^1.6.1",
         "clsx": "^2.1.1",

@@ -1,5 +1,5 @@
 # Web App Notes
 
-When modifying `apps/web/convex/*`, run:
+When modifying `packages/convex/convex/*`, run:
 
-- `cd apps/web && bunx convex codegen`
+- `bun --cwd packages/convex run codegen`

@@ -1,0 +1,43 @@
+{
+    "name": "@convex",
+    "version": "0.2.0",
+    "private": true,
+    "types": "convex/_generated/api.d.ts",
+    "files": [
+        "convex/**"
+    ],
+    "exports": {
+        "./_generated/api": {
+            "types": "./convex/_generated/api.d.ts",
+            "default": "./convex/_generated/api.js"
+        },
+        "./_generated/server": {
+            "types": "./convex/_generated/server.d.ts",
+            "default": "./convex/_generated/server.js"
+        },
+        "./_generated/dataModel": {
+            "types": "./convex/_generated/dataModel.d.ts"
+        }
+    },
+    "scripts": {
+        "dev": "bunx convex dev",
+        "codegen": "bunx convex codegen",
+        "deploy": "bunx convex deploy",
+        "typecheck": "tsc --noEmit",
+        "lint": "eslint .",
+        "format": "prettier --write \"convex/**/*.{js,jsx,ts,tsx,json,css,md}\" \"*.{js,jsx,ts,tsx,json,css,md}\"",
+        "format:check": "prettier --check \"convex/**/*.{js,jsx,ts,tsx,json,css,md}\" \"*.{js,jsx,ts,tsx,json,css,md}\"",
+        "test": "bun test",
+        "health": "bun run format && bun run typecheck && bun run lint && bun run test"
+    },
+    "dependencies": {
+        "@auth/core": "0.37.0",
+        "@convex-dev/auth": "^0.0.90",
+        "convex": "^1.31.6"
+    },
+    "devDependencies": {
+        "eslint": "^9.39.2",
+        "typescript": "^5.9.3",
+        "typescript-eslint": "^8.53.1"
+    }
+}

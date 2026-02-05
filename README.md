@@ -81,11 +81,10 @@ Only required if you are hosting an instance with Cloud Sync enabled.
 
 See `docs/cloud_dashboard_setup.md` for the Convex/RevenueCat dashboard checklist.
 
-**`.env` (app runtime)**
+**Local env files**
 
-- `CONVEX_DEPLOYMENT`
-- `NEXT_PUBLIC_CONVEX_URL`
-- `REVENUECAT_WEB_PURCHASE_URL` - RevenueCat purchase link template without trailing slash (e.g., `https://pay.rev.cat/sandbox/abc123`); userId is appended as a path segment
+- `apps/web/.env.local` (app runtime): `NEXT_PUBLIC_CONVEX_URL`, `REVENUECAT_WEB_PURCHASE_URL` - RevenueCat purchase link template without trailing slash (e.g., `https://pay.rev.cat/sandbox/abc123`); userId is appended as a path segment
+- `packages/convex/.env.local` (Convex CLI): `CONVEX_DEPLOYMENT`
 
 **Convex environment variables**
 

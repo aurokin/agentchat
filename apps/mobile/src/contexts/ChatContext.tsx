@@ -7,7 +7,7 @@ import React, {
     type ReactNode,
 } from "react";
 import { useQuery } from "convex/react";
-import { api } from "../../../web/convex/_generated/api";
+import { api } from "@convex/_generated/api";
 import { useStorageAdapter, useSync } from "@/contexts/SyncContext";
 import type {
     ChatSession,

@@ -19,6 +19,13 @@ config.resolver.alias = {
         "src",
         "$1",
     ),
+    "^@convex/(.+)$": path.join(
+        workspaceRoot,
+        "packages",
+        "convex",
+        "convex",
+        "$1",
+    ),
 };
 
 module.exports = config;

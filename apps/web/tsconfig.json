@@ -22,7 +22,7 @@
         "paths": {
             "@/*": ["./src/*"],
             "@shared/*": ["../../packages/shared/src/*"],
-            "@/convex/*": ["./convex/*"]
+            "@convex/*": ["../../packages/convex/convex/*"]
         }
     },
     "include": [
@@ -32,5 +32,5 @@
         ".next/types/**/*.ts",
         ".next/dev/types/**/*.ts"
     ],
-    "exclude": ["node_modules", "convex", "convex/_generated"]
+    "exclude": ["node_modules"]
 }
