@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Outfit, IBM_Plex_Mono } from "next/font/google";
-import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import "highlight.js/styles/github-dark.css";
 import { SafeConvexProvider } from "@/contexts/ConvexProvider";
@@ -44,7 +43,6 @@ export default function RootLayout({
                         </SettingsProvider>
                     </SyncProvider>
                 </SafeConvexProvider>
-                <Analytics />
             </body>
         </html>
     );
