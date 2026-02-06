@@ -79,19 +79,24 @@ cd apps/web && bun dev
 
 Only required if you are hosting an instance with Cloud Sync enabled.
 
-See `docs/cloud_dashboard_setup.md` for the Convex/RevenueCat dashboard checklist.
+See:
+
+- `docs/deploy/railway.md` for Railway deployment configuration.
+- `docs/cloud_dashboard_setup.md` for the Convex/RevenueCat dashboard checklist.
 
 **Local env files**
 
-- `apps/web/.env.local` (app runtime): `NEXT_PUBLIC_CONVEX_URL`, `REVENUECAT_WEB_PURCHASE_URL` - RevenueCat purchase link template without trailing slash (e.g., `https://pay.rev.cat/sandbox/abc123`); userId is appended as a path segment
+- `apps/web/.env.local` (app runtime, optional): `NEXT_PUBLIC_CONVEX_URL`, `REVENUECAT_WEB_PURCHASE_URL`
+    - When hosting on Railway, set these as Railway service variables instead of committing an `.env.local` file.
+    - `REVENUECAT_WEB_PURCHASE_URL` is a RevenueCat purchase link template without trailing slash (e.g., `https://pay.rev.cat/sandbox/abc123`); userId is appended as a path segment.
 - `packages/convex/.env.local` (Convex CLI): `CONVEX_DEPLOYMENT`
 
 **Convex environment variables**
 
 - `AUTH_GOOGLE_ID` - Google OAuth client ID
 - `AUTH_GOOGLE_SECRET` - Google OAuth client secret
-- `JWKS` - JSON Web Key Set for auth
-- `JWT_PRIVATE_KEY` - Private key for JWT signing
+- `JWKS` - JSON Web Key Set used by Convex auth
+- `JWT_PRIVATE_KEY` - Private key used by Convex auth for JWT signing
 - `SITE_URL` - Your deployment URL
 - `REVENUECAT_WEBHOOK_SECRET` - Authorization header secret for RevenueCat webhooks
 - `REVENUECAT_API_KEY` - RevenueCat v2 secret API key for entitlement refresh
