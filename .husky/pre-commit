@@ -3,12 +3,18 @@
 # Ensure PATH includes common locations
 export PATH="$HOME/.bun/bin:$PATH"
 
-# Format staged files with prettier
-FILES=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(js|jsx|ts|tsx|json|css|md)$' || true)
+# Format staged files with prettier (skip generated Convex files)
+FILES=$(git diff --cached --name-only --diff-filter=ACMR \
+    | grep -E '\.(js|jsx|ts|tsx|json|css|md)$' \
+    | grep -v '^packages/convex/convex/_generated/' \
+    || true)
 if [ -n "$FILES" ]; then
     echo "$FILES" | xargs prettierd
     echo "$FILES" | xargs git add
 fi
+
+# Verify env vars are documented (README + .env.example templates)
+bun run env:check || exit 1
 
 # Run tests
 # bun test

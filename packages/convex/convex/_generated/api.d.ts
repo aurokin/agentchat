@@ -13,31 +13,43 @@ import type * as attachments from "../attachments.js";
 import type * as auth from "../auth.js";
 import type * as chats from "../chats.js";
 import type * as http from "../http.js";
+import type * as lib_authz from "../lib/authz.js";
+import type * as lib_batch from "../lib/batch.js";
+import type * as lib_cloud_usage from "../lib/cloud_usage.js";
 import type * as lib_encryption from "../lib/encryption.js";
+import type * as lib_limits from "../lib/limits.js";
+import type * as lib_pagination from "../lib/pagination.js";
 import type * as lib_revenuecat_helpers from "../lib/revenuecat_helpers.js";
+import type * as lib_subscription from "../lib/subscription.js";
 import type * as messages from "../messages.js";
 import type * as revenuecat from "../revenuecat.js";
 import type * as skills from "../skills.js";
 import type * as users from "../users.js";
 
 import type {
-    ApiFromModules,
-    FilterApi,
-    FunctionReference,
+  ApiFromModules,
+  FilterApi,
+  FunctionReference,
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
-    apiKey: typeof apiKey;
-    attachments: typeof attachments;
-    auth: typeof auth;
-    chats: typeof chats;
-    http: typeof http;
-    "lib/encryption": typeof lib_encryption;
-    "lib/revenuecat_helpers": typeof lib_revenuecat_helpers;
-    messages: typeof messages;
-    revenuecat: typeof revenuecat;
-    skills: typeof skills;
-    users: typeof users;
+  apiKey: typeof apiKey;
+  attachments: typeof attachments;
+  auth: typeof auth;
+  chats: typeof chats;
+  http: typeof http;
+  "lib/authz": typeof lib_authz;
+  "lib/batch": typeof lib_batch;
+  "lib/cloud_usage": typeof lib_cloud_usage;
+  "lib/encryption": typeof lib_encryption;
+  "lib/limits": typeof lib_limits;
+  "lib/pagination": typeof lib_pagination;
+  "lib/revenuecat_helpers": typeof lib_revenuecat_helpers;
+  "lib/subscription": typeof lib_subscription;
+  messages: typeof messages;
+  revenuecat: typeof revenuecat;
+  skills: typeof skills;
+  users: typeof users;
 }>;
 
 /**
@@ -49,8 +61,8 @@ declare const fullApi: ApiFromModules<{
  * ```
  */
 export declare const api: FilterApi<
-    typeof fullApi,
-    FunctionReference<any, "public">
+  typeof fullApi,
+  FunctionReference<any, "public">
 >;
 
 /**
@@ -62,8 +74,8 @@ export declare const api: FilterApi<
  * ```
  */
 export declare const internal: FilterApi<
-    typeof fullApi,
-    FunctionReference<any, "internal">
+  typeof fullApi,
+  FunctionReference<any, "internal">
 >;
 
 export declare const components: {};

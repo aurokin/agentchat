@@ -83,27 +83,72 @@ See:
 
 - `docs/deploy/railway.md` for Railway deployment configuration.
 - `docs/cloud_dashboard_setup.md` for the Convex/RevenueCat dashboard checklist.
+- `docs/mobile_dev_setup.md` for mobile dev builds.
 
-**Local env files**
+#### Environment variables
 
-- `apps/web/.env.local` (app runtime, optional): `NEXT_PUBLIC_CONVEX_URL`, `REVENUECAT_WEB_PURCHASE_URL`
-    - When hosting on Railway, set these as Railway service variables instead of committing an `.env.local` file.
-    - `REVENUECAT_WEB_PURCHASE_URL` is a RevenueCat purchase link template without trailing slash (e.g., `https://pay.rev.cat/sandbox/abc123`); userId is appended as a path segment.
-- `packages/convex/.env.local` (Convex CLI): `CONVEX_DEPLOYMENT`
+RouterChat can run in local-only mode with no env vars. Cloud Sync and Billing require configuration across:
 
-**Convex environment variables**
+- Web app runtime (Railway service variables / `apps/web/.env.local`)
+- Mobile app runtime (EAS build env / `apps/mobile/.env`)
+- Convex CLI (local dev only, `packages/convex/.env.local`)
+- Convex deployment runtime (Convex dashboard / `convex env set`)
 
-- `AUTH_GOOGLE_ID` - Google OAuth client ID
-- `AUTH_GOOGLE_SECRET` - Google OAuth client secret
-- `JWKS` - JSON Web Key Set used by Convex auth
-- `JWT_PRIVATE_KEY` - Private key used by Convex auth for JWT signing
-- `SITE_URL` - Your deployment URL
-- `REVENUECAT_WEBHOOK_SECRET` - Authorization header secret for RevenueCat webhooks
-- `REVENUECAT_API_KEY` - RevenueCat v2 secret API key for entitlement refresh
-- `REVENUECAT_PROJECT_ID` - RevenueCat project ID for API v2 calls
-- `REVENUECAT_ENTITLEMENT_IDS` - Optional comma-separated entitlement identifiers or IDs to treat as Pro (defaults to `pro`)
-- `REVENUECAT_DEBUG` - Optional debug flag for logging RevenueCat responses
-- `ENCRYPTION_KEY` - AES-256 key for encrypting sensitive data (API keys)
+**Web app runtime (`apps/web`)**
+
+Set these as Railway service variables (preview/production) or in `apps/web/.env.local` for local dev. A template lives at `apps/web/.env.example`.
+
+- `NEXT_PUBLIC_CONVEX_URL` - Convex deployment URL (from the Convex dashboard). When unset, RouterChat runs local-only (no cloud sync).
+- `REVENUECAT_WEB_PURCHASE_URL` - RevenueCat Web Billing purchase link template (from the RevenueCat dashboard, no trailing slash). `userId` is appended as a path segment.
+- `NEXT_PUBLIC_REVENUECAT_WEB_PURCHASE_URL` - Legacy alias for `REVENUECAT_WEB_PURCHASE_URL`.
+- `DISABLE_CSP` - Optional debug flag. Set to `true` to disable CSP headers in middleware.
+
+**Mobile app runtime (`apps/mobile`)**
+
+Set these in EAS build env (see `apps/mobile/eas.json`) or in `apps/mobile/.env` for local runs. A template lives at `apps/mobile/.env.example`.
+
+- `EXPO_PUBLIC_CONVEX_URL` - Convex deployment URL for this build (same as web `NEXT_PUBLIC_CONVEX_URL`, from the Convex dashboard). When unset, mobile runs local-only and cloud features are disabled.
+- `EXPO_PUBLIC_GOOGLE_CLIENT_ID` - Optional. Only needed for client-side Google OAuth flows (the current Convex-hosted sign-in does not require it).
+
+**Convex CLI (`packages/convex`)**
+
+Local dev only. Configure the Convex CLI target deployment in `packages/convex/.env.local` (a template lives at `packages/convex/.env.example`):
+
+- `CONVEX_DEPLOYMENT` - Deployment name used by `convex dev` / `convex codegen`.
+    - `CONVEX_URL` is written by the Convex CLI; you don't need to set it manually.
+
+**Convex backend (set per deployment in Convex)**
+
+These are Convex-managed environment variables (not Railway vars). Set them in the Convex dashboard, or via `bunx convex env set ...`.
+
+- `SITE_URL` - Base URL for this deployment (no trailing slash, typically your Railway domain). Used to validate auth redirects.
+- `AUTH_GOOGLE_ID` - Google OAuth client ID (from Google Cloud Console).
+- `AUTH_GOOGLE_SECRET` - Google OAuth client secret (from Google Cloud Console).
+- `JWKS` - JSON Web Key Set used by Convex auth.
+- `JWT_PRIVATE_KEY` - Private key used by Convex auth for JWT signing.
+- `ENCRYPTION_KEY` - AES-256 key for encrypting sensitive data (API keys).
+- `REVENUECAT_WEBHOOK_SECRET` - Authorization header secret for RevenueCat webhooks (you choose this; configure it in RevenueCat server notifications).
+- `REVENUECAT_API_KEY` - RevenueCat v2 secret API key for entitlement refresh (from the RevenueCat dashboard).
+- `REVENUECAT_PROJECT_ID` - RevenueCat project ID for API v2 calls (from the RevenueCat dashboard).
+- `REVENUECAT_ENTITLEMENT_IDS` - Optional comma-separated entitlement identifiers or IDs to treat as Pro (defaults to `pro`).
+- `REVENUECAT_DEBUG` - Optional debug flag for logging RevenueCat responses.
+
+Convex also provides some runtime variables that you can read but do not set:
+
+- `CONVEX_SITE_URL` - Convex-provided base URL for this deployment's "site" (used by Convex Auth in `packages/convex/convex/auth.config.ts`).
+
+**Optional Convex limits (anti-abuse knobs)**
+
+These are Convex-managed environment variables used by `packages/convex/convex/lib/limits.ts`. They are optional; defaults apply when unset.
+
+- Content size: `ROUTERCHAT_MAX_CHAT_TITLE_CHARS`, `ROUTERCHAT_MAX_MESSAGE_CONTENT_CHARS`, `ROUTERCHAT_MAX_MESSAGE_CONTEXT_CHARS`, `ROUTERCHAT_MAX_MESSAGE_THINKING_CHARS`, `ROUTERCHAT_MAX_SKILL_NAME_CHARS`, `ROUTERCHAT_MAX_SKILL_DESCRIPTION_CHARS`, `ROUTERCHAT_MAX_SKILL_PROMPT_CHARS`, `ROUTERCHAT_MAX_LOCAL_ID_CHARS`
+- Per-object / per-user: `ROUTERCHAT_MAX_ATTACHMENT_BYTES`, `ROUTERCHAT_MAX_CHATS_PER_USER`, `ROUTERCHAT_MAX_ATTACHMENTS_PER_MESSAGE`, `ROUTERCHAT_MAX_SKILLS_PER_USER`, `ROUTERCHAT_MAX_MESSAGES_PER_USER`, `ROUTERCHAT_MAX_USER_TOTAL_ATTACH_BYTES`
+- Query: `ROUTERCHAT_MAX_LIST_CHATS`, `ROUTERCHAT_MAX_LIST_MESSAGES`, `ROUTERCHAT_MAX_LIST_SKILLS`, `ROUTERCHAT_MAX_LIST_ATTACHMENTS`
+- Pagination: `ROUTERCHAT_MAX_PAGE_CHATS`, `ROUTERCHAT_MAX_PAGE_MESSAGES`, `ROUTERCHAT_MAX_PAGE_SKILLS`
+
+Note: Convex requires environment variable names to be < 40 characters.
+
+**Billing note**: Billing is handled via RevenueCat Web Billing. Stripe is configured inside RevenueCat; do not set Stripe API keys/webhooks for RouterChat.
 
 **Generating the encryption key:**
 

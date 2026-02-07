@@ -19,6 +19,18 @@ Always run the health task for each app you modify before finishing:
 - Shared: `cd packages/shared && bun run health`
 - Convex: `cd packages/convex && bun run health`
 
+From the repo root, the equivalent commands are:
+
+- Web: `bun run health:web`
+- Mobile: `bun run health:mobile`
+- Shared: `bun run health:shared`
+- Convex: `bun run health:convex`
+
+Env var docs:
+
+- `bun run env:check` verifies environment variables referenced in code are documented (and that `.env.example` files stay in sync).
+- `bun run health` from the repo root runs `env:check` first.
+
 The health check output may log "Encryption is not configured" from Convex tests; this is expected.
 
 ## Tests

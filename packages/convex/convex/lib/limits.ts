@@ -53,7 +53,8 @@ export const LIMITS = {
         100_000,
     ),
     maxTotalAttachmentBytesPerUser: readPositiveIntEnv(
-        "ROUTERCHAT_MAX_TOTAL_ATTACHMENT_BYTES_PER_USER",
+        // Convex env var names must be < 40 chars.
+        "ROUTERCHAT_MAX_USER_TOTAL_ATTACH_BYTES",
         1 * 1024 * 1024 * 1024, // 1GB
     ),
 
