@@ -1,8 +1,35 @@
 import { v } from "convex/values";
-import { query, mutation } from "./_generated/server";
+import {
+    internalMutation,
+    internalQuery,
+    mutation,
+    query,
+} from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { requireAuthUserId, requireUserMatches } from "./lib/authz";
+import { requireCloudSync } from "./lib/subscription";
+import { drainBatches, safeStorageDelete } from "./lib/batch";
+import {
+    cloudUsageCountersToPatch,
+    computeCloudAttachmentUsage,
+    computeCloudChatCount,
+    computeCloudMessageCount,
+    computeCloudUsageCounters,
+    ensureCloudUsageCounters,
+    readCloudUsageCountersFromUser,
+    zeroCloudUsageCounters,
+} from "./lib/cloud_usage";
 
 export const get = query({
+    args: { id: v.id("users") },
+    handler: async (ctx, args) => {
+        const authenticatedUserId = await requireAuthUserId(ctx);
+        requireUserMatches(authenticatedUserId, args.id);
+        return await ctx.db.get(args.id);
+    },
+});
+
+export const getById = internalQuery({
     args: { id: v.id("users") },
     handler: async (ctx, args) => {
         return await ctx.db.get(args.id);
@@ -19,34 +46,34 @@ export const getCurrentUserId = query({
 export const getStorageUsage = query({
     args: { userId: v.id("users") },
     handler: async (ctx, args) => {
-        const attachments = await ctx.db
-            .query("attachments")
-            .withIndex("by_user", (q) => q.eq("userId", args.userId))
-            .collect();
-        const bytes = attachments.reduce(
-            (sum, attachment) =>
-                sum + (attachment.purgedAt ? 0 : attachment.size),
-            0,
-        );
+        const authenticatedUserId = await requireCloudSync(ctx);
+        requireUserMatches(authenticatedUserId, args.userId);
 
-        const chats = await ctx.db
-            .query("chats")
-            .withIndex("by_user", (q) => q.eq("userId", args.userId))
-            .collect();
-        const messages = await ctx.db
-            .query("messages")
-            .withIndex("by_user", (q) => q.eq("userId", args.userId))
-            .collect();
+        const user = await ctx.db.get(authenticatedUserId);
+        const cached = readCloudUsageCountersFromUser(user);
+        if (cached) {
+            return {
+                bytes: cached.attachmentBytes,
+                messageCount: cached.messageCount,
+                sessionCount: cached.chatCount,
+            };
+        }
+
+        const [attachments, sessionCount, messageCount] = await Promise.all([
+            computeCloudAttachmentUsage(ctx, authenticatedUserId),
+            computeCloudChatCount(ctx, authenticatedUserId),
+            computeCloudMessageCount(ctx, authenticatedUserId),
+        ]);
 
         return {
-            bytes,
-            messageCount: messages.length,
-            sessionCount: chats.length,
+            bytes: attachments.attachmentBytes,
+            messageCount,
+            sessionCount,
         };
     },
 });
 
-export const create = mutation({
+export const create = internalMutation({
     args: {
         email: v.optional(v.string()),
     },
@@ -60,6 +87,11 @@ export const create = mutation({
             subscriptionCancelAtPeriodEnd: false,
             entitlementActive: false,
             initialSync: false,
+            cloudChatCount: 0,
+            cloudMessageCount: 0,
+            cloudSkillCount: 0,
+            cloudAttachmentCount: 0,
+            cloudAttachmentBytes: 0,
             createdAt: now,
             updatedAt: now,
         });
@@ -74,54 +106,112 @@ export const resetCloudData = mutation({
             throw new Error("Not authenticated");
         }
 
-        const chats = await ctx.db
-            .query("chats")
-            .withIndex("by_user", (q) => q.eq("userId", userId))
-            .collect();
-
-        for (const chat of chats) {
-            const messages = await ctx.db
-                .query("messages")
-                .withIndex("by_chat", (q) => q.eq("chatId", chat._id))
-                .collect();
-
-            for (const message of messages) {
-                const attachments = await ctx.db
+        // Clear attachments first so we don't have to do nested deletions.
+        await drainBatches(
+            () =>
+                ctx.db
                     .query("attachments")
-                    .withIndex("by_message", (q) =>
-                        q.eq("messageId", message._id),
-                    )
-                    .collect();
+                    .withIndex("by_user", (q) => q.eq("userId", userId))
+                    .take(200),
+            async (attachment: any) => {
+                await safeStorageDelete(ctx, attachment.storageId);
+                await ctx.db.delete(attachment._id);
+            },
+        );
 
-                for (const attachment of attachments) {
-                    await ctx.storage.delete(attachment.storageId);
-                    await ctx.db.delete(attachment._id);
-                }
-
+        await drainBatches(
+            () =>
+                ctx.db
+                    .query("messages")
+                    .withIndex("by_user", (q) => q.eq("userId", userId))
+                    .take(500),
+            async (message: any) => {
                 await ctx.db.delete(message._id);
-            }
+            },
+        );
 
-            await ctx.db.delete(chat._id);
+        await drainBatches(
+            () =>
+                ctx.db
+                    .query("chats")
+                    .withIndex("by_user", (q) => q.eq("userId", userId))
+                    .take(200),
+            async (chat: any) => {
+                await ctx.db.delete(chat._id);
+            },
+        );
+
+        await drainBatches(
+            () =>
+                ctx.db
+                    .query("skills")
+                    .withIndex("by_user", (q) => q.eq("userId", userId))
+                    .take(200),
+            async (skill: any) => {
+                await ctx.db.delete(skill._id);
+            },
+        );
+
+        await ctx.db.patch(
+            userId,
+            cloudUsageCountersToPatch(zeroCloudUsageCounters()) as any,
+        );
+    },
+});
+
+export const ensureUsageCounters = mutation({
+    args: {},
+    handler: async (ctx) => {
+        const userId = await requireCloudSync(ctx);
+        return await ensureCloudUsageCounters(ctx, userId);
+    },
+});
+
+async function rebuildUsageCounters(
+    ctx: { db: { patch: (...args: any[]) => Promise<void> } },
+    userId: any,
+) {
+    const computed = await computeCloudUsageCounters(ctx as any, userId);
+    await ctx.db.patch(userId, {
+        ...cloudUsageCountersToPatch(computed),
+        updatedAt: Date.now(),
+    } as any);
+    return computed;
+}
+
+// Internal / admin repair tool: recompute from ground truth and overwrite counters.
+// This is intended for operations and should not be exposed to clients.
+export const rebuildUsageCountersForUser = internalMutation({
+    args: { userId: v.id("users") },
+    handler: async (ctx, args) => {
+        return await rebuildUsageCounters(ctx as any, args.userId);
+    },
+});
+
+export const rebuildUsageCountersForEmail = internalMutation({
+    args: { email: v.string() },
+    handler: async (ctx, args) => {
+        const rawEmail = args.email.trim();
+        if (!rawEmail) {
+            throw new Error("Email is required");
         }
 
-        const remainingAttachments = await ctx.db
-            .query("attachments")
-            .withIndex("by_user", (q) => q.eq("userId", userId))
-            .collect();
-
-        for (const attachment of remainingAttachments) {
-            await ctx.storage.delete(attachment.storageId);
-            await ctx.db.delete(attachment._id);
+        const candidates = Array.from(
+            new Set([rawEmail, rawEmail.toLowerCase()]),
+        );
+        let user: any = null;
+        for (const email of candidates) {
+            user = await ctx.db
+                .query("users")
+                .withIndex("email", (q) => q.eq("email", email))
+                .unique();
+            if (user) break;
+        }
+        if (!user) {
+            throw new Error("User not found");
         }
 
-        const skills = await ctx.db
-            .query("skills")
-            .withIndex("by_user", (q) => q.eq("userId", userId))
-            .collect();
-
-        for (const skill of skills) {
-            await ctx.db.delete(skill._id);
-        }
+        return await rebuildUsageCounters(ctx as any, user._id);
     },
 });
 
@@ -142,7 +232,7 @@ export const setInitialSync = mutation({
     },
 });
 
-export const updateSubscription = mutation({
+export const updateSubscription = internalMutation({
     args: {
         id: v.id("users"),
         subscriptionStatus: v.union(

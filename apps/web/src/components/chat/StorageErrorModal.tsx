@@ -4,11 +4,13 @@ import { useEffect } from "react";
 import { AlertCircle } from "lucide-react";
 
 interface StorageErrorModalProps {
+    title?: string;
     message: string | null; // null = hidden
     onDismiss: () => void;
 }
 
 export function StorageErrorModal({
+    title,
     message,
     onDismiss,
 }: StorageErrorModalProps) {
@@ -49,7 +51,7 @@ export function StorageErrorModal({
                     </div>
                     <div className="flex-1">
                         <h2 className="text-lg font-semibold text-foreground">
-                            Storage Limit Reached
+                            {title ?? "Storage Error"}
                         </h2>
                         <p className="text-sm text-muted-foreground mt-2">
                             {message}

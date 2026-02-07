@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, {
+    useState,
+    useEffect,
+    useMemo,
+    useCallback,
+    useRef,
+} from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
@@ -32,6 +38,9 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
     const {
         chats,
         loading,
+        canLoadMoreChats,
+        isChatsLoadingMore,
+        loadMoreChats,
         createChat,
         deleteChat,
         selectChat,
@@ -48,6 +57,8 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
     const [pendingDeleteChatId, setPendingDeleteChatId] = useState<
         string | null
     >(null);
+    const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+    const loadMoreRef = useRef<HTMLLIElement | null>(null);
 
     const pendingChat = useMemo(
         () => chats.find((chat) => chat.id === pendingDeleteChatId) ?? null,
@@ -225,6 +236,27 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
         requestDeleteChat,
     ]);
 
+    useEffect(() => {
+        if (!canLoadMoreChats) return;
+
+        const root = scrollContainerRef.current;
+        const target = loadMoreRef.current;
+        if (!root || !target) return;
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                const [entry] = entries;
+                if (!entry?.isIntersecting) return;
+                if (isChatsLoadingMore) return;
+                loadMoreChats();
+            },
+            { root, rootMargin: "200px" },
+        );
+
+        observer.observe(target);
+        return () => observer.disconnect();
+    }, [canLoadMoreChats, isChatsLoadingMore, loadMoreChats]);
+
     const handleSelectChat = (chatId: string) => {
         selectChat(chatId);
         router.push("/chat");
@@ -300,7 +332,10 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                     </button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto">
+                <div
+                    ref={scrollContainerRef}
+                    className="flex-1 overflow-y-auto"
+                >
                     {loading ? (
                         <ChatListSkeleton />
                     ) : chats.length === 0 ? (
@@ -383,6 +418,16 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                                     </li>
                                 );
                             })}
+                            <li
+                                ref={loadMoreRef}
+                                aria-hidden="true"
+                                className="h-6"
+                            />
+                            {isChatsLoadingMore && (
+                                <li className="py-2 text-center text-xs text-muted-foreground">
+                                    Loading more...
+                                </li>
+                            )}
                         </ul>
                     )}
                 </div>

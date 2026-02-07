@@ -43,6 +43,12 @@ export default defineSchema({
         encryptedApiKey: v.optional(v.string()), // Base64 ciphertext
         apiKeyNonce: v.optional(v.string()), // Base64 IV/nonce
         apiKeyUpdatedAt: v.optional(v.number()), // For sync conflict resolution
+        // Cloud usage counters (anti-abuse + cheap usage queries)
+        cloudChatCount: v.optional(v.number()),
+        cloudMessageCount: v.optional(v.number()),
+        cloudSkillCount: v.optional(v.number()),
+        cloudAttachmentCount: v.optional(v.number()),
+        cloudAttachmentBytes: v.optional(v.number()),
         createdAt: v.optional(v.number()),
         updatedAt: v.optional(v.number()),
     })
@@ -109,6 +115,7 @@ export default defineSchema({
     })
         .index("by_message", ["messageId"])
         .index("by_user", ["userId"])
+        .index("by_user_storage", ["userId", "storageId"])
         .index("by_user_created", ["userId", "createdAt"])
         .index("by_local_id", ["userId", "localId"]),
 });

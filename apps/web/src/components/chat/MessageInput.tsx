@@ -74,7 +74,10 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
             PendingAttachment[]
         >([]);
         const [processingCount, setProcessingCount] = useState(0);
-        const [storageError, setStorageError] = useState<string | null>(null);
+        const [modalError, setModalError] = useState<{
+            title: string;
+            message: string;
+        } | null>(null);
 
         const textareaRef = useRef<HTMLTextAreaElement>(null);
         const actualRef =
@@ -184,7 +187,10 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
             async (files: File[]) => {
                 const { allowed, error } = await checkStorageLimits();
                 if (!allowed) {
-                    setStorageError(error || "Storage limit reached");
+                    setModalError({
+                        title: "Storage Limit Reached",
+                        message: error || "Storage limit reached",
+                    });
                     return;
                 }
 
@@ -213,6 +219,14 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
                         setPendingAttachments((prev) => [...prev, attachment]);
                     } catch (err) {
                         console.error("Failed to process image:", err);
+                        const message =
+                            err instanceof Error
+                                ? err.message
+                                : "Failed to process image";
+                        setModalError({
+                            title: "Couldn't Add Image",
+                            message,
+                        });
                     } finally {
                         setProcessingCount((prev) => prev - 1);
                     }
@@ -356,8 +370,9 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
                     </div>
                 </form>
                 <StorageErrorModal
-                    message={storageError}
-                    onDismiss={() => setStorageError(null)}
+                    title={modalError?.title}
+                    message={modalError?.message ?? null}
+                    onDismiss={() => setModalError(null)}
                 />
             </>
         );

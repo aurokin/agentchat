@@ -6,7 +6,6 @@ import { format } from "date-fns";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
-import rehypeRaw from "rehype-raw";
 import {
     Brain,
     MessageCircle,
@@ -372,7 +371,7 @@ function MessageItem({
                             ) : message.content ? (
                                 <ReactMarkdown
                                     remarkPlugins={[remarkGfm]}
-                                    rehypePlugins={[rehypeHighlight, rehypeRaw]}
+                                    rehypePlugins={[rehypeHighlight]}
                                     components={{
                                         a: ({
                                             children,

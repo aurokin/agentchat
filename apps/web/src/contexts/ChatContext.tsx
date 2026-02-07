@@ -8,7 +8,7 @@ import React, {
     useCallback,
     useRef,
 } from "react";
-import { useQuery } from "convex/react";
+import { usePaginatedQuery, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type {
     ChatSession,
@@ -33,6 +33,9 @@ interface ChatContextType {
     messages: Message[];
     loading: boolean;
     isMessagesLoading: boolean;
+    canLoadMoreChats: boolean;
+    isChatsLoadingMore: boolean;
+    loadMoreChats: () => void;
     createChat: (title?: string, modelId?: string) => Promise<ChatSession>;
     selectChat: (chatId: string) => Promise<void>;
     deleteChat: (chatId: string) => Promise<void>;
@@ -61,6 +64,8 @@ interface ChatContextType {
 
 const ChatContext = createContext<ChatContextType | null>(null);
 
+const CLOUD_CHAT_PAGE_SIZE = 50;
+
 export function ChatProvider({ children }: { children: React.ReactNode }) {
     const storageAdapter = useStorageAdapter();
     const { syncState, isConvexAvailable, subscription } = useSync();
@@ -82,10 +87,12 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         api.users.getCurrentUserId,
         isCloudSyncActive ? {} : "skip",
     );
-    const cloudChats = useQuery(
-        api.chats.listByUser,
+    const cloudChatsPagination = usePaginatedQuery(
+        api.chats.listByUserPaginated,
         isCloudSyncActive && cloudUserId ? { userId: cloudUserId } : "skip",
+        { initialNumItems: CLOUD_CHAT_PAGE_SIZE },
     );
+    const cloudChats = cloudChatsPagination.results;
     const cloudCurrentChat = useQuery(
         api.chats.getByLocalId,
         isCloudSyncActive && cloudUserId && currentChatId
@@ -104,7 +111,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     }, [currentChat?.id]);
 
     useEffect(() => {
-        if (!isCloudSyncActive || !cloudChats) return;
+        if (!isCloudSyncActive) return;
 
         const mapped = cloudChats.map(mapConvexChatToLocal);
         const pending = pendingChatIdsRef.current;
@@ -152,6 +159,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     }, [cloudCurrentChat, cloudMessages, isCloudSyncActive]);
 
     useEffect(() => {
+        if (!isCloudSyncActive) return;
+        setLoading(cloudChatsPagination.status === "LoadingFirstPage");
+    }, [cloudChatsPagination.status, isCloudSyncActive]);
+
+    useEffect(() => {
         if (!isCloudSyncActive || !currentChatId) return;
         if (cloudCurrentChat && cloudMessages) return;
         setIsMessagesLoading(true);
@@ -194,8 +206,19 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
     // Load chats on mount and when adapter changes
     useEffect(() => {
+        if (isCloudSyncActive) return;
         loadChats();
-    }, [loadChats]);
+    }, [isCloudSyncActive, loadChats]);
+
+    const canLoadMoreChats =
+        isCloudSyncActive && cloudChatsPagination.status === "CanLoadMore";
+    const isChatsLoadingMore =
+        isCloudSyncActive && cloudChatsPagination.status === "LoadingMore";
+    const loadMoreChats = useCallback(() => {
+        if (!isCloudSyncActive) return;
+        if (cloudChatsPagination.status !== "CanLoadMore") return;
+        cloudChatsPagination.loadMore(CLOUD_CHAT_PAGE_SIZE);
+    }, [cloudChatsPagination, isCloudSyncActive]);
 
     const createChat = useCallback(
         async (title?: string, modelId?: string): Promise<ChatSession> => {
@@ -228,6 +251,15 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
     const selectChat = useCallback(
         async (chatId: string) => {
+            if (isCloudSyncActive) {
+                const chat = chats.find((candidate) => candidate.id === chatId);
+                if (!chat) return;
+                setCurrentChat(chat);
+                // `cloudMessages` will populate `messages` reactively.
+                setIsMessagesLoading(true);
+                return;
+            }
+
             const chat = await storageAdapter.getChat(chatId);
             if (chat) {
                 setCurrentChat(chat);
@@ -240,7 +272,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             }
             setIsMessagesLoading(false);
         },
-        [storageAdapter],
+        [chats, isCloudSyncActive, storageAdapter],
     );
 
     const deleteChat = useCallback(
@@ -390,6 +422,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 messages,
                 loading,
                 isMessagesLoading,
+                canLoadMoreChats,
+                isChatsLoadingMore,
+                loadMoreChats,
                 createChat,
                 selectChat,
                 deleteChat,

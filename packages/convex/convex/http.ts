@@ -1,6 +1,6 @@
 import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
-import { api } from "./_generated/api";
+import { internal } from "./_generated/api";
 import { auth } from "./auth";
 
 const http = httpRouter();
@@ -53,16 +53,13 @@ http.route({
         };
 
         try {
-            await ctx.runAction(api.revenuecat.handleWebhook, {
+            await ctx.runAction(internal.revenuecat.handleWebhook, {
                 event: sanitizedEvent,
             });
             return new Response("OK", { status: 200 });
         } catch (error) {
             console.error("RevenueCat webhook error:", error);
-            return new Response(
-                `Webhook error: ${error instanceof Error ? error.message : "Unknown error"}`,
-                { status: 400 },
-            );
+            return new Response("Webhook processing failed", { status: 400 });
         }
     }),
 });
