@@ -7,6 +7,11 @@ import { SyncProvider } from "@/contexts/SyncContext";
 import { SettingsProvider } from "@/contexts/SettingsContext";
 import { ChatProvider } from "@/contexts/ChatContext";
 
+// Required for CSP nonces:
+// The middleware generates a per-request CSP nonce, and Next can only attach that nonce to
+// its inline scripts when rendering per-request (not from a static HTML file).
+export const dynamic = "force-dynamic";
+
 const outfit = Outfit({
     subsets: ["latin"],
     variable: "--font-display",
