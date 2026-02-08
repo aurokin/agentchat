@@ -49,3 +49,6 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 ai_dump
 .env*.local
 .private/backups/
+
+# billing secrets (scripts read repo-root .env.billing.<env>.local)
+billing/*.local
