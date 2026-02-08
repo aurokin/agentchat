@@ -16,6 +16,7 @@
         "billing:apply": "bun scripts/billing/apply.ts",
         "billing:bootstrap": "bun scripts/billing/bootstrap.ts",
         "billing:convex-env": "bun scripts/billing/convex-env.ts",
+        "billing:railway-env": "bun scripts/billing/railway-env.ts",
         "format": "prettier --write \"apps/**/*.{js,jsx,ts,tsx,json,css,md}\" \"packages/**/*.{js,jsx,ts,tsx,json,css,md}\"",
         "format:check": "prettier --check \"apps/**/*.{js,jsx,ts,tsx,json,css,md}\" \"packages/**/*.{js,jsx,ts,tsx,json,css,md}\"",
         "lint": "bun run --cwd apps/web lint && bun run --cwd apps/mobile lint && bun run --cwd packages/shared lint && bun run --cwd packages/convex lint",
