@@ -99,7 +99,7 @@ RouterChat can run in local-only mode with no env vars. Cloud Sync and Billing r
 Set these as Railway service variables (preview/production) or in `apps/web/.env.local` for local dev. A template lives at `apps/web/.env.example`.
 
 - `NEXT_PUBLIC_CONVEX_URL` - Convex deployment URL (from the Convex dashboard). When unset, RouterChat runs local-only (no cloud sync).
-- `REVENUECAT_WEB_PURCHASE_URL` - RevenueCat Web Billing purchase link template (from the RevenueCat dashboard, no trailing slash). `userId` is appended as a path segment.
+- `REVENUECAT_WEB_PURCHASE_URL` - RevenueCat Web Billing purchase link template (from the RevenueCat dashboard). RouterChat appends `userId` as a path segment (trailing slash is ok).
 - `NEXT_PUBLIC_REVENUECAT_WEB_PURCHASE_URL` - Legacy alias for `REVENUECAT_WEB_PURCHASE_URL`.
 - `DISABLE_CSP` - Optional debug flag. Set to `true` to disable CSP headers in middleware.
 
