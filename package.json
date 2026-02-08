@@ -14,6 +14,7 @@
         "env:check": "bun scripts/check-env-docs.ts",
         "env:apply": "bun scripts/env/apply.ts",
         "convex:env": "bun scripts/env/convex-env.ts",
+        "convex:gen-secrets": "bun scripts/env/convex-secrets.ts",
         "billing:check": "bun scripts/billing/check.ts",
         "billing:apply": "bun scripts/billing/apply.ts",
         "billing:bootstrap": "bun scripts/billing/bootstrap.ts",
