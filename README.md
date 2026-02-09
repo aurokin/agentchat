@@ -68,6 +68,12 @@ bun install
 cd apps/web && bun dev
 ```
 
+### Environment Setup Runbooks
+
+- Local development (local-only, optional Convex dev): `docs/local_environment_setup_checklist.md`
+- Preview (Cloud Sync + Billing): `docs/preview_environment_setup_checklist.md`
+- Production (Cloud Sync + Billing): `docs/prod_environment_setup_checklist.md`
+
 ### Configuration
 
 1. Create an application and get your API keys
@@ -79,12 +85,15 @@ cd apps/web && bun dev
 
 Only required if you are hosting an instance with Cloud Sync enabled.
 
-See:
+Primary runbooks:
+
+- `docs/preview_environment_setup_checklist.md` for the end-to-end preview environment setup runbook.
+- `docs/prod_environment_setup_checklist.md` for the end-to-end production environment setup runbook.
+
+References:
 
 - `docs/deploy/railway.md` for Railway deployment configuration.
 - `docs/cloud_dashboard_setup.md` for the Convex/RevenueCat dashboard checklist.
-- `docs/preview_environment_setup_checklist.md` for the end-to-end preview environment setup runbook.
-- `docs/prod_environment_setup_checklist.md` for the end-to-end production environment setup runbook.
 - `docs/mobile_dev_setup.md` for mobile dev builds.
 
 #### Environment variables

@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import {
+    type AppEnvName,
     isMissingSecret,
     loadDotEnvIfExists,
     mergeEnv,
@@ -29,8 +30,9 @@ const inferDeploymentNameFromUrl = (
 };
 
 const inferDeploymentNameFromBillingEnv = (
-    envName: "preview" | "prod",
+    envName: AppEnvName,
 ): string | undefined => {
+    if (envName === "dev") return undefined;
     try {
         const abs = repoRootPath("billing", `env.${envName}.json`);
         if (!fs.existsSync(abs)) return undefined;
@@ -46,7 +48,8 @@ const inferDeploymentNameFromBillingEnv = (
     }
 };
 
-const inferSiteUrlFromBillingEnv = (envName: "preview" | "prod"): string | undefined => {
+const inferSiteUrlFromBillingEnv = (envName: AppEnvName): string | undefined => {
+    if (envName === "dev") return undefined;
     try {
         const abs = repoRootPath("billing", `env.${envName}.json`);
         if (!fs.existsSync(abs)) return undefined;
@@ -67,7 +70,7 @@ const inferSiteUrlFromBillingEnv = (envName: "preview" | "prod"): string | undef
 };
 
 const toConvexDeploymentId = (
-    envName: "preview" | "prod",
+    envName: AppEnvName,
     value: string,
 ): string => {
     const trimmed = value.trim();
@@ -81,8 +84,8 @@ const toConvexDeploymentId = (
         return trimmed;
     }
 
-    // For preview we default to a dev deployment.
-    if (envName === "preview") {
+    // For dev/preview we default to a dev deployment.
+    if (envName === "dev" || envName === "preview") {
         return `dev:${trimmed}`;
     }
 
@@ -138,7 +141,10 @@ const main = (): void => {
 
     // Optional: default SITE_URL from billing/env.<env>.json if caller didn't provide it.
     if (!env.SITE_URL?.trim()) {
-        const inferred = inferSiteUrlFromBillingEnv(envName);
+        const inferred =
+            envName === "dev"
+                ? "http://localhost:4040"
+                : inferSiteUrlFromBillingEnv(envName);
         if (inferred) {
             env.SITE_URL = inferred;
         }
@@ -217,4 +223,3 @@ try {
     console.error(err instanceof Error ? err.message : String(err));
     process.exit(1);
 }
-
