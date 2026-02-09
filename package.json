@@ -18,6 +18,7 @@
         "billing:check": "bun scripts/billing/check.ts",
         "billing:apply": "bun scripts/billing/apply.ts",
         "billing:bootstrap": "bun scripts/billing/bootstrap.ts",
+        "billing:gen-webhook-secret": "bun scripts/billing/gen-webhook-secret.ts",
         "billing:convex-env": "bun scripts/billing/convex-env.ts",
         "billing:railway-env": "bun scripts/billing/railway-env.ts",
         "railway:env": "bun scripts/env/railway-env.ts",
