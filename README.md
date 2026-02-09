@@ -112,7 +112,7 @@ Set these as Railway service variables (preview/production) or in `apps/web/.env
 - `NEXT_PUBLIC_CONVEX_URL` - Convex deployment URL (from the Convex dashboard). When unset, RouterChat runs local-only (no cloud sync).
 - `REVENUECAT_WEB_PURCHASE_URL` - RevenueCat Web Billing purchase link template (from the RevenueCat dashboard). RouterChat appends `userId` as a path segment (trailing slash is ok).
 - `NEXT_PUBLIC_REVENUECAT_WEB_PURCHASE_URL` - Legacy alias for `REVENUECAT_WEB_PURCHASE_URL`.
-- `DISABLE_CSP` - Optional debug flag. Set to `true` to disable CSP headers in middleware.
+- `DISABLE_CSP` - Optional debug flag (preview/prod only). Set to `true` to disable only the `Content-Security-Policy` header in middleware; other security headers remain enabled. Avoid enabling this in production.
 
 **Mobile app runtime (`apps/mobile`)**
 

@@ -32,7 +32,12 @@ import {
     hasImageInClipboardEvent,
     readImageFromClipboardEvent,
 } from "@/lib/clipboard";
-import { MAX_SESSION_STORAGE, MAX_TOTAL_STORAGE } from "@/lib/db";
+import {
+    CLOUD_IMAGE_QUOTA,
+    LOCAL_IMAGE_QUOTA,
+    MAX_SESSION_STORAGE,
+} from "@shared/core/quota";
+import { ConvexStorageAdapter } from "@/lib/sync/convex-adapter";
 
 interface MessageInputProps {
     onSend: (content: string, attachments?: PendingAttachment[]) => void;
@@ -141,15 +146,26 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
             error?: string;
         }> => {
             try {
+                const isCloudStorage =
+                    storageAdapter instanceof ConvexStorageAdapter;
+                const totalLimit = isCloudStorage
+                    ? CLOUD_IMAGE_QUOTA
+                    : LOCAL_IMAGE_QUOTA;
+
                 const usage = await storageAdapter.getStorageUsage();
-                if (usage.bytes >= MAX_TOTAL_STORAGE) {
+                if (usage.bytes >= totalLimit) {
                     return {
                         allowed: false,
-                        error: "Storage limit reached. Delete old conversations to free up space.",
+                        error: isCloudStorage
+                            ? "Cloud storage limit reached. Delete old conversations or remove cloud images to free up space."
+                            : "Storage limit reached. Delete old conversations to free up space.",
                     };
                 }
 
-                if (sessionId) {
+                // Per-conversation image limits are a local-storage guardrail. Cloud storage has
+                // its own server-side limits, and checking per-chat usage would require
+                // downloading or querying a lot of metadata.
+                if (!isCloudStorage && sessionId) {
                     const sessionMessages =
                         await storageAdapter.getMessagesByChat(sessionId);
                     let sessionUsage = 0;

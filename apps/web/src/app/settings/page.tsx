@@ -10,11 +10,8 @@ import { useSync } from "@/contexts/SyncContext";
 import { useSettings } from "@/contexts/SettingsContext";
 import { validateApiKey } from "@/lib/openrouter";
 import type { Skill } from "@/lib/types";
-import {
-    getStorageUsage,
-    cleanupOldAttachments,
-    MAX_TOTAL_STORAGE,
-} from "@/lib/db";
+import { getStorageUsage, cleanupOldAttachments } from "@/lib/db";
+import { LOCAL_IMAGE_QUOTA } from "@shared/core/quota";
 import {
     Settings,
     Key,
@@ -195,7 +192,7 @@ function SettingsPageContent() {
     const handleClearAttachments = async () => {
         if (
             !confirm(
-                "This will delete all image attachments from your conversations. This cannot be undone. Continue?",
+                "This will remove all images from your local conversations. You'll see placeholders where images used to be. This cannot be undone. Continue?",
             )
         ) {
             return;
@@ -215,7 +212,7 @@ function SettingsPageContent() {
     const handleClearCloudImages = async () => {
         if (
             !confirm(
-                "This will delete all cloud image attachments from your conversations. This cannot be undone. Continue?",
+                "This will remove all images from your cloud conversations. You'll see placeholders where images used to be. This cannot be undone. Continue?",
             )
         ) {
             return;
@@ -807,7 +804,7 @@ function SettingsPageContent() {
                                             {formatBytes(
                                                 storageUsage.attachments,
                                             )}{" "}
-                                            / {formatBytes(MAX_TOTAL_STORAGE)}
+                                            / {formatBytes(LOCAL_IMAGE_QUOTA)}
                                         </span>
                                     </div>
                                     <div className="h-2 bg-muted border border-border overflow-hidden">
@@ -815,17 +812,17 @@ function SettingsPageContent() {
                                             className={cn(
                                                 "h-full transition-all duration-300",
                                                 storageUsage.attachments /
-                                                    MAX_TOTAL_STORAGE >
+                                                    LOCAL_IMAGE_QUOTA >
                                                     0.9
                                                     ? "bg-error"
                                                     : storageUsage.attachments /
-                                                            MAX_TOTAL_STORAGE >
+                                                            LOCAL_IMAGE_QUOTA >
                                                         0.7
                                                       ? "bg-warning"
                                                       : "bg-primary",
                                             )}
                                             style={{
-                                                width: `${Math.min(100, (storageUsage.attachments / MAX_TOTAL_STORAGE) * 100)}%`,
+                                                width: `${Math.min(100, (storageUsage.attachments / LOCAL_IMAGE_QUOTA) * 100)}%`,
                                             }}
                                         />
                                     </div>

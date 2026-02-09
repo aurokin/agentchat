@@ -6,11 +6,17 @@
         "apps/*",
         "packages/*"
     ],
+    "overrides": {
+        "@isaacs/brace-expansion": "5.0.1",
+        "markdown-it": "12.3.2",
+        "tar": "7.5.7"
+    },
     "scripts": {
         "dev": "bun run dev:all",
         "dev:web": "concurrently -k -n convex,web -c green,blue \"bun run --cwd packages/convex dev\" \"bun run --cwd apps/web dev\"",
         "dev:mobile": "concurrently -k -n convex,mobile -c green,magenta \"bun run --cwd packages/convex dev\" \"bun run --cwd apps/mobile dev-client\"",
         "dev:all": "concurrently -k -n convex,web,mobile -c green,blue,magenta \"bun run --cwd packages/convex dev\" \"bun run --cwd apps/web dev\" \"bun run --cwd apps/mobile dev-client\"",
+        "env:validate": "bun scripts/env/validate.ts",
         "env:check": "bun scripts/check-env-docs.ts",
         "env:apply": "bun scripts/env/apply.ts",
         "convex:env": "bun scripts/env/convex-env.ts",

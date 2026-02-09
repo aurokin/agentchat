@@ -1,11 +1,6 @@
 import React, { useMemo } from "react";
 import { Linking, Text, View } from "react-native";
 import Markdown from "react-native-markdown-display";
-import SyntaxHighlighter from "react-native-syntax-highlighter";
-import {
-    atomOneDark,
-    atomOneLight,
-} from "react-syntax-highlighter/dist/esm/styles/hljs";
 import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
 
 interface MarkdownRendererProps {
@@ -16,28 +11,6 @@ interface MarkdownRendererProps {
 type MarkdownRules = NonNullable<
     React.ComponentProps<typeof Markdown>["rules"]
 >;
-
-const getLanguageFromInfo = (info: unknown): string | undefined => {
-    if (typeof info !== "string") return undefined;
-    const trimmed = info.trim();
-    if (!trimmed) return undefined;
-    return trimmed.split(/\s+/)[0];
-};
-
-const getLanguageFromNode = (node: unknown): string | undefined => {
-    if (!node || typeof node !== "object") return undefined;
-    const typedNode = node as {
-        info?: string;
-        attributes?: { className?: string };
-    };
-    const infoLanguage = getLanguageFromInfo(typedNode.info);
-    if (infoLanguage) return infoLanguage;
-    const className = typedNode.attributes?.className;
-    if (typeof className === "string" && className.startsWith("language-")) {
-        return className.replace("language-", "");
-    }
-    return undefined;
-};
 
 const normalizeCodeContent = (content: unknown): string => {
     if (typeof content === "string") return content;
@@ -64,62 +37,62 @@ export function MarkdownRenderer({
     content,
     isUser = false,
 }: MarkdownRendererProps): React.ReactElement {
-    const { colors, scheme } = useTheme();
+    const { colors } = useTheme();
     const markdownStyles = useMemo(
         () => createMarkdownStyles(colors, isUser),
         [colors, isUser],
     );
-    const syntaxTheme = scheme === "dark" ? atomOneDark : atomOneLight;
     const codeBackground = isUser
         ? colors.codeBackgroundOnAccent
         : colors.codeBackground;
+    const codeColor = colors.text;
 
     const markdownRules = useMemo<MarkdownRules>(
         () => ({
             fence: (node) => (
-                <SyntaxHighlighter
+                <View
                     key={getNodeKey(node)}
-                    language={getLanguageFromNode(node)}
-                    style={syntaxTheme}
-                    PreTag={View}
-                    CodeTag={Text}
-                    customStyle={{
+                    style={{
                         backgroundColor: codeBackground,
                         padding: 12,
                         borderRadius: 8,
                         marginVertical: 6,
                     }}
-                    codeTagProps={{
-                        style: { fontFamily: "monospace", fontSize: 13 },
-                    }}
-                    wrapLongLines
                 >
-                    {getNodeContent(node)}
-                </SyntaxHighlighter>
+                    <Text
+                        style={{
+                            fontFamily: "monospace",
+                            fontSize: 13,
+                            color: codeColor,
+                        }}
+                    >
+                        {getNodeContent(node)}
+                    </Text>
+                </View>
             ),
             code_block: (node) => (
-                <SyntaxHighlighter
+                <View
                     key={getNodeKey(node)}
-                    language={getLanguageFromNode(node)}
-                    style={syntaxTheme}
-                    PreTag={View}
-                    CodeTag={Text}
-                    customStyle={{
+                    style={{
                         backgroundColor: codeBackground,
                         padding: 12,
                         borderRadius: 8,
                         marginVertical: 6,
                     }}
-                    codeTagProps={{
-                        style: { fontFamily: "monospace", fontSize: 13 },
-                    }}
-                    wrapLongLines
                 >
-                    {getNodeContent(node)}
-                </SyntaxHighlighter>
+                    <Text
+                        style={{
+                            fontFamily: "monospace",
+                            fontSize: 13,
+                            color: codeColor,
+                        }}
+                    >
+                        {getNodeContent(node)}
+                    </Text>
+                </View>
             ),
         }),
-        [codeBackground, syntaxTheme],
+        [codeBackground, codeColor],
     );
 
     return (

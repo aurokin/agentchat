@@ -35,6 +35,8 @@ export function MessageList({ messages, sending, loading }: MessageListProps) {
     const [galleryOpen, setGalleryOpen] = useState(false);
     const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
     const [allImages, setAllImages] = useState<GalleryImage[]>([]);
+    const lastImageKeyRef = useRef<string | null>(null);
+    const lastAdapterRef = useRef<unknown>(null);
 
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -42,6 +44,27 @@ export function MessageList({ messages, sending, loading }: MessageListProps) {
 
     // Collect all images from all messages
     useEffect(() => {
+        // Avoid re-fetching images while streaming messages (when attachment IDs haven't changed).
+        const attachmentIds: string[] = [];
+        for (const message of messages) {
+            if (message.attachmentIds?.length) {
+                attachmentIds.push(...message.attachmentIds);
+            }
+        }
+        const nextKey = attachmentIds.join("|");
+
+        if (lastAdapterRef.current !== storageAdapter) {
+            lastAdapterRef.current = storageAdapter;
+            lastImageKeyRef.current = null;
+        }
+
+        if (lastImageKeyRef.current === nextKey) {
+            return;
+        }
+        lastImageKeyRef.current = nextKey;
+
+        let cancelled = false;
+
         async function collectImages() {
             const images: GalleryImage[] = [];
 
@@ -50,7 +73,11 @@ export function MessageList({ messages, sending, loading }: MessageListProps) {
                     for (const attachmentId of message.attachmentIds) {
                         const attachment =
                             await storageAdapter.getAttachment(attachmentId);
-                        if (attachment) {
+                        if (
+                            attachment &&
+                            !attachment.purgedAt &&
+                            attachment.data
+                        ) {
                             images.push({
                                 id: attachment.id,
                                 src: createDataUrl(
@@ -65,10 +92,16 @@ export function MessageList({ messages, sending, loading }: MessageListProps) {
                 }
             }
 
-            setAllImages(images);
+            if (!cancelled) {
+                setAllImages(images);
+            }
         }
 
-        collectImages();
+        void collectImages();
+
+        return () => {
+            cancelled = true;
+        };
     }, [messages, storageAdapter]);
 
     const handleImageClick = useCallback((imageId: string) => {
@@ -231,17 +264,32 @@ function MessageAttachments({
                 <button
                     key={attachment.id}
                     onClick={() => onImageClick(attachment.id)}
-                    className="relative w-20 h-20 bg-muted/30 border border-border/50 overflow-hidden hover:border-primary/50 transition-colors cursor-pointer"
+                    disabled={Boolean(attachment.purgedAt) || !attachment.data}
+                    className={cn(
+                        "relative w-20 h-20 bg-muted/30 border border-border/50 overflow-hidden transition-colors",
+                        Boolean(attachment.purgedAt) || !attachment.data
+                            ? "opacity-70 cursor-not-allowed"
+                            : "hover:border-primary/50 cursor-pointer",
+                    )}
                 >
-                    <img
-                        src={createDataUrl(
-                            attachment.data,
-                            attachment.mimeType,
-                        )}
-                        alt={`Attachment ${index + 1}`}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                    />
+                    {Boolean(attachment.purgedAt) || !attachment.data ? (
+                        <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-muted-foreground/70">
+                            <ImageIcon size={18} />
+                            <span className="text-[10px] uppercase tracking-wider">
+                                Removed
+                            </span>
+                        </div>
+                    ) : (
+                        <img
+                            src={createDataUrl(
+                                attachment.data,
+                                attachment.mimeType,
+                            )}
+                            alt={`Attachment ${index + 1}`}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                        />
+                    )}
                 </button>
             ))}
         </div>
