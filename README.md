@@ -83,8 +83,8 @@ See:
 
 - `docs/deploy/railway.md` for Railway deployment configuration.
 - `docs/cloud_dashboard_setup.md` for the Convex/RevenueCat dashboard checklist.
-- `docs/billing_preview_setup_checklist.md` for the end-to-end preview billing setup runbook.
-- `docs/billing_prod_setup_checklist.md` for the end-to-end production billing setup runbook.
+- `docs/preview_environment_setup_checklist.md` for the end-to-end preview environment setup runbook.
+- `docs/prod_environment_setup_checklist.md` for the end-to-end production environment setup runbook.
 - `docs/mobile_dev_setup.md` for mobile dev builds.
 
 #### Environment variables
