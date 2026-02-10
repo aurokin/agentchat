@@ -245,23 +245,39 @@ function SettingsPageContent() {
     const [skillDescription, setSkillDescription] = useState("");
     const [skillPrompt, setSkillPrompt] = useState("");
 
-    const handleValidate = async () => {
-        if (!newApiKey.trim()) return;
+    const validateCurrentKey = async (key: string) => {
         setValidating(true);
         setValidationResult(null);
-        const isValid = await validateApiKey(newApiKey.trim());
+        const isValid = await validateApiKey(key);
         setValidationResult(isValid);
         setValidating(false);
+        return isValid;
     };
 
-    const handleSave = () => {
+    const handleValidate = async () => {
+        const trimmedKey = newApiKey.trim();
+        if (!trimmedKey) return;
+        await validateCurrentKey(trimmedKey);
+    };
+
+    const handleSave = async () => {
+        const trimmedKey = newApiKey.trim();
         setSaving(true);
-        if (newApiKey.trim()) {
-            setApiKey(newApiKey.trim());
-        } else {
-            clearApiKey();
+        try {
+            // Only allow saving an unvalidated key if the user is explicitly clearing it.
+            if (!trimmedKey) {
+                clearApiKey();
+                setValidationResult(null);
+                return;
+            }
+
+            const isValid = await validateCurrentKey(trimmedKey);
+            if (!isValid) return;
+
+            setApiKey(trimmedKey);
+        } finally {
+            setSaving(false);
         }
-        setSaving(false);
     };
 
     const handleClear = () => {
@@ -400,7 +416,7 @@ function SettingsPageContent() {
                                 />
                             </div>
 
-                            {apiKey && (
+                            {apiKey && newApiKey.trim() === apiKey && (
                                 <div className="flex items-center gap-2 text-success px-3 py-2 bg-success/5 border border-success/20">
                                     <Check size={14} />
                                     <span className="text-sm font-medium">
@@ -412,7 +428,11 @@ function SettingsPageContent() {
                             <div className="flex flex-wrap gap-3">
                                 <button
                                     onClick={handleValidate}
-                                    disabled={validating || !newApiKey.trim()}
+                                    disabled={
+                                        validating ||
+                                        saving ||
+                                        !newApiKey.trim()
+                                    }
                                     className="btn-deco btn-deco-secondary cursor-pointer"
                                 >
                                     {validating ? (
@@ -428,11 +448,15 @@ function SettingsPageContent() {
 
                                 <button
                                     onClick={handleSave}
-                                    disabled={saving}
+                                    disabled={saving || validating}
                                     className="btn-deco btn-deco-primary cursor-pointer"
                                 >
                                     <span className="text-sm">
-                                        {saving ? "Saving..." : "Save Key"}
+                                        {validating
+                                            ? "Validating..."
+                                            : saving
+                                              ? "Saving..."
+                                              : "Save Key"}
                                     </span>
                                 </button>
 
