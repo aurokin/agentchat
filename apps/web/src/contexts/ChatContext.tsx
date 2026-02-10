@@ -56,7 +56,10 @@ interface ChatContextType {
     updateMessage: (
         id: string,
         updates: Partial<
-            Pick<Message, "content" | "contextContent" | "thinking">
+            Pick<
+                Message,
+                "content" | "contextContent" | "thinking" | "attachmentIds"
+            >
         >,
     ) => Promise<void>;
     clearCurrentChat: () => void;
@@ -372,7 +375,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         async (
             id: string,
             updates: Partial<
-                Pick<Message, "content" | "contextContent" | "thinking">
+                Pick<
+                    Message,
+                    "content" | "contextContent" | "thinking" | "attachmentIds"
+                >
             >,
         ) => {
             let updatedMessage: Message | undefined;

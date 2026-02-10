@@ -40,6 +40,7 @@ import {
 import { trimTrailingEmptyLines } from "@shared/core/text";
 import { generateUUID } from "@/lib/utils";
 import { Hexagon, Sparkles, AlertCircle, RefreshCw } from "lucide-react";
+import { ConvexStorageAdapter } from "@/lib/sync/convex-adapter";
 
 interface ErrorState {
     message: string;
@@ -511,40 +512,78 @@ export function ChatWindow() {
 
             // Generate a stable message ID for attachments
             const messageId = generateUUID();
+            const isCloudStorage =
+                storageAdapter instanceof ConvexStorageAdapter;
 
             // Convert pending attachments to stored attachments
             let attachmentIds: string[] | undefined;
-            if (pendingAttachments && pendingAttachments.length > 0) {
-                const attachments: Attachment[] = pendingAttachments.map(
-                    (pa) => ({
-                        id: generateUUID(),
-                        messageId,
-                        type: "image" as const,
-                        mimeType: pa.mimeType as ImageMimeType,
-                        data: pa.data,
-                        width: pa.width,
-                        height: pa.height,
-                        size: pa.size,
-                        createdAt: Date.now(),
-                    }),
-                );
+            const attachments: Attachment[] = pendingAttachments?.length
+                ? pendingAttachments.map((pa) => ({
+                      id: generateUUID(),
+                      messageId,
+                      type: "image" as const,
+                      mimeType: pa.mimeType as ImageMimeType,
+                      data: pa.data,
+                      width: pa.width,
+                      height: pa.height,
+                      size: pa.size,
+                      createdAt: Date.now(),
+                  }))
+                : [];
 
-                await storageAdapter.saveAttachments(attachments);
+            if (attachments.length > 0) {
                 attachmentIds = attachments.map((a) => a.id);
-            }
 
-            await addMessage({
-                id: messageId,
-                role: "user",
-                content: content,
-                contextContent: contextContent,
-                skill: clonedSkill,
-                modelId: chatSnapshot.modelId,
-                thinkingLevel: effectiveThinking,
-                searchLevel: effectiveSearchLevel,
-                attachmentIds,
-                chatId: chatSnapshot.id,
-            });
+                if (isCloudStorage) {
+                    // Cloud attachments must reference an existing message, so create the
+                    // message first, then upload attachments, then patch attachmentIds.
+                    await addMessage({
+                        id: messageId,
+                        role: "user",
+                        content: content,
+                        contextContent: contextContent,
+                        skill: clonedSkill,
+                        modelId: chatSnapshot.modelId,
+                        thinkingLevel: effectiveThinking,
+                        searchLevel: effectiveSearchLevel,
+                        chatId: chatSnapshot.id,
+                    });
+
+                    await storageAdapter.saveAttachments(attachments);
+
+                    // Update message so UI fetches attachments and cloud message record
+                    // references them for future reloads.
+                    await updateMessage(messageId, { attachmentIds });
+                } else {
+                    // Local storage can save attachments first so they render immediately.
+                    await storageAdapter.saveAttachments(attachments);
+
+                    await addMessage({
+                        id: messageId,
+                        role: "user",
+                        content: content,
+                        contextContent: contextContent,
+                        skill: clonedSkill,
+                        modelId: chatSnapshot.modelId,
+                        thinkingLevel: effectiveThinking,
+                        searchLevel: effectiveSearchLevel,
+                        attachmentIds,
+                        chatId: chatSnapshot.id,
+                    });
+                }
+            } else {
+                await addMessage({
+                    id: messageId,
+                    role: "user",
+                    content: content,
+                    contextContent: contextContent,
+                    skill: clonedSkill,
+                    modelId: chatSnapshot.modelId,
+                    thinkingLevel: effectiveThinking,
+                    searchLevel: effectiveSearchLevel,
+                    chatId: chatSnapshot.id,
+                });
+            }
 
             setDefaultModel(chatSnapshot.modelId);
             if (supportsReasoning) {

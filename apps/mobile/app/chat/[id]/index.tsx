@@ -30,6 +30,7 @@ import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
 import { loadAttachmentData, saveFile } from "@/lib/storage";
 import { useApiKey } from "@/hooks/useApiKey";
 import { useStorageAdapter } from "@/contexts/SyncContext";
+import { ConvexStorageAdapter } from "@/lib/sync/convex-adapter";
 import {
     sendMessage,
     buildMessageContent,
@@ -558,29 +559,66 @@ export default function ChatScreen(): ReactElement {
                 ? { ...skillForMessage, createdAt: Date.now() }
                 : null;
 
+            const isCloudStorage =
+                storageAdapter instanceof ConvexStorageAdapter;
             const messageId = uuidv4();
             let attachmentIds: string[] | undefined;
 
             if (pendingAttachments && pendingAttachments.length > 0) {
-                const saved = await savePendingAttachmentsToStorage(
-                    pendingAttachments,
-                    messageId,
-                );
-                attachmentIds = saved.map((attachment) => attachment.id);
-            }
+                if (isCloudStorage) {
+                    // Cloud attachments must reference an existing message, so create the
+                    // message first, then upload attachments, then patch attachmentIds.
+                    const userMessage = await addMessage({
+                        id: messageId,
+                        sessionId: chatSnapshot.id,
+                        role: "user",
+                        content: content,
+                        contextContent: contextContent,
+                        skill: clonedSkill,
+                        modelId: chatSnapshot.modelId,
+                        thinkingLevel: effectiveThinking,
+                        searchLevel: effectiveSearchLevel,
+                    });
 
-            await addMessage({
-                id: messageId,
-                sessionId: chatSnapshot.id,
-                role: "user",
-                content: content,
-                contextContent: contextContent,
-                skill: clonedSkill,
-                modelId: chatSnapshot.modelId,
-                thinkingLevel: effectiveThinking,
-                searchLevel: effectiveSearchLevel,
-                attachmentIds,
-            });
+                    const saved = await savePendingAttachmentsToStorage(
+                        pendingAttachments,
+                        messageId,
+                    );
+                    attachmentIds = saved.map((attachment) => attachment.id);
+                    await updateMessage({ ...userMessage, attachmentIds });
+                } else {
+                    const saved = await savePendingAttachmentsToStorage(
+                        pendingAttachments,
+                        messageId,
+                    );
+                    attachmentIds = saved.map((attachment) => attachment.id);
+
+                    await addMessage({
+                        id: messageId,
+                        sessionId: chatSnapshot.id,
+                        role: "user",
+                        content: content,
+                        contextContent: contextContent,
+                        skill: clonedSkill,
+                        modelId: chatSnapshot.modelId,
+                        thinkingLevel: effectiveThinking,
+                        searchLevel: effectiveSearchLevel,
+                        attachmentIds,
+                    });
+                }
+            } else {
+                await addMessage({
+                    id: messageId,
+                    sessionId: chatSnapshot.id,
+                    role: "user",
+                    content: content,
+                    contextContent: contextContent,
+                    skill: clonedSkill,
+                    modelId: chatSnapshot.modelId,
+                    thinkingLevel: effectiveThinking,
+                    searchLevel: effectiveSearchLevel,
+                });
+            }
 
             void setSelectedModel(chatSnapshot.modelId);
             if (supportsReasoning) {
