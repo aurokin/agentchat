@@ -69,6 +69,7 @@ function SettingsPageContent() {
         isConvexAvailable,
         localQuotaStatus,
         refreshQuotaStatus,
+        syncState,
     } = useSync();
     const {
         apiKey,
@@ -394,8 +395,8 @@ function SettingsPageContent() {
 
                         <p className="text-sm text-muted-foreground mb-5 leading-relaxed">
                             Enter your OpenRouter API key to enable AI model
-                            access. Your key is stored locally and never sent to
-                            our servers.
+                            access. Requests are sent directly to OpenRouter
+                            from your device.
                         </p>
 
                         <div className="space-y-4">
@@ -414,6 +415,11 @@ function SettingsPageContent() {
                                     placeholder="sk-or-..."
                                     className="input-deco font-mono"
                                 />
+                                <div className="mt-2 text-xs text-muted-foreground">
+                                    {syncState === "cloud-enabled"
+                                        ? "Stored in cloud sync (encrypted)."
+                                        : "Stored locally in this browser."}
+                                </div>
                             </div>
 
                             {apiKey && newApiKey.trim() === apiKey && (

@@ -54,7 +54,7 @@ export default function OnboardingScreen({
                 "• All chats stored locally on your device",
                 "• Works completely offline",
                 "• Fast and private - no server required",
-                "• Your API key stays on your device",
+                "• Your API key stays on your device by default",
             ],
         },
         {
@@ -64,6 +64,7 @@ export default function OnboardingScreen({
                 "• Sign in with Google to enable cloud sync",
                 "• Chats sync across mobile and web",
                 "• Backup your conversations safely",
+                "• API keys sync in encrypted form",
                 "• Turn sync on or off anytime",
             ],
         },
