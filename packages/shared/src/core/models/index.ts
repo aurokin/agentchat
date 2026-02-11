@@ -1,4 +1,4 @@
-export const APP_DEFAULT_MODEL = "minimax/minimax-m2.1";
+export const APP_DEFAULT_MODEL = "moonshotai/kimi-k2.5";
 
 export interface OpenRouterModel {
     id: string;
