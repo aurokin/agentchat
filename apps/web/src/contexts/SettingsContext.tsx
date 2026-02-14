@@ -58,6 +58,24 @@ const defaultSettings: UserSettings = {
 
 const SettingsContext = createContext<SettingsContextType | null>(null);
 
+export function selectInitialDefaultModel(params: {
+    fetchedModels: OpenRouterModel[];
+    userPreferredModel: string | null;
+}): string | null {
+    const { fetchedModels, userPreferredModel } = params;
+    const modelIds = fetchedModels.map((model) => model.id);
+
+    if (userPreferredModel && modelIds.includes(userPreferredModel)) {
+        return userPreferredModel;
+    }
+
+    if (modelIds.includes(APP_DEFAULT_MODEL)) {
+        return APP_DEFAULT_MODEL;
+    }
+
+    return fetchedModels[0]?.id ?? null;
+}
+
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
     const [settings, setSettings] = useState<UserSettings>(defaultSettings);
     const [models, setModels] = useState<OpenRouterModel[]>([]);
@@ -92,29 +110,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
             const promise = fetchModels().then((fetchedModels) => {
                 setModels(fetchedModels);
 
-                // Select appropriate default model
-                const userPreferredModel = storage.getDefaultModel();
-                const modelIds = fetchedModels.map((m) => m.id);
+                const selectedModelId = selectInitialDefaultModel({
+                    fetchedModels,
+                    userPreferredModel: storage.getDefaultModel(),
+                });
 
-                let selectedModelId: string | null = null;
-
-                // 1. Try user's preferred model
-                if (
-                    userPreferredModel &&
-                    modelIds.includes(userPreferredModel)
-                ) {
-                    selectedModelId = userPreferredModel;
-                }
-                // 2. Try app default model
-                else if (modelIds.includes(APP_DEFAULT_MODEL)) {
-                    selectedModelId = APP_DEFAULT_MODEL;
-                }
-                // 3. Fall back to first model from API
-                else if (fetchedModels.length > 0) {
-                    selectedModelId = fetchedModels[0].id;
-                }
-
-                // Update default model if we found one
                 if (selectedModelId) {
                     storage.setDefaultModel(selectedModelId);
                     setSettings((prev) => ({
