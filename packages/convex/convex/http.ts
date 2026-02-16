@@ -13,6 +13,7 @@ http.route({
     handler: httpAction(async (ctx, request) => {
         const authHeader = request.headers.get("authorization");
         const webhookSecret = process.env.REVENUECAT_WEBHOOK_SECRET?.trim();
+        const debugEnabled = process.env.REVENUECAT_DEBUG === "true";
 
         if (!webhookSecret) {
             return new Response("RevenueCat webhook not configured", {
@@ -20,7 +21,36 @@ http.route({
             });
         }
 
-        if (!authHeader || authHeader.trim() !== webhookSecret) {
+        const normalize = (value: string | null) => {
+            let normalized = value?.trim() ?? "";
+            if (
+                (normalized.startsWith('"') && normalized.endsWith('"')) ||
+                (normalized.startsWith("'") && normalized.endsWith("'"))
+            ) {
+                normalized = normalized.slice(1, -1).trim();
+            }
+            const parts = normalized.split(/\s+/);
+            const tokenLike = parts[parts.length - 1];
+            return tokenLike ?? "";
+        };
+
+        const normalizedAuthorization = normalize(authHeader);
+        const normalizedSecret = webhookSecret;
+
+        if (!authHeader || normalizedAuthorization !== normalizedSecret) {
+            if (debugEnabled) {
+                console.log(
+                    "RevenueCat webhook auth mismatch",
+                    JSON.stringify({
+                        authHeaderPresent: Boolean(authHeader),
+                        authorizationPrefix: authHeader
+                            ? authHeader.slice(0, 20)
+                            : null,
+                        authHeaderLength: authHeader?.length ?? 0,
+                        secretLength: webhookSecret.length,
+                    }),
+                );
+            }
             return new Response("Unauthorized", { status: 401 });
         }
 

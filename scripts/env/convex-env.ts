@@ -101,7 +101,22 @@ const runConvexEnvSet = (args: {
     value: string;
 }): void => {
     // Use stdin so secrets don't end up in shell history or process args.
-    const result = spawnSync("bunx", ["convex", "env", "set", args.name], {
+    const targetDeployment = args.convexDeployment;
+    const forceProd = process.argv.includes("--prod");
+    const cliArgs: string[] = ["convex", "env", "set"];
+    if (forceProd || targetDeployment.startsWith("prod:")) {
+        cliArgs.push("--prod");
+    } else if (targetDeployment.startsWith("dev:")) {
+        cliArgs.push(
+            "--deployment-name",
+            targetDeployment.replace(/^dev:/, ""),
+        );
+    } else {
+        cliArgs.push("--deployment-name", targetDeployment);
+    }
+    cliArgs.push(args.name);
+
+    const result = spawnSync("bunx", cliArgs, {
         cwd: repoRootPath("packages", "convex"),
         input: args.value,
         stdio: ["pipe", "inherit", "inherit"],
@@ -110,7 +125,6 @@ const runConvexEnvSet = (args: {
             // Convex CLI initializes Sentry when CI is unset. In environments with restricted DNS,
             // this can cause the CLI to crash-report and fail. Treat this as a scripted/CI-style run.
             CI: "1",
-            CONVEX_DEPLOYMENT: args.convexDeployment,
         },
     });
 
