@@ -39,7 +39,9 @@ export function MessageList({ messages, sending, loading }: MessageListProps) {
     const lastAdapterRef = useRef<unknown>(null);
 
     useEffect(() => {
-        bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+        bottomRef.current?.scrollIntoView({
+            behavior: sending ? "auto" : "smooth",
+        });
     }, [messages, sending]);
 
     // Collect all images from all messages
