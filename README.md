@@ -141,7 +141,7 @@ These are Convex-managed environment variables (not Railway vars). Set them in t
 - `REVENUECAT_WEBHOOK_SECRET` - Authorization header secret for RevenueCat webhooks (you choose this; configure it in RevenueCat server notifications).
 - `REVENUECAT_API_KEY` - RevenueCat v2 secret API key for entitlement refresh (from the RevenueCat dashboard).
 - `REVENUECAT_PROJECT_ID` - RevenueCat project ID for API v2 calls (from the RevenueCat dashboard).
-- `REVENUECAT_ENTITLEMENT_IDS` - Optional comma-separated entitlement identifiers or IDs to treat as Pro (defaults to `pro`).
+- `REVENUECAT_ENTITLEMENT_IDS` - Optional comma-separated entitlement identifiers or IDs to treat as Pro (defaults to `pro`). Recommended: include both lookup key and internal id(s), e.g. `pro,entl7a739786eb`.
 - `REVENUECAT_DEBUG` - Optional debug flag for logging RevenueCat responses.
 
 Convex also provides some runtime variables that you can read but do not set:
