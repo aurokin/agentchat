@@ -5,6 +5,7 @@ import {
     useRef,
     useEffect,
     useCallback,
+    useMemo,
     startTransition,
 } from "react";
 import { useRouter } from "next/navigation";
@@ -29,6 +30,7 @@ import {
     type Attachment,
     type ImageMimeType,
     type ChatSession,
+    type Message,
 } from "@/lib/types";
 import { APP_DEFAULT_MODEL } from "@shared/core/models";
 import { type Skill, getSkillSelectionUpdate } from "@shared/core/skills";
@@ -45,6 +47,32 @@ import { ConvexStorageAdapter } from "@/lib/sync/convex-adapter";
 interface ErrorState {
     message: string;
     isRetryable: boolean;
+}
+
+interface StreamingMessageState {
+    id: string;
+    content: string;
+    thinking?: string;
+}
+
+export function applyStreamingMessageOverlay(
+    messages: Message[],
+    streamingMessage: StreamingMessageState | null,
+): Message[] {
+    if (!streamingMessage) {
+        return messages;
+    }
+
+    return messages.map((message) =>
+        message.id === streamingMessage.id
+            ? {
+                  ...message,
+                  content: streamingMessage.content,
+                  contextContent: streamingMessage.content,
+                  thinking: streamingMessage.thinking,
+              }
+            : message,
+    );
 }
 
 const isKeybindingBlocked = () => {
@@ -150,6 +178,12 @@ export function ChatWindow() {
         contextContent: string;
     } | null>(null);
     const inputRef = useRef<HTMLTextAreaElement>(null);
+    const [streamingMessage, setStreamingMessage] =
+        useState<StreamingMessageState | null>(null);
+    const pendingStreamingUpdateRef = useRef<StreamingMessageState | null>(
+        null,
+    );
+    const streamingFrameRef = useRef<number | null>(null);
     const lastSkillChangeRef = useRef<{
         skill: Skill | null;
         mode: "auto" | "manual";
@@ -168,6 +202,44 @@ export function ChatWindow() {
         [setSelectedSkill],
     );
 
+    const queueStreamingMessageUpdate = useCallback(
+        (nextState: StreamingMessageState | null) => {
+            pendingStreamingUpdateRef.current = nextState;
+
+            if (typeof window === "undefined") {
+                setStreamingMessage(nextState);
+                return;
+            }
+
+            if (streamingFrameRef.current !== null) {
+                return;
+            }
+
+            streamingFrameRef.current = window.requestAnimationFrame(() => {
+                streamingFrameRef.current = null;
+                setStreamingMessage(pendingStreamingUpdateRef.current);
+            });
+        },
+        [],
+    );
+
+    const clearStreamingMessage = useCallback(() => {
+        pendingStreamingUpdateRef.current = null;
+        if (streamingFrameRef.current !== null) {
+            window.cancelAnimationFrame(streamingFrameRef.current);
+            streamingFrameRef.current = null;
+        }
+        setStreamingMessage(null);
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            if (streamingFrameRef.current !== null) {
+                window.cancelAnimationFrame(streamingFrameRef.current);
+            }
+        };
+    }, []);
+
     useEffect(() => {
         lastSkillChangeRef.current = {
             skill: selectedSkill,
@@ -180,6 +252,10 @@ export function ChatWindow() {
             lastInitializedChatIdRef.current = null;
         }
     }, [currentChat]);
+
+    const displayedMessages = useMemo(() => {
+        return applyStreamingMessageOverlay(messages, streamingMessage);
+    }, [messages, streamingMessage]);
 
     useEffect(() => {
         if (!currentChat || isMessagesLoading) return;
@@ -480,12 +556,17 @@ export function ChatWindow() {
         setSending(true);
         setError(null);
         setRetryChat(null);
+        clearStreamingMessage();
 
         const skillSnapshot = lastSkillChangeRef.current;
         let skillForMessage = selectedSkill;
         if (skillSnapshot.mode === "manual") {
             skillForMessage = skillSnapshot.skill;
         }
+
+        let assistantMessageId: string | null = null;
+        let fullResponse = "";
+        let fullThinking = "";
 
         try {
             const currentModel = models.find(
@@ -664,9 +745,12 @@ export function ChatWindow() {
                 searchLevel: effectiveSearchLevel,
                 chatId: chatSnapshot.id,
             });
-
-            let fullResponse = "";
-            let fullThinking = "";
+            assistantMessageId = assistantMessage.id;
+            queueStreamingMessageUpdate({
+                id: assistantMessage.id,
+                content: "",
+                thinking: undefined,
+            });
 
             await sendMessage(
                 apiKey,
@@ -680,9 +764,9 @@ export function ChatWindow() {
                         fullResponse += chunk;
                     }
 
-                    updateMessage(assistantMessage.id, {
+                    queueStreamingMessageUpdate({
+                        id: assistantMessage.id,
                         content: fullResponse,
-                        contextContent: fullResponse,
                         thinking: fullThinking || undefined,
                     });
                 },
@@ -690,12 +774,27 @@ export function ChatWindow() {
 
             const trimmedResponse = trimTrailingEmptyLines(fullResponse) ?? "";
             const trimmedThinking = trimTrailingEmptyLines(fullThinking);
-            updateMessage(assistantMessage.id, {
+            await updateMessage(assistantMessage.id, {
                 content: trimmedResponse,
                 contextContent: trimmedResponse,
                 thinking: trimmedThinking || undefined,
             });
         } catch (err) {
+            if (assistantMessageId && (fullResponse || fullThinking)) {
+                const partialResponse =
+                    trimTrailingEmptyLines(fullResponse) ?? "";
+                const partialThinking = trimTrailingEmptyLines(fullThinking);
+                try {
+                    await updateMessage(assistantMessageId, {
+                        content: partialResponse,
+                        contextContent: partialResponse,
+                        thinking: partialThinking || undefined,
+                    });
+                } catch {
+                    // Preserve the original streaming error as the surfaced failure.
+                }
+            }
+
             if (err instanceof OpenRouterApiError) {
                 setError({
                     message: err.message,
@@ -720,6 +819,7 @@ export function ChatWindow() {
             }
         } finally {
             setSending(false);
+            clearStreamingMessage();
         }
     };
 
@@ -858,7 +958,7 @@ export function ChatWindow() {
 
             {/* Messages */}
             <div className="flex-1 overflow-y-auto relative z-10">
-                <MessageList messages={messages} sending={sending} />
+                <MessageList messages={displayedMessages} sending={sending} />
             </div>
 
             {/* Unified input bar with all controls */}
