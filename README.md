@@ -159,7 +159,7 @@ These are Convex-managed environment variables used by `packages/convex/convex/l
 
 Note: Convex requires environment variable names to be < 40 characters.
 
-**Billing note**: Billing is handled via RevenueCat Web Billing. Stripe is configured inside RevenueCat; do not set Stripe API keys/webhooks for RouterChat.
+**Billing note**: Billing is handled via RevenueCat Web Billing. Configure billing only through RevenueCat and do not set direct payment-processor keys/webhooks in RouterChat.
 
 **Generating the encryption key:**
 
