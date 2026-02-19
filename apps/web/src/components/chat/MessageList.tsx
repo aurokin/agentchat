@@ -402,7 +402,7 @@ function MessageItem({
                             className={cn(
                                 "p-5 prose prose-sm dark:prose-invert max-w-none",
                                 isUser
-                                    ? "bg-primary/20 border border-primary/30"
+                                    ? "bg-primary/20 border border-primary/30 text-left"
                                     : "bg-background-elevated border border-border prose-headings:text-foreground prose-p:text-foreground prose-pre:bg-muted prose-pre:border prose-pre:border-border prose-code:text-primary",
                             )}
                         >
