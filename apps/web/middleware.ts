@@ -4,6 +4,33 @@ import type { NextRequest } from "next/server";
 // Only enforce security headers on deployed environments (preview/prod), not
 // local development (`next dev`).
 const isProduction = process.env.NODE_ENV === "production";
+const canonicalHost = process.env.CANONICAL_HOST?.trim().toLowerCase();
+
+function normalizeHost(host: string): string {
+    return host
+        .trim()
+        .toLowerCase()
+        .replace(/\.$/, "")
+        .replace(/:\d+$/, "");
+}
+
+function getRequestHost(request: NextRequest): string {
+    const forwardedHost =
+        request.headers
+            .get("x-forwarded-host")
+            ?.split(",")[0]
+            ?.trim() ?? "";
+    if (forwardedHost) {
+        return normalizeHost(forwardedHost);
+    }
+
+    const hostHeader = request.headers.get("host")?.trim() ?? "";
+    if (hostHeader) {
+        return normalizeHost(hostHeader);
+    }
+
+    return normalizeHost(request.nextUrl.host);
+}
 
 function createNonce(): string {
     const bytes = new Uint8Array(16);
@@ -46,6 +73,20 @@ function applyCommonSecurityHeaders(response: NextResponse): void {
 export function middleware(request: NextRequest) {
     if (!isProduction) {
         return NextResponse.next();
+    }
+
+    if (canonicalHost) {
+        const requestHost = getRequestHost(request);
+        if (requestHost && requestHost !== canonicalHost) {
+            const redirectUrl = request.nextUrl.clone();
+            redirectUrl.protocol = "https";
+            redirectUrl.hostname = canonicalHost;
+            redirectUrl.port = "";
+
+            const response = NextResponse.redirect(redirectUrl, 308);
+            applyCommonSecurityHeaders(response);
+            return response;
+        }
     }
 
     const disableCsp = process.env.DISABLE_CSP?.toLowerCase() === "true";
