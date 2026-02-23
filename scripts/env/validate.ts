@@ -53,6 +53,18 @@ function validateConvexCloudUrl(value: string): string | null {
     return null;
 }
 
+function validateHostOnly(value: string): string | null {
+    const raw = value.trim();
+    if (!raw) return "is empty";
+    if (raw.includes("://")) return "must be a hostname only (no scheme)";
+    if (raw.includes("/")) return "must not include path segments";
+    if (raw.includes("?") || raw.includes("#")) {
+        return "must not include query or fragment components";
+    }
+    if (/\s/.test(raw)) return "must not contain whitespace";
+    return null;
+}
+
 function validateRevenueCatWpl(envName: "dev" | "preview" | "prod", value: string) {
     const hasSandbox = value.includes("/sandbox/");
     if (envName === "preview" && !hasSandbox) {
@@ -103,6 +115,14 @@ const main = (): void => {
         });
     }
 
+    const canonicalHost = railwayEnv.CANONICAL_HOST?.trim();
+    if (canonicalHost) {
+        const hostError = validateHostOnly(canonicalHost);
+        if (hostError) {
+            errors.push(`CANONICAL_HOST ${hostError}`);
+        }
+    }
+
     const disableCsp = isTrueFlag(railwayEnv.DISABLE_CSP);
     if (disableCsp) {
         if (envName === "prod") {
@@ -144,6 +164,19 @@ const main = (): void => {
     requireKey(convexEnv, "ENCRYPTION_KEY", errors, {
         validate: validateBase64Key32,
     });
+
+    if (canonicalHost) {
+        try {
+            const siteHost = new URL(convexEnv.SITE_URL ?? "").hostname.toLowerCase();
+            if (siteHost && siteHost !== canonicalHost.toLowerCase()) {
+                warnings.push(
+                    `CANONICAL_HOST (${canonicalHost}) differs from SITE_URL host (${siteHost}). This can cause cross-origin redirects.`,
+                );
+            }
+        } catch {
+            // SITE_URL validation above will report format issues.
+        }
+    }
 
     if (errors.length > 0) {
         const header = `Environment validation failed for --env ${envName}`;
