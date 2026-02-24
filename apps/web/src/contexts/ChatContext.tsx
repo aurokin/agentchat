@@ -23,6 +23,7 @@ import {
     mapConvexMessageToLocal,
     mergeByIdWithPending,
 } from "@shared/core/sync";
+import { trackAnalyticsEvent } from "@/lib/analytics/posthog";
 import { useStorageAdapter, useSync } from "@/contexts/SyncContext";
 import * as storage from "@/lib/storage";
 import { v4 as uuid } from "uuid";
@@ -246,6 +247,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             setCurrentChat(chat);
             setMessages([]);
             setIsMessagesLoading(false);
+            trackAnalyticsEvent("chat_created", {
+                model: chat.modelId,
+            });
 
             return chat;
         },

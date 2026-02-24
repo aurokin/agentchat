@@ -18,6 +18,7 @@ Visit https://www.routerchat.chat to start chatting with your OpenRouter API key
 - **Local Storage** - API key, settings, and chat history stored in browser (default)
 - **Cloud Sync** - Optional sync to Convex for cross-device access (Pro subscription)
 - **First-run Tutorial** - Short, skippable setup for sync and API keys
+- **Optional Analytics** - PostHog instrumentation for product usage events when enabled
 - **IndexedDB Persistence** - Full chat history stored locally
 - **Theme Support** - Light, dark, and system theme options
 
@@ -112,6 +113,9 @@ Set these as Railway service variables (preview/production) or in `apps/web/.env
 - `NEXT_PUBLIC_CONVEX_URL` - Convex deployment URL (from the Convex dashboard). When unset, RouterChat runs local-only (no cloud sync).
 - `REVENUECAT_WEB_PURCHASE_URL` - RevenueCat Web Billing purchase link template (from the RevenueCat dashboard). RouterChat appends `userId` as a path segment (trailing slash is ok).
 - `NEXT_PUBLIC_REVENUECAT_WEB_PURCHASE_URL` - Legacy alias for `REVENUECAT_WEB_PURCHASE_URL`.
+- `NEXT_PUBLIC_ANALYTICS_ENABLED` - Optional web analytics flag. Set to `true` to enable PostHog client events.
+- `NEXT_PUBLIC_POSTHOG_KEY` - PostHog project API key (required when `NEXT_PUBLIC_ANALYTICS_ENABLED=true`).
+- `NEXT_PUBLIC_POSTHOG_HOST` - Optional PostHog host URL (defaults to `https://us.i.posthog.com`).
 - `CANONICAL_HOST` - Optional canonical host redirect enforced by web middleware in deployed environments. Example: `CANONICAL_HOST=www.routerchat.chat` to redirect apex requests to `www`. For preview consistency, you can set `CANONICAL_HOST=preview.routerchat.chat` (optional).
 - `DISABLE_CSP` - Optional debug flag (preview/prod only). Set to `true` to disable only the `Content-Security-Policy` header in middleware; other security headers remain enabled. Avoid enabling this in production.
 

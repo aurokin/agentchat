@@ -41,6 +41,7 @@ import {
 } from "@shared/core/defaults";
 import { trimTrailingEmptyLines } from "@shared/core/text";
 import { generateUUID } from "@/lib/utils";
+import { trackAnalyticsEvent } from "@/lib/analytics/posthog";
 import { Hexagon, Sparkles, AlertCircle, RefreshCw } from "lucide-react";
 import { ConvexStorageAdapter } from "@/lib/sync/convex-adapter";
 
@@ -140,6 +141,15 @@ export function getChatTitleUpdate(
 
     const title = content.slice(0, 50) + (content.length > 50 ? "..." : "");
     return { ...chat, title };
+}
+
+function getMessageLengthBucket(content: string): string {
+    const length = content.trim().length;
+    if (length === 0) return "0";
+    if (length <= 80) return "1-80";
+    if (length <= 300) return "81-300";
+    if (length <= 800) return "301-800";
+    return "801+";
 }
 
 export function ChatWindow() {
@@ -558,6 +568,13 @@ export function ChatWindow() {
         setRetryChat(null);
         clearStreamingMessage();
 
+        trackAnalyticsEvent("message_sent", {
+            model: chatSnapshot.modelId,
+            has_attachments: (pendingAttachments?.length ?? 0) > 0,
+            attachment_count: pendingAttachments?.length ?? 0,
+            message_length_bucket: getMessageLengthBucket(content),
+        });
+
         const skillSnapshot = lastSkillChangeRef.current;
         let skillForMessage = selectedSkill;
         if (skillSnapshot.mode === "manual") {
@@ -833,6 +850,7 @@ export function ChatWindow() {
 
     const handleModelChange = async (modelId: string) => {
         if (!currentChat) return;
+        const previousModelId = currentChat.modelId;
         const nextModel = models.find((model) => model.id === modelId);
         const supportsReasoning = nextModel
             ? modelSupportsReasoning(nextModel)
@@ -851,18 +869,38 @@ export function ChatWindow() {
             searchLevel: nextSearchLevel,
         });
         setDefaultModel(modelId);
+        if (previousModelId !== modelId) {
+            trackAnalyticsEvent("model_changed", {
+                from: previousModelId,
+                to: modelId,
+            });
+        }
     };
 
     const handleThinkingChange = async (value: ThinkingLevel) => {
         if (!currentChat) return;
+        const wasEnabled = currentChat.thinking !== "none";
         await updateChat({ ...currentChat, thinking: value });
         setDefaultThinking(value);
+        const isEnabled = value !== "none";
+        if (wasEnabled !== isEnabled) {
+            trackAnalyticsEvent("thinking_toggled", {
+                enabled: isEnabled,
+            });
+        }
     };
 
     const handleSearchChange = async (level: SearchLevel) => {
         if (!currentChat) return;
+        const wasEnabled = currentChat.searchLevel !== "none";
         await updateChat({ ...currentChat, searchLevel: level });
         setDefaultSearchLevel(level);
+        const isEnabled = level !== "none";
+        if (wasEnabled !== isEnabled) {
+            trackAnalyticsEvent("search_toggled", {
+                enabled: isEnabled,
+            });
+        }
     };
 
     if (!currentChat) {
