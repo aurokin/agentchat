@@ -1,6 +1,6 @@
 import type { ReactElement, ReactNode } from "react";
 import { Stack } from "expo-router";
-import { StatusBar } from "react-native";
+import { Platform, StatusBar } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AppProvider, useAppContext } from "@/contexts/AppContext";
 import { ThemeProvider, useTheme } from "@/contexts/ThemeContext";
@@ -10,6 +10,7 @@ import { ConvexProvider } from "@/lib/convex";
 import { ModelProvider } from "@/contexts/ModelContext";
 import { SkillsProvider } from "@/contexts/SkillsContext";
 import { SyncProvider } from "@/contexts/SyncContext";
+import { ShareIntentBridge } from "@/components/share/ShareIntentBridge";
 import OnboardingScreen from "./onboarding";
 
 function OnboardingWrapper({
@@ -38,7 +39,10 @@ function ThemedStatusBar(): React.ReactElement {
     return (
         <StatusBar
             barStyle={scheme === "dark" ? "light-content" : "dark-content"}
-            backgroundColor={colors.background}
+            translucent={Platform.OS === "android"}
+            backgroundColor={
+                Platform.OS === "android" ? "transparent" : colors.background
+            }
         />
     );
 }
@@ -55,6 +59,7 @@ export default function Layout(): ReactElement {
                                 <SkillsProvider>
                                     <AppProvider>
                                         <ChatProvider>
+                                            <ShareIntentBridge />
                                             <OnboardingWrapper>
                                                 <Stack
                                                     screenOptions={{

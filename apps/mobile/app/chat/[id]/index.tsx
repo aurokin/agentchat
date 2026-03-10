@@ -18,7 +18,7 @@ import {
     KeyboardAvoidingView,
     Platform,
     ScrollView,
-    Dimensions,
+    useWindowDimensions,
     type NativeScrollEvent,
     type NativeSyntheticEvent,
 } from "react-native";
@@ -64,6 +64,8 @@ import { MessageInput } from "@/components/chat/MessageInput";
 import { AttachmentGallery } from "@/components/chat/AttachmentGallery";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { v4 as uuidv4 } from "uuid";
+import { consumePendingSharePayload } from "@/lib/share-intent/pending-share";
+import { importSharedImageFiles } from "@/lib/share-intent/attachments";
 
 interface ErrorState {
     message: string;
@@ -100,6 +102,7 @@ export default function ChatScreen(): ReactElement {
     const router = useRouter();
     const chatId = params.id as string;
     const {
+        chats,
         currentChat,
         messages,
         defaultModel,
@@ -113,6 +116,7 @@ export default function ChatScreen(): ReactElement {
         createChat,
         deleteChat,
         updateChat,
+        loadChats,
     } = useChatContext();
     const {
         models,
@@ -168,7 +172,11 @@ export default function ChatScreen(): ReactElement {
         [],
     );
     const [galleryInitialIndex, setGalleryInitialIndex] = useState(0);
-    const screenWidth = Dimensions.get("window").width;
+    const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+    const screenWidth = windowWidth;
+    const smallestSide = Math.min(windowWidth, windowHeight);
+    const isTwoPaneLayout = smallestSide >= 700;
+    const sidebarWidth = Math.max(280, Math.min(360, windowWidth * 0.32));
     const lastSkillChangeRef = useRef<{
         skill: Skill | null;
         mode: "auto" | "manual";
@@ -178,6 +186,7 @@ export default function ChatScreen(): ReactElement {
     });
     const lastInitializedChatIdRef = useRef<string | null>(null);
     const suppressInputRef = useRef(false);
+    const sharePayloadAppliedRef = useRef<string | null>(null);
 
     const updateSelectedSkill = useCallback(
         (skill: Skill | null, options?: { mode?: "auto" | "manual" }) => {
@@ -193,6 +202,17 @@ export default function ChatScreen(): ReactElement {
             selectChat(chatId);
         }
     }, [chatId, selectChat]);
+
+    useEffect(() => {
+        if (chats.length > 0) return;
+        void loadChats();
+    }, [chats.length, loadChats]);
+
+    useEffect(() => {
+        if (!isTwoPaneLayout) return;
+        if (currentChat || chats.length === 0) return;
+        router.replace(`/chat/${chats[0].id}`);
+    }, [chats, currentChat, isTwoPaneLayout, router]);
 
     useEffect(() => {
         return () => {
@@ -267,6 +287,59 @@ export default function ChatScreen(): ReactElement {
             isMounted = false;
         };
     }, [chatMessages, storageAdapter]);
+
+    useEffect(() => {
+        if (!chatId || !currentChat || currentChat.id !== chatId) return;
+        if (sharePayloadAppliedRef.current === chatId) return;
+
+        const payload = consumePendingSharePayload(chatId);
+        if (!payload) return;
+        sharePayloadAppliedRef.current = chatId;
+
+        if (payload.text.trim()) {
+            setInputText(payload.text);
+        }
+
+        if (payload.files.length === 0) {
+            return;
+        }
+
+        void (async () => {
+            try {
+                const {
+                    attachments: imported,
+                    unsupportedFiles,
+                    blockedByQuota,
+                } = await importSharedImageFiles(payload.files, chatId);
+
+                if (imported.length > 0) {
+                    setAttachments((prev) => [...prev, ...imported]);
+                }
+
+                const notes: string[] = [];
+                if (unsupportedFiles > 0) {
+                    notes.push(
+                        `${unsupportedFiles} unsupported file${
+                            unsupportedFiles > 1 ? "s were" : " was"
+                        } skipped (only images are supported right now).`,
+                    );
+                }
+                if (blockedByQuota) {
+                    notes.push(
+                        "Some images were skipped because local storage limits were reached.",
+                    );
+                }
+                if (notes.length > 0) {
+                    Alert.alert("Shared Content", notes.join("\n\n"));
+                }
+            } catch {
+                Alert.alert(
+                    "Shared Content",
+                    "Unable to import one or more shared files.",
+                );
+            }
+        })();
+    }, [chatId, currentChat]);
 
     useEffect(() => {
         if (!currentChat || !hasLoadedMessages) return;
@@ -834,6 +907,15 @@ export default function ChatScreen(): ReactElement {
     };
 
     const handleDeleteChat = async () => {
+        const fallbackChatId = chats.find((chat) => chat.id !== chatId)?.id;
+        const navigateAfterDelete = () => {
+            if (isTwoPaneLayout && fallbackChatId) {
+                router.replace(`/chat/${fallbackChatId}`);
+                return;
+            }
+            router.replace("/");
+        };
+
         if (chatMessages.length > 0) {
             Alert.alert(
                 "Delete Chat",
@@ -846,7 +928,7 @@ export default function ChatScreen(): ReactElement {
                         onPress: () => {
                             void (async () => {
                                 await deleteChat(chatId);
-                                router.replace("/");
+                                navigateAfterDelete();
                             })();
                         },
                     },
@@ -856,7 +938,7 @@ export default function ChatScreen(): ReactElement {
         }
 
         await deleteChat(chatId);
-        router.replace("/");
+        navigateAfterDelete();
     };
 
     const handleManageStorage = () => {
@@ -866,6 +948,110 @@ export default function ChatScreen(): ReactElement {
     const handleStartNewChat = async () => {
         const chat = await createChat();
         router.replace(`/chat/${chat.id}`);
+    };
+
+    const handleSelectChatFromSidebar = (nextChatId: string) => {
+        if (nextChatId === chatId) return;
+        router.replace(`/chat/${nextChatId}`);
+    };
+
+    const formatChatListDate = (timestamp: number): string => {
+        const date = new Date(timestamp);
+        const now = new Date();
+        const diffDays = Math.floor(
+            (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24),
+        );
+
+        if (diffDays === 0) {
+            return date.toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+            });
+        }
+        if (diffDays === 1) {
+            return "Yesterday";
+        }
+        if (diffDays < 7) {
+            return date.toLocaleDateString([], { weekday: "short" });
+        }
+        return date.toLocaleDateString([], {
+            month: "short",
+            day: "numeric",
+        });
+    };
+
+    const renderTabletSidebar = () => {
+        return (
+            <View style={[styles.tabletSidebar, { width: sidebarWidth }]}>
+                <View style={styles.tabletSidebarHeader}>
+                    <Text style={styles.tabletSidebarTitle}>RouterChat</Text>
+                    <View style={styles.tabletSidebarHeaderActions}>
+                        <TouchableOpacity
+                            style={styles.tabletSidebarHeaderButton}
+                            onPress={() => router.push("/settings")}
+                            accessibilityRole="button"
+                            accessibilityLabel="Open settings"
+                        >
+                            <Feather
+                                name="settings"
+                                size={18}
+                                color={colors.accent}
+                            />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.tabletSidebarHeaderButton}
+                            onPress={handleStartNewChat}
+                            accessibilityRole="button"
+                            accessibilityLabel="Start new chat"
+                        >
+                            <Feather
+                                name="plus"
+                                size={18}
+                                color={colors.accent}
+                            />
+                        </TouchableOpacity>
+                    </View>
+                </View>
+                {chats.length === 0 ? (
+                    <View style={styles.tabletSidebarEmpty}>
+                        <Text style={styles.tabletSidebarEmptyText}>
+                            No chats yet
+                        </Text>
+                    </View>
+                ) : (
+                    <FlatList
+                        data={chats}
+                        keyExtractor={(item) => item.id}
+                        contentContainerStyle={styles.tabletSidebarListContent}
+                        renderItem={({ item }) => {
+                            const isActive = item.id === chatId;
+                            return (
+                                <TouchableOpacity
+                                    style={[
+                                        styles.tabletSidebarChatItem,
+                                        isActive &&
+                                            styles.tabletSidebarChatItemActive,
+                                    ]}
+                                    onPress={() =>
+                                        handleSelectChatFromSidebar(item.id)
+                                    }
+                                >
+                                    <Text
+                                        style={styles.tabletSidebarChatTitle}
+                                        numberOfLines={1}
+                                    >
+                                        {item.title}
+                                    </Text>
+                                    <Text style={styles.tabletSidebarChatDate}>
+                                        {formatChatListDate(item.updatedAt)}
+                                    </Text>
+                                </TouchableOpacity>
+                            );
+                        }}
+                    />
+                )}
+            </View>
+        );
     };
 
     const toggleThinking = (messageId: string) => {
@@ -1343,24 +1529,45 @@ export default function ChatScreen(): ReactElement {
                 style={styles.container}
                 edges={["top", "left", "right"]}
             >
-                <ActivityIndicator size="large" color={colors.accent} />
+                {isTwoPaneLayout ? (
+                    <View style={styles.tabletLayout}>
+                        {renderTabletSidebar()}
+                        <View style={styles.tabletThreadPaneLoading}>
+                            <ActivityIndicator
+                                size="large"
+                                color={colors.accent}
+                            />
+                        </View>
+                    </View>
+                ) : (
+                    <ActivityIndicator size="large" color={colors.accent} />
+                )}
             </SafeAreaView>
         );
     }
 
-    return (
-        <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
+    const threadContent = (
+        <>
             <View style={styles.header}>
-                <TouchableOpacity
-                    onPress={() => router.replace("/")}
-                    style={[styles.iconButton, styles.backButton]}
-                >
-                    <Feather
-                        name="arrow-left"
-                        size={20}
-                        color={colors.accent}
+                {isTwoPaneLayout ? (
+                    <View
+                        style={[
+                            styles.iconButton,
+                            styles.backButtonPlaceholder,
+                        ]}
                     />
-                </TouchableOpacity>
+                ) : (
+                    <TouchableOpacity
+                        onPress={() => router.replace("/")}
+                        style={[styles.iconButton, styles.backButton]}
+                    >
+                        <Feather
+                            name="arrow-left"
+                            size={20}
+                            color={colors.accent}
+                        />
+                    </TouchableOpacity>
+                )}
                 <Text style={styles.headerTitle} numberOfLines={1}>
                     {currentChat.title}
                 </Text>
@@ -1459,6 +1666,19 @@ export default function ChatScreen(): ReactElement {
                     onStartNewChat={handleStartNewChat}
                 />
             </KeyboardAvoidingView>
+        </>
+    );
+
+    return (
+        <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
+            {isTwoPaneLayout ? (
+                <View style={styles.tabletLayout}>
+                    {renderTabletSidebar()}
+                    <View style={styles.tabletThreadPane}>{threadContent}</View>
+                </View>
+            ) : (
+                threadContent
+            )}
 
             <AttachmentGallery
                 key={`${galleryVisible}-${galleryInitialIndex}-${galleryAttachments.length}`}
@@ -1477,6 +1697,91 @@ const createStyles = (colors: ThemeColors) =>
             flex: 1,
             backgroundColor: colors.background,
         },
+        tabletLayout: {
+            flex: 1,
+            flexDirection: "row",
+        },
+        tabletSidebar: {
+            borderRightWidth: 1,
+            borderRightColor: colors.border,
+            backgroundColor: colors.surface,
+        },
+        tabletSidebarHeader: {
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.border,
+        },
+        tabletSidebarTitle: {
+            fontSize: 20,
+            fontWeight: "700",
+            color: colors.text,
+        },
+        tabletSidebarHeaderActions: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+        },
+        tabletSidebarHeaderButton: {
+            width: 34,
+            height: 34,
+            borderRadius: 17,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: colors.accentSoft,
+            borderWidth: 1,
+            borderColor: colors.accentBorder,
+        },
+        tabletSidebarListContent: {
+            padding: 12,
+            paddingBottom: 24,
+            gap: 8,
+        },
+        tabletSidebarChatItem: {
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.surfaceMuted,
+            paddingHorizontal: 12,
+            paddingVertical: 10,
+            gap: 4,
+        },
+        tabletSidebarChatItemActive: {
+            borderColor: colors.accentBorder,
+            backgroundColor: colors.accentSoft,
+        },
+        tabletSidebarChatTitle: {
+            fontSize: 14,
+            fontWeight: "600",
+            color: colors.text,
+        },
+        tabletSidebarChatDate: {
+            fontSize: 12,
+            color: colors.textSubtle,
+        },
+        tabletSidebarEmpty: {
+            flex: 1,
+            alignItems: "center",
+            justifyContent: "center",
+            paddingHorizontal: 24,
+        },
+        tabletSidebarEmptyText: {
+            fontSize: 14,
+            color: colors.textMuted,
+            textAlign: "center",
+        },
+        tabletThreadPane: {
+            flex: 1,
+            minWidth: 0,
+        },
+        tabletThreadPaneLoading: {
+            flex: 1,
+            alignItems: "center",
+            justifyContent: "center",
+        },
         header: {
             flexDirection: "row",
             alignItems: "center",
@@ -1490,6 +1795,10 @@ const createStyles = (colors: ThemeColors) =>
             padding: 4,
         },
         backButton: {
+            marginRight: 8,
+        },
+        backButtonPlaceholder: {
+            width: 28,
             marginRight: 8,
         },
         headerTitle: {

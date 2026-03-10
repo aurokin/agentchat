@@ -3,7 +3,7 @@
 import React, { useRef, useEffect, useState, useCallback } from "react";
 import type { Message, Attachment } from "@/lib/types";
 import { format } from "date-fns";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import {
@@ -28,6 +28,14 @@ interface MessageListProps {
     sending?: boolean;
     loading?: boolean;
 }
+
+const markdownComponents: Components = {
+    a: ({ children, href, title }) => (
+        <a href={href} title={title} {...externalLinkProps}>
+            {children}
+        </a>
+    ),
+};
 
 export function MessageList({ messages, sending, loading }: MessageListProps) {
     const storageAdapter = useStorageAdapter();
@@ -422,21 +430,7 @@ function MessageItem({
                                 <ReactMarkdown
                                     remarkPlugins={[remarkGfm]}
                                     rehypePlugins={[rehypeHighlight]}
-                                    components={{
-                                        a: ({
-                                            children,
-                                            node: _node,
-                                            ref: _ref,
-                                            ...props
-                                        }) => (
-                                            <a
-                                                {...props}
-                                                {...externalLinkProps}
-                                            >
-                                                {children}
-                                            </a>
-                                        ),
-                                    }}
+                                    components={markdownComponents}
                                 >
                                     {message.content}
                                 </ReactMarkdown>

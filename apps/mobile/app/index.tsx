@@ -13,6 +13,7 @@ import {
     StyleSheet,
     ActivityIndicator,
     Alert,
+    useWindowDimensions,
     type LayoutChangeEvent,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
@@ -36,12 +37,20 @@ export default function HomeScreen(): React.ReactElement {
     );
     const longPressTriggeredRef = useRef(false);
     const [headerHeight, setHeaderHeight] = useState<number | null>(null);
+    const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+    const isTwoPaneLayout = Math.min(windowWidth, windowHeight) >= 700;
 
     useEffect(() => {
         if (isInitialized) {
             loadChats();
         }
     }, [isInitialized, loadChats]);
+
+    useEffect(() => {
+        if (!isInitialized || !isTwoPaneLayout) return;
+        if (isLoading || chats.length === 0) return;
+        router.replace(`/chat/${chats[0].id}`);
+    }, [chats, isInitialized, isLoading, isTwoPaneLayout, router]);
 
     const handleCreateChat = async () => {
         const chat = await createChat();

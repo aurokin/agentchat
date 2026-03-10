@@ -17,6 +17,7 @@ import {
     Image,
     FlatList,
     ScrollView,
+    useWindowDimensions,
 } from "react-native";
 import type { OpenRouterModel } from "@shared/core/models";
 import type { ThinkingLevel, SearchLevel } from "@shared/core/types";
@@ -96,10 +97,20 @@ export function MessageInput({
 }: MessageInputProps): ReactElement {
     const { colors } = useTheme();
     const insets = useSafeAreaInsets();
+    const { width: windowWidth, height: windowHeight } = useWindowDimensions();
     const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
     const [quotaWarning, setQuotaWarning] = useState<QuotaWarning | null>(null);
     const inputRef = useRef<TextInput>(null);
     const bottomPadding = isKeyboardVisible ? 8 : 8 + insets.bottom;
+    const isTwoPaneLayout = Math.min(windowWidth, windowHeight) >= 700;
+    const composerMaxWidth = Math.max(640, Math.min(980, windowWidth - 40));
+    const composerConstraintStyle = isTwoPaneLayout
+        ? {
+              width: "100%" as const,
+              maxWidth: composerMaxWidth,
+              alignSelf: "center" as const,
+          }
+        : null;
     const styles = useMemo(
         () => createStyles(colors, bottomPadding),
         [colors, bottomPadding],
@@ -205,10 +216,48 @@ export function MessageInput({
         onSend();
     };
 
+    const controlsContent = (
+        <>
+            <ModelSelector
+                models={models}
+                selectedModelId={selectedModelId}
+                onModelChange={onModelChange}
+                favoriteModels={favoriteModels}
+                onToggleFavoriteModel={onToggleFavoriteModel}
+                disabled={isLoading}
+            />
+            <SkillSelector
+                skills={skills}
+                selectedSkill={selectedSkill}
+                onSelectSkill={onSkillSelect}
+                disabled={isLoading}
+            />
+            {searchSupported && (
+                <SearchToggle
+                    value={searchLevel}
+                    onChange={onSearchChange}
+                    disabled={isLoading}
+                />
+            )}
+            {reasoningSupported && (
+                <ThinkingToggle
+                    value={thinkingLevel}
+                    onChange={onThinkingChange}
+                    disabled={isLoading}
+                />
+            )}
+        </>
+    );
+
     return (
-        <View style={styles.container}>
+        <View
+            style={[
+                styles.container,
+                isTwoPaneLayout && styles.containerTablet,
+            ]}
+        >
             {quotaWarning && (
-                <View style={styles.quotaBanner}>
+                <View style={[styles.quotaBanner, composerConstraintStyle]}>
                     <View style={styles.quotaHeader}>
                         <Feather
                             name="alert-triangle"
@@ -278,7 +327,12 @@ export function MessageInput({
                 </View>
             )}
             {attachments.length > 0 && (
-                <View style={styles.attachmentsContainer}>
+                <View
+                    style={[
+                        styles.attachmentsContainer,
+                        composerConstraintStyle,
+                    ]}
+                >
                     <FlatList
                         data={attachments}
                         renderItem={renderAttachmentThumbnail}
@@ -290,47 +344,33 @@ export function MessageInput({
                 </View>
             )}
 
-            <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-                style={styles.controlsContainer}
-                contentContainerStyle={styles.controlsRow}
-            >
-                <ModelSelector
-                    models={models}
-                    selectedModelId={selectedModelId}
-                    onModelChange={onModelChange}
-                    favoriteModels={favoriteModels}
-                    onToggleFavoriteModel={onToggleFavoriteModel}
-                    disabled={isLoading}
-                />
-                <SkillSelector
-                    skills={skills}
-                    selectedSkill={selectedSkill}
-                    onSelectSkill={onSkillSelect}
-                    disabled={isLoading}
-                />
-                {searchSupported && (
-                    <SearchToggle
-                        value={searchLevel}
-                        onChange={onSearchChange}
-                        disabled={isLoading}
-                    />
-                )}
-                {reasoningSupported && (
-                    <ThinkingToggle
-                        value={thinkingLevel}
-                        onChange={onThinkingChange}
-                        disabled={isLoading}
-                    />
-                )}
-            </ScrollView>
+            {isTwoPaneLayout ? (
+                <View
+                    style={[styles.controlsContainer, composerConstraintStyle]}
+                >
+                    <View style={styles.controlsRowWrapped}>
+                        {controlsContent}
+                    </View>
+                </View>
+            ) : (
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                    style={styles.controlsContainer}
+                    contentContainerStyle={styles.controlsRow}
+                >
+                    {controlsContent}
+                </ScrollView>
+            )}
 
-            <View style={styles.inputRow}>
+            <View style={[styles.inputRow, composerConstraintStyle]}>
                 <TextInput
                     ref={inputRef}
-                    style={styles.textInput}
+                    style={[
+                        styles.textInput,
+                        isTwoPaneLayout && styles.textInputTablet,
+                    ]}
                     value={inputText}
                     onChangeText={onInputChange}
                     placeholder={
@@ -389,6 +429,9 @@ const createStyles = (colors: ThemeColors, bottomPadding: number) =>
             borderTopWidth: 1,
             borderTopColor: colors.border,
             backgroundColor: colors.surface,
+        },
+        containerTablet: {
+            paddingTop: 4,
         },
         quotaBanner: {
             paddingHorizontal: 12,
@@ -482,6 +525,14 @@ const createStyles = (colors: ThemeColors, bottomPadding: number) =>
             paddingVertical: 8,
             gap: 8,
         },
+        controlsRowWrapped: {
+            flexDirection: "row",
+            alignItems: "center",
+            flexWrap: "wrap",
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            gap: 8,
+        },
         inputRow: {
             flexDirection: "row",
             alignItems: "center",
@@ -500,6 +551,9 @@ const createStyles = (colors: ThemeColors, bottomPadding: number) =>
             backgroundColor: colors.inputBackground,
             color: colors.text,
             fontSize: 16,
+        },
+        textInputTablet: {
+            maxHeight: 160,
         },
         sendButton: {
             backgroundColor: colors.accent,

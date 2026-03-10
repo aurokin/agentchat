@@ -7,7 +7,9 @@
         "orientation": "portrait",
         "icon": "./assets/icon.png",
         "userInterfaceStyle": "light",
-        "newArchEnabled": true,
+        "experiments": {
+            "reactCompiler": true
+        },
         "splash": {
             "image": "./assets/splash-icon.png",
             "resizeMode": "contain",
@@ -25,7 +27,6 @@
                 "foregroundImage": "./assets/adaptive-icon.png",
                 "backgroundColor": "#ffffff"
             },
-            "edgeToEdgeEnabled": true,
             "package": "com.routerchat.app"
         },
         "web": {
@@ -36,6 +37,12 @@
                 "projectId": "48d2ca6b-f5c6-4d6b-afe2-dd560e22f0f7"
             }
         },
-        "owner": "aurokins-organization"
+        "owner": "aurokins-organization",
+        "plugins": [
+            "expo-router",
+            "expo-secure-store",
+            "expo-sqlite",
+            "./plugins/withAndroidShareIntent"
+        ]
     }
 }
