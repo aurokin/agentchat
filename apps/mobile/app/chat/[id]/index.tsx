@@ -326,7 +326,7 @@ export default function ChatScreen(): ReactElement {
                 }
                 if (blockedByQuota) {
                     notes.push(
-                        "Some images were skipped because local storage limits were reached.",
+                        "Some images were skipped because the current storage limits were reached.",
                     );
                 }
                 if (notes.length > 0) {

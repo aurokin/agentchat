@@ -4,7 +4,6 @@ import React, { useState, useCallback } from "react";
 import { Sidebar } from "./Sidebar";
 import { ChatWindow } from "./ChatWindow";
 import { MobileNav } from "./MobileNav";
-import { FirstRunTutorialModal } from "@/components/tutorial/FirstRunTutorialModal";
 import { useIsMobile } from "@/hooks/useMediaQuery";
 
 export function ChatLayout() {
@@ -26,7 +25,6 @@ export function ChatLayout() {
 
     return (
         <div className="flex h-dvh w-full overflow-hidden bg-background max-w-full">
-            <FirstRunTutorialModal />
             {isMobile && (
                 <MobileNav
                     isOpen={mobileMenuOpen}

@@ -47,12 +47,12 @@ export default function TermsPage() {
                         your credentials.
                     </p>
 
-                    <h2>Subscriptions and Billing</h2>
+                    <h2>Hosting and Access</h2>
                     <p>
-                        Certain features may require a paid subscription. Web
-                        purchases may be processed through RevenueCat and Stripe
-                        as our billing providers. Taxes may apply where
-                        required.
+                        Agentchat is intended to be self-hosted. You are
+                        responsible for your own hosting, infrastructure costs,
+                        and any third-party services you connect to the
+                        application.
                     </p>
 
                     <h2>Acceptable Use</h2>

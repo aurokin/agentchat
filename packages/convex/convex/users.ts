@@ -81,11 +81,6 @@ export const create = internalMutation({
         const now = Date.now();
         return await ctx.db.insert("users", {
             email: args.email ?? undefined,
-            subscriptionStatus: "none",
-            subscriptionTier: "free",
-            subscriptionOverridePro: false,
-            subscriptionCancelAtPeriodEnd: false,
-            entitlementActive: false,
             initialSync: false,
             cloudChatCount: 0,
             cloudMessageCount: 0,
@@ -232,34 +227,6 @@ export const setInitialSync = mutation({
     },
 });
 
-export const updateSubscription = internalMutation({
-    args: {
-        id: v.id("users"),
-        subscriptionStatus: v.union(
-            v.literal("active"),
-            v.literal("expired"),
-            v.literal("none"),
-        ),
-        subscriptionTier: v.union(v.literal("free"), v.literal("pro")),
-        subscriptionExpiresAt: v.optional(v.number()),
-        subscriptionCancelAtPeriodEnd: v.optional(v.boolean()),
-        entitlementId: v.optional(v.string()),
-        entitlementActive: v.optional(v.boolean()),
-        entitlementExpiresAt: v.optional(v.number()),
-        revenuecatCustomerId: v.optional(v.string()),
-        lastWebhookEventId: v.optional(v.string()),
-        lastWebhookEventType: v.optional(v.string()),
-        lastWebhookEventAt: v.optional(v.number()),
-    },
-    handler: async (ctx, args) => {
-        const { id, ...updates } = args;
-        await ctx.db.patch(id, {
-            ...updates,
-            updatedAt: Date.now(),
-        });
-    },
-});
-
 export const getSubscriptionStatus = query({
     args: {},
     handler: async (ctx) => {
@@ -286,39 +253,12 @@ export const getSubscriptionStatus = query({
             };
         }
 
-        const subscriptionOverridePro =
-            (user as any).subscriptionOverridePro ?? false;
-        if (subscriptionOverridePro) {
-            return {
-                hasCloudSync: true,
-                cancelAtPeriodEnd: false,
-                expiresAt: null,
-                tier: "pro" as const,
-                status: "active" as const,
-            };
-        }
-
-        const entitlementActive = (user as any).entitlementActive ?? false;
-        const entitlementExpiresAt = (user as any).entitlementExpiresAt ?? null;
-        const subscriptionStatus: "active" | "expired" | "none" =
-            entitlementActive
-                ? "active"
-                : entitlementExpiresAt
-                  ? "expired"
-                  : "none";
-        const subscriptionTier: "pro" | "free" = entitlementActive
-            ? "pro"
-            : "free";
-        const expiresAt =
-            (user as any).subscriptionExpiresAt ?? entitlementExpiresAt ?? null;
-
         return {
-            hasCloudSync: entitlementActive,
-            cancelAtPeriodEnd:
-                (user as any).subscriptionCancelAtPeriodEnd ?? false,
-            expiresAt,
-            tier: subscriptionTier,
-            status: subscriptionStatus,
+            hasCloudSync: true,
+            cancelAtPeriodEnd: false,
+            expiresAt: null,
+            tier: "pro" as const,
+            status: "active" as const,
         };
     },
 });

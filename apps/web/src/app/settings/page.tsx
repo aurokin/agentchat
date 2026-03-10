@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, Suspense } from "react";
-import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Sidebar } from "@/components/chat/Sidebar";
 import { KeybindingsContent } from "@/components/keybindings/KeybindingsContent";
@@ -35,13 +34,6 @@ import {
     ChevronDown,
 } from "lucide-react";
 import { cn, externalLinkProps } from "@/lib/utils";
-const CloudSyncSettings = dynamic(
-    () =>
-        import("@/components/sync/CloudSyncSettings").then(
-            (mod) => mod.CloudSyncSettings,
-        ),
-    { ssr: false },
-);
 
 const isKeybindingBlocked = () => {
     if (typeof document === "undefined") return false;
@@ -90,13 +82,11 @@ function SettingsPageContent() {
     );
     const [saving, setSaving] = useState(false);
     const searchParams = useSearchParams();
-    const [highlightCloudSync, setHighlightCloudSync] = useState(false);
     const [highlightApiKey, setHighlightApiKey] = useState(false);
 
     useEffect(() => {
         if (typeof window === "undefined") return;
         const highlight = searchParams.get("highlight");
-        setHighlightCloudSync(highlight === "cloud-sync");
         setHighlightApiKey(highlight === "api-key");
 
         const hash = window.location.hash.replace("#", "");
@@ -114,7 +104,6 @@ function SettingsPageContent() {
 
         if (!highlight) return;
         const timeout = window.setTimeout(() => {
-            setHighlightCloudSync(false);
             setHighlightApiKey(false);
         }, 4000);
         return () => window.clearTimeout(timeout);
@@ -417,8 +406,8 @@ function SettingsPageContent() {
                                 />
                                 <div className="mt-2 text-xs text-muted-foreground">
                                     {syncState === "cloud-enabled"
-                                        ? "Stored in cloud sync (encrypted)."
-                                        : "Stored locally in this browser."}
+                                        ? "Stored in Convex (encrypted)."
+                                        : "Sign in to store your key in Convex."}
                                 </div>
                             </div>
 
@@ -1029,9 +1018,6 @@ function SettingsPageContent() {
                         )}
                     </section>
 
-                    {/* Cloud Sync - only shown when Convex is available */}
-                    <CloudSyncSettings highlightEnable={highlightCloudSync} />
-
                     {/* About */}
                     <section className="card-deco">
                         <div className="flex items-center gap-3 mb-4">
@@ -1042,8 +1028,8 @@ function SettingsPageContent() {
                         </div>
                         <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
                             Agentchat provides a unified interface for AI
-                            conversations through OpenRouter, with a flexible
-                            setup that lets you choose how your data is stored.
+                            conversations through OpenRouter for self-hosted
+                            deployments backed by Convex.
                         </p>
                         <details className="group mt-4">
                             <summary className="flex items-center justify-between gap-4 cursor-pointer select-none border border-border bg-background-elevated px-4 py-3 text-sm text-foreground hover:border-primary/40 transition-colors">
@@ -1056,24 +1042,22 @@ function SettingsPageContent() {
                             <div className="mt-4 space-y-4">
                                 <div className="border border-border bg-muted/20 p-4 space-y-2">
                                     <div className="text-xs uppercase tracking-wider text-muted-foreground">
-                                        Local Only
+                                        Self-Hosted
                                     </div>
                                     <p className="text-sm text-muted-foreground leading-relaxed">
-                                        Agentchat works offline by default. Your
-                                        data stays on this device, and requests
-                                        are sent directly to OpenRouter using
-                                        your API key.
+                                        Agentchat is designed to run against
+                                        your own Convex deployment and your own
+                                        agent stack.
                                     </p>
                                 </div>
                                 <div className="border border-border bg-muted/20 p-4 space-y-2">
                                     <div className="text-xs uppercase tracking-wider text-muted-foreground">
-                                        Cloud Sync
+                                        Data Model
                                     </div>
                                     <p className="text-sm text-muted-foreground leading-relaxed">
-                                        Enable cloud sync with a Pro
-                                        subscription. Sync is powered by Convex,
-                                        and API keys are stored in encrypted
-                                        form for additional safety.
+                                        Chats, skills, and encrypted API keys
+                                        are stored in Convex while the app is
+                                        running in Convex-only mode.
                                     </p>
                                 </div>
                                 <div className="border border-border bg-muted/20 p-4 space-y-2">

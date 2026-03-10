@@ -19,10 +19,8 @@ import type * as lib_cloud_usage from "../lib/cloud_usage.js";
 import type * as lib_encryption from "../lib/encryption.js";
 import type * as lib_limits from "../lib/limits.js";
 import type * as lib_pagination from "../lib/pagination.js";
-import type * as lib_revenuecat_helpers from "../lib/revenuecat_helpers.js";
 import type * as lib_subscription from "../lib/subscription.js";
 import type * as messages from "../messages.js";
-import type * as revenuecat from "../revenuecat.js";
 import type * as skills from "../skills.js";
 import type * as users from "../users.js";
 
@@ -44,10 +42,8 @@ declare const fullApi: ApiFromModules<{
   "lib/encryption": typeof lib_encryption;
   "lib/limits": typeof lib_limits;
   "lib/pagination": typeof lib_pagination;
-  "lib/revenuecat_helpers": typeof lib_revenuecat_helpers;
   "lib/subscription": typeof lib_subscription;
   messages: typeof messages;
-  revenuecat: typeof revenuecat;
   skills: typeof skills;
   users: typeof users;
 }>;

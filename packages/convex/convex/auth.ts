@@ -126,9 +126,6 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
 
                     await ctx.db.patch(args.existingUserId, {
                         ...profileUpdates,
-                        subscriptionStatus:
-                            existing.subscriptionStatus ?? "none",
-                        subscriptionTier: existing.subscriptionTier ?? "free",
                         createdAt: existing.createdAt ?? now,
                         updatedAt: now,
                         initialSync,
@@ -140,9 +137,6 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
 
             const userId = await ctx.db.insert("users", {
                 ...profileUpdates,
-                subscriptionStatus: "none",
-                subscriptionTier: "free",
-                subscriptionOverridePro: false,
                 cloudChatCount: 0,
                 cloudMessageCount: 0,
                 cloudSkillCount: 0,

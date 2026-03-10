@@ -10,65 +10,6 @@ import {
     repoRootPath,
 } from "./lib";
 
-const inferDeploymentNameFromUrl = (
-    urlValue: string | undefined,
-): string | undefined => {
-    if (!urlValue) return undefined;
-    try {
-        const url = new URL(urlValue);
-        const host = url.hostname;
-        for (const suffix of [".convex.site", ".convex.cloud"]) {
-            if (!host.endsWith(suffix)) continue;
-            const prefix = host.slice(0, -suffix.length);
-            if (!prefix || prefix.includes(".")) return undefined;
-            return prefix;
-        }
-        return undefined;
-    } catch {
-        return undefined;
-    }
-};
-
-const inferDeploymentNameFromBillingEnv = (
-    envName: AppEnvName,
-): string | undefined => {
-    if (envName === "dev") return undefined;
-    try {
-        const abs = repoRootPath("billing", `env.${envName}.json`);
-        if (!fs.existsSync(abs)) return undefined;
-        const text = fs.readFileSync(abs, "utf8");
-        const parsed = JSON.parse(text) as {
-            webhook?: { url?: unknown };
-        };
-        const webhookUrl =
-            typeof parsed.webhook?.url === "string" ? parsed.webhook.url : undefined;
-        return inferDeploymentNameFromUrl(webhookUrl?.trim());
-    } catch {
-        return undefined;
-    }
-};
-
-const inferSiteUrlFromBillingEnv = (envName: AppEnvName): string | undefined => {
-    if (envName === "dev") return undefined;
-    try {
-        const abs = repoRootPath("billing", `env.${envName}.json`);
-        if (!fs.existsSync(abs)) return undefined;
-        const text = fs.readFileSync(abs, "utf8");
-        const parsed = JSON.parse(text) as {
-            app?: { base_url?: unknown };
-        };
-        const baseUrl =
-            typeof parsed.app?.base_url === "string" ? parsed.app.base_url : undefined;
-        if (!baseUrl) return undefined;
-        const trimmed = baseUrl.trim();
-        if (!trimmed) return undefined;
-        if (trimmed.includes("<")) return undefined;
-        return trimmed.replace(/\/$/, "");
-    } catch {
-        return undefined;
-    }
-};
-
 const toConvexDeploymentId = (
     envName: AppEnvName,
     value: string,
@@ -153,32 +94,23 @@ const main = (): void => {
 
     const env = allowProcessEnv ? mergeEnv(process.env, secretsFileEnv) : secretsFileEnv;
 
-    // Optional: default SITE_URL from billing/env.<env>.json if caller didn't provide it.
     if (!env.SITE_URL?.trim()) {
-        const inferred =
-            envName === "dev"
-                ? "http://localhost:4040"
-                : inferSiteUrlFromBillingEnv(envName);
-        if (inferred) {
-            env.SITE_URL = inferred;
+        if (envName === "dev") {
+            env.SITE_URL = "http://localhost:4040";
         }
     }
 
     const deploymentArg = readArgValue(process.argv, "--deployment");
     const deploymentNameArg = readArgValue(process.argv, "--deployment-name");
     const deploymentFromEnv = env.CONVEX_DEPLOYMENT?.trim();
-    const inferredDeploymentName = inferDeploymentNameFromBillingEnv(envName);
     const deploymentInput =
-        deploymentArg ??
-        deploymentNameArg ??
-        deploymentFromEnv ??
-        inferredDeploymentName;
+        deploymentArg ?? deploymentNameArg ?? deploymentFromEnv;
 
     if (!deploymentInput) {
         throw new Error(
             [
                 "Missing Convex deployment.",
-                "Pass --deployment <CONVEX_DEPLOYMENT> (recommended), set CONVEX_DEPLOYMENT=... in .env.convex.<env>.local, or ensure billing/env.<env>.json webhook.url is a https://<deployment>.convex.site/... URL so it can be inferred.",
+                "Pass --deployment <CONVEX_DEPLOYMENT> (recommended) or set CONVEX_DEPLOYMENT=... in .env.convex.<env>.local.",
                 `Example: bun run convex:env -- --env ${envName} --deployment dev:blessed-cuttlefish-350`,
             ].join("\n"),
         );

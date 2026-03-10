@@ -9,7 +9,6 @@ import {
     ScrollView,
     Alert,
     Image,
-    Linking,
     Platform,
     useWindowDimensions,
 } from "react-native";
@@ -24,7 +23,6 @@ import type { Skill } from "@shared/core/skills";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { useAuthContext } from "@/lib/convex/AuthContext";
 import { useApiKey } from "@/hooks/useApiKey";
-import { useSubscription } from "@/hooks/useSubscription";
 
 export default function SettingsScreen(): ReactElement {
     const router = useRouter();
@@ -32,7 +30,6 @@ export default function SettingsScreen(): ReactElement {
         syncState,
         enableCloudSync,
         disableCloudSync,
-        cloneToLocal,
         clearCloudImages,
         refreshQuotaStatus,
         localQuotaStatus,
@@ -53,11 +50,6 @@ export default function SettingsScreen(): ReactElement {
         isConvexAvailable,
     } = useAuthContext();
     const { colors, userTheme, setUserTheme, isMaterialYouActive } = useTheme();
-    const {
-        status: subscription,
-        isLoading: isSubscriptionLoading,
-        openPortal,
-    } = useSubscription();
     const {
         apiKey: storedApiKey,
         isLoading: isApiKeyLoading,
@@ -84,8 +76,7 @@ export default function SettingsScreen(): ReactElement {
     const [skillDescription, setSkillDescription] = useState("");
     const [skillPrompt, setSkillPrompt] = useState("");
 
-    const convexUnavailableMessage =
-        "Cloud sync isn't configured for this build.";
+    const convexUnavailableMessage = "Convex isn't configured for this build.";
 
     useEffect(() => {
         if (isApiKeyLoading) return;
@@ -205,7 +196,7 @@ export default function SettingsScreen(): ReactElement {
 
     const handleGoogleSignIn = async () => {
         if (!isConvexAvailable) {
-            Alert.alert("Cloud Sync Not Configured", convexUnavailableMessage, [
+            Alert.alert("Convex Not Configured", convexUnavailableMessage, [
                 { text: "OK" },
             ]);
             return;
@@ -223,7 +214,7 @@ export default function SettingsScreen(): ReactElement {
 
     const handleEnableCloudSync = async () => {
         if (!isConvexAvailable) {
-            Alert.alert("Cloud Sync Not Configured", convexUnavailableMessage, [
+            Alert.alert("Convex Not Configured", convexUnavailableMessage, [
                 { text: "OK" },
             ]);
             return;
@@ -232,7 +223,7 @@ export default function SettingsScreen(): ReactElement {
         if (!isAuthenticated) {
             Alert.alert(
                 "Sign In Required",
-                "Please sign in with Google to enable cloud sync.",
+                "Please sign in with Google to access your Convex-backed workspace.",
                 [
                     { text: "Cancel", style: "cancel" },
                     {
@@ -246,109 +237,37 @@ export default function SettingsScreen(): ReactElement {
             return;
         }
 
-        if (isSubscriptionLoading) {
-            Alert.alert(
-                "Checking Subscription",
-                "Please wait while we verify your subscription.",
-            );
-            return;
-        }
-
-        if (subscription?.hasCloudSync === false) {
-            Alert.alert(
-                "Subscription Required",
-                "Cloud sync requires an Agentchat Pro subscription.",
-                openPortal
-                    ? [
-                          { text: "Cancel", style: "cancel" },
-                          {
-                              text: "Manage Subscription",
-                              onPress: async () => {
-                                  const portalUrl = await openPortal();
-                                  if (portalUrl) {
-                                      await Linking.openURL(portalUrl);
-                                  }
-                              },
-                          },
-                      ]
-                    : [{ text: "OK" }],
-            );
-            return;
-        }
-
         try {
             await enableCloudSync();
             Alert.alert(
-                "Cloud Sync Enabled",
-                "Your chats will now sync across devices when connected to the internet.",
+                "Workspace Ready",
+                "Your chats now use your Convex backend.",
             );
         } catch (error) {
             Alert.alert(
                 "Error",
-                "Failed to enable cloud sync. Please try again.",
+                "Failed to connect to Convex. Please try again.",
             );
         }
     };
 
     const handleDisableCloudSync = async () => {
         Alert.alert(
-            "Disable Cloud Sync",
-            "Your chats will no longer sync to the cloud. Your local data will be preserved.",
+            "Sign Out",
+            "Signing out disconnects this device from your Convex workspace.",
             [
                 { text: "Cancel", style: "cancel" },
                 {
-                    text: "Disable",
+                    text: "Sign Out",
                     style: "destructive",
                     onPress: async () => {
                         try {
                             await disableCloudSync();
-                            Alert.alert(
-                                "Cloud Sync Disabled",
-                                "Your chats are now stored only on this device.",
-                            );
+                            await signOut();
                         } catch (error) {
                             Alert.alert(
                                 "Error",
-                                "Failed to disable cloud sync. Please try again.",
-                            );
-                        }
-                    },
-                },
-            ],
-        );
-    };
-
-    const handleOpenPortal = async () => {
-        const portalUrl = await openPortal();
-        if (!portalUrl) {
-            Alert.alert(
-                "Portal Unavailable",
-                "Subscription management is not available right now.",
-            );
-            return;
-        }
-        await Linking.openURL(portalUrl);
-    };
-
-    const handleCloneToLocal = async () => {
-        Alert.alert(
-            "Clone Cloud Data",
-            "This will copy your cloud chats and attachments to this device.",
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Clone",
-                    onPress: async () => {
-                        try {
-                            await cloneToLocal();
-                            Alert.alert(
-                                "Clone Complete",
-                                "Your cloud data has been copied to this device.",
-                            );
-                        } catch {
-                            Alert.alert(
-                                "Clone Failed",
-                                "Could not clone cloud data. Please try again.",
+                                "Failed to sign out. Please try again.",
                             );
                         }
                     },
@@ -458,7 +377,6 @@ export default function SettingsScreen(): ReactElement {
 
     const isSkillValid =
         skillName.trim().length > 0 && skillPrompt.trim().length > 0;
-    const hasCloudSync = subscription?.hasCloudSync ?? false;
     const syncActionDisabled = isMigrating || isCloning;
     const isGoogleButtonBusy = isAuthLoading || isSigningIn;
     const isTwoPaneLayout = Math.min(windowWidth, windowHeight) >= 700;
@@ -472,8 +390,6 @@ export default function SettingsScreen(): ReactElement {
         switch (syncState) {
             case "cloud-enabled":
                 return "#34C759";
-            case "cloud-disabled":
-                return "#FF9500";
             default:
                 return "#8E8E93";
         }
@@ -482,11 +398,9 @@ export default function SettingsScreen(): ReactElement {
     const getSyncStatusText = () => {
         switch (syncState) {
             case "cloud-enabled":
-                return "Your chats sync to the cloud automatically.";
-            case "cloud-disabled":
-                return "Cloud sync is disabled. Your data stays on this device.";
+                return "Your chats and skills are stored in Convex.";
             default:
-                return "Your chats are stored only on this device.";
+                return "Sign in to connect this device to your Convex workspace.";
         }
     };
 
@@ -626,8 +540,8 @@ export default function SettingsScreen(): ReactElement {
                                         </View>
                                     ) : (
                                         <Text style={styles.notSignedIn}>
-                                            Sign in to enable cloud sync across
-                                            devices.
+                                            Sign in to access your Agentchat
+                                            workspace.
                                         </Text>
                                     )}
 
@@ -728,11 +642,8 @@ export default function SettingsScreen(): ReactElement {
                                                         >
                                                             {syncState ===
                                                             "cloud-enabled"
-                                                                ? "Cloud Sync Active"
-                                                                : syncState ===
-                                                                    "cloud-disabled"
-                                                                  ? "Cloud Sync Off"
-                                                                  : "Local Only"}
+                                                                ? "Connected"
+                                                                : "Sign In Required"}
                                                         </Text>
                                                         <Text
                                                             style={
@@ -741,30 +652,6 @@ export default function SettingsScreen(): ReactElement {
                                                         >
                                                             {getSyncStatusText()}
                                                         </Text>
-                                                        {isSubscriptionLoading && (
-                                                            <Text
-                                                                style={
-                                                                    styles.syncStatusMeta
-                                                                }
-                                                            >
-                                                                Checking
-                                                                subscription...
-                                                            </Text>
-                                                        )}
-                                                        {!isSubscriptionLoading &&
-                                                            isAuthenticated &&
-                                                            !hasCloudSync && (
-                                                                <Text
-                                                                    style={
-                                                                        styles.syncStatusMeta
-                                                                    }
-                                                                >
-                                                                    Cloud sync
-                                                                    requires
-                                                                    Agentchat
-                                                                    Pro.
-                                                                </Text>
-                                                            )}
                                                         {isMigrating &&
                                                             migrationProgress && (
                                                                 <Text
@@ -796,7 +683,8 @@ export default function SettingsScreen(): ReactElement {
                                                     </View>
                                                 </View>
 
-                                                {syncState === "local-only" && (
+                                                {syncState !==
+                                                    "cloud-enabled" && (
                                                     <TouchableOpacity
                                                         style={
                                                             styles.enableSyncButton
@@ -813,7 +701,7 @@ export default function SettingsScreen(): ReactElement {
                                                                 styles.enableSyncButtonText
                                                             }
                                                         >
-                                                            Enable Cloud Sync
+                                                            Connect Workspace
                                                         </Text>
                                                     </TouchableOpacity>
                                                 )}
@@ -833,57 +721,13 @@ export default function SettingsScreen(): ReactElement {
                                                     >
                                                         <Text
                                                             style={
-                                                                styles.disableSyncButtonText
-                                                            }
-                                                        >
-                                                            Disable Cloud Sync
-                                                        </Text>
-                                                    </TouchableOpacity>
-                                                )}
-
-                                                {syncState ===
-                                                    "cloud-disabled" && (
-                                                    <TouchableOpacity
-                                                        style={
-                                                            styles.enableSyncButton
-                                                        }
-                                                        onPress={
-                                                            handleEnableCloudSync
-                                                        }
-                                                        disabled={
-                                                            syncActionDisabled
-                                                        }
-                                                    >
-                                                        <Text
-                                                            style={
                                                                 styles.enableSyncButtonText
                                                             }
                                                         >
-                                                            Re-enable Cloud Sync
+                                                            Sign Out
                                                         </Text>
                                                     </TouchableOpacity>
                                                 )}
-
-                                                {isAuthenticated &&
-                                                    !hasCloudSync && (
-                                                        <TouchableOpacity
-                                                            style={
-                                                                styles.portalButton
-                                                            }
-                                                            onPress={
-                                                                handleOpenPortal
-                                                            }
-                                                        >
-                                                            <Text
-                                                                style={
-                                                                    styles.portalButtonText
-                                                                }
-                                                            >
-                                                                Manage
-                                                                Subscription
-                                                            </Text>
-                                                        </TouchableOpacity>
-                                                    )}
                                             </View>
                                         )}
 
@@ -937,7 +781,7 @@ export default function SettingsScreen(): ReactElement {
                                                             styles.apiKeyStorageText
                                                         }
                                                     >
-                                                        Stored in cloud sync
+                                                        Stored in Convex
                                                     </Text>
                                                 )}
                                             </View>
@@ -1648,28 +1492,12 @@ export default function SettingsScreen(): ReactElement {
                                                 ]}
                                             >
                                                 Your attachments are stored in
-                                                the cloud and sync across
-                                                devices.
+                                                Convex and sync across devices.
                                             </Text>
                                         )}
 
                                         {syncState === "cloud-enabled" && (
                                             <View style={styles.buttonRow}>
-                                                <TouchableOpacity
-                                                    style={styles.saveButton}
-                                                    onPress={handleCloneToLocal}
-                                                    disabled={
-                                                        syncActionDisabled
-                                                    }
-                                                >
-                                                    <Text
-                                                        style={
-                                                            styles.saveButtonText
-                                                        }
-                                                    >
-                                                        Clone to Local
-                                                    </Text>
-                                                </TouchableOpacity>
                                                 <TouchableOpacity
                                                     style={styles.clearButton}
                                                     onPress={
@@ -1684,7 +1512,7 @@ export default function SettingsScreen(): ReactElement {
                                                             styles.clearButtonText
                                                         }
                                                     >
-                                                        Clear Cloud Images
+                                                        Clear Synced Images
                                                     </Text>
                                                 </TouchableOpacity>
                                             </View>
@@ -1699,17 +1527,9 @@ export default function SettingsScreen(): ReactElement {
                                                             styles.storageInfoSpacing,
                                                     ]}
                                                 >
-                                                    Your chats and attachments
-                                                    are stored only on this
-                                                    device.
-                                                </Text>
-                                                <Text
-                                                    style={
-                                                        styles.storageInfoSubtext
-                                                    }
-                                                >
-                                                    Enable cloud sync to access
-                                                    your data across devices.
+                                                    Sign in to inspect synced
+                                                    storage usage for this
+                                                    workspace.
                                                 </Text>
                                             </>
                                         )}
@@ -1729,8 +1549,8 @@ export default function SettingsScreen(): ReactElement {
                                         </Text>
                                     </View>
                                     <Text style={styles.settingDescription}>
-                                        An offline-first chat app powered by
-                                        OpenRouter.
+                                        A self-hosted AI chat app powered by
+                                        OpenRouter and Convex.
                                     </Text>
                                 </View>
                             </View>

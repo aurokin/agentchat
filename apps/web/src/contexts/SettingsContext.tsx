@@ -197,19 +197,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
     const setApiKey = useCallback(
         (key: string) => {
-            // Use the cloud-synced API key setter
-            // This will save to both local storage and cloud (if enabled)
             void setCloudApiKey(key);
-            // Local state will be updated via the useEffect that watches cloudApiKey
         },
         [setCloudApiKey],
     );
 
     const clearApiKey = useCallback(() => {
-        // Use the cloud-synced API key clearer
-        // This will clear from both local storage and cloud (if enabled)
         void clearCloudApiKey();
-        // Local state will be updated via the useEffect that watches cloudApiKey
     }, [clearCloudApiKey]);
 
     const setDefaultModel = (modelId: string) => {

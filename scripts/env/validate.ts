@@ -65,17 +65,6 @@ function validateHostOnly(value: string): string | null {
     return null;
 }
 
-function validateRevenueCatWpl(envName: "dev" | "preview" | "prod", value: string) {
-    const hasSandbox = value.includes("/sandbox/");
-    if (envName === "preview" && !hasSandbox) {
-        return "should be a sandbox Web Purchase Link (expected /sandbox/ in preview)";
-    }
-    if (envName === "prod" && hasSandbox) {
-        return "must not be a sandbox Web Purchase Link (remove /sandbox/ for prod)";
-    }
-    return null;
-}
-
 function isTrueFlag(value: string | undefined): boolean {
     return (value ?? "").trim().toLowerCase() === "true";
 }
@@ -94,17 +83,11 @@ const main = (): void => {
     const allowProcessEnv = process.argv.includes("--allow-process-env");
     const allowDisableCsp = process.argv.includes("--allow-disable-csp");
 
-    const wantsBilling = envName !== "dev";
-
     const railwayFile = repoRootPath(`.env.railway.${envName}.local`);
     const convexFile = repoRootPath(`.env.convex.${envName}.local`);
-    const billingFile = repoRootPath(`.env.billing.${envName}.local`);
 
     const railwayEnv = loadEnvOrThrow(railwayFile, allowProcessEnv);
     const convexEnv = loadEnvOrThrow(convexFile, allowProcessEnv);
-    const billingEnv = wantsBilling
-        ? loadEnvOrThrow(billingFile, allowProcessEnv)
-        : {};
 
     const errors: string[] = [];
     const warnings: string[] = [];
@@ -138,17 +121,6 @@ const main = (): void => {
                 "DISABLE_CSP is enabled in preview (debug only). Remember to remove it so CSP matches production.",
             );
         }
-    }
-
-    if (wantsBilling) {
-        requireKey(billingEnv, "REVENUECAT_API_KEY", errors);
-        requireKey(billingEnv, "REVENUECAT_PROJECT_ID", errors);
-        requireKey(billingEnv, "REVENUECAT_WEBHOOK_SECRET", errors);
-        requireKey(billingEnv, "REVENUECAT_WEB_PURCHASE_URL", errors, {
-            validate: (value) =>
-                validateRevenueCatWpl(envName, value) ??
-                validateUrlStartsWithHttps(value),
-        });
     }
 
     requireKey(convexEnv, "CONVEX_DEPLOYMENT", errors);

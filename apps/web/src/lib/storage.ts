@@ -288,12 +288,12 @@ export function setSyncState(state: SyncState): void {
     localStorage.setItem(STORAGE_KEYS.SYNC_STATE, state);
 }
 
-export type SyncAutoEnableReason = "login" | "billing";
+export type SyncAutoEnableReason = "login";
 
 export function getSyncAutoEnableReason(): SyncAutoEnableReason | null {
     if (typeof window === "undefined") return null;
     const stored = localStorage.getItem(STORAGE_KEYS.SYNC_AUTO_ENABLE);
-    if (stored === "login" || stored === "billing") {
+    if (stored === "login") {
         return stored;
     }
     return null;

@@ -18,26 +18,6 @@ export default defineSchema({
         phone: v.optional(v.string()),
         phoneVerificationTime: v.optional(v.number()),
         isAnonymous: v.optional(v.boolean()),
-        subscriptionStatus: v.optional(
-            v.union(
-                v.literal("active"),
-                v.literal("expired"),
-                v.literal("none"),
-            ),
-        ),
-        subscriptionTier: v.optional(
-            v.union(v.literal("free"), v.literal("pro")),
-        ),
-        subscriptionOverridePro: v.optional(v.boolean()),
-        subscriptionExpiresAt: v.optional(v.number()),
-        subscriptionCancelAtPeriodEnd: v.optional(v.boolean()),
-        entitlementId: v.optional(v.string()),
-        entitlementActive: v.optional(v.boolean()),
-        entitlementExpiresAt: v.optional(v.number()),
-        revenuecatCustomerId: v.optional(v.string()),
-        lastWebhookEventId: v.optional(v.string()),
-        lastWebhookEventType: v.optional(v.string()),
-        lastWebhookEventAt: v.optional(v.number()),
         initialSync: v.optional(v.boolean()),
         // Encrypted API key storage (AES-256-GCM)
         encryptedApiKey: v.optional(v.string()), // Base64 ciphertext
