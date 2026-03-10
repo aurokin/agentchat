@@ -1,10 +1,10 @@
-# RouterChat
+# Agentchat
 
 A web application for chatting with AI models through OpenRouter. Users provide their own OpenRouter API key. Data can be stored locally in the browser or synced to the cloud.
 
 ## Try It Now
 
-Visit https://www.routerchat.chat to start chatting with your OpenRouter API key.
+Visit https://www.routerchat.chat to start chatting with Agentchat using your OpenRouter API key.
 
 ## Features
 
@@ -22,9 +22,9 @@ Visit https://www.routerchat.chat to start chatting with your OpenRouter API key
 - **IndexedDB Persistence** - Full chat history stored locally
 - **Theme Support** - Light, dark, and system theme options
 
-## About RouterChat
+## About Agentchat
 
-RouterChat is designed to keep you in control of your data and model choices.
+Agentchat is designed to keep you in control of your data and model choices.
 
 - **Local-first** - Works offline by default. Data stays on-device and requests go straight to OpenRouter.
 - **Optional cloud sync** - Enable sync with a Pro subscription, powered by Convex. API keys are stored in encrypted form.
@@ -99,7 +99,7 @@ References:
 
 #### Environment variables
 
-RouterChat can run in local-only mode with no env vars. Cloud Sync and Billing require configuration across:
+Agentchat can run in local-only mode with no env vars. Cloud Sync and Billing require configuration across:
 
 - Web app runtime (Railway service variables / `apps/web/.env.local`)
 - Mobile app runtime (EAS build env / `apps/mobile/.env`)
@@ -110,11 +110,11 @@ RouterChat can run in local-only mode with no env vars. Cloud Sync and Billing r
 
 Set these as Railway service variables (preview/production) or in `apps/web/.env.local` for local dev. A template lives at `apps/web/.env.example`.
 
-- `NEXT_PUBLIC_CONVEX_URL` - Convex deployment URL (from the Convex dashboard). When unset, RouterChat runs local-only (no cloud sync).
-- `REVENUECAT_WEB_PURCHASE_URL` - RevenueCat Web Billing purchase link template (from the RevenueCat dashboard). RouterChat appends `userId` as a path segment (trailing slash is ok).
+- `NEXT_PUBLIC_CONVEX_URL` - Convex deployment URL (from the Convex dashboard). When unset, Agentchat runs local-only (no cloud sync).
+- `REVENUECAT_WEB_PURCHASE_URL` - RevenueCat Web Billing purchase link template (from the RevenueCat dashboard). Agentchat appends `userId` as a path segment (trailing slash is ok).
 - `NEXT_PUBLIC_REVENUECAT_WEB_PURCHASE_URL` - Legacy alias for `REVENUECAT_WEB_PURCHASE_URL`.
 - `NEXT_PUBLIC_ANALYTICS_ENABLED` - Optional web analytics flag. Set to `true` to enable PostHog client events.
-- `NEXT_PUBLIC_ANALYTICS_ENV` - Optional PostHog environment tag when sharing one PostHog project across environments. Recommended values: `dev` (local), `preview` (staging), `prod` (production). When unset, RouterChat infers from hostname and runtime.
+- `NEXT_PUBLIC_ANALYTICS_ENV` - Optional PostHog environment tag when sharing one PostHog project across environments. Recommended values: `dev` (local), `preview` (staging), `prod` (production). When unset, Agentchat infers from hostname and runtime.
 - `NEXT_PUBLIC_POSTHOG_KEY` - PostHog project API key (required when `NEXT_PUBLIC_ANALYTICS_ENABLED=true`).
 - `NEXT_PUBLIC_POSTHOG_HOST` - Optional PostHog host URL (defaults to `https://us.i.posthog.com`).
 - `CANONICAL_HOST` - Optional canonical host redirect enforced by web middleware in deployed environments. Example: `CANONICAL_HOST=www.routerchat.chat` to redirect apex requests to `www`. For preview consistency, you can set `CANONICAL_HOST=preview.routerchat.chat` (optional).
@@ -165,7 +165,7 @@ These are Convex-managed environment variables used by `packages/convex/convex/l
 
 Note: Convex requires environment variable names to be < 40 characters.
 
-**Billing note**: Billing is handled via RevenueCat Web Billing. Configure billing only through RevenueCat and do not set direct payment-processor keys/webhooks in RouterChat.
+**Billing note**: Billing is handled via RevenueCat Web Billing. Configure billing only through RevenueCat and do not set direct payment-processor keys/webhooks in Agentchat.
 
 **Generating the encryption key:**
 

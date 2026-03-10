@@ -1,4 +1,4 @@
-# RouterChat Agent Instructions
+# Agentchat Agent Instructions
 
 Read this file before making any changes in this repository.
 
@@ -6,7 +6,7 @@ Read this file before making any changes in this repository.
 
 - Package manager: Bun.
 - Health checks: run for each app you modify (see Tooling).
-- Product name: RouterChat.
+- Product name: Agentchat.
 - Git: avoid `git commit --no-verify` so hooks run.
 
 ## Detailed Instructions

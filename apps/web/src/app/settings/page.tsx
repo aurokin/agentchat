@@ -1041,7 +1041,7 @@ function SettingsPageContent() {
                             <h2 className="text-lg font-medium">About</h2>
                         </div>
                         <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
-                            RouterChat provides a unified interface for AI
+                            Agentchat provides a unified interface for AI
                             conversations through OpenRouter, with a flexible
                             setup that lets you choose how your data is stored.
                         </p>
@@ -1059,10 +1059,10 @@ function SettingsPageContent() {
                                         Local Only
                                     </div>
                                     <p className="text-sm text-muted-foreground leading-relaxed">
-                                        RouterChat works offline by default.
-                                        Your data stays on this device, and
-                                        requests are sent directly to OpenRouter
-                                        using your API key.
+                                        Agentchat works offline by default. Your
+                                        data stays on this device, and requests
+                                        are sent directly to OpenRouter using
+                                        your API key.
                                     </p>
                                 </div>
                                 <div className="border border-border bg-muted/20 p-4 space-y-2">
@@ -1083,7 +1083,7 @@ function SettingsPageContent() {
                                     <p className="text-sm text-muted-foreground leading-relaxed">
                                         Choose any model available through
                                         OpenRouter and tailor the experience to
-                                        your workflow. RouterChat is built to
+                                        your workflow. Agentchat is built to
                                         maximize flexibility and put you in
                                         control.
                                     </p>

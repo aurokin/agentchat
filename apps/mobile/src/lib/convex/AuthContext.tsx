@@ -85,7 +85,7 @@ export function AuthProvider({
         }
 
         const redirectUri = makeRedirectUri({
-            scheme: "routerchat",
+            scheme: "agentchat",
             path: "convex-auth",
         });
         const retryDelaysMs = [500, 1000, 2000, 4000, 8000];

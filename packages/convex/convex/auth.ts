@@ -68,7 +68,7 @@ const getSiteUrl = () => {
 };
 
 const resolveRedirectTo = (redirectTo: string) => {
-    const mobileRedirectPrefix = "routerchat://convex-auth";
+    const mobileRedirectPrefix = "agentchat://convex-auth";
     if (redirectTo.startsWith(mobileRedirectPrefix)) {
         return redirectTo;
     }

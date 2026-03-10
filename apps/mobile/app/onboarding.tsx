@@ -43,7 +43,7 @@ export default function OnboardingScreen({
 
     const steps = [
         {
-            title: "Welcome to RouterChat",
+            title: "Welcome to Agentchat",
             subtitle: "An offline-first chat app powered by OpenRouter",
             content: [],
         },

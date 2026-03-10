@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-    title: "Terms of Service | RouterChat",
+    title: "Terms of Service | Agentchat",
 };
 
 export default function TermsPage() {
@@ -22,14 +22,14 @@ export default function TermsPage() {
                         href="/"
                         className="text-sm text-muted-foreground hover:text-foreground"
                     >
-                        RouterChat
+                        Agentchat
                     </Link>
                 </div>
 
                 <div className="prose prose-sm max-w-none dark:prose-invert prose-headings:text-foreground prose-p:text-foreground prose-a:text-primary prose-strong:text-foreground">
                     <p>
                         These Terms of Service (the &quot;Terms&quot;) govern
-                        your access to and use of RouterChat (the
+                        your access to and use of Agentchat (the
                         &quot;Service&quot;). By using the Service, you agree to
                         these Terms.
                     </p>

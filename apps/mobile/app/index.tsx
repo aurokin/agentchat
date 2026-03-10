@@ -197,7 +197,7 @@ export default function HomeScreen(): React.ReactElement {
                 >
                     {isSelecting
                         ? `${selectedChatIds.size} selected`
-                        : "RouterChat"}
+                        : "Agentchat"}
                 </Text>
                 {isSelecting ? (
                     <View style={styles.selectionActions}>

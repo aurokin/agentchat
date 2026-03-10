@@ -1,8 +1,8 @@
 {
     "expo": {
-        "name": "RouterChat",
-        "slug": "routerchat",
-        "scheme": "routerchat",
+        "name": "Agentchat",
+        "slug": "agentchat",
+        "scheme": "agentchat",
         "version": "1.0.0",
         "orientation": "portrait",
         "icon": "./assets/icon.png",
@@ -15,7 +15,7 @@
         },
         "ios": {
             "supportsTablet": true,
-            "bundleIdentifier": "com.routerchat.app",
+            "bundleIdentifier": "com.agentchat.app",
             "infoPlist": {
                 "ITSAppUsesNonExemptEncryption": false
             }
@@ -26,7 +26,7 @@
                 "backgroundColor": "#ffffff"
             },
             "edgeToEdgeEnabled": true,
-            "package": "com.routerchat.app"
+            "package": "com.agentchat.app"
         },
         "web": {
             "favicon": "./assets/favicon.png"

@@ -1,5 +1,5 @@
 {
-    "name": "@routerchat/shared",
+    "name": "@agentchat/shared",
     "version": "0.2.0",
     "private": true,
     "main": "src/index.ts",

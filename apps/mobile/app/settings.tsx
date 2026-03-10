@@ -254,7 +254,7 @@ export default function SettingsScreen(): ReactElement {
         if (subscription?.hasCloudSync === false) {
             Alert.alert(
                 "Subscription Required",
-                "Cloud sync requires a RouterChat Pro subscription.",
+                "Cloud sync requires an Agentchat Pro subscription.",
                 openPortal
                     ? [
                           { text: "Cancel", style: "cancel" },
@@ -629,7 +629,7 @@ export default function SettingsScreen(): ReactElement {
                                                         }
                                                     >
                                                         Cloud sync requires
-                                                        RouterChat Pro.
+                                                        Agentchat Pro.
                                                     </Text>
                                                 )}
                                             {isMigrating &&
@@ -1333,7 +1333,7 @@ export default function SettingsScreen(): ReactElement {
                     <View style={styles.section}>
                         <Text style={styles.sectionTitle}>About</Text>
                         <View style={styles.settingItem}>
-                            <Text style={styles.appName}>RouterChat</Text>
+                            <Text style={styles.appName}>Agentchat</Text>
                             <Text style={styles.version}>Version 1.0.0</Text>
                         </View>
                         <Text style={styles.settingDescription}>

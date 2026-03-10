@@ -82,7 +82,7 @@ http.route({
             id: (event as any).id,
         };
 
-        // RevenueCat dashboard "Test webhook" events are not tied to a real RouterChat user id.
+        // RevenueCat dashboard "Test webhook" events are not tied to a real Agentchat user id.
         // Treat them as a transport/auth smoke test and return 200 so the integration can be verified.
         if (sanitizedEvent.type === "TEST") {
             console.log("RevenueCat webhook test event received");

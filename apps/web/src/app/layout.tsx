@@ -28,7 +28,7 @@ const ibmPlexMono = IBM_Plex_Mono({
 const isDevelopment = process.env.NODE_ENV === "development";
 
 export const metadata: Metadata = {
-    title: isDevelopment ? "RouterChat - DEV" : "RouterChat",
+    title: isDevelopment ? "Agentchat - DEV" : "Agentchat",
     description: "Chat with AI models through OpenRouter",
 };
 

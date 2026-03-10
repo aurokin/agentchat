@@ -6,7 +6,7 @@
 - Entry point: `index.tsx` imports `expo-router/entry`.
 - TypeScript config extends `expo/tsconfig.base`.
 - EAS config for dev builds is in `eas.json`.
-- Bundle ID: `com.routerchat.app` (configured in `app.json`).
+- Bundle ID: `com.agentchat.app` (configured in `app.json`).
 - Monorepo paths: use `@shared/*` for `packages/shared/src/*` and ensure `metro.config.js` includes `watchFolders` pointing to the workspace root.
 
 ## Credential Storage (API Keys And Tokens)
@@ -50,7 +50,7 @@ await clearAllCredentials();
 
 - All credential storage functions are async (unlike web's localStorage which is sync).
 - Expo SecureStore automatically encrypts data on Android and iOS.
-- Keys are prefixed with `routerchat-` to avoid collisions with other apps.
+- Keys are still prefixed with `routerchat-` for backward compatibility with existing installs.
 - Always use `clearAllCredentials()` for complete logout, not just `clearApiKey()`.
 
 ## Google OAuth Via Convex Auth
@@ -67,7 +67,7 @@ The mobile app uses Expo Auth Session with Convex Auth for Google sign-in.
 
 - Convex URL is stored in SecureStore under `routerchat-convex-url`.
 - Env var: `EXPO_PUBLIC_GOOGLE_CLIENT_ID` (set in `app.config.js` or `app.config.ts`).
-- Redirect URI: `routerchat://convex-auth`.
+- Redirect URI: `agentchat://convex-auth`.
 - API key validation works independently of Convex Auth.
 
 ### Auth Context
@@ -272,6 +272,8 @@ const handleValidate = async () => {
 ## First-Run Onboarding
 
 Onboarding completion is stored in SecureStore under `routerchat-has-completed-onboarding`.
+
+The app brand is now `Agentchat`, but persisted SecureStore keys remain on the legacy `routerchat-*` namespace until an explicit migration is added.
 
 ```typescript
 import {

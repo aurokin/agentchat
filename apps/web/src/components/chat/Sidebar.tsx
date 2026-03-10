@@ -310,7 +310,7 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                         </div>
                         <div>
                             <h1 className="font-semibold text-lg tracking-tight text-foreground">
-                                RouterChat
+                                Agentchat
                             </h1>
                             <CloudStatusBadge />
                         </div>

@@ -24,15 +24,15 @@ if [[ -z "$latest_tar" ]]; then
     exit 1
 fi
 
-rm -rf "$BUILD_DIR/RouterChat" "$BUILD_DIR/RouterChat.app"
+rm -rf "$BUILD_DIR/Agentchat" "$BUILD_DIR/Agentchat.app"
 tar -xzf "$latest_tar" -C "$BUILD_DIR"
 
-app_path="$BUILD_DIR/RouterChat.app"
+app_path="$BUILD_DIR/Agentchat.app"
 if [[ ! -d "$app_path" ]]; then
-    if [[ -d "$BUILD_DIR/RouterChat/RouterChat.app" ]]; then
-        app_path="$BUILD_DIR/RouterChat/RouterChat.app"
+    if [[ -d "$BUILD_DIR/Agentchat/Agentchat.app" ]]; then
+        app_path="$BUILD_DIR/Agentchat/Agentchat.app"
     else
-        echo "RouterChat.app not found after extracting $latest_tar" >&2
+        echo "Agentchat.app not found after extracting $latest_tar" >&2
         exit 1
     fi
 fi
