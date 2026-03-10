@@ -87,7 +87,7 @@ const { user, isAuthenticated, isLoading, signIn, signOut, isConvexAvailable } =
 2. Expo Auth Session opens Google OAuth.
 3. On success, Convex client queries `auth:user` with the access token.
 4. Auth context updates user state.
-5. Cloud sync becomes available.
+5. The Convex-backed workspace becomes available.
 
 ### Sign-Out Flow
 
@@ -95,15 +95,17 @@ const { user, isAuthenticated, isLoading, signIn, signOut, isConvexAvailable } =
 2. Auth context clears user state.
 3. Convex client is cleared.
 4. Credentials are cleared via `clearAllCredentials()`.
-5. Sync state reverts to `local-only`.
+5. The app returns to a signed-out, Convex-only state.
 
 ## Sync State Management
 
-The mobile app uses three sync states:
+The shared sync types still expose three states:
 
-- `local-only`: default, all data stored locally
-- `cloud-enabled`: cloud sync is active
-- `cloud-disabled`: cloud sync configured but disabled by user
+- `local-only`
+- `cloud-enabled`
+- `cloud-disabled`
+
+Current mobile runtime behavior is Convex-first: signed-in users operate in `cloud-enabled`, and signed-out users are treated as disconnected rather than local-first.
 
 ### Sync State Storage
 

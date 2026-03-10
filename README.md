@@ -1,6 +1,6 @@
 # Agentchat
 
-A web application for chatting with AI models through OpenRouter. Users provide their own OpenRouter API key. Data can be stored locally in the browser or synced to the cloud.
+A web application for chatting with AI models through OpenRouter. Users provide their own OpenRouter API key. Agentchat is now being shaped as a self-hosted, Convex-backed app.
 
 ## Try It Now
 
@@ -15,11 +15,9 @@ Visit https://www.routerchat.chat to start chatting with Agentchat using your Op
 - **System Skills** - Choose from preset prompts or create custom system messages
 - **Markdown Support** - Rich text rendering for code blocks, lists, and formatting
 - **Copy Messages** - One-click copy for any message
-- **Local Storage** - API key, settings, and chat history stored in browser (default)
-- **Cloud Sync** - Optional sync to Convex for cross-device access (Pro subscription)
-- **First-run Tutorial** - Short, skippable setup for sync and API keys
+- **Convex Workspace** - Chats, skills, and encrypted API keys stored in Convex
+- **Self-Hosted Direction** - Built for deployments you run and control
 - **Optional Analytics** - PostHog instrumentation for product usage events when enabled
-- **IndexedDB Persistence** - Full chat history stored locally
 - **Theme Support** - Light, dark, and system theme options
 - **Android Share Intent** - Share text, links, and images from other Android apps directly into a new Agentchat draft
 
@@ -27,8 +25,8 @@ Visit https://www.routerchat.chat to start chatting with Agentchat using your Op
 
 Agentchat is designed to keep you in control of your data and model choices.
 
-- **Local-first** - Works offline by default. Data stays on-device and requests go straight to OpenRouter.
-- **Optional cloud sync** - Enable sync with a Pro subscription, powered by Convex. API keys are stored in encrypted form.
+- **Self-hosted** - Run Agentchat on infrastructure you control.
+- **Convex-backed** - Chats, skills, and encrypted API keys live in Convex.
 - **User-empowered** - Choose any model available through OpenRouter and customize your experience.
 
 ## Tech Stack
@@ -40,7 +38,7 @@ Agentchat is designed to keep you in control of your data and model choices.
 | Language  | TypeScript 5.x                                    |
 | UI        | Tailwind CSS 4                                    |
 | State     | React Context + Hooks                             |
-| Storage   | IndexedDB + localStorage (local) / Convex (cloud) |
+| Storage   | Convex + encrypted API key storage                 |
 | API       | OpenRouter API                                    |
 | Linting   | ESLint                                            |
 | Testing   | Bun Test                                          |
@@ -72,9 +70,9 @@ cd apps/web && bun dev
 
 ### Environment Setup Runbooks
 
-- Local development (local-only, optional Convex dev): `docs/local_environment_setup_checklist.md`
-- Preview (Cloud Sync + Billing): `docs/preview_environment_setup_checklist.md`
-- Production (Cloud Sync + Billing): `docs/prod_environment_setup_checklist.md`
+- Local development: `docs/local_environment_setup_checklist.md`
+- Preview deployment: `docs/preview_environment_setup_checklist.md`
+- Production deployment: `docs/prod_environment_setup_checklist.md`
 
 ### Configuration
 
@@ -83,9 +81,9 @@ cd apps/web && bun dev
 3. Generate an API key from https://openrouter.ai/keys
 4. Enter the key in the app's Settings page
 
-### Cloud Sync Hosting
+### Hosting
 
-Only required if you are hosting an instance with Cloud Sync enabled.
+Required for any self-hosted Agentchat deployment.
 
 Primary runbooks:
 
@@ -95,12 +93,12 @@ Primary runbooks:
 References:
 
 - `docs/deploy/railway.md` for Railway deployment configuration.
-- `docs/cloud_dashboard_setup.md` for the Convex/RevenueCat dashboard checklist.
+- `docs/cloud_dashboard_setup.md` for the Convex dashboard checklist.
 - `docs/mobile_dev_setup.md` for mobile dev builds.
 
 #### Environment variables
 
-Agentchat can run in local-only mode with no env vars. Cloud Sync and Billing require configuration across:
+Agentchat requires Convex for synced data and authentication:
 
 - Web app runtime (Railway service variables / `apps/web/.env.local`)
 - Mobile app runtime (EAS build env / `apps/mobile/.env`)
@@ -111,9 +109,7 @@ Agentchat can run in local-only mode with no env vars. Cloud Sync and Billing re
 
 Set these as Railway service variables (preview/production) or in `apps/web/.env.local` for local dev. A template lives at `apps/web/.env.example`.
 
-- `NEXT_PUBLIC_CONVEX_URL` - Convex deployment URL (from the Convex dashboard). When unset, Agentchat runs local-only (no cloud sync).
-- `REVENUECAT_WEB_PURCHASE_URL` - RevenueCat Web Billing purchase link template (from the RevenueCat dashboard). Agentchat appends `userId` as a path segment (trailing slash is ok).
-- `NEXT_PUBLIC_REVENUECAT_WEB_PURCHASE_URL` - Legacy alias for `REVENUECAT_WEB_PURCHASE_URL`.
+- `NEXT_PUBLIC_CONVEX_URL` - Convex deployment URL (from the Convex dashboard).
 - `NEXT_PUBLIC_ANALYTICS_ENABLED` - Optional web analytics flag. Set to `true` to enable PostHog client events.
 - `NEXT_PUBLIC_ANALYTICS_ENV` - Optional PostHog environment tag when sharing one PostHog project across environments. Recommended values: `dev` (local), `preview` (staging), `prod` (production). When unset, Agentchat infers from hostname and runtime.
 - `NEXT_PUBLIC_POSTHOG_KEY` - PostHog project API key (required when `NEXT_PUBLIC_ANALYTICS_ENABLED=true`).
@@ -125,7 +121,7 @@ Set these as Railway service variables (preview/production) or in `apps/web/.env
 
 Set these in EAS build env (see `apps/mobile/eas.json`) or in `apps/mobile/.env` for local runs. A template lives at `apps/mobile/.env.example`.
 
-- `EXPO_PUBLIC_CONVEX_URL` - Convex deployment URL for this build (same as web `NEXT_PUBLIC_CONVEX_URL`, from the Convex dashboard). When unset, mobile runs local-only and cloud features are disabled.
+- `EXPO_PUBLIC_CONVEX_URL` - Convex deployment URL for this build (same as web `NEXT_PUBLIC_CONVEX_URL`, from the Convex dashboard).
 - `EXPO_PUBLIC_GOOGLE_CLIENT_ID` - Optional. Only needed for client-side Google OAuth flows (the current Convex-hosted sign-in does not require it).
 
 **Convex CLI (`packages/convex`)**
@@ -145,12 +141,6 @@ These are Convex-managed environment variables (not Railway vars). Set them in t
 - `JWKS` - JSON Web Key Set used by Convex auth.
 - `JWT_PRIVATE_KEY` - Private key used by Convex auth for JWT signing.
 - `ENCRYPTION_KEY` - AES-256 key for encrypting sensitive data (API keys).
-- `REVENUECAT_WEBHOOK_SECRET` - Authorization header secret for RevenueCat webhooks (you choose this; configure it in RevenueCat server notifications).
-- `REVENUECAT_API_KEY` - RevenueCat v2 secret API key for entitlement refresh (from the RevenueCat dashboard).
-- `REVENUECAT_PROJECT_ID` - RevenueCat project ID for API v2 calls (from the RevenueCat dashboard).
-- `REVENUECAT_ENTITLEMENT_IDS` - Optional comma-separated entitlement identifiers or IDs to treat as Pro (defaults to `pro`). Recommended: include both lookup key and internal id(s), e.g. `pro,entl7a739786eb`.
-- `REVENUECAT_DEBUG` - Optional debug flag for logging RevenueCat responses.
-
 Convex also provides some runtime variables that you can read but do not set:
 
 - `CONVEX_SITE_URL` - Convex-provided base URL for this deployment's "site" (used by Convex Auth in `packages/convex/convex/auth.config.ts`).
@@ -165,8 +155,6 @@ These are Convex-managed environment variables used by `packages/convex/convex/l
 - Pagination: `ROUTERCHAT_MAX_PAGE_CHATS`, `ROUTERCHAT_MAX_PAGE_MESSAGES`, `ROUTERCHAT_MAX_PAGE_SKILLS`
 
 Note: Convex requires environment variable names to be < 40 characters.
-
-**Billing note**: Billing is handled via RevenueCat Web Billing. Configure billing only through RevenueCat and do not set direct payment-processor keys/webhooks in Agentchat.
 
 **Generating the encryption key:**
 
@@ -211,12 +199,9 @@ Agent instructions live in `AGENTS.md` and the linked docs under `docs/agents/`.
 ## Architecture Notes
 
 - **Direct API calls**: OpenRouter API calls are made directly from the client
-- **Dual storage paths**: App supports both local-only and cloud sync modes
-    - **Local mode** (default): All data in IndexedDB + localStorage, no account required
-    - **Cloud mode**: Data synced to Convex, requires authentication and Pro subscription
-- **Storage adapter pattern**: Unified interface abstracts local vs cloud storage
+- **Convex-only runtime**: Chats, skills, and API keys are stored through Convex during the current development phase
+- **Storage adapter pattern**: The local adapter remains in the codebase, but runtime paths now use Convex
 - **Monorepo**: Designed for future mobile expansion with shared types
-- **Offline support**: Local storage (IndexedDB + localStorage) is a separate database from cloud; users can copy cloud data to local storage for offline access
 
 ## License
 
