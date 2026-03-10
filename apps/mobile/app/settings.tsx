@@ -10,6 +10,8 @@ import {
     Alert,
     Image,
     Linking,
+    Platform,
+    useWindowDimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
@@ -50,7 +52,7 @@ export default function SettingsScreen(): ReactElement {
         signOut,
         isConvexAvailable,
     } = useAuthContext();
-    const { colors, userTheme, setUserTheme } = useTheme();
+    const { colors, userTheme, setUserTheme, isMaterialYouActive } = useTheme();
     const {
         status: subscription,
         isLoading: isSubscriptionLoading,
@@ -63,6 +65,7 @@ export default function SettingsScreen(): ReactElement {
         clearApiKey: removeApiKey,
         isCloudSynced,
     } = useApiKey();
+    const { width: windowWidth, height: windowHeight } = useWindowDimensions();
     const styles = useMemo(() => createStyles(colors), [colors]);
 
     const [apiKey, setApiKeyValue] = useState("");
@@ -458,6 +461,12 @@ export default function SettingsScreen(): ReactElement {
     const hasCloudSync = subscription?.hasCloudSync ?? false;
     const syncActionDisabled = isMigrating || isCloning;
     const isGoogleButtonBusy = isAuthLoading || isSigningIn;
+    const isTwoPaneLayout = Math.min(windowWidth, windowHeight) >= 700;
+    const settingsRailWidth = Math.max(256, Math.min(320, windowWidth * 0.28));
+    const settingsContentMaxWidth = Math.max(
+        620,
+        Math.min(980, windowWidth - settingsRailWidth - 48),
+    );
 
     const getSyncStatusColor = () => {
         switch (syncState) {
@@ -481,866 +490,1253 @@ export default function SettingsScreen(): ReactElement {
         }
     };
 
+    const handleBack = () => {
+        if (router.canGoBack()) {
+            router.back();
+            return;
+        }
+        router.replace("/");
+    };
+
     return (
         <SafeAreaProvider>
             <SafeAreaView style={styles.container}>
-                <View style={styles.header}>
-                    <TouchableOpacity
-                        onPress={() => router.replace("/")}
-                        style={styles.backButton}
-                        accessibilityLabel="Back"
-                    >
-                        <Feather
-                            name="arrow-left"
-                            size={20}
-                            color={colors.accent}
-                        />
-                    </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Settings</Text>
-                    <View style={styles.headerSpacer} />
-                </View>
-
-                <ScrollView style={styles.scrollContent}>
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Account</Text>
-
-                        {isAuthLoading ? (
-                            <ActivityIndicator
-                                style={styles.loading}
-                                color={colors.accent}
-                            />
-                        ) : isAuthenticated && user ? (
-                            <View style={styles.userInfo}>
-                                {user.image && (
-                                    <Image
-                                        source={{ uri: user.image }}
-                                        style={styles.userAvatar}
-                                    />
-                                )}
-                                <View style={styles.userDetails}>
-                                    <Text style={styles.userName}>
-                                        {user.name || "User"}
-                                    </Text>
-                                    <Text style={styles.userEmail}>
-                                        {user.email}
-                                    </Text>
-                                </View>
-                            </View>
-                        ) : (
-                            <Text style={styles.notSignedIn}>
-                                Sign in to enable cloud sync across devices.
-                            </Text>
-                        )}
-
-                        {isConvexAvailable && (
-                            <TouchableOpacity
-                                style={[
-                                    styles.googleButton,
-                                    isGoogleButtonBusy &&
-                                        styles.googleButtonDisabled,
-                                ]}
-                                onPress={
-                                    isAuthenticated
-                                        ? handleSignOut
-                                        : handleGoogleSignIn
-                                }
-                                disabled={isGoogleButtonBusy}
-                            >
-                                {isGoogleButtonBusy ? (
-                                    <View style={styles.googleButtonContent}>
-                                        <ActivityIndicator
-                                            color={colors.textOnAccent}
-                                            style={styles.googleButtonSpinner}
-                                        />
-                                        <Text style={styles.googleButtonText}>
-                                            {isSigningIn
-                                                ? "Signing in..."
-                                                : "Loading..."}
-                                        </Text>
-                                    </View>
-                                ) : (
-                                    <Text style={styles.googleButtonText}>
-                                        {isAuthenticated
-                                            ? "Sign Out"
-                                            : "Sign in with Google"}
-                                    </Text>
-                                )}
-                            </TouchableOpacity>
-                        )}
-
-                        {!isConvexAvailable && (
-                            <View style={styles.cloudWarning}>
-                                <Text style={styles.cloudWarningText}>
-                                    {convexUnavailableMessage}
+                <View
+                    style={[
+                        styles.settingsLayout,
+                        isTwoPaneLayout && styles.settingsLayoutTablet,
+                    ]}
+                >
+                    {isTwoPaneLayout && (
+                        <View
+                            style={[
+                                styles.tabletRail,
+                                { width: settingsRailWidth },
+                            ]}
+                        >
+                            <View style={styles.tabletRailHeader}>
+                                <Text style={styles.tabletRailAppName}>
+                                    Agentchat
+                                </Text>
+                                <Text style={styles.tabletRailTitle}>
+                                    Settings
                                 </Text>
                             </View>
-                        )}
-                    </View>
-
-                    {isAuthenticated && (
-                        <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>Sync</Text>
-
-                            {isConvexAvailable && (
-                                <View style={styles.syncStatusCard}>
-                                    <View style={styles.syncStatusHeader}>
-                                        <View
-                                            style={[
-                                                styles.syncStatusIndicator,
-                                                {
-                                                    backgroundColor:
-                                                        getSyncStatusColor(),
-                                                },
-                                            ]}
-                                        />
-                                        <View style={styles.syncStatusInfo}>
-                                            <Text
-                                                style={styles.syncStatusTitle}
-                                            >
-                                                {syncState === "cloud-enabled"
-                                                    ? "Cloud Sync Active"
-                                                    : syncState ===
-                                                        "cloud-disabled"
-                                                      ? "Cloud Sync Off"
-                                                      : "Local Only"}
-                                            </Text>
-                                            <Text
-                                                style={
-                                                    styles.syncStatusDescription
-                                                }
-                                            >
-                                                {getSyncStatusText()}
-                                            </Text>
-                                            {isSubscriptionLoading && (
-                                                <Text
-                                                    style={
-                                                        styles.syncStatusMeta
-                                                    }
-                                                >
-                                                    Checking subscription...
-                                                </Text>
-                                            )}
-                                            {!isSubscriptionLoading &&
-                                                isAuthenticated &&
-                                                !hasCloudSync && (
-                                                    <Text
-                                                        style={
-                                                            styles.syncStatusMeta
-                                                        }
-                                                    >
-                                                        Cloud sync requires
-                                                        Agentchat Pro.
-                                                    </Text>
-                                                )}
-                                            {isMigrating &&
-                                                migrationProgress && (
-                                                    <Text
-                                                        style={
-                                                            styles.syncStatusMeta
-                                                        }
-                                                    >
-                                                        Migrating...{" "}
-                                                        {Math.round(
-                                                            migrationProgress.percentage,
-                                                        )}
-                                                        %
-                                                    </Text>
-                                                )}
-                                            {isCloning && cloneProgress && (
-                                                <Text
-                                                    style={
-                                                        styles.syncStatusMeta
-                                                    }
-                                                >
-                                                    Cloning...{" "}
-                                                    {Math.round(
-                                                        cloneProgress.percentage,
-                                                    )}
-                                                    %
-                                                </Text>
-                                            )}
-                                        </View>
-                                    </View>
-
-                                    {syncState === "local-only" && (
-                                        <TouchableOpacity
-                                            style={styles.enableSyncButton}
-                                            onPress={handleEnableCloudSync}
-                                            disabled={syncActionDisabled}
-                                        >
-                                            <Text
-                                                style={
-                                                    styles.enableSyncButtonText
-                                                }
-                                            >
-                                                Enable Cloud Sync
-                                            </Text>
-                                        </TouchableOpacity>
-                                    )}
-
-                                    {syncState === "cloud-enabled" && (
-                                        <TouchableOpacity
-                                            style={styles.disableSyncButton}
-                                            onPress={handleDisableCloudSync}
-                                            disabled={syncActionDisabled}
-                                        >
-                                            <Text
-                                                style={
-                                                    styles.disableSyncButtonText
-                                                }
-                                            >
-                                                Disable Cloud Sync
-                                            </Text>
-                                        </TouchableOpacity>
-                                    )}
-
-                                    {syncState === "cloud-disabled" && (
-                                        <TouchableOpacity
-                                            style={styles.enableSyncButton}
-                                            onPress={handleEnableCloudSync}
-                                            disabled={syncActionDisabled}
-                                        >
-                                            <Text
-                                                style={
-                                                    styles.enableSyncButtonText
-                                                }
-                                            >
-                                                Re-enable Cloud Sync
-                                            </Text>
-                                        </TouchableOpacity>
-                                    )}
-
-                                    {isAuthenticated && !hasCloudSync && (
-                                        <TouchableOpacity
-                                            style={styles.portalButton}
-                                            onPress={handleOpenPortal}
-                                        >
-                                            <Text
-                                                style={styles.portalButtonText}
-                                            >
-                                                Manage Subscription
-                                            </Text>
-                                        </TouchableOpacity>
-                                    )}
-                                </View>
-                            )}
-
-                            {!isConvexAvailable && (
-                                <View style={styles.syncWarning}>
-                                    <Text style={styles.syncWarningText}>
-                                        {convexUnavailableMessage}
-                                    </Text>
-                                </View>
-                            )}
+                            <TouchableOpacity
+                                style={styles.tabletRailBackButton}
+                                onPress={handleBack}
+                                accessibilityLabel="Back to chats"
+                            >
+                                <Feather
+                                    name="arrow-left"
+                                    size={16}
+                                    color={colors.accent}
+                                />
+                                <Text style={styles.tabletRailBackButtonText}>
+                                    Back to chats
+                                </Text>
+                            </TouchableOpacity>
+                            <View style={styles.tabletRailSummaryCard}>
+                                <Text style={styles.tabletRailSummaryLabel}>
+                                    Account
+                                </Text>
+                                <Text
+                                    style={styles.tabletRailSummaryValue}
+                                    numberOfLines={1}
+                                >
+                                    {isAuthenticated
+                                        ? user?.email || "Signed in"
+                                        : "Signed out"}
+                                </Text>
+                                <Text style={styles.tabletRailSummaryLabel}>
+                                    Sync
+                                </Text>
+                                <Text style={styles.tabletRailSummaryValue}>
+                                    {syncState === "cloud-enabled"
+                                        ? "Cloud active"
+                                        : syncState === "cloud-disabled"
+                                          ? "Cloud paused"
+                                          : "Local only"}
+                                </Text>
+                            </View>
                         </View>
                     )}
 
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>OpenRouter API</Text>
-
-                        {isApiKeyLoading ? (
-                            <ActivityIndicator
-                                style={styles.loading}
-                                color={colors.accent}
-                            />
-                        ) : (
-                            <>
-                                <View style={styles.inputContainer}>
-                                    <Text style={styles.inputLabel}>
-                                        API Key
-                                    </Text>
-                                    <TextInput
-                                        style={styles.textInput}
-                                        value={apiKey}
-                                        onChangeText={setApiKeyValue}
-                                        placeholder="sk-..."
-                                        placeholderTextColor={colors.textFaint}
-                                        secureTextEntry
-                                        autoCapitalize="none"
-                                        autoCorrect={false}
+                    <View style={styles.settingsMain}>
+                        {!isTwoPaneLayout && (
+                            <View style={styles.header}>
+                                <TouchableOpacity
+                                    onPress={handleBack}
+                                    style={styles.backButton}
+                                    accessibilityLabel="Back"
+                                >
+                                    <Feather
+                                        name="arrow-left"
+                                        size={20}
+                                        color={colors.accent}
                                     />
-                                    {isCloudSynced && (
-                                        <Text style={styles.apiKeyStorageText}>
-                                            Stored in cloud sync
+                                </TouchableOpacity>
+                                <Text style={styles.headerTitle}>Settings</Text>
+                                <View style={styles.headerSpacer} />
+                            </View>
+                        )}
+
+                        <ScrollView
+                            style={styles.scrollContent}
+                            contentContainerStyle={[
+                                styles.scrollContentContainer,
+                                isTwoPaneLayout &&
+                                    styles.scrollContentContainerTablet,
+                            ]}
+                        >
+                            <View
+                                style={[
+                                    styles.sectionsColumn,
+                                    isTwoPaneLayout && {
+                                        maxWidth: settingsContentMaxWidth,
+                                    },
+                                ]}
+                            >
+                                <View style={styles.section}>
+                                    <Text style={styles.sectionTitle}>
+                                        Account
+                                    </Text>
+
+                                    {isAuthLoading ? (
+                                        <ActivityIndicator
+                                            style={styles.loading}
+                                            color={colors.accent}
+                                        />
+                                    ) : isAuthenticated && user ? (
+                                        <View style={styles.userInfo}>
+                                            {user.image && (
+                                                <Image
+                                                    source={{ uri: user.image }}
+                                                    style={styles.userAvatar}
+                                                />
+                                            )}
+                                            <View style={styles.userDetails}>
+                                                <Text style={styles.userName}>
+                                                    {user.name || "User"}
+                                                </Text>
+                                                <Text style={styles.userEmail}>
+                                                    {user.email}
+                                                </Text>
+                                            </View>
+                                        </View>
+                                    ) : (
+                                        <Text style={styles.notSignedIn}>
+                                            Sign in to enable cloud sync across
+                                            devices.
                                         </Text>
+                                    )}
+
+                                    {isConvexAvailable && (
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.googleButton,
+                                                isGoogleButtonBusy &&
+                                                    styles.googleButtonDisabled,
+                                            ]}
+                                            onPress={
+                                                isAuthenticated
+                                                    ? handleSignOut
+                                                    : handleGoogleSignIn
+                                            }
+                                            disabled={isGoogleButtonBusy}
+                                        >
+                                            {isGoogleButtonBusy ? (
+                                                <View
+                                                    style={
+                                                        styles.googleButtonContent
+                                                    }
+                                                >
+                                                    <ActivityIndicator
+                                                        color={
+                                                            colors.textOnAccent
+                                                        }
+                                                        style={
+                                                            styles.googleButtonSpinner
+                                                        }
+                                                    />
+                                                    <Text
+                                                        style={
+                                                            styles.googleButtonText
+                                                        }
+                                                    >
+                                                        {isSigningIn
+                                                            ? "Signing in..."
+                                                            : "Loading..."}
+                                                    </Text>
+                                                </View>
+                                            ) : (
+                                                <Text
+                                                    style={
+                                                        styles.googleButtonText
+                                                    }
+                                                >
+                                                    {isAuthenticated
+                                                        ? "Sign Out"
+                                                        : "Sign in with Google"}
+                                                </Text>
+                                            )}
+                                        </TouchableOpacity>
+                                    )}
+
+                                    {!isConvexAvailable && (
+                                        <View style={styles.cloudWarning}>
+                                            <Text
+                                                style={styles.cloudWarningText}
+                                            >
+                                                {convexUnavailableMessage}
+                                            </Text>
+                                        </View>
                                     )}
                                 </View>
 
-                                {apiKey.length > 0 && (
-                                    <View style={styles.validationContainer}>
-                                        {isValidating ? (
-                                            <ActivityIndicator
-                                                size="small"
-                                                color={colors.accent}
-                                            />
-                                        ) : isValid === true ? (
-                                            <Text style={styles.validText}>
-                                                ✓ Valid API key
-                                            </Text>
-                                        ) : isValid === false ? (
-                                            <Text style={styles.invalidText}>
-                                                ✗ Invalid API key
-                                            </Text>
-                                        ) : null}
+                                {isAuthenticated && (
+                                    <View style={styles.section}>
+                                        <Text style={styles.sectionTitle}>
+                                            Sync
+                                        </Text>
+
+                                        {isConvexAvailable && (
+                                            <View style={styles.syncStatusCard}>
+                                                <View
+                                                    style={
+                                                        styles.syncStatusHeader
+                                                    }
+                                                >
+                                                    <View
+                                                        style={[
+                                                            styles.syncStatusIndicator,
+                                                            {
+                                                                backgroundColor:
+                                                                    getSyncStatusColor(),
+                                                            },
+                                                        ]}
+                                                    />
+                                                    <View
+                                                        style={
+                                                            styles.syncStatusInfo
+                                                        }
+                                                    >
+                                                        <Text
+                                                            style={
+                                                                styles.syncStatusTitle
+                                                            }
+                                                        >
+                                                            {syncState ===
+                                                            "cloud-enabled"
+                                                                ? "Cloud Sync Active"
+                                                                : syncState ===
+                                                                    "cloud-disabled"
+                                                                  ? "Cloud Sync Off"
+                                                                  : "Local Only"}
+                                                        </Text>
+                                                        <Text
+                                                            style={
+                                                                styles.syncStatusDescription
+                                                            }
+                                                        >
+                                                            {getSyncStatusText()}
+                                                        </Text>
+                                                        {isSubscriptionLoading && (
+                                                            <Text
+                                                                style={
+                                                                    styles.syncStatusMeta
+                                                                }
+                                                            >
+                                                                Checking
+                                                                subscription...
+                                                            </Text>
+                                                        )}
+                                                        {!isSubscriptionLoading &&
+                                                            isAuthenticated &&
+                                                            !hasCloudSync && (
+                                                                <Text
+                                                                    style={
+                                                                        styles.syncStatusMeta
+                                                                    }
+                                                                >
+                                                                    Cloud sync
+                                                                    requires
+                                                                    Agentchat
+                                                                    Pro.
+                                                                </Text>
+                                                            )}
+                                                        {isMigrating &&
+                                                            migrationProgress && (
+                                                                <Text
+                                                                    style={
+                                                                        styles.syncStatusMeta
+                                                                    }
+                                                                >
+                                                                    Migrating...{" "}
+                                                                    {Math.round(
+                                                                        migrationProgress.percentage,
+                                                                    )}
+                                                                    %
+                                                                </Text>
+                                                            )}
+                                                        {isCloning &&
+                                                            cloneProgress && (
+                                                                <Text
+                                                                    style={
+                                                                        styles.syncStatusMeta
+                                                                    }
+                                                                >
+                                                                    Cloning...{" "}
+                                                                    {Math.round(
+                                                                        cloneProgress.percentage,
+                                                                    )}
+                                                                    %
+                                                                </Text>
+                                                            )}
+                                                    </View>
+                                                </View>
+
+                                                {syncState === "local-only" && (
+                                                    <TouchableOpacity
+                                                        style={
+                                                            styles.enableSyncButton
+                                                        }
+                                                        onPress={
+                                                            handleEnableCloudSync
+                                                        }
+                                                        disabled={
+                                                            syncActionDisabled
+                                                        }
+                                                    >
+                                                        <Text
+                                                            style={
+                                                                styles.enableSyncButtonText
+                                                            }
+                                                        >
+                                                            Enable Cloud Sync
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                )}
+
+                                                {syncState ===
+                                                    "cloud-enabled" && (
+                                                    <TouchableOpacity
+                                                        style={
+                                                            styles.disableSyncButton
+                                                        }
+                                                        onPress={
+                                                            handleDisableCloudSync
+                                                        }
+                                                        disabled={
+                                                            syncActionDisabled
+                                                        }
+                                                    >
+                                                        <Text
+                                                            style={
+                                                                styles.disableSyncButtonText
+                                                            }
+                                                        >
+                                                            Disable Cloud Sync
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                )}
+
+                                                {syncState ===
+                                                    "cloud-disabled" && (
+                                                    <TouchableOpacity
+                                                        style={
+                                                            styles.enableSyncButton
+                                                        }
+                                                        onPress={
+                                                            handleEnableCloudSync
+                                                        }
+                                                        disabled={
+                                                            syncActionDisabled
+                                                        }
+                                                    >
+                                                        <Text
+                                                            style={
+                                                                styles.enableSyncButtonText
+                                                            }
+                                                        >
+                                                            Re-enable Cloud Sync
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                )}
+
+                                                {isAuthenticated &&
+                                                    !hasCloudSync && (
+                                                        <TouchableOpacity
+                                                            style={
+                                                                styles.portalButton
+                                                            }
+                                                            onPress={
+                                                                handleOpenPortal
+                                                            }
+                                                        >
+                                                            <Text
+                                                                style={
+                                                                    styles.portalButtonText
+                                                                }
+                                                            >
+                                                                Manage
+                                                                Subscription
+                                                            </Text>
+                                                        </TouchableOpacity>
+                                                    )}
+                                            </View>
+                                        )}
+
+                                        {!isConvexAvailable && (
+                                            <View style={styles.syncWarning}>
+                                                <Text
+                                                    style={
+                                                        styles.syncWarningText
+                                                    }
+                                                >
+                                                    {convexUnavailableMessage}
+                                                </Text>
+                                            </View>
+                                        )}
                                     </View>
                                 )}
 
-                                <View style={styles.buttonRow}>
-                                    <TouchableOpacity
-                                        style={styles.saveButton}
-                                        onPress={handleSaveApiKey}
-                                        disabled={isValidating}
-                                    >
-                                        <Text style={styles.saveButtonText}>
-                                            Save API Key
-                                        </Text>
-                                    </TouchableOpacity>
+                                <View style={styles.section}>
+                                    <Text style={styles.sectionTitle}>
+                                        OpenRouter API
+                                    </Text>
 
-                                    {apiKey.length > 0 && (
-                                        <TouchableOpacity
-                                            style={styles.clearButton}
-                                            onPress={handleClearApiKey}
-                                            disabled={isValidating}
-                                        >
-                                            <Text
-                                                style={styles.clearButtonText}
-                                            >
-                                                Clear
+                                    {isApiKeyLoading ? (
+                                        <ActivityIndicator
+                                            style={styles.loading}
+                                            color={colors.accent}
+                                        />
+                                    ) : (
+                                        <>
+                                            <View style={styles.inputContainer}>
+                                                <Text style={styles.inputLabel}>
+                                                    API Key
+                                                </Text>
+                                                <TextInput
+                                                    style={styles.textInput}
+                                                    value={apiKey}
+                                                    onChangeText={
+                                                        setApiKeyValue
+                                                    }
+                                                    placeholder="sk-..."
+                                                    placeholderTextColor={
+                                                        colors.textFaint
+                                                    }
+                                                    secureTextEntry
+                                                    autoCapitalize="none"
+                                                    autoCorrect={false}
+                                                />
+                                                {isCloudSynced && (
+                                                    <Text
+                                                        style={
+                                                            styles.apiKeyStorageText
+                                                        }
+                                                    >
+                                                        Stored in cloud sync
+                                                    </Text>
+                                                )}
+                                            </View>
+
+                                            {apiKey.length > 0 && (
+                                                <View
+                                                    style={
+                                                        styles.validationContainer
+                                                    }
+                                                >
+                                                    {isValidating ? (
+                                                        <ActivityIndicator
+                                                            size="small"
+                                                            color={
+                                                                colors.accent
+                                                            }
+                                                        />
+                                                    ) : isValid === true ? (
+                                                        <Text
+                                                            style={
+                                                                styles.validText
+                                                            }
+                                                        >
+                                                            ✓ Valid API key
+                                                        </Text>
+                                                    ) : isValid === false ? (
+                                                        <Text
+                                                            style={
+                                                                styles.invalidText
+                                                            }
+                                                        >
+                                                            ✗ Invalid API key
+                                                        </Text>
+                                                    ) : null}
+                                                </View>
+                                            )}
+
+                                            <View style={styles.buttonRow}>
+                                                <TouchableOpacity
+                                                    style={styles.saveButton}
+                                                    onPress={handleSaveApiKey}
+                                                    disabled={isValidating}
+                                                >
+                                                    <Text
+                                                        style={
+                                                            styles.saveButtonText
+                                                        }
+                                                    >
+                                                        Save API Key
+                                                    </Text>
+                                                </TouchableOpacity>
+
+                                                {apiKey.length > 0 && (
+                                                    <TouchableOpacity
+                                                        style={
+                                                            styles.clearButton
+                                                        }
+                                                        onPress={
+                                                            handleClearApiKey
+                                                        }
+                                                        disabled={isValidating}
+                                                    >
+                                                        <Text
+                                                            style={
+                                                                styles.clearButtonText
+                                                            }
+                                                        >
+                                                            Clear
+                                                        </Text>
+                                                    </TouchableOpacity>
+                                                )}
+                                            </View>
+
+                                            <Text style={styles.helpText}>
+                                                Get your API key from{" "}
+                                                <Text
+                                                    style={styles.linkText}
+                                                    onPress={() => {}}
+                                                >
+                                                    openrouter.ai
+                                                </Text>
                                             </Text>
-                                        </TouchableOpacity>
+                                        </>
                                     )}
                                 </View>
 
-                                <Text style={styles.helpText}>
-                                    Get your API key from{" "}
-                                    <Text
-                                        style={styles.linkText}
-                                        onPress={() => {}}
-                                    >
-                                        openrouter.ai
+                                <View style={styles.section}>
+                                    <Text style={styles.sectionTitle}>
+                                        Theme
                                     </Text>
-                                </Text>
-                            </>
-                        )}
-                    </View>
-
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Theme</Text>
-                        <Text style={styles.sectionDescription}>
-                            Choose your preferred color scheme
-                        </Text>
-                        <View style={styles.themeContainer}>
-                            <TouchableOpacity
-                                style={[
-                                    styles.themeOption,
-                                    userTheme === "light" &&
-                                        styles.themeOptionSelected,
-                                ]}
-                                onPress={() => handleThemeChange("light")}
-                            >
-                                <Feather
-                                    name="sun"
-                                    size={22}
-                                    color={
-                                        userTheme === "light"
-                                            ? colors.accent
-                                            : colors.textMuted
-                                    }
-                                    style={styles.themeIcon}
-                                />
-                                <Text
-                                    style={[
-                                        styles.themeLabel,
-                                        userTheme === "light" &&
-                                            styles.themeLabelSelected,
-                                    ]}
-                                >
-                                    Light
-                                </Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={[
-                                    styles.themeOption,
-                                    userTheme === "dark" &&
-                                        styles.themeOptionSelected,
-                                ]}
-                                onPress={() => handleThemeChange("dark")}
-                            >
-                                <Feather
-                                    name="moon"
-                                    size={22}
-                                    color={
-                                        userTheme === "dark"
-                                            ? colors.accent
-                                            : colors.textMuted
-                                    }
-                                    style={styles.themeIcon}
-                                />
-                                <Text
-                                    style={[
-                                        styles.themeLabel,
-                                        userTheme === "dark" &&
-                                            styles.themeLabelSelected,
-                                    ]}
-                                >
-                                    Dark
-                                </Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                                style={[
-                                    styles.themeOption,
-                                    userTheme === "system" &&
-                                        styles.themeOptionSelected,
-                                ]}
-                                onPress={() => handleThemeChange("system")}
-                            >
-                                <Feather
-                                    name="monitor"
-                                    size={22}
-                                    color={
-                                        userTheme === "system"
-                                            ? colors.accent
-                                            : colors.textMuted
-                                    }
-                                    style={styles.themeIcon}
-                                />
-                                <Text
-                                    style={[
-                                        styles.themeLabel,
-                                        userTheme === "system" &&
-                                            styles.themeLabelSelected,
-                                    ]}
-                                >
-                                    System
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-
-                    <View style={styles.section}>
-                        <View style={styles.sectionHeaderRow}>
-                            <Text style={styles.sectionTitle}>Skills</Text>
-                            <TouchableOpacity
-                                style={styles.skillHeaderButton}
-                                onPress={openNewSkillForm}
-                                accessibilityLabel="New skill"
-                            >
-                                <Feather
-                                    name="plus"
-                                    size={16}
-                                    color={colors.textOnAccent}
-                                />
-                                <Text style={styles.skillHeaderButtonText}>
-                                    New Skill
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-                        <Text style={styles.sectionDescription}>
-                            Create reusable prompt templates
-                        </Text>
-
-                        {showSkillForm && (
-                            <View style={styles.skillForm}>
-                                <View style={styles.skillFormHeader}>
-                                    <Text style={styles.skillFormTitle}>
-                                        {editingSkillId
-                                            ? "Edit Skill"
-                                            : "New Skill"}
+                                    <Text style={styles.sectionDescription}>
+                                        Choose your preferred color scheme
                                     </Text>
-                                    <TouchableOpacity
-                                        onPress={closeSkillForm}
-                                        style={styles.skillIconButton}
-                                        accessibilityLabel="Close skill form"
-                                    >
-                                        <Feather
-                                            name="x"
-                                            size={16}
-                                            color={colors.textMuted}
-                                        />
-                                    </TouchableOpacity>
-                                </View>
-                                <View style={styles.inputContainer}>
-                                    <Text style={styles.inputLabel}>Name</Text>
-                                    <TextInput
-                                        style={styles.textInput}
-                                        value={skillName}
-                                        onChangeText={setSkillName}
-                                        placeholder="e.g., Code Reviewer"
-                                        placeholderTextColor={colors.textFaint}
-                                    />
-                                </View>
-                                <View style={styles.inputContainer}>
-                                    <Text style={styles.inputLabel}>
-                                        Description (optional)
-                                    </Text>
-                                    <TextInput
-                                        style={styles.textInput}
-                                        value={skillDescription}
-                                        onChangeText={setSkillDescription}
-                                        placeholder="Short summary"
-                                        placeholderTextColor={colors.textFaint}
-                                    />
-                                </View>
-                                <View style={styles.inputContainer}>
-                                    <Text style={styles.inputLabel}>
-                                        Prompt
-                                    </Text>
-                                    <TextInput
-                                        style={[
-                                            styles.textInput,
-                                            styles.promptInput,
-                                        ]}
-                                        value={skillPrompt}
-                                        onChangeText={setSkillPrompt}
-                                        placeholder="You are an expert reviewer..."
-                                        placeholderTextColor={colors.textFaint}
-                                        multiline
-                                        textAlignVertical="top"
-                                    />
-                                </View>
-                                <View style={styles.skillFormActions}>
-                                    <TouchableOpacity
-                                        style={[
-                                            styles.skillSaveButton,
-                                            !isSkillValid &&
-                                                styles.skillSaveButtonDisabled,
-                                        ]}
-                                        onPress={handleSaveSkill}
-                                        disabled={!isSkillValid}
-                                    >
-                                        <Feather
-                                            name="check"
-                                            size={16}
-                                            color={colors.textOnAccent}
-                                        />
-                                        <Text
-                                            style={styles.skillSaveButtonText}
+                                    <View style={styles.themeContainer}>
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.themeOption,
+                                                userTheme === "light" &&
+                                                    styles.themeOptionSelected,
+                                            ]}
+                                            onPress={() =>
+                                                handleThemeChange("light")
+                                            }
                                         >
-                                            {editingSkillId
-                                                ? "Update"
-                                                : "Create"}
-                                        </Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={styles.skillCancelButton}
-                                        onPress={closeSkillForm}
-                                    >
-                                        <Feather
-                                            name="x"
-                                            size={16}
-                                            color={colors.textOnAccent}
-                                        />
-                                        <Text
-                                            style={styles.skillCancelButtonText}
-                                        >
-                                            Cancel
-                                        </Text>
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-                        )}
+                                            <Feather
+                                                name="sun"
+                                                size={22}
+                                                color={
+                                                    userTheme === "light"
+                                                        ? colors.accent
+                                                        : colors.textMuted
+                                                }
+                                                style={styles.themeIcon}
+                                            />
+                                            <Text
+                                                style={[
+                                                    styles.themeLabel,
+                                                    userTheme === "light" &&
+                                                        styles.themeLabelSelected,
+                                                ]}
+                                            >
+                                                Light
+                                            </Text>
+                                        </TouchableOpacity>
 
-                        {skills.length === 0 ? (
-                            <View style={styles.emptySkills}>
-                                <Text style={styles.emptySkillsText}>
-                                    No skills created yet
-                                </Text>
-                                <Text style={styles.emptySkillsSubtext}>
-                                    Skills you create will appear here
-                                </Text>
-                            </View>
-                        ) : (
-                            <View style={styles.skillsList}>
-                                {skills.map((skill) => (
-                                    <View
-                                        key={skill.id}
-                                        style={styles.skillCard}
-                                    >
-                                        <View style={styles.skillCardHeader}>
-                                            <View style={styles.skillCardBody}>
-                                                <Text
-                                                    style={styles.skillName}
-                                                    numberOfLines={1}
-                                                >
-                                                    {skill.name}
-                                                </Text>
-                                                {skill.description ? (
-                                                    <Text
-                                                        style={
-                                                            styles.skillDescription
-                                                        }
-                                                        numberOfLines={1}
-                                                    >
-                                                        {skill.description}
-                                                    </Text>
-                                                ) : null}
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.themeOption,
+                                                userTheme === "dark" &&
+                                                    styles.themeOptionSelected,
+                                            ]}
+                                            onPress={() =>
+                                                handleThemeChange("dark")
+                                            }
+                                        >
+                                            <Feather
+                                                name="moon"
+                                                size={22}
+                                                color={
+                                                    userTheme === "dark"
+                                                        ? colors.accent
+                                                        : colors.textMuted
+                                                }
+                                                style={styles.themeIcon}
+                                            />
+                                            <Text
+                                                style={[
+                                                    styles.themeLabel,
+                                                    userTheme === "dark" &&
+                                                        styles.themeLabelSelected,
+                                                ]}
+                                            >
+                                                Dark
+                                            </Text>
+                                        </TouchableOpacity>
+
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.themeOption,
+                                                userTheme === "system" &&
+                                                    styles.themeOptionSelected,
+                                            ]}
+                                            onPress={() =>
+                                                handleThemeChange("system")
+                                            }
+                                        >
+                                            <Feather
+                                                name="monitor"
+                                                size={22}
+                                                color={
+                                                    userTheme === "system"
+                                                        ? colors.accent
+                                                        : colors.textMuted
+                                                }
+                                                style={styles.themeIcon}
+                                            />
+                                            <Text
+                                                style={[
+                                                    styles.themeLabel,
+                                                    userTheme === "system" &&
+                                                        styles.themeLabelSelected,
+                                                ]}
+                                            >
+                                                System
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                    {Platform.OS === "android" && (
+                                        <View style={styles.materialYouHint}>
+                                            <Feather
+                                                name={
+                                                    isMaterialYouActive
+                                                        ? "droplet"
+                                                        : "smartphone"
+                                                }
+                                                size={14}
+                                                color={colors.textMuted}
+                                            />
+                                            <Text
+                                                style={
+                                                    styles.materialYouHintText
+                                                }
+                                            >
+                                                {isMaterialYouActive
+                                                    ? "Material You colors are active from your system wallpaper."
+                                                    : "Select System theme to enable Material You colors on Android 12+."}
+                                            </Text>
+                                        </View>
+                                    )}
+                                </View>
+
+                                <View style={styles.section}>
+                                    <View style={styles.sectionHeaderRow}>
+                                        <Text style={styles.sectionTitle}>
+                                            Skills
+                                        </Text>
+                                        <TouchableOpacity
+                                            style={styles.skillHeaderButton}
+                                            onPress={openNewSkillForm}
+                                            accessibilityLabel="New skill"
+                                        >
+                                            <Feather
+                                                name="plus"
+                                                size={16}
+                                                color={colors.textOnAccent}
+                                            />
+                                            <Text
+                                                style={
+                                                    styles.skillHeaderButtonText
+                                                }
+                                            >
+                                                New Skill
+                                            </Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                    <Text style={styles.sectionDescription}>
+                                        Create reusable prompt templates
+                                    </Text>
+
+                                    {showSkillForm && (
+                                        <View style={styles.skillForm}>
+                                            <View
+                                                style={styles.skillFormHeader}
+                                            >
                                                 <Text
                                                     style={
-                                                        styles.skillPromptPreview
+                                                        styles.skillFormTitle
                                                     }
-                                                    numberOfLines={2}
                                                 >
-                                                    {skill.prompt}
+                                                    {editingSkillId
+                                                        ? "Edit Skill"
+                                                        : "New Skill"}
                                                 </Text>
-                                            </View>
-                                            <View style={styles.skillActions}>
                                                 <TouchableOpacity
-                                                    onPress={() =>
-                                                        openEditSkillForm(skill)
-                                                    }
+                                                    onPress={closeSkillForm}
                                                     style={
-                                                        styles.skillActionButton
+                                                        styles.skillIconButton
                                                     }
-                                                    accessibilityLabel={`Edit ${skill.name}`}
+                                                    accessibilityLabel="Close skill form"
                                                 >
                                                     <Feather
-                                                        name="edit-2"
+                                                        name="x"
                                                         size={16}
                                                         color={colors.textMuted}
                                                     />
                                                 </TouchableOpacity>
+                                            </View>
+                                            <View style={styles.inputContainer}>
+                                                <Text style={styles.inputLabel}>
+                                                    Name
+                                                </Text>
+                                                <TextInput
+                                                    style={styles.textInput}
+                                                    value={skillName}
+                                                    onChangeText={setSkillName}
+                                                    placeholder="e.g., Code Reviewer"
+                                                    placeholderTextColor={
+                                                        colors.textFaint
+                                                    }
+                                                />
+                                            </View>
+                                            <View style={styles.inputContainer}>
+                                                <Text style={styles.inputLabel}>
+                                                    Description (optional)
+                                                </Text>
+                                                <TextInput
+                                                    style={styles.textInput}
+                                                    value={skillDescription}
+                                                    onChangeText={
+                                                        setSkillDescription
+                                                    }
+                                                    placeholder="Short summary"
+                                                    placeholderTextColor={
+                                                        colors.textFaint
+                                                    }
+                                                />
+                                            </View>
+                                            <View style={styles.inputContainer}>
+                                                <Text style={styles.inputLabel}>
+                                                    Prompt
+                                                </Text>
+                                                <TextInput
+                                                    style={[
+                                                        styles.textInput,
+                                                        styles.promptInput,
+                                                    ]}
+                                                    value={skillPrompt}
+                                                    onChangeText={
+                                                        setSkillPrompt
+                                                    }
+                                                    placeholder="You are an expert reviewer..."
+                                                    placeholderTextColor={
+                                                        colors.textFaint
+                                                    }
+                                                    multiline
+                                                    textAlignVertical="top"
+                                                />
+                                            </View>
+                                            <View
+                                                style={styles.skillFormActions}
+                                            >
                                                 <TouchableOpacity
-                                                    onPress={() =>
-                                                        handleDeleteSkill(skill)
-                                                    }
-                                                    style={
-                                                        styles.skillActionButton
-                                                    }
-                                                    accessibilityLabel={`Delete ${skill.name}`}
+                                                    style={[
+                                                        styles.skillSaveButton,
+                                                        !isSkillValid &&
+                                                            styles.skillSaveButtonDisabled,
+                                                    ]}
+                                                    onPress={handleSaveSkill}
+                                                    disabled={!isSkillValid}
                                                 >
                                                     <Feather
-                                                        name="trash-2"
+                                                        name="check"
                                                         size={16}
-                                                        color={colors.danger}
+                                                        color={
+                                                            colors.textOnAccent
+                                                        }
                                                     />
+                                                    <Text
+                                                        style={
+                                                            styles.skillSaveButtonText
+                                                        }
+                                                    >
+                                                        {editingSkillId
+                                                            ? "Update"
+                                                            : "Create"}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                                <TouchableOpacity
+                                                    style={
+                                                        styles.skillCancelButton
+                                                    }
+                                                    onPress={closeSkillForm}
+                                                >
+                                                    <Feather
+                                                        name="x"
+                                                        size={16}
+                                                        color={
+                                                            colors.textOnAccent
+                                                        }
+                                                    />
+                                                    <Text
+                                                        style={
+                                                            styles.skillCancelButtonText
+                                                        }
+                                                    >
+                                                        Cancel
+                                                    </Text>
                                                 </TouchableOpacity>
                                             </View>
                                         </View>
-                                    </View>
-                                ))}
-                            </View>
-                        )}
-                    </View>
-
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Storage</Text>
-
-                        <View style={styles.storageContainer}>
-                            {isStorageLoading ? (
-                                <ActivityIndicator
-                                    style={styles.loading}
-                                    color={colors.accent}
-                                />
-                            ) : localQuotaStatus ? (
-                                <>
-                                    <View style={styles.storageRow}>
-                                        <Text style={styles.storageLabel}>
-                                            Local attachments
-                                        </Text>
-                                        <Text style={styles.storageValue}>
-                                            {formatBytes(localQuotaStatus.used)}{" "}
-                                            /{" "}
-                                            {formatBytes(
-                                                localQuotaStatus.limit,
-                                            )}
-                                        </Text>
-                                    </View>
-                                    <View style={styles.storageBar}>
-                                        <View
-                                            style={[
-                                                styles.storageBarFill,
-                                                {
-                                                    width: `${Math.min(localQuotaStatus.percentage * 100, 100)}%`,
-                                                    backgroundColor:
-                                                        localQuotaStatus.isExceeded
-                                                            ? colors.danger
-                                                            : localQuotaStatus.isWarning80
-                                                              ? colors.warning
-                                                              : colors.success,
-                                                },
-                                            ]}
-                                        />
-                                    </View>
-                                    {storageUsage && (
-                                        <View style={styles.statsRow}>
-                                            <View style={styles.statCard}>
-                                                <Text style={styles.statValue}>
-                                                    {storageUsage.sessions}
-                                                </Text>
-                                                <Text style={styles.statLabel}>
-                                                    Chats
-                                                </Text>
-                                            </View>
-                                            <View style={styles.statCard}>
-                                                <Text style={styles.statValue}>
-                                                    {storageUsage.messages}
-                                                </Text>
-                                                <Text style={styles.statLabel}>
-                                                    Messages
-                                                </Text>
-                                            </View>
-                                        </View>
                                     )}
-                                    {cloudQuotaStatus && (
-                                        <>
-                                            <View
-                                                style={[
-                                                    styles.storageRow,
-                                                    styles.storageSectionSpacing,
-                                                ]}
+
+                                    {skills.length === 0 ? (
+                                        <View style={styles.emptySkills}>
+                                            <Text
+                                                style={styles.emptySkillsText}
                                             >
-                                                <Text
-                                                    style={styles.storageLabel}
-                                                >
-                                                    Cloud attachments
-                                                </Text>
-                                                <Text
-                                                    style={styles.storageValue}
-                                                >
-                                                    {formatBytes(
-                                                        cloudQuotaStatus.used,
-                                                    )}{" "}
-                                                    /{" "}
-                                                    {formatBytes(
-                                                        cloudQuotaStatus.limit,
-                                                    )}
-                                                </Text>
-                                            </View>
-                                            <View style={styles.storageBar}>
+                                                No skills created yet
+                                            </Text>
+                                            <Text
+                                                style={
+                                                    styles.emptySkillsSubtext
+                                                }
+                                            >
+                                                Skills you create will appear
+                                                here
+                                            </Text>
+                                        </View>
+                                    ) : (
+                                        <View style={styles.skillsList}>
+                                            {skills.map((skill) => (
                                                 <View
-                                                    style={[
-                                                        styles.storageBarFill,
-                                                        {
-                                                            width: `${Math.min(cloudQuotaStatus.percentage * 100, 100)}%`,
-                                                            backgroundColor:
-                                                                cloudQuotaStatus.isExceeded
-                                                                    ? colors.danger
-                                                                    : cloudQuotaStatus.isWarning80
-                                                                      ? colors.warning
-                                                                      : colors.success,
-                                                        },
-                                                    ]}
-                                                />
-                                            </View>
-                                            {cloudStorageUsage && (
-                                                <View style={styles.statsRow}>
+                                                    key={skill.id}
+                                                    style={styles.skillCard}
+                                                >
                                                     <View
-                                                        style={styles.statCard}
+                                                        style={
+                                                            styles.skillCardHeader
+                                                        }
                                                     >
-                                                        <Text
+                                                        <View
                                                             style={
-                                                                styles.statValue
+                                                                styles.skillCardBody
                                                             }
                                                         >
-                                                            {
-                                                                cloudStorageUsage.sessionCount
-                                                            }
-                                                        </Text>
-                                                        <Text
+                                                            <Text
+                                                                style={
+                                                                    styles.skillName
+                                                                }
+                                                                numberOfLines={
+                                                                    1
+                                                                }
+                                                            >
+                                                                {skill.name}
+                                                            </Text>
+                                                            {skill.description ? (
+                                                                <Text
+                                                                    style={
+                                                                        styles.skillDescription
+                                                                    }
+                                                                    numberOfLines={
+                                                                        1
+                                                                    }
+                                                                >
+                                                                    {
+                                                                        skill.description
+                                                                    }
+                                                                </Text>
+                                                            ) : null}
+                                                            <Text
+                                                                style={
+                                                                    styles.skillPromptPreview
+                                                                }
+                                                                numberOfLines={
+                                                                    2
+                                                                }
+                                                            >
+                                                                {skill.prompt}
+                                                            </Text>
+                                                        </View>
+                                                        <View
                                                             style={
-                                                                styles.statLabel
+                                                                styles.skillActions
                                                             }
                                                         >
-                                                            Cloud Chats
-                                                        </Text>
-                                                    </View>
-                                                    <View
-                                                        style={styles.statCard}
-                                                    >
-                                                        <Text
-                                                            style={
-                                                                styles.statValue
-                                                            }
-                                                        >
-                                                            {
-                                                                cloudStorageUsage.messageCount
-                                                            }
-                                                        </Text>
-                                                        <Text
-                                                            style={
-                                                                styles.statLabel
-                                                            }
-                                                        >
-                                                            Cloud Messages
-                                                        </Text>
+                                                            <TouchableOpacity
+                                                                onPress={() =>
+                                                                    openEditSkillForm(
+                                                                        skill,
+                                                                    )
+                                                                }
+                                                                style={
+                                                                    styles.skillActionButton
+                                                                }
+                                                                accessibilityLabel={`Edit ${skill.name}`}
+                                                            >
+                                                                <Feather
+                                                                    name="edit-2"
+                                                                    size={16}
+                                                                    color={
+                                                                        colors.textMuted
+                                                                    }
+                                                                />
+                                                            </TouchableOpacity>
+                                                            <TouchableOpacity
+                                                                onPress={() =>
+                                                                    handleDeleteSkill(
+                                                                        skill,
+                                                                    )
+                                                                }
+                                                                style={
+                                                                    styles.skillActionButton
+                                                                }
+                                                                accessibilityLabel={`Delete ${skill.name}`}
+                                                            >
+                                                                <Feather
+                                                                    name="trash-2"
+                                                                    size={16}
+                                                                    color={
+                                                                        colors.danger
+                                                                    }
+                                                                />
+                                                            </TouchableOpacity>
+                                                        </View>
                                                     </View>
                                                 </View>
-                                            )}
-                                        </>
+                                            ))}
+                                        </View>
                                     )}
-                                </>
-                            ) : null}
-
-                            {syncState === "cloud-enabled" && (
-                                <Text
-                                    style={[
-                                        styles.storageInfoText,
-                                        localQuotaStatus &&
-                                            styles.storageInfoSpacing,
-                                    ]}
-                                >
-                                    Your attachments are stored in the cloud and
-                                    sync across devices.
-                                </Text>
-                            )}
-
-                            {syncState === "cloud-enabled" && (
-                                <View style={styles.buttonRow}>
-                                    <TouchableOpacity
-                                        style={styles.saveButton}
-                                        onPress={handleCloneToLocal}
-                                        disabled={syncActionDisabled}
-                                    >
-                                        <Text style={styles.saveButtonText}>
-                                            Clone to Local
-                                        </Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={styles.clearButton}
-                                        onPress={handleClearCloudImages}
-                                        disabled={syncActionDisabled}
-                                    >
-                                        <Text style={styles.clearButtonText}>
-                                            Clear Cloud Images
-                                        </Text>
-                                    </TouchableOpacity>
                                 </View>
-                            )}
 
-                            {syncState !== "cloud-enabled" && (
-                                <>
-                                    <Text
-                                        style={[
-                                            styles.storageInfoText,
-                                            localQuotaStatus &&
-                                                styles.storageInfoSpacing,
-                                        ]}
-                                    >
-                                        Your chats and attachments are stored
-                                        only on this device.
+                                <View style={styles.section}>
+                                    <Text style={styles.sectionTitle}>
+                                        Storage
                                     </Text>
-                                    <Text style={styles.storageInfoSubtext}>
-                                        Enable cloud sync to access your data
-                                        across devices.
-                                    </Text>
-                                </>
-                            )}
-                        </View>
-                    </View>
 
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>About</Text>
-                        <View style={styles.settingItem}>
-                            <Text style={styles.appName}>Agentchat</Text>
-                            <Text style={styles.version}>Version 1.0.0</Text>
-                        </View>
-                        <Text style={styles.settingDescription}>
-                            An offline-first chat app powered by OpenRouter.
-                        </Text>
+                                    <View style={styles.storageContainer}>
+                                        {isStorageLoading ? (
+                                            <ActivityIndicator
+                                                style={styles.loading}
+                                                color={colors.accent}
+                                            />
+                                        ) : localQuotaStatus ? (
+                                            <>
+                                                <View style={styles.storageRow}>
+                                                    <Text
+                                                        style={
+                                                            styles.storageLabel
+                                                        }
+                                                    >
+                                                        Local attachments
+                                                    </Text>
+                                                    <Text
+                                                        style={
+                                                            styles.storageValue
+                                                        }
+                                                    >
+                                                        {formatBytes(
+                                                            localQuotaStatus.used,
+                                                        )}{" "}
+                                                        /{" "}
+                                                        {formatBytes(
+                                                            localQuotaStatus.limit,
+                                                        )}
+                                                    </Text>
+                                                </View>
+                                                <View style={styles.storageBar}>
+                                                    <View
+                                                        style={[
+                                                            styles.storageBarFill,
+                                                            {
+                                                                width: `${Math.min(localQuotaStatus.percentage * 100, 100)}%`,
+                                                                backgroundColor:
+                                                                    localQuotaStatus.isExceeded
+                                                                        ? colors.danger
+                                                                        : localQuotaStatus.isWarning80
+                                                                          ? colors.warning
+                                                                          : colors.success,
+                                                            },
+                                                        ]}
+                                                    />
+                                                </View>
+                                                {storageUsage && (
+                                                    <View
+                                                        style={styles.statsRow}
+                                                    >
+                                                        <View
+                                                            style={
+                                                                styles.statCard
+                                                            }
+                                                        >
+                                                            <Text
+                                                                style={
+                                                                    styles.statValue
+                                                                }
+                                                            >
+                                                                {
+                                                                    storageUsage.sessions
+                                                                }
+                                                            </Text>
+                                                            <Text
+                                                                style={
+                                                                    styles.statLabel
+                                                                }
+                                                            >
+                                                                Chats
+                                                            </Text>
+                                                        </View>
+                                                        <View
+                                                            style={
+                                                                styles.statCard
+                                                            }
+                                                        >
+                                                            <Text
+                                                                style={
+                                                                    styles.statValue
+                                                                }
+                                                            >
+                                                                {
+                                                                    storageUsage.messages
+                                                                }
+                                                            </Text>
+                                                            <Text
+                                                                style={
+                                                                    styles.statLabel
+                                                                }
+                                                            >
+                                                                Messages
+                                                            </Text>
+                                                        </View>
+                                                    </View>
+                                                )}
+                                                {cloudQuotaStatus && (
+                                                    <>
+                                                        <View
+                                                            style={[
+                                                                styles.storageRow,
+                                                                styles.storageSectionSpacing,
+                                                            ]}
+                                                        >
+                                                            <Text
+                                                                style={
+                                                                    styles.storageLabel
+                                                                }
+                                                            >
+                                                                Cloud
+                                                                attachments
+                                                            </Text>
+                                                            <Text
+                                                                style={
+                                                                    styles.storageValue
+                                                                }
+                                                            >
+                                                                {formatBytes(
+                                                                    cloudQuotaStatus.used,
+                                                                )}{" "}
+                                                                /{" "}
+                                                                {formatBytes(
+                                                                    cloudQuotaStatus.limit,
+                                                                )}
+                                                            </Text>
+                                                        </View>
+                                                        <View
+                                                            style={
+                                                                styles.storageBar
+                                                            }
+                                                        >
+                                                            <View
+                                                                style={[
+                                                                    styles.storageBarFill,
+                                                                    {
+                                                                        width: `${Math.min(cloudQuotaStatus.percentage * 100, 100)}%`,
+                                                                        backgroundColor:
+                                                                            cloudQuotaStatus.isExceeded
+                                                                                ? colors.danger
+                                                                                : cloudQuotaStatus.isWarning80
+                                                                                  ? colors.warning
+                                                                                  : colors.success,
+                                                                    },
+                                                                ]}
+                                                            />
+                                                        </View>
+                                                        {cloudStorageUsage && (
+                                                            <View
+                                                                style={
+                                                                    styles.statsRow
+                                                                }
+                                                            >
+                                                                <View
+                                                                    style={
+                                                                        styles.statCard
+                                                                    }
+                                                                >
+                                                                    <Text
+                                                                        style={
+                                                                            styles.statValue
+                                                                        }
+                                                                    >
+                                                                        {
+                                                                            cloudStorageUsage.sessionCount
+                                                                        }
+                                                                    </Text>
+                                                                    <Text
+                                                                        style={
+                                                                            styles.statLabel
+                                                                        }
+                                                                    >
+                                                                        Cloud
+                                                                        Chats
+                                                                    </Text>
+                                                                </View>
+                                                                <View
+                                                                    style={
+                                                                        styles.statCard
+                                                                    }
+                                                                >
+                                                                    <Text
+                                                                        style={
+                                                                            styles.statValue
+                                                                        }
+                                                                    >
+                                                                        {
+                                                                            cloudStorageUsage.messageCount
+                                                                        }
+                                                                    </Text>
+                                                                    <Text
+                                                                        style={
+                                                                            styles.statLabel
+                                                                        }
+                                                                    >
+                                                                        Cloud
+                                                                        Messages
+                                                                    </Text>
+                                                                </View>
+                                                            </View>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </>
+                                        ) : null}
+
+                                        {syncState === "cloud-enabled" && (
+                                            <Text
+                                                style={[
+                                                    styles.storageInfoText,
+                                                    localQuotaStatus &&
+                                                        styles.storageInfoSpacing,
+                                                ]}
+                                            >
+                                                Your attachments are stored in
+                                                the cloud and sync across
+                                                devices.
+                                            </Text>
+                                        )}
+
+                                        {syncState === "cloud-enabled" && (
+                                            <View style={styles.buttonRow}>
+                                                <TouchableOpacity
+                                                    style={styles.saveButton}
+                                                    onPress={handleCloneToLocal}
+                                                    disabled={
+                                                        syncActionDisabled
+                                                    }
+                                                >
+                                                    <Text
+                                                        style={
+                                                            styles.saveButtonText
+                                                        }
+                                                    >
+                                                        Clone to Local
+                                                    </Text>
+                                                </TouchableOpacity>
+                                                <TouchableOpacity
+                                                    style={styles.clearButton}
+                                                    onPress={
+                                                        handleClearCloudImages
+                                                    }
+                                                    disabled={
+                                                        syncActionDisabled
+                                                    }
+                                                >
+                                                    <Text
+                                                        style={
+                                                            styles.clearButtonText
+                                                        }
+                                                    >
+                                                        Clear Cloud Images
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        )}
+
+                                        {syncState !== "cloud-enabled" && (
+                                            <>
+                                                <Text
+                                                    style={[
+                                                        styles.storageInfoText,
+                                                        localQuotaStatus &&
+                                                            styles.storageInfoSpacing,
+                                                    ]}
+                                                >
+                                                    Your chats and attachments
+                                                    are stored only on this
+                                                    device.
+                                                </Text>
+                                                <Text
+                                                    style={
+                                                        styles.storageInfoSubtext
+                                                    }
+                                                >
+                                                    Enable cloud sync to access
+                                                    your data across devices.
+                                                </Text>
+                                            </>
+                                        )}
+                                    </View>
+                                </View>
+
+                                <View style={styles.section}>
+                                    <Text style={styles.sectionTitle}>
+                                        About
+                                    </Text>
+                                    <View style={styles.settingItem}>
+                                        <Text style={styles.appName}>
+                                            Agentchat
+                                        </Text>
+                                        <Text style={styles.version}>
+                                            Version 1.0.0
+                                        </Text>
+                                    </View>
+                                    <Text style={styles.settingDescription}>
+                                        An offline-first chat app powered by
+                                        OpenRouter.
+                                    </Text>
+                                </View>
+                            </View>
+                        </ScrollView>
                     </View>
-                </ScrollView>
+                </View>
             </SafeAreaView>
         </SafeAreaProvider>
     );
@@ -1351,6 +1747,73 @@ const createStyles = (colors: ThemeColors) =>
         container: {
             flex: 1,
             backgroundColor: colors.background,
+        },
+        settingsLayout: {
+            flex: 1,
+        },
+        settingsLayoutTablet: {
+            flexDirection: "row",
+        },
+        settingsMain: {
+            flex: 1,
+        },
+        tabletRail: {
+            borderRightWidth: 1,
+            borderRightColor: colors.border,
+            backgroundColor: colors.surface,
+            paddingHorizontal: 16,
+            paddingVertical: 16,
+            gap: 16,
+        },
+        tabletRailHeader: {
+            gap: 4,
+        },
+        tabletRailAppName: {
+            fontSize: 18,
+            fontWeight: "700",
+            color: colors.text,
+        },
+        tabletRailTitle: {
+            fontSize: 13,
+            color: colors.textSubtle,
+            textTransform: "uppercase",
+            letterSpacing: 0.8,
+        },
+        tabletRailBackButton: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            borderWidth: 1,
+            borderColor: colors.accentBorder,
+            backgroundColor: colors.accentSoft,
+            borderRadius: 10,
+            paddingHorizontal: 12,
+            paddingVertical: 10,
+        },
+        tabletRailBackButtonText: {
+            fontSize: 14,
+            fontWeight: "600",
+            color: colors.accent,
+        },
+        tabletRailSummaryCard: {
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.surfaceMuted,
+            borderRadius: 12,
+            padding: 12,
+            gap: 6,
+        },
+        tabletRailSummaryLabel: {
+            fontSize: 11,
+            color: colors.textSubtle,
+            textTransform: "uppercase",
+            letterSpacing: 0.7,
+            marginTop: 6,
+        },
+        tabletRailSummaryValue: {
+            fontSize: 14,
+            fontWeight: "600",
+            color: colors.text,
         },
         header: {
             flexDirection: "row",
@@ -1378,6 +1841,17 @@ const createStyles = (colors: ThemeColors) =>
         },
         scrollContent: {
             flex: 1,
+        },
+        scrollContentContainer: {
+            paddingBottom: 24,
+        },
+        scrollContentContainerTablet: {
+            paddingHorizontal: 24,
+            paddingTop: 20,
+        },
+        sectionsColumn: {
+            width: "100%",
+            alignSelf: "center",
         },
         section: {
             padding: 16,
@@ -1648,6 +2122,23 @@ const createStyles = (colors: ThemeColors) =>
         themeContainer: {
             flexDirection: "row",
             gap: 12,
+        },
+        materialYouHint: {
+            marginTop: 10,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            paddingVertical: 8,
+            paddingHorizontal: 10,
+            borderWidth: 1,
+            borderColor: colors.border,
+            borderRadius: 10,
+            backgroundColor: colors.surfaceMuted,
+        },
+        materialYouHintText: {
+            flex: 1,
+            fontSize: 12,
+            color: colors.textMuted,
         },
         themeOption: {
             flex: 1,

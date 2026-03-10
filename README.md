@@ -21,6 +21,7 @@ Visit https://www.routerchat.chat to start chatting with Agentchat using your Op
 - **Optional Analytics** - PostHog instrumentation for product usage events when enabled
 - **IndexedDB Persistence** - Full chat history stored locally
 - **Theme Support** - Light, dark, and system theme options
+- **Android Share Intent** - Share text, links, and images from other Android apps directly into a new Agentchat draft
 
 ## About Agentchat
 
