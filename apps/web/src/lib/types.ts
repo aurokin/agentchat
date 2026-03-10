@@ -1,9 +1,4 @@
 import type {
-    Skill,
-    SkillSettings as SharedSkillSettings,
-    SkillSettingsUpdate as SharedSkillSettingsUpdate,
-} from "@shared/core/skills";
-import type {
     Message as SharedMessage,
     ChatSession as SharedChatSession,
     UserSettings as SharedUserSettings,
@@ -12,11 +7,6 @@ import type {
     ThinkingLevel as SharedThinkingLevel,
     SearchLevel as SharedSearchLevel,
 } from "@shared/core/types";
-
-export type { Skill };
-
-export type { SharedSkillSettings as SkillSettings };
-export type { SharedSkillSettingsUpdate as SkillSettingsUpdate };
 
 export type ThinkingLevel = SharedThinkingLevel;
 

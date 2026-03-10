@@ -36,12 +36,6 @@ export {
     setTheme,
     getHasCompletedOnboarding,
     setHasCompletedOnboarding,
-    getCloudDefaultSkillId,
-    setCloudDefaultSkillId,
-    getCloudSelectedSkillId,
-    setCloudSelectedSkillId,
-    getCloudSelectedSkillMode,
-    setCloudSelectedSkillMode,
     type UserTheme,
 } from "@/lib/storage/sync-storage";
 export {

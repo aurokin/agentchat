@@ -45,18 +45,12 @@ const getInitialSync = async (
         return existingInitialSync;
     }
 
-    const [chat, skill] = await Promise.all([
-        ctx.db
-            .query("chats")
-            .filter((q: any) => q.eq(q.field("userId"), userId))
-            .first(),
-        ctx.db
-            .query("skills")
-            .filter((q: any) => q.eq(q.field("userId"), userId))
-            .first(),
-    ]);
+    const chat = await ctx.db
+        .query("chats")
+        .filter((q: any) => q.eq(q.field("userId"), userId))
+        .first();
 
-    return Boolean(chat || skill);
+    return Boolean(chat);
 };
 
 const getSiteUrl = () => {
@@ -139,7 +133,6 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
                 ...profileUpdates,
                 cloudChatCount: 0,
                 cloudMessageCount: 0,
-                cloudSkillCount: 0,
                 cloudAttachmentCount: 0,
                 cloudAttachmentBytes: 0,
                 createdAt: now,

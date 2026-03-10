@@ -84,7 +84,6 @@ export const create = internalMutation({
             initialSync: false,
             cloudChatCount: 0,
             cloudMessageCount: 0,
-            cloudSkillCount: 0,
             cloudAttachmentCount: 0,
             cloudAttachmentBytes: 0,
             createdAt: now,
@@ -133,17 +132,6 @@ export const resetCloudData = mutation({
                     .take(200),
             async (chat: any) => {
                 await ctx.db.delete(chat._id);
-            },
-        );
-
-        await drainBatches(
-            () =>
-                ctx.db
-                    .query("skills")
-                    .withIndex("by_user", (q) => q.eq("userId", userId))
-                    .take(200),
-            async (skill: any) => {
-                await ctx.db.delete(skill._id);
             },
         );
 

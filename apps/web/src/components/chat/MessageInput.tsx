@@ -11,7 +11,6 @@ import { Send } from "lucide-react";
 import { cn, generateUUID } from "@/lib/utils";
 import { useStorageAdapter } from "@/contexts/SyncContext";
 import { ModelSelector } from "./ModelSelector";
-import { SkillSelector } from "./SkillSelector";
 import { ThinkingToggle } from "./ThinkingToggle";
 import { SearchToggle } from "./SearchToggle";
 import { AttachmentButton } from "./AttachmentButton";
@@ -308,8 +307,6 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
                                 selectedModel={selectedModel}
                                 onModelChange={onModelChange}
                             />
-                            <div className="w-px h-5 bg-border/60" />
-                            <SkillSelector disabled={disabled} />
                             <div className="flex-1" />
                             <SearchToggle
                                 value={searchLevel}

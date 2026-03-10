@@ -15,11 +15,9 @@ import {
 import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useSync } from "@/contexts/SyncContext";
-import { useSkillsContext } from "@/contexts/SkillsContext";
 import { formatBytes, getStorageUsage, type UserTheme } from "@/lib/storage";
 import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
 import { validateApiKey } from "@shared/core/openrouter";
-import type { Skill } from "@shared/core/skills";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { useAuthContext } from "@/lib/convex/AuthContext";
 import { useApiKey } from "@/hooks/useApiKey";
@@ -40,7 +38,6 @@ export default function SettingsScreen(): ReactElement {
         isCloning,
         cloneProgress,
     } = useSync();
-    const { skills, addSkill, updateSkill, deleteSkill } = useSkillsContext();
     const {
         user,
         isAuthenticated,
@@ -70,11 +67,6 @@ export default function SettingsScreen(): ReactElement {
         sessions: number;
     } | null>(null);
     const [isStorageLoading, setIsStorageLoading] = useState(true);
-    const [showSkillForm, setShowSkillForm] = useState(false);
-    const [editingSkillId, setEditingSkillId] = useState<string | null>(null);
-    const [skillName, setSkillName] = useState("");
-    const [skillDescription, setSkillDescription] = useState("");
-    const [skillPrompt, setSkillPrompt] = useState("");
 
     const convexUnavailableMessage = "Convex isn't configured for this build.";
 
@@ -307,76 +299,6 @@ export default function SettingsScreen(): ReactElement {
     const handleThemeChange = async (theme: UserTheme) => {
         await setUserTheme(theme);
     };
-
-    const resetSkillForm = () => {
-        setSkillName("");
-        setSkillDescription("");
-        setSkillPrompt("");
-        setEditingSkillId(null);
-    };
-
-    const openNewSkillForm = () => {
-        resetSkillForm();
-        setShowSkillForm(true);
-    };
-
-    const openEditSkillForm = (skill: Skill) => {
-        setSkillName(skill.name);
-        setSkillDescription(skill.description);
-        setSkillPrompt(skill.prompt);
-        setEditingSkillId(skill.id);
-        setShowSkillForm(true);
-    };
-
-    const closeSkillForm = () => {
-        setShowSkillForm(false);
-        resetSkillForm();
-    };
-
-    const handleSaveSkill = () => {
-        const trimmedName = skillName.trim();
-        const trimmedPrompt = skillPrompt.trim();
-        if (!trimmedName || !trimmedPrompt) {
-            return;
-        }
-
-        const payload = {
-            name: trimmedName,
-            description: skillDescription.trim(),
-            prompt: trimmedPrompt,
-        };
-
-        if (editingSkillId) {
-            updateSkill(editingSkillId, payload);
-        } else {
-            addSkill(payload);
-        }
-
-        closeSkillForm();
-    };
-
-    const handleDeleteSkill = (skill: Skill) => {
-        Alert.alert(
-            "Delete Skill",
-            `Delete "${skill.name}"? This cannot be undone.`,
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Delete",
-                    style: "destructive",
-                    onPress: () => {
-                        deleteSkill(skill.id);
-                        if (editingSkillId === skill.id) {
-                            closeSkillForm();
-                        }
-                    },
-                },
-            ],
-        );
-    };
-
-    const isSkillValid =
-        skillName.trim().length > 0 && skillPrompt.trim().length > 0;
     const syncActionDisabled = isMigrating || isCloning;
     const isGoogleButtonBusy = isAuthLoading || isSigningIn;
     const isTwoPaneLayout = Math.min(windowWidth, windowHeight) >= 700;
@@ -398,7 +320,7 @@ export default function SettingsScreen(): ReactElement {
     const getSyncStatusText = () => {
         switch (syncState) {
             case "cloud-enabled":
-                return "Your chats and skills are stored in Convex.";
+                return "Your chats are stored in Convex.";
             default:
                 return "Sign in to connect this device to your Convex workspace.";
         }
@@ -989,286 +911,6 @@ export default function SettingsScreen(): ReactElement {
                                                     ? "Material You colors are active from your system wallpaper."
                                                     : "Select System theme to enable Material You colors on Android 12+."}
                                             </Text>
-                                        </View>
-                                    )}
-                                </View>
-
-                                <View style={styles.section}>
-                                    <View style={styles.sectionHeaderRow}>
-                                        <Text style={styles.sectionTitle}>
-                                            Skills
-                                        </Text>
-                                        <TouchableOpacity
-                                            style={styles.skillHeaderButton}
-                                            onPress={openNewSkillForm}
-                                            accessibilityLabel="New skill"
-                                        >
-                                            <Feather
-                                                name="plus"
-                                                size={16}
-                                                color={colors.textOnAccent}
-                                            />
-                                            <Text
-                                                style={
-                                                    styles.skillHeaderButtonText
-                                                }
-                                            >
-                                                New Skill
-                                            </Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                    <Text style={styles.sectionDescription}>
-                                        Create reusable prompt templates
-                                    </Text>
-
-                                    {showSkillForm && (
-                                        <View style={styles.skillForm}>
-                                            <View
-                                                style={styles.skillFormHeader}
-                                            >
-                                                <Text
-                                                    style={
-                                                        styles.skillFormTitle
-                                                    }
-                                                >
-                                                    {editingSkillId
-                                                        ? "Edit Skill"
-                                                        : "New Skill"}
-                                                </Text>
-                                                <TouchableOpacity
-                                                    onPress={closeSkillForm}
-                                                    style={
-                                                        styles.skillIconButton
-                                                    }
-                                                    accessibilityLabel="Close skill form"
-                                                >
-                                                    <Feather
-                                                        name="x"
-                                                        size={16}
-                                                        color={colors.textMuted}
-                                                    />
-                                                </TouchableOpacity>
-                                            </View>
-                                            <View style={styles.inputContainer}>
-                                                <Text style={styles.inputLabel}>
-                                                    Name
-                                                </Text>
-                                                <TextInput
-                                                    style={styles.textInput}
-                                                    value={skillName}
-                                                    onChangeText={setSkillName}
-                                                    placeholder="e.g., Code Reviewer"
-                                                    placeholderTextColor={
-                                                        colors.textFaint
-                                                    }
-                                                />
-                                            </View>
-                                            <View style={styles.inputContainer}>
-                                                <Text style={styles.inputLabel}>
-                                                    Description (optional)
-                                                </Text>
-                                                <TextInput
-                                                    style={styles.textInput}
-                                                    value={skillDescription}
-                                                    onChangeText={
-                                                        setSkillDescription
-                                                    }
-                                                    placeholder="Short summary"
-                                                    placeholderTextColor={
-                                                        colors.textFaint
-                                                    }
-                                                />
-                                            </View>
-                                            <View style={styles.inputContainer}>
-                                                <Text style={styles.inputLabel}>
-                                                    Prompt
-                                                </Text>
-                                                <TextInput
-                                                    style={[
-                                                        styles.textInput,
-                                                        styles.promptInput,
-                                                    ]}
-                                                    value={skillPrompt}
-                                                    onChangeText={
-                                                        setSkillPrompt
-                                                    }
-                                                    placeholder="You are an expert reviewer..."
-                                                    placeholderTextColor={
-                                                        colors.textFaint
-                                                    }
-                                                    multiline
-                                                    textAlignVertical="top"
-                                                />
-                                            </View>
-                                            <View
-                                                style={styles.skillFormActions}
-                                            >
-                                                <TouchableOpacity
-                                                    style={[
-                                                        styles.skillSaveButton,
-                                                        !isSkillValid &&
-                                                            styles.skillSaveButtonDisabled,
-                                                    ]}
-                                                    onPress={handleSaveSkill}
-                                                    disabled={!isSkillValid}
-                                                >
-                                                    <Feather
-                                                        name="check"
-                                                        size={16}
-                                                        color={
-                                                            colors.textOnAccent
-                                                        }
-                                                    />
-                                                    <Text
-                                                        style={
-                                                            styles.skillSaveButtonText
-                                                        }
-                                                    >
-                                                        {editingSkillId
-                                                            ? "Update"
-                                                            : "Create"}
-                                                    </Text>
-                                                </TouchableOpacity>
-                                                <TouchableOpacity
-                                                    style={
-                                                        styles.skillCancelButton
-                                                    }
-                                                    onPress={closeSkillForm}
-                                                >
-                                                    <Feather
-                                                        name="x"
-                                                        size={16}
-                                                        color={
-                                                            colors.textOnAccent
-                                                        }
-                                                    />
-                                                    <Text
-                                                        style={
-                                                            styles.skillCancelButtonText
-                                                        }
-                                                    >
-                                                        Cancel
-                                                    </Text>
-                                                </TouchableOpacity>
-                                            </View>
-                                        </View>
-                                    )}
-
-                                    {skills.length === 0 ? (
-                                        <View style={styles.emptySkills}>
-                                            <Text
-                                                style={styles.emptySkillsText}
-                                            >
-                                                No skills created yet
-                                            </Text>
-                                            <Text
-                                                style={
-                                                    styles.emptySkillsSubtext
-                                                }
-                                            >
-                                                Skills you create will appear
-                                                here
-                                            </Text>
-                                        </View>
-                                    ) : (
-                                        <View style={styles.skillsList}>
-                                            {skills.map((skill) => (
-                                                <View
-                                                    key={skill.id}
-                                                    style={styles.skillCard}
-                                                >
-                                                    <View
-                                                        style={
-                                                            styles.skillCardHeader
-                                                        }
-                                                    >
-                                                        <View
-                                                            style={
-                                                                styles.skillCardBody
-                                                            }
-                                                        >
-                                                            <Text
-                                                                style={
-                                                                    styles.skillName
-                                                                }
-                                                                numberOfLines={
-                                                                    1
-                                                                }
-                                                            >
-                                                                {skill.name}
-                                                            </Text>
-                                                            {skill.description ? (
-                                                                <Text
-                                                                    style={
-                                                                        styles.skillDescription
-                                                                    }
-                                                                    numberOfLines={
-                                                                        1
-                                                                    }
-                                                                >
-                                                                    {
-                                                                        skill.description
-                                                                    }
-                                                                </Text>
-                                                            ) : null}
-                                                            <Text
-                                                                style={
-                                                                    styles.skillPromptPreview
-                                                                }
-                                                                numberOfLines={
-                                                                    2
-                                                                }
-                                                            >
-                                                                {skill.prompt}
-                                                            </Text>
-                                                        </View>
-                                                        <View
-                                                            style={
-                                                                styles.skillActions
-                                                            }
-                                                        >
-                                                            <TouchableOpacity
-                                                                onPress={() =>
-                                                                    openEditSkillForm(
-                                                                        skill,
-                                                                    )
-                                                                }
-                                                                style={
-                                                                    styles.skillActionButton
-                                                                }
-                                                                accessibilityLabel={`Edit ${skill.name}`}
-                                                            >
-                                                                <Feather
-                                                                    name="edit-2"
-                                                                    size={16}
-                                                                    color={
-                                                                        colors.textMuted
-                                                                    }
-                                                                />
-                                                            </TouchableOpacity>
-                                                            <TouchableOpacity
-                                                                onPress={() =>
-                                                                    handleDeleteSkill(
-                                                                        skill,
-                                                                    )
-                                                                }
-                                                                style={
-                                                                    styles.skillActionButton
-                                                                }
-                                                                accessibilityLabel={`Delete ${skill.name}`}
-                                                            >
-                                                                <Feather
-                                                                    name="trash-2"
-                                                                    size={16}
-                                                                    color={
-                                                                        colors.danger
-                                                                    }
-                                                                />
-                                                            </TouchableOpacity>
-                                                        </View>
-                                                    </View>
-                                                </View>
-                                            ))}
                                         </View>
                                     )}
                                 </View>

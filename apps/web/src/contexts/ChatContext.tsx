@@ -13,7 +13,6 @@ import { api } from "@convex/_generated/api";
 import type {
     ChatSession,
     Message,
-    Skill,
     ThinkingLevel,
     SearchLevel,
 } from "@/lib/types";
@@ -47,7 +46,6 @@ interface ChatContextType {
         content: string;
         contextContent: string;
         thinking?: string;
-        skill?: Skill | null;
         modelId?: string;
         thinkingLevel?: ThinkingLevel;
         searchLevel?: SearchLevel;
@@ -317,7 +315,6 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             content: string;
             contextContent: string;
             thinking?: string;
-            skill?: Skill | null;
             modelId?: string;
             thinkingLevel?: ThinkingLevel;
             searchLevel?: SearchLevel;
@@ -334,7 +331,6 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 content: message.content,
                 contextContent: message.contextContent,
                 thinking: message.thinking,
-                skill: message.skill,
                 modelId: message.modelId,
                 thinkingLevel: message.thinkingLevel,
                 searchLevel: message.searchLevel,

@@ -23,18 +23,6 @@ export const LIMITS = {
         "ROUTERCHAT_MAX_MESSAGE_THINKING_CHARS",
         200_000,
     ),
-    maxSkillNameChars: readPositiveIntEnv(
-        "ROUTERCHAT_MAX_SKILL_NAME_CHARS",
-        200,
-    ),
-    maxSkillDescriptionChars: readPositiveIntEnv(
-        "ROUTERCHAT_MAX_SKILL_DESCRIPTION_CHARS",
-        5_000,
-    ),
-    maxSkillPromptChars: readPositiveIntEnv(
-        "ROUTERCHAT_MAX_SKILL_PROMPT_CHARS",
-        100_000,
-    ),
     maxLocalIdChars: readPositiveIntEnv("ROUTERCHAT_MAX_LOCAL_ID_CHARS", 200),
 
     // Per-object limits (anti-abuse knobs)
@@ -47,7 +35,6 @@ export const LIMITS = {
         "ROUTERCHAT_MAX_ATTACHMENTS_PER_MESSAGE",
         50,
     ),
-    maxSkillsPerUser: readPositiveIntEnv("ROUTERCHAT_MAX_SKILLS_PER_USER", 500),
     maxMessagesPerUser: readPositiveIntEnv(
         "ROUTERCHAT_MAX_MESSAGES_PER_USER",
         100_000,
@@ -61,7 +48,6 @@ export const LIMITS = {
     // Query limits (anti-DoS knobs). Keep >= corresponding maxes above.
     maxListChats: readPositiveIntEnv("ROUTERCHAT_MAX_LIST_CHATS", 5_000),
     maxListMessages: readPositiveIntEnv("ROUTERCHAT_MAX_LIST_MESSAGES", 20_000),
-    maxListSkills: readPositiveIntEnv("ROUTERCHAT_MAX_LIST_SKILLS", 500),
     maxListAttachments: readPositiveIntEnv(
         "ROUTERCHAT_MAX_LIST_ATTACHMENTS",
         50_000,
@@ -70,7 +56,6 @@ export const LIMITS = {
     // Pagination limits (anti-DoS knobs). Bounds `paginationOpts.numItems`.
     maxPageChats: readPositiveIntEnv("ROUTERCHAT_MAX_PAGE_CHATS", 250),
     maxPageMessages: readPositiveIntEnv("ROUTERCHAT_MAX_PAGE_MESSAGES", 200),
-    maxPageSkills: readPositiveIntEnv("ROUTERCHAT_MAX_PAGE_SKILLS", 250),
 } as const;
 
 export function assertMaxLen(

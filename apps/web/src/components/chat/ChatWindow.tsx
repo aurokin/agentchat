@@ -33,7 +33,6 @@ import {
     type Message,
 } from "@/lib/types";
 import { APP_DEFAULT_MODEL } from "@shared/core/models";
-import { type Skill, getSkillSelectionUpdate } from "@shared/core/skills";
 import {
     applyModelCapabilities,
     getLastUserSettings,
@@ -171,13 +170,8 @@ export function ChatWindow() {
         setDefaultModel,
         setDefaultThinking,
         setDefaultSearchLevel,
-        selectedSkill,
-        defaultSkill,
-        selectedSkillMode,
-        setSelectedSkill,
         models,
         favoriteModels,
-        skills,
     } = useSettings();
     const storageAdapter = useStorageAdapter();
 
@@ -194,23 +188,7 @@ export function ChatWindow() {
         null,
     );
     const streamingFrameRef = useRef<number | null>(null);
-    const lastSkillChangeRef = useRef<{
-        skill: Skill | null;
-        mode: "auto" | "manual";
-    }>({
-        skill: selectedSkill,
-        mode: selectedSkillMode,
-    });
     const lastInitializedChatIdRef = useRef<string | null>(null);
-
-    const updateSelectedSkill = useCallback(
-        (skill: Skill | null, options?: { mode?: "auto" | "manual" }) => {
-            const mode = options?.mode ?? "manual";
-            lastSkillChangeRef.current = { skill, mode };
-            setSelectedSkill(skill, { mode });
-        },
-        [setSelectedSkill],
-    );
 
     const queueStreamingMessageUpdate = useCallback(
         (nextState: StreamingMessageState | null) => {
@@ -249,13 +227,6 @@ export function ChatWindow() {
             }
         };
     }, []);
-
-    useEffect(() => {
-        lastSkillChangeRef.current = {
-            skill: selectedSkill,
-            mode: selectedSkillMode,
-        };
-    }, [selectedSkill, selectedSkillMode]);
 
     useEffect(() => {
         if (!currentChat) {
@@ -322,27 +293,6 @@ export function ChatWindow() {
         messages,
         models,
         updateChat,
-    ]);
-
-    useEffect(() => {
-        if (!currentChat || isMessagesLoading) return;
-        const nextSkill = getSkillSelectionUpdate({
-            messageCount: messages.length,
-            defaultSkill,
-            selectedSkill,
-            selectedSkillMode,
-        });
-        if (nextSkill !== undefined) {
-            updateSelectedSkill(nextSkill, { mode: "auto" });
-        }
-    }, [
-        currentChat,
-        defaultSkill,
-        isMessagesLoading,
-        messages.length,
-        selectedSkill,
-        selectedSkillMode,
-        updateSelectedSkill,
     ]);
 
     useEffect(() => {
@@ -423,27 +373,6 @@ export function ChatWindow() {
                     });
                     setDefaultModel(nextModelId);
                 }
-                return;
-            }
-
-            if (hasModifier && hasAlt && !event.shiftKey && code === "keys") {
-                event.preventDefault();
-                const skillSequence = [null, ...skills];
-                const currentIndex = selectedSkill
-                    ? skillSequence.findIndex(
-                          (skill) => skill?.id === selectedSkill.id,
-                      )
-                    : 0;
-                const nextIndex =
-                    (currentIndex + 1) % Math.max(skillSequence.length, 1);
-                const nextSkill = skillSequence[nextIndex] ?? null;
-                updateSelectedSkill(nextSkill, { mode: "manual" });
-                return;
-            }
-
-            if (hasModifier && hasAlt && !event.shiftKey && code === "keyn") {
-                event.preventDefault();
-                updateSelectedSkill(null, { mode: "manual" });
                 return;
             }
 
@@ -534,12 +463,9 @@ export function ChatWindow() {
         favoriteModels,
         models,
         router,
-        selectedSkill,
         setDefaultModel,
         setDefaultThinking,
         setDefaultSearchLevel,
-        updateSelectedSkill,
-        skills,
         updateChat,
     ]);
 
@@ -575,12 +501,6 @@ export function ChatWindow() {
             message_length_bucket: getMessageLengthBucket(content),
         });
 
-        const skillSnapshot = lastSkillChangeRef.current;
-        let skillForMessage = selectedSkill;
-        if (skillSnapshot.mode === "manual") {
-            skillForMessage = skillSnapshot.skill;
-        }
-
         let assistantMessageId: string | null = null;
         let fullResponse = "";
         let fullThinking = "";
@@ -600,13 +520,7 @@ export function ChatWindow() {
                     ? chatSnapshot.searchLevel
                     : "none";
 
-            const contextContent = skillForMessage
-                ? `${skillForMessage.prompt}\n\nUser: ${content}`
-                : content;
-
-            const clonedSkill = skillForMessage
-                ? JSON.parse(JSON.stringify(skillForMessage))
-                : null;
+            const contextContent = content;
 
             // Generate a stable message ID for attachments
             const messageId = generateUUID();
@@ -640,7 +554,6 @@ export function ChatWindow() {
                         role: "user",
                         content: content,
                         contextContent: contextContent,
-                        skill: clonedSkill,
                         modelId: chatSnapshot.modelId,
                         thinkingLevel: effectiveThinking,
                         searchLevel: effectiveSearchLevel,
@@ -661,7 +574,6 @@ export function ChatWindow() {
                         role: "user",
                         content: content,
                         contextContent: contextContent,
-                        skill: clonedSkill,
                         modelId: chatSnapshot.modelId,
                         thinkingLevel: effectiveThinking,
                         searchLevel: effectiveSearchLevel,
@@ -675,7 +587,6 @@ export function ChatWindow() {
                     role: "user",
                     content: content,
                     contextContent: contextContent,
-                    skill: clonedSkill,
                     modelId: chatSnapshot.modelId,
                     thinkingLevel: effectiveThinking,
                     searchLevel: effectiveSearchLevel,
@@ -690,8 +601,6 @@ export function ChatWindow() {
             if (supportsSearch) {
                 setDefaultSearchLevel(effectiveSearchLevel);
             }
-
-            updateSelectedSkill(null, { mode: "auto" });
 
             const updatedChat = getChatTitleUpdate(
                 chatSnapshot,
@@ -756,7 +665,6 @@ export function ChatWindow() {
                 role: "assistant",
                 content: "",
                 contextContent: "",
-                skill: null,
                 modelId: chatSnapshot.modelId,
                 thinkingLevel: effectiveThinking,
                 searchLevel: effectiveSearchLevel,
@@ -820,9 +728,7 @@ export function ChatWindow() {
                 if (err.isRetryable) {
                     setRetryChat({
                         content: content,
-                        contextContent: skillForMessage
-                            ? `${skillForMessage.prompt}\n\nUser: ${content}`
-                            : content,
+                        contextContent: content,
                     });
                 }
             } else {

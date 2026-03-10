@@ -21,7 +21,6 @@ import type * as lib_limits from "../lib/limits.js";
 import type * as lib_pagination from "../lib/pagination.js";
 import type * as lib_subscription from "../lib/subscription.js";
 import type * as messages from "../messages.js";
-import type * as skills from "../skills.js";
 import type * as users from "../users.js";
 
 import type {
@@ -44,7 +43,6 @@ declare const fullApi: ApiFromModules<{
   "lib/pagination": typeof lib_pagination;
   "lib/subscription": typeof lib_subscription;
   messages: typeof messages;
-  skills: typeof skills;
   users: typeof users;
 }>;
 

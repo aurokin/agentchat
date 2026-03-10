@@ -51,7 +51,7 @@ export default function OnboardingScreen({
             title: "Self-Hosted Design",
             subtitle: "Connect the app to your own backend",
             content: [
-                "• Chats, skills, and API keys live in your Convex deployment",
+                "• Chats and API keys live in your Convex deployment",
                 "• Bring your own infrastructure and agent stack",
                 "• Keep full control of storage and auth",
                 "• Your API key is stored encrypted in Convex",
@@ -63,7 +63,7 @@ export default function OnboardingScreen({
             content: [
                 "• Sign in with Google to access your workspace",
                 "• Chats sync across mobile and web",
-                "• Skills and settings follow your account",
+                "• Settings follow your account",
                 "• Encrypted API keys are available on every signed-in device",
                 "• Agentchat stays aligned with its Convex backend",
             ],

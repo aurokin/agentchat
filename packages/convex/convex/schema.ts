@@ -26,7 +26,6 @@ export default defineSchema({
         // Cloud usage counters (anti-abuse + cheap usage queries)
         cloudChatCount: v.optional(v.number()),
         cloudMessageCount: v.optional(v.number()),
-        cloudSkillCount: v.optional(v.number()),
         cloudAttachmentCount: v.optional(v.number()),
         cloudAttachmentBytes: v.optional(v.number()),
         createdAt: v.optional(v.number()),
@@ -59,7 +58,6 @@ export default defineSchema({
         content: v.string(),
         contextContent: v.string(),
         thinking: v.optional(v.string()),
-        skill: v.optional(v.any()),
         modelId: v.optional(v.string()),
         thinkingLevel: v.optional(v.string()),
         searchLevel: v.optional(v.string()),
@@ -68,16 +66,6 @@ export default defineSchema({
     })
         .index("by_chat", ["chatId"])
         .index("by_chat_created", ["chatId", "createdAt"])
-        .index("by_user", ["userId"])
-        .index("by_local_id", ["userId", "localId"]),
-    skills: defineTable({
-        userId: v.id("users"),
-        localId: v.optional(v.string()),
-        name: v.string(),
-        description: v.string(),
-        prompt: v.string(),
-        createdAt: v.number(),
-    })
         .index("by_user", ["userId"])
         .index("by_local_id", ["userId", "localId"]),
     attachments: defineTable({

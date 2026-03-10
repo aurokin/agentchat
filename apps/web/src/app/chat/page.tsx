@@ -61,8 +61,7 @@ export default function ChatPage() {
                     <h1 className="text-xl font-semibold">Sign in required</h1>
                     <p className="mt-3 text-sm text-muted-foreground">
                         Agentchat now runs against your Convex backend only.
-                        Sign in to access chats, skills, and your encrypted API
-                        key.
+                        Sign in to access chats and your encrypted API key.
                     </p>
                     <button
                         type="button"

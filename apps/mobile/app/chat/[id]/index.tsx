@@ -25,7 +25,6 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useChatContext } from "@/contexts/ChatContext";
 import { useModelContext } from "@/contexts/ModelContext";
-import { useSkillsContext } from "@/contexts/SkillsContext";
 import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
 import { loadAttachmentData, saveFile } from "@/lib/storage";
 import { useApiKey } from "@/hooks/useApiKey";
@@ -51,7 +50,6 @@ import type {
     Attachment,
     PendingAttachment,
 } from "@shared/core/types";
-import { type Skill, getSkillSelectionUpdate } from "@shared/core/skills";
 import {
     applyModelCapabilities,
     getLastUserSettings,
@@ -124,13 +122,6 @@ export default function ChatScreen(): ReactElement {
         favoriteModels,
         toggleFavoriteModel,
     } = useModelContext();
-    const {
-        skills,
-        selectedSkill,
-        defaultSkill,
-        selectedSkillMode,
-        setSelectedSkill,
-    } = useSkillsContext();
     const { colors } = useTheme();
     const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -164,9 +155,6 @@ export default function ChatScreen(): ReactElement {
     const [expandedThinking, setExpandedThinking] = useState<
         Record<string, boolean>
     >({});
-    const [expandedSkill, setExpandedSkill] = useState<Record<string, boolean>>(
-        {},
-    );
     const [galleryVisible, setGalleryVisible] = useState(false);
     const [galleryAttachments, setGalleryAttachments] = useState<Attachment[]>(
         [],
@@ -177,25 +165,9 @@ export default function ChatScreen(): ReactElement {
     const smallestSide = Math.min(windowWidth, windowHeight);
     const isTwoPaneLayout = smallestSide >= 700;
     const sidebarWidth = Math.max(280, Math.min(360, windowWidth * 0.32));
-    const lastSkillChangeRef = useRef<{
-        skill: Skill | null;
-        mode: "auto" | "manual";
-    }>({
-        skill: selectedSkill,
-        mode: selectedSkillMode,
-    });
     const lastInitializedChatIdRef = useRef<string | null>(null);
     const suppressInputRef = useRef(false);
     const sharePayloadAppliedRef = useRef<string | null>(null);
-
-    const updateSelectedSkill = useCallback(
-        (skill: Skill | null, options?: { mode?: "auto" | "manual" }) => {
-            const mode = options?.mode ?? "manual";
-            lastSkillChangeRef.current = { skill, mode };
-            setSelectedSkill(skill, { mode });
-        },
-        [setSelectedSkill],
-    );
 
     useEffect(() => {
         if (chatId) {
@@ -224,13 +196,6 @@ export default function ChatScreen(): ReactElement {
             }
         };
     }, []);
-
-    useEffect(() => {
-        lastSkillChangeRef.current = {
-            skill: selectedSkill,
-            mode: selectedSkillMode,
-        };
-    }, [selectedSkill, selectedSkillMode]);
 
     useEffect(() => {
         if (!currentChat) {
@@ -340,27 +305,6 @@ export default function ChatScreen(): ReactElement {
             }
         })();
     }, [chatId, currentChat]);
-
-    useEffect(() => {
-        if (!currentChat || !hasLoadedMessages) return;
-        const nextSkill = getSkillSelectionUpdate({
-            messageCount: chatMessages.length,
-            defaultSkill,
-            selectedSkill,
-            selectedSkillMode,
-        });
-        if (nextSkill !== undefined) {
-            updateSelectedSkill(nextSkill, { mode: "auto" });
-        }
-    }, [
-        chatMessages.length,
-        currentChat,
-        hasLoadedMessages,
-        defaultSkill,
-        selectedSkill,
-        selectedSkillMode,
-        updateSelectedSkill,
-    ]);
 
     useEffect(() => {
         if (!currentChat || !hasLoadedMessages) return;
@@ -603,12 +547,6 @@ export default function ChatScreen(): ReactElement {
         setStreamingMessageId(null);
         setStreamingDraft(null);
 
-        const skillSnapshot = lastSkillChangeRef.current;
-        let skillForMessage = selectedSkill;
-        if (skillSnapshot.mode === "manual") {
-            skillForMessage = skillSnapshot.skill;
-        }
-
         try {
             const activeModel = models.find(
                 (model) => model.id === chatSnapshot.modelId,
@@ -624,13 +562,7 @@ export default function ChatScreen(): ReactElement {
                     ? chatSnapshot.searchLevel
                     : "none";
 
-            const contextContent = skillForMessage
-                ? `${skillForMessage.prompt}\n\nUser: ${content}`
-                : content;
-
-            const clonedSkill = skillForMessage
-                ? { ...skillForMessage, createdAt: Date.now() }
-                : null;
+            const contextContent = content;
 
             const isCloudStorage =
                 storageAdapter instanceof ConvexStorageAdapter;
@@ -647,7 +579,6 @@ export default function ChatScreen(): ReactElement {
                         role: "user",
                         content: content,
                         contextContent: contextContent,
-                        skill: clonedSkill,
                         modelId: chatSnapshot.modelId,
                         thinkingLevel: effectiveThinking,
                         searchLevel: effectiveSearchLevel,
@@ -672,7 +603,6 @@ export default function ChatScreen(): ReactElement {
                         role: "user",
                         content: content,
                         contextContent: contextContent,
-                        skill: clonedSkill,
                         modelId: chatSnapshot.modelId,
                         thinkingLevel: effectiveThinking,
                         searchLevel: effectiveSearchLevel,
@@ -686,7 +616,6 @@ export default function ChatScreen(): ReactElement {
                     role: "user",
                     content: content,
                     contextContent: contextContent,
-                    skill: clonedSkill,
                     modelId: chatSnapshot.modelId,
                     thinkingLevel: effectiveThinking,
                     searchLevel: effectiveSearchLevel,
@@ -700,8 +629,6 @@ export default function ChatScreen(): ReactElement {
             if (supportsSearch) {
                 setDefaultSearchLevel(effectiveSearchLevel);
             }
-
-            updateSelectedSkill(null, { mode: "auto" });
 
             const updatedChat = getChatTitleUpdate(
                 chatSnapshot,
@@ -743,7 +670,6 @@ export default function ChatScreen(): ReactElement {
                 contextContent: "",
                 thinking: undefined,
                 modelId: chatSnapshot.modelId,
-                skill: null,
                 thinkingLevel: effectiveThinking,
                 searchLevel: effectiveSearchLevel,
             });
@@ -1061,13 +987,6 @@ export default function ChatScreen(): ReactElement {
         }));
     };
 
-    const toggleSkill = (messageId: string) => {
-        setExpandedSkill((prev) => ({
-            ...prev,
-            [messageId]: !prev[messageId],
-        }));
-    };
-
     const openGallery = (attachmentId: string, attachments: Attachment[]) => {
         const index = attachments.findIndex((a) => a.id === attachmentId);
         if (index >= 0) {
@@ -1159,76 +1078,6 @@ export default function ChatScreen(): ReactElement {
         );
     };
 
-    const renderSkillInfo = (skill: Skill, messageId: string) => {
-        const isExpanded = expandedSkill[messageId];
-
-        return (
-            <View style={[styles.skillPanel, styles.skillPanelOutside]}>
-                <TouchableOpacity
-                    style={[
-                        styles.skillHeader,
-                        isExpanded && styles.skillHeaderExpanded,
-                    ]}
-                    onPress={() => toggleSkill(messageId)}
-                    activeOpacity={0.7}
-                >
-                    <Text
-                        style={[
-                            styles.skillName,
-                            isExpanded && styles.skillNameExpanded,
-                        ]}
-                        numberOfLines={1}
-                    >
-                        {skill.name}
-                    </Text>
-                    <View style={styles.skillHeaderIcons}>
-                        <Feather
-                            name="award"
-                            size={12}
-                            color={colors.accent}
-                            style={styles.skillIcon}
-                        />
-                        <Feather
-                            name={isExpanded ? "chevron-down" : "chevron-left"}
-                            size={14}
-                            color={colors.accent}
-                            style={styles.skillChevron}
-                        />
-                    </View>
-                </TouchableOpacity>
-                {isExpanded && (
-                    <View style={styles.skillContent}>
-                        {skill.description && (
-                            <Text
-                                style={[
-                                    styles.skillDescription,
-                                    isExpanded &&
-                                        styles.skillDescriptionExpanded,
-                                ]}
-                            >
-                                {skill.description}
-                            </Text>
-                        )}
-                        <View style={styles.skillPromptBox}>
-                            <ScrollView
-                                style={styles.skillPromptScroll}
-                                contentContainerStyle={
-                                    styles.skillPromptContent
-                                }
-                                nestedScrollEnabled
-                                showsVerticalScrollIndicator
-                            >
-                                <Text style={styles.skillPromptText}>
-                                    {skill.prompt}
-                                </Text>
-                            </ScrollView>
-                        </View>
-                    </View>
-                )}
-            </View>
-        );
-    };
-
     const formatMessageTime = (timestamp: number): string => {
         return new Date(timestamp).toLocaleTimeString([], {
             hour: "numeric",
@@ -1294,9 +1143,6 @@ export default function ChatScreen(): ReactElement {
                         : styles.messageGroupAssistant,
                 ]}
             >
-                {item.skill && item.role === "user"
-                    ? renderSkillInfo(item.skill, item.id)
-                    : null}
                 {isUser && hasAttachments
                     ? renderAttachments(
                           item.attachmentIds as string[],
@@ -1653,11 +1499,6 @@ export default function ChatScreen(): ReactElement {
                     searchSupported={searchSupported}
                     searchLevel={currentChat.searchLevel}
                     onSearchChange={handleSearchChange}
-                    skills={skills}
-                    selectedSkill={selectedSkill}
-                    onSkillSelect={(skill) =>
-                        updateSelectedSkill(skill, { mode: "manual" })
-                    }
                     attachments={attachments}
                     onAttachmentsChange={handleAttachmentsSelected}
                     onRemoveAttachment={handleRemoveAttachment}

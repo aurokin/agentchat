@@ -8,16 +8,13 @@ import React, {
     useCallback,
     useRef,
 } from "react";
-import { useStorageAdapter } from "@/contexts/SyncContext";
 import type {
     UserSettings,
     OpenRouterModel,
     ThinkingLevel,
     SearchLevel,
-    Skill,
 } from "@/lib/types";
 import { APP_DEFAULT_MODEL } from "@shared/core/models";
-import { v4 as uuid } from "uuid";
 import * as storage from "@/lib/storage";
 import { fetchModels } from "@/lib/openrouter";
 import { useApiKey } from "@/hooks/useApiKey";
@@ -33,18 +30,6 @@ interface SettingsContextType extends UserSettings {
     models: OpenRouterModel[];
     loadingModels: boolean;
     refreshModels: () => Promise<void>;
-    skills: Skill[];
-    addSkill: (skill: Omit<Skill, "id" | "createdAt">) => void;
-    updateSkill: (id: string, updates: Partial<Skill>) => void;
-    deleteSkill: (id: string) => void;
-    selectedSkill: Skill | null;
-    defaultSkill: Skill | null;
-    setSelectedSkill: (
-        skill: Skill | null,
-        options?: { mode?: "auto" | "manual" },
-    ) => void;
-    selectedSkillMode: "auto" | "manual";
-    setDefaultSkill: (skill: Skill | null) => void;
 }
 
 const defaultSettings: UserSettings = {
@@ -81,16 +66,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     const [models, setModels] = useState<OpenRouterModel[]>([]);
     const [loadingModels, setLoadingModels] = useState(false);
     const [mounted, setMounted] = useState(false);
-    const [skills, setSkills] = useState<Skill[]>([]);
-    const [selectedSkill, setSelectedSkillState] = useState<Skill | null>(null);
-    const [selectedSkillMode, setSelectedSkillMode] = useState<
-        "auto" | "manual"
-    >("auto");
-    const [defaultSkillId, setDefaultSkillIdState] = useState<string | null>(
-        null,
-    );
     const refreshPromiseRef = useRef<Promise<void> | null>(null);
-    const storageAdapter = useStorageAdapter();
 
     // Use the useApiKey hook for cloud-synced API key management
     const {
@@ -153,41 +129,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
             apiKey: cloudApiKey,
         }));
     }, [cloudApiKey]);
-
-    useEffect(() => {
-        let isActive = true;
-
-        const loadSkills = async () => {
-            try {
-                const [loadedSkills, skillSettings] = await Promise.all([
-                    storageAdapter.getSkills(),
-                    storageAdapter.getSkillSettings(),
-                ]);
-
-                if (!isActive) return;
-
-                setSkills(loadedSkills);
-                setDefaultSkillIdState(skillSettings.defaultSkillId);
-                setSelectedSkillMode(skillSettings.selectedSkillMode);
-
-                const selectedSkill = skillSettings.selectedSkillId
-                    ? (loadedSkills.find(
-                          (skill) => skill.id === skillSettings.selectedSkillId,
-                      ) ?? null)
-                    : null;
-
-                setSelectedSkillState(selectedSkill);
-            } catch (error) {
-                console.error("Failed to load skills:", error);
-            }
-        };
-
-        void loadSkills();
-
-        return () => {
-            isActive = false;
-        };
-    }, [storageAdapter]);
 
     useEffect(() => {
         if (mounted) {
@@ -253,108 +194,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         });
     };
 
-    const addSkill = (skill: Omit<Skill, "id" | "createdAt">) => {
-        const newSkill: Skill = {
-            ...skill,
-            id: uuid(),
-            createdAt: Date.now(),
-        };
-        const newSkills = [...skills, newSkill];
-        setSkills(newSkills);
-        void storageAdapter.createSkill(newSkill);
-        return newSkill;
-    };
-
-    const updateSkill = (id: string, updates: Partial<Skill>) => {
-        const newSkills = skills.map((s) =>
-            s.id === id ? { ...s, ...updates } : s,
-        );
-        const updatedSkill = newSkills.find((skill) => skill.id === id);
-        setSkills(newSkills);
-        if (selectedSkill?.id === id && updatedSkill) {
-            setSelectedSkillState(updatedSkill);
-        }
-
-        if (updatedSkill) {
-            void storageAdapter.updateSkill(updatedSkill);
-        }
-    };
-
-    const setDefaultSkill = useCallback(
-        (skill: Skill | null) => {
-            const skillId = skill?.id ?? null;
-            setDefaultSkillIdState(skillId);
-            void storageAdapter.upsertSkillSettings({
-                defaultSkillId: skillId,
-            });
-        },
-        [storageAdapter],
-    );
-
-    const deleteSkill = (id: string) => {
-        const newSkills = skills.filter((s) => s.id !== id);
-        setSkills(newSkills);
-        void storageAdapter.deleteSkill(id);
-
-        if (selectedSkill?.id === id) {
-            setSelectedSkillState(null);
-            setSelectedSkillMode("auto");
-            void storageAdapter.upsertSkillSettings({
-                selectedSkillId: null,
-                selectedSkillMode: "auto",
-            });
-        }
-        if (defaultSkillId === id) {
-            setDefaultSkill(null);
-        }
-    };
-
-    const setSelectedSkill = (
-        skill: Skill | null,
-        options?: { mode?: "auto" | "manual" },
-    ) => {
-        const mode = options?.mode ?? "manual";
-        setSelectedSkillState(skill);
-        setSelectedSkillMode(mode);
-        if (mode === "manual") {
-            setDefaultSkill(skill ?? null);
-        }
-        void storageAdapter.upsertSkillSettings({
-            selectedSkillId: skill?.id ?? null,
-            selectedSkillMode: mode,
-        });
-    };
-
-    useEffect(() => {
-        if (
-            defaultSkillId &&
-            !skills.find((skill) => skill.id === defaultSkillId)
-        ) {
-            setDefaultSkill(null);
-        }
-        if (
-            selectedSkill &&
-            !skills.find((skill) => skill.id === selectedSkill.id)
-        ) {
-            setSelectedSkillState(null);
-            setSelectedSkillMode("auto");
-            void storageAdapter.upsertSkillSettings({
-                selectedSkillId: null,
-                selectedSkillMode: "auto",
-            });
-        }
-    }, [
-        defaultSkillId,
-        selectedSkill,
-        skills,
-        setDefaultSkill,
-        storageAdapter,
-    ]);
-
-    const defaultSkill = defaultSkillId
-        ? skills.find((skill) => skill.id === defaultSkillId) || null
-        : null;
-
     useEffect(() => {
         if (mounted) {
             setTheme(settings.theme);
@@ -375,15 +214,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
                 models,
                 loadingModels,
                 refreshModels,
-                skills,
-                addSkill,
-                updateSkill,
-                deleteSkill,
-                selectedSkill,
-                selectedSkillMode,
-                defaultSkill,
-                setSelectedSkill,
-                setDefaultSkill,
             }}
         >
             {children}

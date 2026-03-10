@@ -1,5 +1,3 @@
-import type { Skill } from "../skills";
-
 export type ThinkingLevel =
     | "xhigh"
     | "high"
@@ -17,7 +15,6 @@ export interface Message {
     content: string;
     contextContent: string;
     thinking?: string;
-    skill?: Skill | null;
     modelId?: string;
     thinkingLevel?: ThinkingLevel;
     searchLevel?: SearchLevel;

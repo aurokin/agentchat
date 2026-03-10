@@ -9,9 +9,7 @@ import rehypeHighlight from "rehype-highlight";
 import {
     Brain,
     MessageCircle,
-    Sparkles,
     ChevronDown,
-    ChevronLeft,
     ChevronRight,
     Search,
     Cpu,
@@ -318,13 +316,6 @@ function MessageItem({
     onImageClick: (imageId: string) => void;
 }) {
     const isUser = message.role === "user";
-    const [showSkill, setShowSkill] = useState(false);
-
-    // Use skill directly from message (already cloned)
-    const skill = message.skill;
-
-    // Check if this user message has a skill
-    const isSkillMessage = isUser && skill;
 
     // Get display-friendly model name
     const getModelDisplayName = (modelId?: string) => {
@@ -348,41 +339,6 @@ function MessageItem({
                     isUser ? "items-end" : "items-start",
                 )}
             >
-                {/* Skill collapsible for user message with skill */}
-                {isSkillMessage && skill && (
-                    <details className="mb-3 inline-flex flex-col max-w-[90%] border border-primary/30 bg-primary/15">
-                        <summary
-                            className="flex items-center gap-2 px-4 py-2.5 cursor-pointer select-none text-primary"
-                            onClick={() => setShowSkill(!showSkill)}
-                        >
-                            <span
-                                className={cn(
-                                    "font-medium text-sm",
-                                    showSkill && "flex-1 text-right",
-                                )}
-                            >
-                                {skill.name}
-                            </span>
-                            <Sparkles size={14} className="ml-auto" />
-                            {showSkill ? (
-                                <ChevronDown size={14} className="ml-2" />
-                            ) : (
-                                <ChevronLeft size={14} className="ml-2" />
-                            )}
-                        </summary>
-                        <div className="px-4 pb-3 text-sm border-t border-primary/20">
-                            {skill.description && (
-                                <p className="text-foreground py-2">
-                                    {skill.description}
-                                </p>
-                            )}
-                            <div className="p-3 bg-muted/50 border border-border mono text-xs whitespace-pre-wrap text-foreground max-h-40 overflow-y-auto">
-                                {skill.prompt}
-                            </div>
-                        </div>
-                    </details>
-                )}
-
                 {/* Attachments - displayed before content for user messages */}
                 {isUser &&
                     message.attachmentIds &&

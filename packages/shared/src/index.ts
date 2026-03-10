@@ -10,15 +10,12 @@ export {
     CloneProgress,
     CloneOptions,
     DEFAULT_SYNC_METADATA,
-    SkillSettings,
-    SkillSettingsUpdate,
     StorageAdapter,
     StorageAdapterFactory,
     MigrationSummary,
     getDataSummary,
     calculateMigrationProgress,
 } from "./core/sync";
-export * from "./core/skills";
 export * from "./core/defaults";
 export * from "./core/errors";
 export {

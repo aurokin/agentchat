@@ -1,23 +1,10 @@
-import type {
-    StorageAdapter,
-    SkillSettings as SyncSkillSettings,
-    SkillSettingsUpdate,
-} from "../sync";
+import type { StorageAdapter } from "../sync";
 import type { ChatSession, Message, Attachment } from "../types";
-import type { Skill } from "../skills";
 
 export type MemoryAdapterSeed = {
     chats?: ChatSession[];
     messages?: Message[];
     attachments?: Attachment[];
-    skills?: Skill[];
-    skillSettings?: SyncSkillSettings;
-};
-
-const defaultSkillSettings: SyncSkillSettings = {
-    defaultSkillId: null,
-    selectedSkillId: null,
-    selectedSkillMode: "auto",
 };
 
 const findIndexById = <T extends { id: string }>(items: T[], id: string) =>
@@ -29,10 +16,6 @@ export function createMemoryAdapter(
     const chats = [...(seed.chats ?? [])];
     const messages = [...(seed.messages ?? [])];
     const attachments = [...(seed.attachments ?? [])];
-    const skills = [...(seed.skills ?? [])];
-    let skillSettings: SyncSkillSettings = seed.skillSettings ?? {
-        ...defaultSkillSettings,
-    };
 
     return {
         async createChat(chat) {
@@ -129,32 +112,6 @@ export function createMemoryAdapter(
                 messageCount: messages.length,
                 sessionCount: chats.length,
             };
-        },
-
-        async getSkills() {
-            return [...skills];
-        },
-        async createSkill(skill) {
-            skills.push(skill);
-            return skill.id;
-        },
-        async updateSkill(skill) {
-            const index = findIndexById(skills, skill.id);
-            if (index >= 0) {
-                skills[index] = skill;
-            }
-        },
-        async deleteSkill(id) {
-            const index = findIndexById(skills, id);
-            if (index >= 0) {
-                skills.splice(index, 1);
-            }
-        },
-        async getSkillSettings() {
-            return { ...skillSettings };
-        },
-        async upsertSkillSettings(settings: SkillSettingsUpdate) {
-            skillSettings = { ...skillSettings, ...settings };
         },
     };
 }

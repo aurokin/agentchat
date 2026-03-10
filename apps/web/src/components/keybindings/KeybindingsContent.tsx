@@ -11,7 +11,6 @@ import {
     Mail,
     Search,
     Settings,
-    Sparkles,
     Trash2,
     type LucideIcon,
 } from "lucide-react";
@@ -82,18 +81,6 @@ const CHAT_KEYBINDINGS: KeybindingItem[] = [
         icon: Cpu,
     },
     {
-        id: "cycleSkills",
-        label: "Cycle skills",
-        keys: ["Cmd/Ctrl", "Alt", "S"],
-        icon: Sparkles,
-    },
-    {
-        id: "clearSkill",
-        label: "Clear skill (None)",
-        keys: ["Cmd/Ctrl", "Alt", "N"],
-        icon: Sparkles,
-    },
-    {
         id: "thinkingLevel",
         label: "Thinking level",
         keys: ["Cmd/Ctrl", "Alt", "1-5"],
@@ -121,8 +108,6 @@ const CHAT_KEYBINDINGS: KeybindingItem[] = [
 
 const HIGHLIGHT_IDS = new Set([
     "cycleFavoriteModels",
-    "cycleSkills",
-    "clearSkill",
     "thinkingLevel",
     "searchLevel",
 ]);

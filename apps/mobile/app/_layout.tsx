@@ -8,7 +8,6 @@ import { ChatProvider } from "@/contexts/ChatContext";
 import { AuthProvider } from "@/lib/convex/AuthContext";
 import { ConvexProvider } from "@/lib/convex";
 import { ModelProvider } from "@/contexts/ModelContext";
-import { SkillsProvider } from "@/contexts/SkillsContext";
 import { SyncProvider } from "@/contexts/SyncContext";
 import { ShareIntentBridge } from "@/components/share/ShareIntentBridge";
 import OnboardingScreen from "./onboarding";
@@ -56,20 +55,18 @@ export default function Layout(): ReactElement {
                     <AuthProvider>
                         <ModelProvider>
                             <SyncProvider>
-                                <SkillsProvider>
-                                    <AppProvider>
-                                        <ChatProvider>
-                                            <ShareIntentBridge />
-                                            <OnboardingWrapper>
-                                                <Stack
-                                                    screenOptions={{
-                                                        headerShown: false,
-                                                    }}
-                                                />
-                                            </OnboardingWrapper>
-                                        </ChatProvider>
-                                    </AppProvider>
-                                </SkillsProvider>
+                                <AppProvider>
+                                    <ChatProvider>
+                                        <ShareIntentBridge />
+                                        <OnboardingWrapper>
+                                            <Stack
+                                                screenOptions={{
+                                                    headerShown: false,
+                                                }}
+                                            />
+                                        </OnboardingWrapper>
+                                    </ChatProvider>
+                                </AppProvider>
                             </SyncProvider>
                         </ModelProvider>
                     </AuthProvider>

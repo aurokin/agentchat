@@ -12,10 +12,9 @@ Visit https://www.routerchat.chat to start chatting with Agentchat using your Op
 - **Model Selection** - Browse and select from available OpenRouter models
 - **Thinking Mode** - Toggle reasoning mode for supported models
 - **Web Search** - Enable web search for online-capable models
-- **System Skills** - Choose from preset prompts or create custom system messages
 - **Markdown Support** - Rich text rendering for code blocks, lists, and formatting
 - **Copy Messages** - One-click copy for any message
-- **Convex Workspace** - Chats, skills, and encrypted API keys stored in Convex
+- **Convex Workspace** - Chats and encrypted API keys stored in Convex
 - **Self-Hosted Direction** - Built for deployments you run and control
 - **Optional Analytics** - PostHog instrumentation for product usage events when enabled
 - **Theme Support** - Light, dark, and system theme options
@@ -26,7 +25,7 @@ Visit https://www.routerchat.chat to start chatting with Agentchat using your Op
 Agentchat is designed to keep you in control of your data and model choices.
 
 - **Self-hosted** - Run Agentchat on infrastructure you control.
-- **Convex-backed** - Chats, skills, and encrypted API keys live in Convex.
+- **Convex-backed** - Chats and encrypted API keys live in Convex.
 - **User-empowered** - Choose any model available through OpenRouter and customize your experience.
 
 ## Tech Stack
@@ -199,7 +198,7 @@ Agent instructions live in `AGENTS.md` and the linked docs under `docs/agents/`.
 ## Architecture Notes
 
 - **Direct API calls**: OpenRouter API calls are made directly from the client
-- **Convex-only runtime**: Chats, skills, and API keys are stored through Convex during the current development phase
+- **Convex-only runtime**: Chats and API keys are stored through Convex during the current development phase
 - **Storage adapter pattern**: The local adapter remains in the codebase, but runtime paths now use Convex
 - **Monorepo**: Designed for future mobile expansion with shared types
 

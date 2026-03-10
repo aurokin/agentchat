@@ -21,12 +21,10 @@ import {
 } from "react-native";
 import type { OpenRouterModel } from "@shared/core/models";
 import type { ThinkingLevel, SearchLevel } from "@shared/core/types";
-import type { Skill } from "@shared/core/skills";
 import type { PendingAttachment } from "@shared/core/types";
 import { ModelSelector } from "@/components/chat/ModelSelector";
 import { ThinkingToggle } from "@/components/chat/ThinkingToggle";
 import { SearchToggle } from "@/components/chat/SearchToggle";
-import { SkillSelector } from "@/components/chat/SkillSelector";
 import { AttachmentPicker } from "@/components/chat/AttachmentPicker";
 import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
 import { modelSupportsVision } from "@/contexts/ModelContext";
@@ -51,9 +49,6 @@ interface MessageInputProps {
     searchSupported: boolean;
     searchLevel: SearchLevel;
     onSearchChange: (value: SearchLevel) => void;
-    skills: Skill[];
-    selectedSkill: Skill | null;
-    onSkillSelect: (skill: Skill | null) => void;
     attachments: PendingAttachment[];
     onAttachmentsChange: (attachments: PendingAttachment[]) => void;
     onRemoveAttachment: (attachmentId: string) => void;
@@ -85,9 +80,6 @@ export function MessageInput({
     searchSupported,
     searchLevel,
     onSearchChange,
-    skills,
-    selectedSkill,
-    onSkillSelect,
     attachments,
     onAttachmentsChange,
     onRemoveAttachment,
@@ -224,12 +216,6 @@ export function MessageInput({
                 onModelChange={onModelChange}
                 favoriteModels={favoriteModels}
                 onToggleFavoriteModel={onToggleFavoriteModel}
-                disabled={isLoading}
-            />
-            <SkillSelector
-                skills={skills}
-                selectedSkill={selectedSkill}
-                onSelectSkill={onSkillSelect}
                 disabled={isLoading}
             />
             {searchSupported && (
