@@ -12,24 +12,13 @@ import { useRouter } from "next/navigation";
 import { api } from "@convex/_generated/api";
 import { useChat } from "@/contexts/ChatContext";
 import { useSettings } from "@/contexts/SettingsContext";
-import { useStorageAdapter } from "@/contexts/SyncContext";
-import {
-    OpenRouterApiError,
-    buildMessageContent,
-    type MessageContent,
-} from "@/lib/openrouter";
+import { OpenRouterApiError, type MessageContent } from "@/lib/openrouter";
 import { useActionSafe } from "@/hooks/useConvexSafe";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import {
-    modelSupportsSearch,
     modelSupportsReasoning,
-    modelSupportsVision,
     type ThinkingLevel,
-    type SearchLevel,
-    type PendingAttachment,
-    type Attachment,
-    type ImageMimeType,
     type ChatSession,
     type Message,
 } from "@/lib/types";
@@ -42,7 +31,6 @@ import {
 import { trimTrailingEmptyLines } from "@shared/core/text";
 import { generateUUID } from "@/lib/utils";
 import { Hexagon, Sparkles, AlertCircle, RefreshCw } from "lucide-react";
-import { ConvexStorageAdapter } from "@/lib/sync/convex-adapter";
 
 interface ErrorState {
     message: string;
@@ -156,14 +144,11 @@ export function ChatWindow() {
     const {
         defaultModel,
         defaultThinking,
-        defaultSearchLevel,
         setDefaultModel,
         setDefaultThinking,
-        setDefaultSearchLevel,
         models,
         favoriteModels,
     } = useSettings();
-    const storageAdapter = useStorageAdapter();
     const sendOpenRouterMessage = useActionSafe(api.openrouter.sendMessage);
 
     const [sending, setSending] = useState(false);
@@ -242,7 +227,7 @@ export function ChatWindow() {
         const defaults = {
             modelId: fallbackModelId,
             thinking: defaultThinking,
-            searchLevel: defaultSearchLevel,
+            searchLevel: "none" as const,
         };
         const lastUserSettings = getLastUserSettings(messages);
         const resolvedSettings = resolveInitialChatSettings({
@@ -257,21 +242,17 @@ export function ChatWindow() {
             supportsReasoning: modelForSettings
                 ? modelSupportsReasoning(modelForSettings)
                 : true,
-            supportsSearch: modelForSettings
-                ? modelSupportsSearch(modelForSettings)
-                : true,
+            supportsSearch: false,
         });
 
         if (
             constrainedSettings.modelId !== currentChat.modelId ||
-            constrainedSettings.thinking !== currentChat.thinking ||
-            constrainedSettings.searchLevel !== currentChat.searchLevel
+            constrainedSettings.thinking !== currentChat.thinking
         ) {
             void updateChat({
                 ...currentChat,
                 modelId: constrainedSettings.modelId,
                 thinking: constrainedSettings.thinking,
-                searchLevel: constrainedSettings.searchLevel,
             });
         }
         lastInitializedChatIdRef.current = currentChat.id;
@@ -279,7 +260,6 @@ export function ChatWindow() {
         currentChat,
         defaultModel,
         defaultThinking,
-        defaultSearchLevel,
         isMessagesLoading,
         messages,
         models,
@@ -347,20 +327,13 @@ export function ChatWindow() {
                     const supportsReasoning = nextModel
                         ? modelSupportsReasoning(nextModel)
                         : true;
-                    const supportsSearch = nextModel
-                        ? modelSupportsSearch(nextModel)
-                        : true;
                     const nextThinking = supportsReasoning
                         ? currentChat.thinking
-                        : "none";
-                    const nextSearchLevel = supportsSearch
-                        ? currentChat.searchLevel
                         : "none";
                     void updateChat({
                         ...currentChat,
                         modelId: nextModelId,
                         thinking: nextThinking,
-                        searchLevel: nextSearchLevel,
                     });
                     setDefaultModel(nextModelId);
                 }
@@ -409,42 +382,6 @@ export function ChatWindow() {
                     return;
                 }
             }
-
-            if (
-                hasModifier &&
-                event.shiftKey &&
-                !hasAlt &&
-                event.key === "Backspace"
-            ) {
-                const currentModel = models.find(
-                    (model) => model.id === currentChat.modelId,
-                );
-                if (!modelSupportsSearch(currentModel)) return;
-                event.preventDefault();
-                void updateChat({ ...currentChat, searchLevel: "none" });
-                setDefaultSearchLevel("none");
-                return;
-            }
-
-            if (hasModifier && event.shiftKey && !hasAlt) {
-                const level = getDigitFromEvent(event);
-                if (level !== null && level >= 1 && level <= 3) {
-                    const currentModel = models.find(
-                        (model) => model.id === currentChat.modelId,
-                    );
-                    if (!modelSupportsSearch(currentModel)) return;
-                    const levels: SearchLevel[] = ["low", "medium", "high"];
-                    const nextLevel = levels[level - 1];
-                    if (nextLevel) {
-                        event.preventDefault();
-                        void updateChat({
-                            ...currentChat,
-                            searchLevel: nextLevel,
-                        });
-                        setDefaultSearchLevel(nextLevel);
-                    }
-                }
-            }
         };
 
         window.addEventListener("keydown", handleKeyDown, true);
@@ -456,14 +393,10 @@ export function ChatWindow() {
         router,
         setDefaultModel,
         setDefaultThinking,
-        setDefaultSearchLevel,
         updateChat,
     ]);
 
-    const handleSendMessage = async (
-        content: string,
-        pendingAttachments?: PendingAttachment[],
-    ) => {
+    const handleSendMessage = async (content: string) => {
         const chatSnapshot = currentChat;
         const messagesSnapshot = messages;
 
@@ -486,96 +419,27 @@ export function ChatWindow() {
                 (m) => m.id === chatSnapshot.modelId,
             );
             const supportsReasoning = modelSupportsReasoning(currentModel);
-            const supportsSearch = modelSupportsSearch(currentModel);
 
             const effectiveThinking = supportsReasoning
                 ? chatSnapshot.thinking
                 : "none";
-            const effectiveSearchLevel: SearchLevel =
-                supportsSearch && chatSnapshot.searchLevel !== "none"
-                    ? chatSnapshot.searchLevel
-                    : "none";
 
             const contextContent = content;
-
-            // Generate a stable message ID for attachments
             const messageId = generateUUID();
-            const isCloudStorage =
-                storageAdapter instanceof ConvexStorageAdapter;
 
-            // Convert pending attachments to stored attachments
-            let attachmentIds: string[] | undefined;
-            const attachments: Attachment[] = pendingAttachments?.length
-                ? pendingAttachments.map((pa) => ({
-                      id: generateUUID(),
-                      messageId,
-                      type: "image" as const,
-                      mimeType: pa.mimeType as ImageMimeType,
-                      data: pa.data,
-                      width: pa.width,
-                      height: pa.height,
-                      size: pa.size,
-                      createdAt: Date.now(),
-                  }))
-                : [];
-
-            if (attachments.length > 0) {
-                attachmentIds = attachments.map((a) => a.id);
-
-                if (isCloudStorage) {
-                    // Cloud attachments must reference an existing message, so create the
-                    // message first, then upload attachments, then patch attachmentIds.
-                    await addMessage({
-                        id: messageId,
-                        role: "user",
-                        content: content,
-                        contextContent: contextContent,
-                        modelId: chatSnapshot.modelId,
-                        thinkingLevel: effectiveThinking,
-                        searchLevel: effectiveSearchLevel,
-                        chatId: chatSnapshot.id,
-                    });
-
-                    await storageAdapter.saveAttachments(attachments);
-
-                    // Update message so UI fetches attachments and cloud message record
-                    // references them for future reloads.
-                    await updateMessage(messageId, { attachmentIds });
-                } else {
-                    // Local storage can save attachments first so they render immediately.
-                    await storageAdapter.saveAttachments(attachments);
-
-                    await addMessage({
-                        id: messageId,
-                        role: "user",
-                        content: content,
-                        contextContent: contextContent,
-                        modelId: chatSnapshot.modelId,
-                        thinkingLevel: effectiveThinking,
-                        searchLevel: effectiveSearchLevel,
-                        attachmentIds,
-                        chatId: chatSnapshot.id,
-                    });
-                }
-            } else {
-                await addMessage({
-                    id: messageId,
-                    role: "user",
-                    content: content,
-                    contextContent: contextContent,
-                    modelId: chatSnapshot.modelId,
-                    thinkingLevel: effectiveThinking,
-                    searchLevel: effectiveSearchLevel,
-                    chatId: chatSnapshot.id,
-                });
-            }
+            await addMessage({
+                id: messageId,
+                role: "user",
+                content: content,
+                contextContent: contextContent,
+                modelId: chatSnapshot.modelId,
+                thinkingLevel: effectiveThinking,
+                chatId: chatSnapshot.id,
+            });
 
             setDefaultModel(chatSnapshot.modelId);
             if (supportsReasoning) {
                 setDefaultThinking(effectiveThinking);
-            }
-            if (supportsSearch) {
-                setDefaultSearchLevel(effectiveSearchLevel);
             }
 
             const updatedChat = getChatTitleUpdate(
@@ -587,54 +451,21 @@ export function ChatWindow() {
                 await updateChat(updatedChat);
             }
 
-            // Build messages array with attachments for API
             const currentMessages: Array<{
                 role: string;
                 content: MessageContent;
             }> = [];
 
-            // Add past messages with their attachments
             for (const m of messagesSnapshot) {
-                let messageContent: MessageContent = m.contextContent;
-
-                // Load attachments if present
-                if (m.attachmentIds && m.attachmentIds.length > 0) {
-                    const msgAttachments =
-                        await storageAdapter.getAttachmentsByMessage(m.id);
-                    if (msgAttachments.length > 0) {
-                        messageContent = buildMessageContent(
-                            m.contextContent,
-                            msgAttachments,
-                        );
-                    }
-                }
-
                 currentMessages.push({
                     role: m.role,
-                    content: messageContent,
+                    content: m.contextContent,
                 });
             }
 
-            // Add the new user message with its attachments
-            const newUserAttachments: Attachment[] | undefined =
-                pendingAttachments?.map((pa) => ({
-                    id: generateUUID(),
-                    messageId: "",
-                    type: "image" as const,
-                    mimeType: pa.mimeType as ImageMimeType,
-                    data: pa.data,
-                    width: pa.width,
-                    height: pa.height,
-                    size: pa.size,
-                    createdAt: Date.now(),
-                }));
-
             currentMessages.push({
                 role: "user",
-                content: buildMessageContent(
-                    contextContent,
-                    newUserAttachments,
-                ),
+                content: contextContent,
             });
 
             const assistantMessage = await addMessage({
@@ -643,7 +474,6 @@ export function ChatWindow() {
                 contextContent: "",
                 modelId: chatSnapshot.modelId,
                 thinkingLevel: effectiveThinking,
-                searchLevel: effectiveSearchLevel,
                 chatId: chatSnapshot.id,
             });
             assistantMessageId = assistantMessage.id;
@@ -659,7 +489,7 @@ export function ChatWindow() {
                     id: chatSnapshot.id,
                     modelId: chatSnapshot.modelId,
                     thinking: effectiveThinking,
-                    searchLevel: effectiveSearchLevel,
+                    searchLevel: "none",
                 },
                 model: currentModel ?? undefined,
             });
@@ -735,18 +565,11 @@ export function ChatWindow() {
         const supportsReasoning = nextModel
             ? modelSupportsReasoning(nextModel)
             : true;
-        const supportsSearch = nextModel
-            ? modelSupportsSearch(nextModel)
-            : true;
         const nextThinking = supportsReasoning ? currentChat.thinking : "none";
-        const nextSearchLevel = supportsSearch
-            ? currentChat.searchLevel
-            : "none";
         await updateChat({
             ...currentChat,
             modelId,
             thinking: nextThinking,
-            searchLevel: nextSearchLevel,
         });
         setDefaultModel(modelId);
     };
@@ -755,12 +578,6 @@ export function ChatWindow() {
         if (!currentChat) return;
         await updateChat({ ...currentChat, thinking: value });
         setDefaultThinking(value);
-    };
-
-    const handleSearchChange = async (level: SearchLevel) => {
-        if (!currentChat) return;
-        await updateChat({ ...currentChat, searchLevel: level });
-        setDefaultSearchLevel(level);
     };
 
     if (!currentChat) {
@@ -873,15 +690,6 @@ export function ChatWindow() {
                     reasoningSupported={modelSupportsReasoning(
                         models.find((m) => m.id === currentChat.modelId),
                     )}
-                    searchLevel={currentChat.searchLevel}
-                    onSearchChange={handleSearchChange}
-                    searchSupported={modelSupportsSearch(
-                        models.find((m) => m.id === currentChat.modelId),
-                    )}
-                    visionSupported={modelSupportsVision(
-                        models.find((m) => m.id === currentChat.modelId),
-                    )}
-                    sessionId={currentChat.id}
                 />
             </div>
         </div>

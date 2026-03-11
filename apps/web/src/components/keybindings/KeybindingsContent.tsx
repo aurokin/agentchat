@@ -9,7 +9,6 @@ import {
     History,
     Keyboard,
     Mail,
-    Search,
     Settings,
     Trash2,
     type LucideIcon,
@@ -92,25 +91,9 @@ const CHAT_KEYBINDINGS: KeybindingItem[] = [
         keys: ["Cmd/Ctrl", "Alt", "Backspace"],
         icon: Brain,
     },
-    {
-        id: "searchLevel",
-        label: "Search level",
-        keys: ["Cmd/Ctrl", "Shift", "1-3"],
-        icon: Search,
-    },
-    {
-        id: "searchOff",
-        label: "Search off",
-        keys: ["Cmd/Ctrl", "Shift", "Backspace"],
-        icon: Search,
-    },
 ];
 
-const HIGHLIGHT_IDS = new Set([
-    "cycleFavoriteModels",
-    "thinkingLevel",
-    "searchLevel",
-]);
+const HIGHLIGHT_IDS = new Set(["cycleFavoriteModels", "thinkingLevel"]);
 
 export const KEYBINDING_HIGHLIGHTS = CHAT_KEYBINDINGS.filter((item) =>
     HIGHLIGHT_IDS.has(item.id),

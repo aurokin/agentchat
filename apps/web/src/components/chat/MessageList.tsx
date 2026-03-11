@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useRef, useEffect, useState, useCallback } from "react";
-import type { Message, Attachment } from "@/lib/types";
+import React, { useRef, useEffect, useState } from "react";
+import type { Message } from "@/lib/types";
 import { format } from "date-fns";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -11,15 +11,10 @@ import {
     MessageCircle,
     ChevronDown,
     ChevronRight,
-    Search,
     Cpu,
-    Image as ImageIcon,
 } from "lucide-react";
 import { cn, externalLinkProps } from "@/lib/utils";
 import { MessageListSkeleton } from "./MessageListSkeleton";
-import { ImageGalleryDialog, type GalleryImage } from "./ImageGalleryDialog";
-import { useStorageAdapter } from "@/contexts/SyncContext";
-import { createDataUrl } from "@/lib/imageProcessing";
 
 interface MessageListProps {
     messages: Message[];
@@ -36,91 +31,13 @@ const markdownComponents: Components = {
 };
 
 export function MessageList({ messages, sending, loading }: MessageListProps) {
-    const storageAdapter = useStorageAdapter();
     const bottomRef = useRef<HTMLDivElement>(null);
-    const [galleryOpen, setGalleryOpen] = useState(false);
-    const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
-    const [allImages, setAllImages] = useState<GalleryImage[]>([]);
-    const lastImageKeyRef = useRef<string | null>(null);
-    const lastAdapterRef = useRef<unknown>(null);
 
     useEffect(() => {
         bottomRef.current?.scrollIntoView({
             behavior: sending ? "auto" : "smooth",
         });
     }, [messages, sending]);
-
-    // Collect all images from all messages
-    useEffect(() => {
-        // Avoid re-fetching images while streaming messages (when attachment IDs haven't changed).
-        const attachmentIds: string[] = [];
-        for (const message of messages) {
-            if (message.attachmentIds?.length) {
-                attachmentIds.push(...message.attachmentIds);
-            }
-        }
-        const nextKey = attachmentIds.join("|");
-
-        if (lastAdapterRef.current !== storageAdapter) {
-            lastAdapterRef.current = storageAdapter;
-            lastImageKeyRef.current = null;
-        }
-
-        if (lastImageKeyRef.current === nextKey) {
-            return;
-        }
-        lastImageKeyRef.current = nextKey;
-
-        let cancelled = false;
-
-        async function collectImages() {
-            const images: GalleryImage[] = [];
-
-            for (const message of messages) {
-                if (message.attachmentIds && message.attachmentIds.length > 0) {
-                    for (const attachmentId of message.attachmentIds) {
-                        const attachment =
-                            await storageAdapter.getAttachment(attachmentId);
-                        if (
-                            attachment &&
-                            !attachment.purgedAt &&
-                            attachment.data
-                        ) {
-                            images.push({
-                                id: attachment.id,
-                                src: createDataUrl(
-                                    attachment.data,
-                                    attachment.mimeType,
-                                ),
-                                alt: `Image ${attachment.width}x${attachment.height}`,
-                                timestamp: attachment.createdAt,
-                            });
-                        }
-                    }
-                }
-            }
-
-            if (!cancelled) {
-                setAllImages(images);
-            }
-        }
-
-        void collectImages();
-
-        return () => {
-            cancelled = true;
-        };
-    }, [messages, storageAdapter]);
-
-    const handleImageClick = useCallback((imageId: string) => {
-        setSelectedImageId(imageId);
-        setGalleryOpen(true);
-    }, []);
-
-    const handleGalleryClose = useCallback(() => {
-        setGalleryOpen(false);
-        setSelectedImageId(null);
-    }, []);
 
     if (loading) {
         return <MessageListSkeleton count={3} />;
@@ -146,38 +63,28 @@ export function MessageList({ messages, sending, loading }: MessageListProps) {
     }
 
     return (
-        <>
-            <div className="max-w-4xl mx-auto p-6 space-y-8">
-                {messages.map((message, index) => (
-                    <MessageItem
-                        key={message.id}
-                        message={message}
-                        index={index}
-                        sending={sending && index === messages.length - 1}
-                        onImageClick={handleImageClick}
-                    />
-                ))}
+        <div className="max-w-4xl mx-auto p-6 space-y-8">
+            {messages.map((message, index) => (
+                <MessageItem
+                    key={message.id}
+                    message={message}
+                    index={index}
+                    sending={sending && index === messages.length - 1}
+                />
+            ))}
 
-                {/* Auto-scroll anchor */}
-                <div ref={bottomRef} />
-            </div>
-
-            <ImageGalleryDialog
-                open={galleryOpen}
-                images={allImages}
-                initialImageId={selectedImageId ?? undefined}
-                onClose={handleGalleryClose}
-            />
-        </>
+            <div ref={bottomRef} />
+        </div>
     );
 }
 
-interface ReasoningSectionProps {
+function ReasoningSection({
+    thinking,
+    isStreaming,
+}: {
     thinking: string;
     isStreaming?: boolean;
-}
-
-function ReasoningSection({ thinking, isStreaming }: ReasoningSectionProps) {
+}) {
     const [isExpanded, setIsExpanded] = useState(false);
 
     return (
@@ -217,110 +124,19 @@ function ReasoningSection({ thinking, isStreaming }: ReasoningSectionProps) {
     );
 }
 
-// Component to display message attachments
-function MessageAttachments({
-    attachmentIds,
-    onImageClick,
-}: {
-    attachmentIds: string[];
-    onImageClick: (imageId: string) => void;
-}) {
-    const storageAdapter = useStorageAdapter();
-    const [attachments, setAttachments] = useState<Attachment[]>([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        async function loadAttachments() {
-            const loaded: Attachment[] = [];
-            for (const id of attachmentIds) {
-                const attachment = await storageAdapter.getAttachment(id);
-                if (attachment) {
-                    loaded.push(attachment);
-                }
-            }
-            setAttachments(loaded);
-            setLoading(false);
-        }
-        loadAttachments();
-    }, [attachmentIds, storageAdapter]);
-
-    if (loading) {
-        return (
-            <div className="flex gap-2 mb-3">
-                {attachmentIds.map((id) => (
-                    <div
-                        key={id}
-                        className="w-20 h-20 bg-muted/30 border border-border/50 animate-pulse flex items-center justify-center"
-                    >
-                        <ImageIcon
-                            size={20}
-                            className="text-muted-foreground/50"
-                        />
-                    </div>
-                ))}
-            </div>
-        );
-    }
-
-    if (attachments.length === 0) {
-        return null;
-    }
-
-    return (
-        <div className="flex flex-wrap gap-2 mb-3">
-            {attachments.map((attachment, index) => (
-                <button
-                    key={attachment.id}
-                    onClick={() => onImageClick(attachment.id)}
-                    disabled={Boolean(attachment.purgedAt) || !attachment.data}
-                    className={cn(
-                        "relative w-20 h-20 bg-muted/30 border border-border/50 overflow-hidden transition-colors",
-                        Boolean(attachment.purgedAt) || !attachment.data
-                            ? "opacity-70 cursor-not-allowed"
-                            : "hover:border-primary/50 cursor-pointer",
-                    )}
-                >
-                    {Boolean(attachment.purgedAt) || !attachment.data ? (
-                        <div className="w-full h-full flex flex-col items-center justify-center gap-1 text-muted-foreground/70">
-                            <ImageIcon size={18} />
-                            <span className="text-[10px] uppercase tracking-wider">
-                                Removed
-                            </span>
-                        </div>
-                    ) : (
-                        <img
-                            src={createDataUrl(
-                                attachment.data,
-                                attachment.mimeType,
-                            )}
-                            alt={`Attachment ${index + 1}`}
-                            className="w-full h-full object-cover"
-                            loading="lazy"
-                        />
-                    )}
-                </button>
-            ))}
-        </div>
-    );
-}
-
 function MessageItem({
     message,
     index,
     sending,
-    onImageClick,
 }: {
     message: Message;
     index: number;
     sending?: boolean;
-    onImageClick: (imageId: string) => void;
 }) {
     const isUser = message.role === "user";
 
-    // Get display-friendly model name
     const getModelDisplayName = (modelId?: string) => {
         if (!modelId) return "Unknown model";
-        // Extract model name from format like "provider/model-name"
         const parts = modelId.split("/");
         return parts.length > 1 ? parts[1] : modelId;
     };
@@ -339,19 +155,6 @@ function MessageItem({
                     isUser ? "items-end" : "items-start",
                 )}
             >
-                {/* Attachments - displayed before content for user messages */}
-                {isUser &&
-                    message.attachmentIds &&
-                    message.attachmentIds.length > 0 && (
-                        <div className="max-w-[90%]">
-                            <MessageAttachments
-                                attachmentIds={message.attachmentIds}
-                                onImageClick={onImageClick}
-                            />
-                        </div>
-                    )}
-
-                {/* Reasoning section - collapsible, above message */}
                 {message.thinking && (
                     <ReasoningSection
                         thinking={message.thinking}
@@ -359,7 +162,6 @@ function MessageItem({
                     />
                 )}
 
-                {/* Main content - hidden while reasoning is streaming */}
                 {!(sending && message.thinking && !message.content) && (
                     <div className="inline-flex max-w-[90%]">
                         <div
@@ -371,7 +173,6 @@ function MessageItem({
                             )}
                         >
                             {sending && !message.content ? (
-                                // Show "Generating..." when waiting for content
                                 <div className="flex items-center gap-3 text-muted-foreground">
                                     <div className="typing-indicator flex gap-1">
                                         <span />
@@ -399,42 +200,22 @@ function MessageItem({
                     </div>
                 )}
 
-                {/* Message metadata badges */}
                 <div
                     className={cn(
                         "flex items-center gap-2 mt-2 text-xs",
                         isUser ? "justify-end" : "justify-start",
                     )}
                 >
-                    {/* Timestamp */}
                     <span className="text-muted-foreground">
                         {format(message.createdAt, "h:mm a")}
                     </span>
 
-                    {/* Divider */}
-                    {((message.searchLevel && message.searchLevel !== "none") ||
-                        (message.thinkingLevel &&
-                            message.thinkingLevel !== "none") ||
+                    {((message.thinkingLevel &&
+                        message.thinkingLevel !== "none") ||
                         message.modelId) && (
                         <span className="w-px h-3 bg-border" />
                     )}
 
-                    {/* Search badge */}
-                    {message.searchLevel && message.searchLevel !== "none" && (
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-accent/10 border border-accent/20 text-accent">
-                            <Search size={10} />
-                            <span className="uppercase tracking-wider font-medium">
-                                Web-
-                                {message.searchLevel === "low"
-                                    ? "3"
-                                    : message.searchLevel === "medium"
-                                      ? "6"
-                                      : "10"}
-                            </span>
-                        </span>
-                    )}
-
-                    {/* Thinking badge */}
                     {message.thinkingLevel &&
                         message.thinkingLevel !== "none" && (
                             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-warning/10 border border-warning/20 text-warning">
@@ -445,14 +226,12 @@ function MessageItem({
                             </span>
                         )}
 
-                    {/* Model icon with tooltip */}
                     {message.modelId && (
                         <span
                             className="inline-flex items-center p-1 bg-muted/50 border border-border text-muted-foreground hover:text-foreground hover:border-primary/30 transition-colors cursor-default group/model relative"
                             title={getModelDisplayName(message.modelId)}
                         >
                             <Cpu size={12} />
-                            {/* Tooltip */}
                             <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-background-elevated border border-border text-xs text-foreground whitespace-nowrap opacity-0 group-hover/model:opacity-100 transition-opacity pointer-events-none z-20">
                                 {getModelDisplayName(message.modelId)}
                                 <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-border" />
