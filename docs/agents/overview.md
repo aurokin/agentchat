@@ -6,9 +6,11 @@ Agentchat is a monorepo with the primary app in `apps/web`.
 
 - Framework: Next.js 16 App Router + React 19 + TypeScript
 - Styling: Tailwind CSS 4 (plus `tailwind-merge`)
-- Backend services: Convex (auth, synced data, encryption)
+- Backend services: Convex today, with an instance-local backend server planned for the rewrite
 - Primary persistence: Convex
-- API: OpenRouter requests are made directly from the client
+- Runtime direction: agent-centric provider architecture with Codex first
+
+The canonical rewrite docs live in `docs/agentchat/`.
 
 ## Key Directories
 
@@ -23,3 +25,4 @@ Agentchat is a monorepo with the primary app in `apps/web`.
 - Major feature additions must be documented in `README.md`.
 - Environment variable requirements must be listed in `README.md`.
 - Use the product name `Agentchat` (not OpenRouter Chat).
+- Product direction, rules, and roadmap for the rewrite belong under `docs/agentchat/`.

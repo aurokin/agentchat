@@ -2,6 +2,23 @@
 
 A self-hosted chat app for connecting users to the agents and model stack you expose from your own deployment. Agentchat currently uses Convex for workspace data and an instance-managed OpenRouter credential for model access.
 
+## Rewrite Direction
+
+The product is currently being refactored into an agent-centric architecture with:
+
+- operator-managed agents defined on the server
+- Convex-owned auth and conversation history
+- an instance-local backend server that talks to provider runtimes
+- Codex as the first provider, behind a provider abstraction
+
+The canonical docs for that rewrite live in `docs/agentchat/`:
+
+- `docs/agentchat/README.md`
+- `docs/agentchat/vision.md`
+- `docs/agentchat/product-rules.md`
+- `docs/agentchat/architecture-v1.md`
+- `docs/agentchat/roadmap.md`
+
 ## Try It Now
 
 Visit https://www.routerchat.chat to see the current hosted build.

@@ -12,6 +12,7 @@ Read this file before making any changes in this repository.
 ## Detailed Instructions
 
 - [Project Overview](docs/agents/overview.md)
+- [Product Direction And Roadmap](docs/agentchat/README.md)
 - [Tooling And Tests](docs/agents/tooling.md)
 - [Imports And Aliases](docs/agents/imports.md)
 - [Sync And Cloud Rules](docs/agents/sync.md)
