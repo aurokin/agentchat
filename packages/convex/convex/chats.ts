@@ -99,7 +99,6 @@ export const create = mutation({
         title: v.string(),
         modelId: v.string(),
         thinking: v.string(),
-        searchLevel: v.string(),
         createdAt: v.optional(v.number()),
         updatedAt: v.optional(v.number()),
     },
@@ -122,7 +121,6 @@ export const create = mutation({
             title: args.title,
             modelId: args.modelId,
             thinking: args.thinking,
-            searchLevel: args.searchLevel,
             createdAt: args.createdAt ?? now,
             updatedAt: args.updatedAt ?? now,
         });
@@ -139,7 +137,6 @@ export const update = mutation({
         title: v.optional(v.string()),
         modelId: v.optional(v.string()),
         thinking: v.optional(v.string()),
-        searchLevel: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
         const authenticatedUserId = await requireCloudSync(ctx);

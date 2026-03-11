@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { Message, ThinkingLevel, SearchLevel } from "../types";
+import type { Message, ThinkingLevel } from "../types";
 import {
     getLastUserSettings,
     resolveInitialChatSettings,
@@ -10,38 +10,34 @@ import {
 describe("defaults", () => {
     it("returns last user settings", () => {
         const messages: Array<
-            Pick<Message, "role" | "modelId" | "thinkingLevel" | "searchLevel">
+            Pick<Message, "role" | "modelId" | "thinkingLevel">
         > = [
             {
                 role: "assistant",
                 modelId: "m1",
                 thinkingLevel: "low",
-                searchLevel: "none",
             },
             {
                 role: "user",
                 modelId: "m2",
                 thinkingLevel: "high",
-                searchLevel: "medium",
             },
         ];
 
         expect(getLastUserSettings(messages)).toEqual({
             modelId: "m2",
             thinking: "high",
-            searchLevel: "medium",
         });
     });
 
     it("returns null when no user messages", () => {
         const messages: Array<
-            Pick<Message, "role" | "modelId" | "thinkingLevel" | "searchLevel">
+            Pick<Message, "role" | "modelId" | "thinkingLevel">
         > = [
             {
                 role: "assistant",
                 modelId: "m1",
                 thinkingLevel: "low",
-                searchLevel: "none",
             },
         ];
 
@@ -52,12 +48,10 @@ describe("defaults", () => {
         const defaults: ChatDefaults = {
             modelId: "default-model",
             thinking: "medium",
-            searchLevel: "low",
         };
         const lastUser = {
             modelId: "user-model",
             thinking: "high" as ThinkingLevel,
-            searchLevel: "medium" as SearchLevel,
         };
 
         expect(
@@ -69,7 +63,6 @@ describe("defaults", () => {
         ).toEqual({
             modelId: "user-model",
             thinking: "high",
-            searchLevel: "medium",
         });
     });
 
@@ -77,7 +70,6 @@ describe("defaults", () => {
         const defaults: ChatDefaults = {
             modelId: "default-model",
             thinking: "medium",
-            searchLevel: "low",
         };
 
         expect(
@@ -93,18 +85,15 @@ describe("defaults", () => {
         const settings: ChatDefaults = {
             modelId: "model",
             thinking: "high",
-            searchLevel: "medium",
         };
 
         expect(
             applyModelCapabilities(settings, {
                 supportsReasoning: false,
-                supportsSearch: false,
             }),
         ).toEqual({
             modelId: "model",
             thinking: "none",
-            searchLevel: "none",
         });
     });
 });

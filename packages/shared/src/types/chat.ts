@@ -12,7 +12,6 @@ export interface ChatSession {
     title: string;
     modelId: string;
     thinkingEnabled: boolean;
-    searchEnabled: boolean;
     createdAt: number;
     updatedAt: number;
 }

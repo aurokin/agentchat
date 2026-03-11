@@ -33,7 +33,6 @@ export default defineSchema({
         title: v.string(),
         modelId: v.string(),
         thinking: v.string(),
-        searchLevel: v.string(),
         createdAt: v.number(),
         updatedAt: v.number(),
     })
@@ -54,7 +53,6 @@ export default defineSchema({
         thinking: v.optional(v.string()),
         modelId: v.optional(v.string()),
         thinkingLevel: v.optional(v.string()),
-        searchLevel: v.optional(v.string()),
         createdAt: v.number(),
     })
         .index("by_chat", ["chatId"])

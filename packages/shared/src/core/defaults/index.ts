@@ -1,21 +1,17 @@
-import type { Message, ThinkingLevel, SearchLevel } from "../types";
+import type { Message, ThinkingLevel } from "../types";
 
 export interface ChatDefaults {
     modelId: string;
     thinking: ThinkingLevel;
-    searchLevel: SearchLevel;
 }
 
 export interface LastUserSettings {
     modelId?: string;
     thinking?: ThinkingLevel;
-    searchLevel?: SearchLevel;
 }
 
 export function getLastUserSettings(
-    messages: Array<
-        Pick<Message, "role" | "modelId" | "thinkingLevel" | "searchLevel">
-    >,
+    messages: Array<Pick<Message, "role" | "modelId" | "thinkingLevel">>,
 ): LastUserSettings | null {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
         const message = messages[i];
@@ -23,7 +19,6 @@ export function getLastUserSettings(
         return {
             modelId: message.modelId,
             thinking: message.thinkingLevel,
-            searchLevel: message.searchLevel,
         };
     }
 
@@ -43,7 +38,6 @@ export function resolveInitialChatSettings({
         return {
             modelId: lastUser.modelId ?? defaults.modelId,
             thinking: lastUser.thinking ?? defaults.thinking,
-            searchLevel: lastUser.searchLevel ?? defaults.searchLevel,
         };
     }
 
@@ -52,11 +46,10 @@ export function resolveInitialChatSettings({
 
 export function applyModelCapabilities(
     settings: ChatDefaults,
-    supports: { supportsReasoning: boolean; supportsSearch: boolean },
+    supports: { supportsReasoning: boolean },
 ): ChatDefaults {
     return {
         ...settings,
         thinking: supports.supportsReasoning ? settings.thinking : "none",
-        searchLevel: supports.supportsSearch ? settings.searchLevel : "none",
     };
 }

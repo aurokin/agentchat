@@ -113,7 +113,6 @@ export const create = mutation({
         thinking: v.optional(v.string()),
         modelId: v.optional(v.string()),
         thinkingLevel: v.optional(v.string()),
-        searchLevel: v.optional(v.string()),
         createdAt: v.optional(v.number()),
     },
     handler: async (ctx, args) => {
@@ -152,7 +151,6 @@ export const create = mutation({
             thinking: args.thinking,
             modelId: args.modelId,
             thinkingLevel: args.thinkingLevel,
-            searchLevel: args.searchLevel,
             createdAt: args.createdAt ?? now,
         });
 

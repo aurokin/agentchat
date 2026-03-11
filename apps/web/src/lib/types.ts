@@ -5,12 +5,9 @@ import type {
     Attachment as SharedAttachment,
     PendingAttachment as SharedPendingAttachment,
     ThinkingLevel as SharedThinkingLevel,
-    SearchLevel as SharedSearchLevel,
 } from "@shared/core/types";
 
 export type ThinkingLevel = SharedThinkingLevel;
-
-export type SearchLevel = SharedSearchLevel;
 
 export interface Message extends SharedMessage {
     contextContent: string;

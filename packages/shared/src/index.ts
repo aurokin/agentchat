@@ -18,7 +18,6 @@ export * from "./core/defaults";
 export * from "./core/errors";
 export {
     ThinkingLevel,
-    SearchLevel,
     Message,
     ChatSession,
     UserSettings,

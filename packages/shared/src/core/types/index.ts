@@ -6,8 +6,6 @@ export type ThinkingLevel =
     | "minimal"
     | "none";
 
-export type SearchLevel = "none" | "low" | "medium" | "high";
-
 export interface Message {
     id: string;
     sessionId: string;
@@ -17,7 +15,6 @@ export interface Message {
     thinking?: string;
     modelId?: string;
     thinkingLevel?: ThinkingLevel;
-    searchLevel?: SearchLevel;
     attachmentIds?: string[];
     createdAt: number;
 }
@@ -27,7 +24,6 @@ export interface ChatSession {
     title: string;
     modelId: string;
     thinking: ThinkingLevel;
-    searchLevel: SearchLevel;
     createdAt: number;
     updatedAt: number;
 }
@@ -35,7 +31,6 @@ export interface ChatSession {
 export interface UserSettings {
     defaultModel: string;
     defaultThinking: ThinkingLevel;
-    defaultSearchLevel: SearchLevel;
     theme: "light" | "dark" | "system";
     favoriteModels: string[];
 }

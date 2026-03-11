@@ -227,7 +227,6 @@ export function ChatWindow() {
         const defaults = {
             modelId: fallbackModelId,
             thinking: defaultThinking,
-            searchLevel: "none" as const,
         };
         const lastUserSettings = getLastUserSettings(messages);
         const resolvedSettings = resolveInitialChatSettings({
@@ -242,7 +241,6 @@ export function ChatWindow() {
             supportsReasoning: modelForSettings
                 ? modelSupportsReasoning(modelForSettings)
                 : true,
-            supportsSearch: false,
         });
 
         if (
@@ -489,7 +487,6 @@ export function ChatWindow() {
                     id: chatSnapshot.id,
                     modelId: chatSnapshot.modelId,
                     thinking: effectiveThinking,
-                    searchLevel: "none",
                 },
                 model: currentModel ?? undefined,
             });

@@ -1,4 +1,3 @@
-import type { SearchLevel } from "./types";
 import type { SyncState, SyncMetadata } from "./sync/types";
 import { DEFAULT_SYNC_METADATA } from "./sync/types";
 
@@ -6,7 +5,6 @@ const STORAGE_KEYS = {
     THEME: "routerchat-theme",
     DEFAULT_MODEL: "routerchat-default-model",
     DEFAULT_THINKING: "routerchat-default-thinking",
-    DEFAULT_SEARCH: "routerchat-default-search",
     FAVORITE_MODELS: "routerchat-favorite-models",
     // Cloud sync keys
     SYNC_STATE: "routerchat-sync-state",
@@ -81,24 +79,6 @@ export function setDefaultThinking(
 ): void {
     if (typeof window === "undefined") return;
     localStorage.setItem(STORAGE_KEYS.DEFAULT_THINKING, value);
-}
-
-export function getDefaultSearchLevel(): SearchLevel {
-    if (typeof window === "undefined") return "none";
-    const stored = localStorage.getItem(STORAGE_KEYS.DEFAULT_SEARCH);
-    // Handle migration from old boolean format
-    if (stored === "true") return "medium";
-    if (stored === "false" || stored === null) return "none";
-    // New format - validate it's a valid SearchLevel
-    if (["none", "low", "medium", "high"].includes(stored)) {
-        return stored as SearchLevel;
-    }
-    return "none";
-}
-
-export function setDefaultSearchLevel(level: SearchLevel): void {
-    if (typeof window === "undefined") return;
-    localStorage.setItem(STORAGE_KEYS.DEFAULT_SEARCH, level);
 }
 
 // Cloud Sync Storage Functions

@@ -10,12 +10,7 @@ import React, {
 } from "react";
 import { usePaginatedQuery, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
-import type {
-    ChatSession,
-    Message,
-    ThinkingLevel,
-    SearchLevel,
-} from "@/lib/types";
+import type { ChatSession, Message, ThinkingLevel } from "@/lib/types";
 import { APP_DEFAULT_MODEL } from "@shared/core/models";
 import {
     mapConvexChatToLocal,
@@ -47,7 +42,6 @@ interface ChatContextType {
         thinking?: string;
         modelId?: string;
         thinkingLevel?: ThinkingLevel;
-        searchLevel?: SearchLevel;
         attachmentIds?: string[];
         chatId?: string;
     }) => Promise<Message>;
@@ -223,13 +217,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         async (title?: string, modelId?: string): Promise<ChatSession> => {
             const defaultModel = storage.getDefaultModel() || APP_DEFAULT_MODEL;
             const defaultThinking = storage.getDefaultThinking();
-            const defaultSearchLevel = storage.getDefaultSearchLevel();
             const chat: ChatSession = {
                 id: uuid(),
                 title: title || "New Chat",
                 modelId: modelId || defaultModel,
                 thinking: defaultThinking,
-                searchLevel: defaultSearchLevel,
                 createdAt: Date.now(),
                 updatedAt: Date.now(),
             };
@@ -311,7 +303,6 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             thinking?: string;
             modelId?: string;
             thinkingLevel?: ThinkingLevel;
-            searchLevel?: SearchLevel;
             attachmentIds?: string[];
             chatId?: string;
         }): Promise<Message> => {
@@ -327,7 +318,6 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 thinking: message.thinking,
                 modelId: message.modelId,
                 thinkingLevel: message.thinkingLevel,
-                searchLevel: message.searchLevel,
                 attachmentIds: message.attachmentIds,
                 sessionId: targetChatId,
                 id: message.id ?? uuid(),

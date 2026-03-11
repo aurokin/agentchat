@@ -8,12 +8,7 @@ import React, {
     useCallback,
     useRef,
 } from "react";
-import type {
-    UserSettings,
-    OpenRouterModel,
-    ThinkingLevel,
-    SearchLevel,
-} from "@/lib/types";
+import type { UserSettings, OpenRouterModel, ThinkingLevel } from "@/lib/types";
 import { APP_DEFAULT_MODEL } from "@shared/core/models";
 import * as storage from "@/lib/storage";
 import { fetchModels } from "@/lib/openrouter";
@@ -21,7 +16,6 @@ import { fetchModels } from "@/lib/openrouter";
 interface SettingsContextType extends UserSettings {
     setDefaultModel: (modelId: string) => void;
     setDefaultThinking: (value: ThinkingLevel) => void;
-    setDefaultSearchLevel: (level: SearchLevel) => void;
     setTheme: (theme: UserSettings["theme"]) => void;
     toggleFavoriteModel: (modelId: string) => void;
     models: OpenRouterModel[];
@@ -32,7 +26,6 @@ interface SettingsContextType extends UserSettings {
 const defaultSettings: UserSettings = {
     defaultModel: "",
     defaultThinking: "none",
-    defaultSearchLevel: "none",
     theme: "system",
     favoriteModels: [],
 };
@@ -103,7 +96,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
             ...prev,
             defaultModel: storage.getDefaultModel(),
             defaultThinking: storage.getDefaultThinking(),
-            defaultSearchLevel: storage.getDefaultSearchLevel(),
             theme: storage.getTheme(),
             favoriteModels: storage.getFavoriteModels(),
         }));
@@ -124,11 +116,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     const setDefaultThinking = (value: ThinkingLevel) => {
         storage.setDefaultThinking(value);
         setSettings((prev) => ({ ...prev, defaultThinking: value }));
-    };
-
-    const setDefaultSearchLevel = (level: SearchLevel) => {
-        storage.setDefaultSearchLevel(level);
-        setSettings((prev) => ({ ...prev, defaultSearchLevel: level }));
     };
 
     const setTheme = (theme: UserSettings["theme"]) => {
@@ -175,7 +162,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
                 ...settings,
                 setDefaultModel,
                 setDefaultThinking,
-                setDefaultSearchLevel,
                 setTheme,
                 toggleFavoriteModel,
                 models,
