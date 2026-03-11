@@ -6,7 +6,6 @@ import { SafeConvexProvider } from "@/contexts/ConvexProvider";
 import { SyncProvider } from "@/contexts/SyncContext";
 import { SettingsProvider } from "@/contexts/SettingsContext";
 import { ChatProvider } from "@/contexts/ChatContext";
-import { PostHogClient } from "@/components/analytics/PostHogClient";
 
 // Required for CSP nonces:
 // The middleware generates a per-request CSP nonce, and Next can only attach that nonce to
@@ -45,10 +44,7 @@ export default function RootLayout({
                 <SafeConvexProvider>
                     <SyncProvider>
                         <SettingsProvider>
-                            <ChatProvider>
-                                <PostHogClient />
-                                {children}
-                            </ChatProvider>
+                            <ChatProvider>{children}</ChatProvider>
                         </SettingsProvider>
                     </SyncProvider>
                 </SafeConvexProvider>

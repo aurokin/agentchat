@@ -214,39 +214,3 @@ export const setInitialSync = mutation({
         });
     },
 });
-
-export const getSubscriptionStatus = query({
-    args: {},
-    handler: async (ctx) => {
-        const userId = await getAuthUserId(ctx);
-
-        if (!userId) {
-            return {
-                hasCloudSync: false,
-                cancelAtPeriodEnd: false,
-                expiresAt: null,
-                tier: "free" as const,
-                status: "none" as const,
-            };
-        }
-
-        const user = await ctx.db.get(userId);
-        if (!user) {
-            return {
-                hasCloudSync: false,
-                cancelAtPeriodEnd: false,
-                expiresAt: null,
-                tier: "free" as const,
-                status: "none" as const,
-            };
-        }
-
-        return {
-            hasCloudSync: true,
-            cancelAtPeriodEnd: false,
-            expiresAt: null,
-            tier: "pro" as const,
-            status: "active" as const,
-        };
-    },
-});

@@ -1,15 +1,17 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { useConvexAuth } from "convex/react";
 import { ChatLayout } from "@/components/chat/ChatLayout";
 import { useChat } from "@/contexts/ChatContext";
-import { useSubscription } from "@/hooks/useSubscription";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { Loader2 } from "lucide-react";
+import { useIsConvexAvailable } from "@/contexts/ConvexProvider";
 
 export default function ChatPage() {
     const { chats, loading, createChat, selectChat, currentChat } = useChat();
-    const { isAuthenticated, isLoading: isAuthLoading } = useSubscription();
+    const isConvexAvailable = useIsConvexAvailable();
+    const { isAuthenticated, isLoading: isAuthLoading } = useConvexAuth();
     const { signIn } = useAuthActions() ?? {};
     const [initialized, setInitialized] = useState(false);
 
@@ -54,14 +56,14 @@ export default function ChatPage() {
         );
     }
 
-    if (!isAuthenticated) {
+    if (!isConvexAvailable || !isAuthenticated) {
         return (
             <div className="flex h-dvh items-center justify-center bg-background px-6">
                 <div className="w-full max-w-md border border-border bg-background-elevated p-8 text-center">
                     <h1 className="text-xl font-semibold">Sign in required</h1>
                     <p className="mt-3 text-sm text-muted-foreground">
-                        Agentchat now runs against your Convex backend only.
-                        Sign in to access chats and your encrypted API key.
+                        Agentchat runs against your Convex workspace only. Sign
+                        in to access chats and your encrypted API key.
                     </p>
                     <button
                         type="button"

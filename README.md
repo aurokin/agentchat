@@ -16,7 +16,6 @@ Visit https://www.routerchat.chat to start chatting with Agentchat using your Op
 - **Copy Messages** - One-click copy for any message
 - **Convex Workspace** - Chats and encrypted API keys stored in Convex
 - **Self-Hosted Direction** - Built for deployments you run and control
-- **Optional Analytics** - PostHog instrumentation for product usage events when enabled
 - **Theme Support** - Light, dark, and system theme options
 - **Android Share Intent** - Share text, links, and images from other Android apps directly into a new Agentchat draft
 
@@ -109,10 +108,6 @@ Agentchat requires Convex for synced data and authentication:
 Set these as Railway service variables (preview/production) or in `apps/web/.env.local` for local dev. A template lives at `apps/web/.env.example`.
 
 - `NEXT_PUBLIC_CONVEX_URL` - Convex deployment URL (from the Convex dashboard).
-- `NEXT_PUBLIC_ANALYTICS_ENABLED` - Optional web analytics flag. Set to `true` to enable PostHog client events.
-- `NEXT_PUBLIC_ANALYTICS_ENV` - Optional PostHog environment tag when sharing one PostHog project across environments. Recommended values: `dev` (local), `preview` (staging), `prod` (production). When unset, Agentchat infers from hostname and runtime.
-- `NEXT_PUBLIC_POSTHOG_KEY` - PostHog project API key (required when `NEXT_PUBLIC_ANALYTICS_ENABLED=true`).
-- `NEXT_PUBLIC_POSTHOG_HOST` - Optional PostHog host URL (defaults to `https://us.i.posthog.com`).
 - `CANONICAL_HOST` - Optional canonical host redirect enforced by web middleware in deployed environments. Example: `CANONICAL_HOST=www.routerchat.chat` to redirect apex requests to `www`. For preview consistency, you can set `CANONICAL_HOST=preview.routerchat.chat` (optional).
 - `DISABLE_CSP` - Optional debug flag (preview/prod only). Set to `true` to disable only the `Content-Security-Policy` header in middleware; other security headers remain enabled. Avoid enabling this in production.
 

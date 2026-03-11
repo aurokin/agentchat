@@ -15,7 +15,7 @@ import {
 import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useSync } from "@/contexts/SyncContext";
-import { formatBytes, getStorageUsage, type UserTheme } from "@/lib/storage";
+import { formatBytes, type UserTheme } from "@/lib/storage";
 import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
 import { validateApiKey } from "@shared/core/openrouter";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
@@ -26,17 +26,10 @@ export default function SettingsScreen(): ReactElement {
     const router = useRouter();
     const {
         syncState,
-        enableCloudSync,
-        disableCloudSync,
         clearCloudImages,
         refreshQuotaStatus,
-        localQuotaStatus,
         cloudQuotaStatus,
         cloudStorageUsage,
-        isMigrating,
-        migrationProgress,
-        isCloning,
-        cloneProgress,
     } = useSync();
     const {
         user,
@@ -61,12 +54,6 @@ export default function SettingsScreen(): ReactElement {
     const [isValidating, setIsValidating] = useState(false);
     const [isValid, setIsValid] = useState<boolean | null>(null);
     const [isSigningIn, setIsSigningIn] = useState(false);
-    const [storageUsage, setStorageUsage] = useState<{
-        attachments: number;
-        messages: number;
-        sessions: number;
-    } | null>(null);
-    const [isStorageLoading, setIsStorageLoading] = useState(true);
 
     const convexUnavailableMessage = "Convex isn't configured for this build.";
 
@@ -85,18 +72,7 @@ export default function SettingsScreen(): ReactElement {
     }, [isApiKeyLoading, storedApiKey]);
 
     useEffect(() => {
-        const loadStorage = async () => {
-            try {
-                const usage = await getStorageUsage();
-                setStorageUsage(usage);
-                await refreshQuotaStatus();
-            } catch {
-                setStorageUsage(null);
-            } finally {
-                setIsStorageLoading(false);
-            }
-        };
-        loadStorage();
+        void refreshQuotaStatus();
     }, [refreshQuotaStatus]);
 
     const handleSaveApiKey = async () => {
@@ -138,22 +114,17 @@ export default function SettingsScreen(): ReactElement {
     const handleSignOut = async () => {
         Alert.alert(
             "Sign Out",
-            "Are you sure you want to sign out? Your local data will be preserved. Cloud data will not be deleted.",
+            "Are you sure you want to sign out? Your workspace data will remain in Convex.",
             [
                 { text: "Cancel", style: "cancel" },
                 {
                     text: "Sign Out",
                     style: "destructive",
                     onPress: async () => {
-                        if (syncState === "cloud-enabled") {
-                            try {
-                                await disableCloudSync();
-                            } catch {}
-                        }
                         await signOut();
                         Alert.alert(
                             "Signed Out",
-                            "You have been signed out successfully. Cloud sync is disabled but your cloud data is preserved.",
+                            "You have been signed out successfully.",
                         );
                     },
                 },
@@ -204,74 +175,10 @@ export default function SettingsScreen(): ReactElement {
         Alert.alert("API Key Cleared", "Your API key has been removed.");
     };
 
-    const handleEnableCloudSync = async () => {
-        if (!isConvexAvailable) {
-            Alert.alert("Convex Not Configured", convexUnavailableMessage, [
-                { text: "OK" },
-            ]);
-            return;
-        }
-
-        if (!isAuthenticated) {
-            Alert.alert(
-                "Sign In Required",
-                "Please sign in with Google to access your Convex-backed workspace.",
-                [
-                    { text: "Cancel", style: "cancel" },
-                    {
-                        text: "Sign In",
-                        onPress: async () => {
-                            await performSignIn();
-                        },
-                    },
-                ],
-            );
-            return;
-        }
-
-        try {
-            await enableCloudSync();
-            Alert.alert(
-                "Workspace Ready",
-                "Your chats now use your Convex backend.",
-            );
-        } catch (error) {
-            Alert.alert(
-                "Error",
-                "Failed to connect to Convex. Please try again.",
-            );
-        }
-    };
-
-    const handleDisableCloudSync = async () => {
-        Alert.alert(
-            "Sign Out",
-            "Signing out disconnects this device from your Convex workspace.",
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Sign Out",
-                    style: "destructive",
-                    onPress: async () => {
-                        try {
-                            await disableCloudSync();
-                            await signOut();
-                        } catch (error) {
-                            Alert.alert(
-                                "Error",
-                                "Failed to sign out. Please try again.",
-                            );
-                        }
-                    },
-                },
-            ],
-        );
-    };
-
     const handleClearCloudImages = async () => {
         Alert.alert(
-            "Clear Cloud Images",
-            "This will delete all cloud attachments. Your chats will remain.",
+            "Clear Workspace Images",
+            "This will delete all synced attachments from your Convex workspace. Your chats will remain.",
             [
                 { text: "Cancel", style: "cancel" },
                 {
@@ -281,8 +188,8 @@ export default function SettingsScreen(): ReactElement {
                         try {
                             await clearCloudImages();
                             Alert.alert(
-                                "Cloud Images Cleared",
-                                "Your cloud attachments have been removed.",
+                                "Workspace Images Cleared",
+                                "Your synced attachments have been removed.",
                             );
                         } catch {
                             Alert.alert(
@@ -299,7 +206,6 @@ export default function SettingsScreen(): ReactElement {
     const handleThemeChange = async (theme: UserTheme) => {
         await setUserTheme(theme);
     };
-    const syncActionDisabled = isMigrating || isCloning;
     const isGoogleButtonBusy = isAuthLoading || isSigningIn;
     const isTwoPaneLayout = Math.min(windowWidth, windowHeight) >= 700;
     const settingsRailWidth = Math.max(256, Math.min(320, windowWidth * 0.28));
@@ -307,24 +213,6 @@ export default function SettingsScreen(): ReactElement {
         620,
         Math.min(980, windowWidth - settingsRailWidth - 48),
     );
-
-    const getSyncStatusColor = () => {
-        switch (syncState) {
-            case "cloud-enabled":
-                return "#34C759";
-            default:
-                return "#8E8E93";
-        }
-    };
-
-    const getSyncStatusText = () => {
-        switch (syncState) {
-            case "cloud-enabled":
-                return "Your chats are stored in Convex.";
-            default:
-                return "Sign in to connect this device to your Convex workspace.";
-        }
-    };
 
     const handleBack = () => {
         if (router.canGoBack()) {
@@ -385,14 +273,12 @@ export default function SettingsScreen(): ReactElement {
                                         : "Signed out"}
                                 </Text>
                                 <Text style={styles.tabletRailSummaryLabel}>
-                                    Sync
+                                    Workspace
                                 </Text>
                                 <Text style={styles.tabletRailSummaryValue}>
                                     {syncState === "cloud-enabled"
-                                        ? "Cloud active"
-                                        : syncState === "cloud-disabled"
-                                          ? "Cloud paused"
-                                          : "Local only"}
+                                        ? "Connected"
+                                        : "Signed out"}
                                 </Text>
                             </View>
                         </View>
@@ -529,143 +415,6 @@ export default function SettingsScreen(): ReactElement {
                                         </View>
                                     )}
                                 </View>
-
-                                {isAuthenticated && (
-                                    <View style={styles.section}>
-                                        <Text style={styles.sectionTitle}>
-                                            Sync
-                                        </Text>
-
-                                        {isConvexAvailable && (
-                                            <View style={styles.syncStatusCard}>
-                                                <View
-                                                    style={
-                                                        styles.syncStatusHeader
-                                                    }
-                                                >
-                                                    <View
-                                                        style={[
-                                                            styles.syncStatusIndicator,
-                                                            {
-                                                                backgroundColor:
-                                                                    getSyncStatusColor(),
-                                                            },
-                                                        ]}
-                                                    />
-                                                    <View
-                                                        style={
-                                                            styles.syncStatusInfo
-                                                        }
-                                                    >
-                                                        <Text
-                                                            style={
-                                                                styles.syncStatusTitle
-                                                            }
-                                                        >
-                                                            {syncState ===
-                                                            "cloud-enabled"
-                                                                ? "Connected"
-                                                                : "Sign In Required"}
-                                                        </Text>
-                                                        <Text
-                                                            style={
-                                                                styles.syncStatusDescription
-                                                            }
-                                                        >
-                                                            {getSyncStatusText()}
-                                                        </Text>
-                                                        {isMigrating &&
-                                                            migrationProgress && (
-                                                                <Text
-                                                                    style={
-                                                                        styles.syncStatusMeta
-                                                                    }
-                                                                >
-                                                                    Migrating...{" "}
-                                                                    {Math.round(
-                                                                        migrationProgress.percentage,
-                                                                    )}
-                                                                    %
-                                                                </Text>
-                                                            )}
-                                                        {isCloning &&
-                                                            cloneProgress && (
-                                                                <Text
-                                                                    style={
-                                                                        styles.syncStatusMeta
-                                                                    }
-                                                                >
-                                                                    Cloning...{" "}
-                                                                    {Math.round(
-                                                                        cloneProgress.percentage,
-                                                                    )}
-                                                                    %
-                                                                </Text>
-                                                            )}
-                                                    </View>
-                                                </View>
-
-                                                {syncState !==
-                                                    "cloud-enabled" && (
-                                                    <TouchableOpacity
-                                                        style={
-                                                            styles.enableSyncButton
-                                                        }
-                                                        onPress={
-                                                            handleEnableCloudSync
-                                                        }
-                                                        disabled={
-                                                            syncActionDisabled
-                                                        }
-                                                    >
-                                                        <Text
-                                                            style={
-                                                                styles.enableSyncButtonText
-                                                            }
-                                                        >
-                                                            Connect Workspace
-                                                        </Text>
-                                                    </TouchableOpacity>
-                                                )}
-
-                                                {syncState ===
-                                                    "cloud-enabled" && (
-                                                    <TouchableOpacity
-                                                        style={
-                                                            styles.disableSyncButton
-                                                        }
-                                                        onPress={
-                                                            handleDisableCloudSync
-                                                        }
-                                                        disabled={
-                                                            syncActionDisabled
-                                                        }
-                                                    >
-                                                        <Text
-                                                            style={
-                                                                styles.enableSyncButtonText
-                                                            }
-                                                        >
-                                                            Sign Out
-                                                        </Text>
-                                                    </TouchableOpacity>
-                                                )}
-                                            </View>
-                                        )}
-
-                                        {!isConvexAvailable && (
-                                            <View style={styles.syncWarning}>
-                                                <Text
-                                                    style={
-                                                        styles.syncWarningText
-                                                    }
-                                                >
-                                                    {convexUnavailableMessage}
-                                                </Text>
-                                            </View>
-                                        )}
-                                    </View>
-                                )}
 
                                 <View style={styles.section}>
                                     <Text style={styles.sectionTitle}>
@@ -921,12 +670,10 @@ export default function SettingsScreen(): ReactElement {
                                     </Text>
 
                                     <View style={styles.storageContainer}>
-                                        {isStorageLoading ? (
-                                            <ActivityIndicator
-                                                style={styles.loading}
-                                                color={colors.accent}
-                                            />
-                                        ) : localQuotaStatus ? (
+                                        {isAuthenticated &&
+                                        syncState === "cloud-enabled" &&
+                                        cloudQuotaStatus &&
+                                        cloudStorageUsage ? (
                                             <>
                                                 <View style={styles.storageRow}>
                                                     <Text
@@ -934,7 +681,7 @@ export default function SettingsScreen(): ReactElement {
                                                             styles.storageLabel
                                                         }
                                                     >
-                                                        Local attachments
+                                                        Workspace attachments
                                                     </Text>
                                                     <Text
                                                         style={
@@ -942,11 +689,11 @@ export default function SettingsScreen(): ReactElement {
                                                         }
                                                     >
                                                         {formatBytes(
-                                                            localQuotaStatus.used,
+                                                            cloudQuotaStatus.used,
                                                         )}{" "}
                                                         /{" "}
                                                         {formatBytes(
-                                                            localQuotaStatus.limit,
+                                                            cloudQuotaStatus.limit,
                                                         )}
                                                     </Text>
                                                 </View>
@@ -955,186 +702,69 @@ export default function SettingsScreen(): ReactElement {
                                                         style={[
                                                             styles.storageBarFill,
                                                             {
-                                                                width: `${Math.min(localQuotaStatus.percentage * 100, 100)}%`,
+                                                                width: `${Math.min(cloudQuotaStatus.percentage * 100, 100)}%`,
                                                                 backgroundColor:
-                                                                    localQuotaStatus.isExceeded
+                                                                    cloudQuotaStatus.isExceeded
                                                                         ? colors.danger
-                                                                        : localQuotaStatus.isWarning80
+                                                                        : cloudQuotaStatus.isWarning80
                                                                           ? colors.warning
                                                                           : colors.success,
                                                             },
                                                         ]}
                                                     />
                                                 </View>
-                                                {storageUsage && (
+                                                <View style={styles.statsRow}>
                                                     <View
-                                                        style={styles.statsRow}
+                                                        style={styles.statCard}
                                                     >
-                                                        <View
+                                                        <Text
                                                             style={
-                                                                styles.statCard
+                                                                styles.statValue
                                                             }
                                                         >
-                                                            <Text
-                                                                style={
-                                                                    styles.statValue
-                                                                }
-                                                            >
-                                                                {
-                                                                    storageUsage.sessions
-                                                                }
-                                                            </Text>
-                                                            <Text
-                                                                style={
-                                                                    styles.statLabel
-                                                                }
-                                                            >
-                                                                Chats
-                                                            </Text>
-                                                        </View>
-                                                        <View
+                                                            {
+                                                                cloudStorageUsage.sessionCount
+                                                            }
+                                                        </Text>
+                                                        <Text
                                                             style={
-                                                                styles.statCard
+                                                                styles.statLabel
                                                             }
                                                         >
-                                                            <Text
-                                                                style={
-                                                                    styles.statValue
-                                                                }
-                                                            >
-                                                                {
-                                                                    storageUsage.messages
-                                                                }
-                                                            </Text>
-                                                            <Text
-                                                                style={
-                                                                    styles.statLabel
-                                                                }
-                                                            >
-                                                                Messages
-                                                            </Text>
-                                                        </View>
+                                                            Chats
+                                                        </Text>
                                                     </View>
-                                                )}
-                                                {cloudQuotaStatus && (
-                                                    <>
-                                                        <View
-                                                            style={[
-                                                                styles.storageRow,
-                                                                styles.storageSectionSpacing,
-                                                            ]}
-                                                        >
-                                                            <Text
-                                                                style={
-                                                                    styles.storageLabel
-                                                                }
-                                                            >
-                                                                Cloud
-                                                                attachments
-                                                            </Text>
-                                                            <Text
-                                                                style={
-                                                                    styles.storageValue
-                                                                }
-                                                            >
-                                                                {formatBytes(
-                                                                    cloudQuotaStatus.used,
-                                                                )}{" "}
-                                                                /{" "}
-                                                                {formatBytes(
-                                                                    cloudQuotaStatus.limit,
-                                                                )}
-                                                            </Text>
-                                                        </View>
-                                                        <View
+                                                    <View
+                                                        style={styles.statCard}
+                                                    >
+                                                        <Text
                                                             style={
-                                                                styles.storageBar
+                                                                styles.statValue
                                                             }
                                                         >
-                                                            <View
-                                                                style={[
-                                                                    styles.storageBarFill,
-                                                                    {
-                                                                        width: `${Math.min(cloudQuotaStatus.percentage * 100, 100)}%`,
-                                                                        backgroundColor:
-                                                                            cloudQuotaStatus.isExceeded
-                                                                                ? colors.danger
-                                                                                : cloudQuotaStatus.isWarning80
-                                                                                  ? colors.warning
-                                                                                  : colors.success,
-                                                                    },
-                                                                ]}
-                                                            />
-                                                        </View>
-                                                        {cloudStorageUsage && (
-                                                            <View
-                                                                style={
-                                                                    styles.statsRow
-                                                                }
-                                                            >
-                                                                <View
-                                                                    style={
-                                                                        styles.statCard
-                                                                    }
-                                                                >
-                                                                    <Text
-                                                                        style={
-                                                                            styles.statValue
-                                                                        }
-                                                                    >
-                                                                        {
-                                                                            cloudStorageUsage.sessionCount
-                                                                        }
-                                                                    </Text>
-                                                                    <Text
-                                                                        style={
-                                                                            styles.statLabel
-                                                                        }
-                                                                    >
-                                                                        Cloud
-                                                                        Chats
-                                                                    </Text>
-                                                                </View>
-                                                                <View
-                                                                    style={
-                                                                        styles.statCard
-                                                                    }
-                                                                >
-                                                                    <Text
-                                                                        style={
-                                                                            styles.statValue
-                                                                        }
-                                                                    >
-                                                                        {
-                                                                            cloudStorageUsage.messageCount
-                                                                        }
-                                                                    </Text>
-                                                                    <Text
-                                                                        style={
-                                                                            styles.statLabel
-                                                                        }
-                                                                    >
-                                                                        Cloud
-                                                                        Messages
-                                                                    </Text>
-                                                                </View>
-                                                            </View>
-                                                        )}
-                                                    </>
-                                                )}
+                                                            {
+                                                                cloudStorageUsage.messageCount
+                                                            }
+                                                        </Text>
+                                                        <Text
+                                                            style={
+                                                                styles.statLabel
+                                                            }
+                                                        >
+                                                            Messages
+                                                        </Text>
+                                                    </View>
+                                                </View>
                                             </>
                                         ) : null}
 
                                         {syncState === "cloud-enabled" && (
                                             <Text
-                                                style={[
-                                                    styles.storageInfoText,
-                                                    localQuotaStatus &&
-                                                        styles.storageInfoSpacing,
-                                                ]}
+                                                style={styles.storageInfoText}
                                             >
                                                 Your attachments are stored in
-                                                Convex and sync across devices.
+                                                Convex and available on every
+                                                signed-in device.
                                             </Text>
                                         )}
 
@@ -1145,35 +775,27 @@ export default function SettingsScreen(): ReactElement {
                                                     onPress={
                                                         handleClearCloudImages
                                                     }
-                                                    disabled={
-                                                        syncActionDisabled
-                                                    }
+                                                    disabled={false}
                                                 >
                                                     <Text
                                                         style={
                                                             styles.clearButtonText
                                                         }
                                                     >
-                                                        Clear Synced Images
+                                                        Clear Workspace Images
                                                     </Text>
                                                 </TouchableOpacity>
                                             </View>
                                         )}
 
                                         {syncState !== "cloud-enabled" && (
-                                            <>
-                                                <Text
-                                                    style={[
-                                                        styles.storageInfoText,
-                                                        localQuotaStatus &&
-                                                            styles.storageInfoSpacing,
-                                                    ]}
-                                                >
-                                                    Sign in to inspect synced
-                                                    storage usage for this
-                                                    workspace.
-                                                </Text>
-                                            </>
+                                            <Text
+                                                style={styles.storageInfoText}
+                                            >
+                                                Sign in to inspect workspace
+                                                storage usage for this
+                                                deployment.
+                                            </Text>
                                         )}
                                     </View>
                                 </View>

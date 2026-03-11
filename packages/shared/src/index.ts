@@ -3,8 +3,6 @@ export * from "./core/models";
 export * from "./core/quota";
 export {
     SyncState,
-    SubscriptionTier,
-    SubscriptionStatus,
     SyncMetadata,
     MigrationProgress,
     CloneProgress,

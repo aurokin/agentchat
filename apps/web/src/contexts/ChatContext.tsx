@@ -22,7 +22,6 @@ import {
     mapConvexMessageToLocal,
     mergeByIdWithPending,
 } from "@shared/core/sync";
-import { trackAnalyticsEvent } from "@/lib/analytics/posthog";
 import { useStorageAdapter, useSync } from "@/contexts/SyncContext";
 import * as storage from "@/lib/storage";
 import { v4 as uuid } from "uuid";
@@ -70,7 +69,7 @@ const CLOUD_CHAT_PAGE_SIZE = 50;
 
 export function ChatProvider({ children }: { children: React.ReactNode }) {
     const storageAdapter = useStorageAdapter();
-    const { syncState, isConvexAvailable, subscription } = useSync();
+    const { syncState, isConvexAvailable } = useSync();
     const [chats, setChats] = useState<ChatSession[]>([]);
     const [currentChat, setCurrentChat] = useState<ChatSession | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
@@ -81,9 +80,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     const pendingMessageIdsRef = useRef<Set<string>>(new Set());
 
     const isCloudSyncActive =
-        isConvexAvailable &&
-        syncState === "cloud-enabled" &&
-        (subscription?.hasCloudSync ?? false);
+        isConvexAvailable && syncState === "cloud-enabled";
     const currentChatId = currentChat?.id ?? null;
     const cloudUserId = useQuery(
         api.users.getCurrentUserId,
@@ -245,9 +242,6 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             setCurrentChat(chat);
             setMessages([]);
             setIsMessagesLoading(false);
-            trackAnalyticsEvent("chat_created", {
-                model: chat.modelId,
-            });
 
             return chat;
         },

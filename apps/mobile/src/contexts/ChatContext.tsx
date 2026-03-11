@@ -98,14 +98,12 @@ export function ChatProvider({
         APP_DEFAULT_MODEL;
 
     const adapter = useStorageAdapter();
-    const { syncState, isConvexAvailable, subscription } = useSync();
+    const { syncState, isConvexAvailable } = useSync();
     const pendingChatIdsRef = React.useRef<Set<string>>(new Set());
     const pendingMessageIdsRef = React.useRef<Set<string>>(new Set());
 
     const isCloudSyncActive =
-        isConvexAvailable &&
-        syncState === "cloud-enabled" &&
-        (subscription?.hasCloudSync ?? false);
+        isConvexAvailable && syncState === "cloud-enabled";
     const currentChatId = currentChat?.id ?? null;
     const cloudUserId = useQuery(
         api.users.getCurrentUserId,
