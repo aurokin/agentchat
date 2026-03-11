@@ -133,8 +133,6 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
                 ...profileUpdates,
                 cloudChatCount: 0,
                 cloudMessageCount: 0,
-                cloudAttachmentCount: 0,
-                cloudAttachmentBytes: 0,
                 createdAt: now,
                 updatedAt: now,
                 initialSync: false,

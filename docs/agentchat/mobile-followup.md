@@ -17,6 +17,8 @@ This document tracks mobile work that should happen after the web-first migratio
 - Replace current model selection with provider, model, and variant flows driven by the backend.
 - Remove image attachment UX and related local handling from the mobile chat flow.
 - Remove search-related UI and settings.
+- Remove mobile image quota, cloud image clearing, and attachment cache code to match the web/Convex cleanup.
+- Remove any remaining mobile dependency on Convex attachment APIs once the mobile runtime is switched to the new provider architecture.
 - Replace current OpenRouter-specific assumptions with backend-driven provider options.
 - Add backend token handling and a single authenticated WebSocket connection to `apps/server`.
 - Update mobile auth/session handling to work with backend-minted tokens from Convex.

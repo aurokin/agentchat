@@ -3,7 +3,7 @@ import { paginationOptsValidator } from "convex/server";
 import { mutation, query } from "./_generated/server";
 import { isOwner, requireUserMatches } from "./lib/authz";
 import { requireCloudSync } from "./lib/subscription";
-import { drainBatches, safeStorageDelete } from "./lib/batch";
+import { drainBatches } from "./lib/batch";
 import { assertMaxLen, LIMITS } from "./lib/limits";
 import { clampPaginationOpts } from "./lib/pagination";
 import {
@@ -114,7 +114,6 @@ export const create = mutation({
         modelId: v.optional(v.string()),
         thinkingLevel: v.optional(v.string()),
         searchLevel: v.optional(v.string()),
-        attachmentIds: v.optional(v.array(v.string())),
         createdAt: v.optional(v.number()),
     },
     handler: async (ctx, args) => {
@@ -154,7 +153,6 @@ export const create = mutation({
             modelId: args.modelId,
             thinkingLevel: args.thinkingLevel,
             searchLevel: args.searchLevel,
-            attachmentIds: args.attachmentIds,
             createdAt: args.createdAt ?? now,
         });
 
@@ -178,7 +176,6 @@ export const update = mutation({
         content: v.optional(v.string()),
         contextContent: v.optional(v.string()),
         thinking: v.optional(v.string()),
-        attachmentIds: v.optional(v.array(v.string())),
     },
     handler: async (ctx, args) => {
         const authenticatedUserId = await requireCloudSync(ctx);
@@ -203,7 +200,7 @@ export const update = mutation({
     },
 });
 
-// Delete a message and its attachments
+// Delete a message
 export const remove = mutation({
     args: { id: v.id("messages") },
     handler: async (ctx, args) => {
@@ -213,32 +210,10 @@ export const remove = mutation({
             throw new Error("Not found");
         }
 
-        let deletedAttachments = 0;
-        let freedAttachmentBytes = 0;
-
-        await drainBatches(
-            () =>
-                ctx.db
-                    .query("attachments")
-                    .withIndex("by_message", (q) => q.eq("messageId", args.id))
-                    .take(100),
-            async (attachment: any) => {
-                if (!attachment?.purgedAt) {
-                    deletedAttachments++;
-                    freedAttachmentBytes += attachment?.size ?? 0;
-                }
-                await safeStorageDelete(ctx, attachment.storageId);
-                await ctx.db.delete(attachment._id);
-            },
-        );
-
-        // Delete the message
         await ctx.db.delete(args.id);
 
         await applyCloudUsageDelta(ctx, authenticatedUserId, {
             messageCount: -1,
-            attachmentCount: -deletedAttachments,
-            attachmentBytes: -freedAttachmentBytes,
         });
     },
 });
@@ -254,9 +229,6 @@ export const deleteByChat = mutation({
         }
 
         let deletedMessages = 0;
-        let deletedAttachments = 0;
-        let freedAttachmentBytes = 0;
-
         await drainBatches(
             () =>
                 ctx.db
@@ -265,32 +237,12 @@ export const deleteByChat = mutation({
                     .take(100),
             async (message: any) => {
                 deletedMessages++;
-                await drainBatches(
-                    () =>
-                        ctx.db
-                            .query("attachments")
-                            .withIndex("by_message", (q) =>
-                                q.eq("messageId", message._id),
-                            )
-                            .take(100),
-                    async (attachment: any) => {
-                        if (!attachment?.purgedAt) {
-                            deletedAttachments++;
-                            freedAttachmentBytes += attachment?.size ?? 0;
-                        }
-                        await safeStorageDelete(ctx, attachment.storageId);
-                        await ctx.db.delete(attachment._id);
-                    },
-                );
-
                 await ctx.db.delete(message._id);
             },
         );
 
         await applyCloudUsageDelta(ctx, authenticatedUserId, {
             messageCount: -deletedMessages,
-            attachmentCount: -deletedAttachments,
-            attachmentBytes: -freedAttachmentBytes,
         });
     },
 });

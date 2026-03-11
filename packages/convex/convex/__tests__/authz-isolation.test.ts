@@ -1,10 +1,5 @@
 import { describe, expect, test } from "bun:test";
 import {
-    create as createAttachment,
-    get as getAttachment,
-    remove as removeAttachment,
-} from "../attachments";
-import {
     create as createChat,
     get as getChat,
     listByUser as listChatsByUser,
@@ -21,8 +16,6 @@ const AUTH_USER_ID = "users:auth";
 const OTHER_USER_ID = "users:other";
 const CHAT_ID = "chats:other";
 const MESSAGE_ID = "messages:other";
-const ATTACHMENT_ID = "attachments:other";
-const STORAGE_ID = "_storage:other";
 
 type HandlerExport = {
     _handler: (ctx: any, args: any) => Promise<unknown>;
@@ -34,9 +27,7 @@ function runHandler(handler: HandlerExport, ctx: any, args: any) {
 
 function createAuthenticatedContext(
     docsById: Record<string, unknown> = {},
-    overrides?: {
-        onGetMetadata?: (storageId: string) => Promise<unknown>;
-    },
+    overrides?: {},
 ) {
     const baseDocs: Record<string, unknown> = {
         [AUTH_USER_ID]: {
@@ -44,9 +35,6 @@ function createAuthenticatedContext(
             entitlementActive: true,
         },
     };
-
-    const getMetadataCalls: string[] = [];
-
     const ctx = {
         auth: {
             getUserIdentity: async () => ({
@@ -71,19 +59,9 @@ function createAuthenticatedContext(
                 throw new Error("Unexpected delete call in this test");
             },
         },
-        storage: {
-            getMetadata: async (storageId: string) => {
-                getMetadataCalls.push(storageId);
-                if (overrides?.onGetMetadata) {
-                    return await overrides.onGetMetadata(storageId);
-                }
-                return null;
-            },
-            delete: async () => {},
-        },
     };
 
-    return { ctx, getMetadataCalls };
+    return { ctx };
 }
 
 describe("cross-user auth isolation", () => {
@@ -141,24 +119,6 @@ describe("cross-user auth isolation", () => {
         expect(result).toBeNull();
     });
 
-    test("attachments.get returns null for non-owner attachment", async () => {
-        const { ctx } = createAuthenticatedContext({
-            [ATTACHMENT_ID]: {
-                _id: ATTACHMENT_ID,
-                userId: OTHER_USER_ID,
-                storageId: STORAGE_ID,
-            },
-        });
-
-        const result = await runHandler(
-            getAttachment as unknown as HandlerExport,
-            ctx,
-            { id: ATTACHMENT_ID },
-        );
-
-        expect(result).toBeNull();
-    });
-
     test("chats.update rejects updating another user's chat", async () => {
         const { ctx } = createAuthenticatedContext({
             [CHAT_ID]: {
@@ -191,22 +151,6 @@ describe("cross-user auth isolation", () => {
         ).rejects.toThrow("Not found");
     });
 
-    test("attachments.remove rejects deleting another user's attachment", async () => {
-        const { ctx } = createAuthenticatedContext({
-            [ATTACHMENT_ID]: {
-                _id: ATTACHMENT_ID,
-                userId: OTHER_USER_ID,
-                storageId: STORAGE_ID,
-            },
-        });
-
-        await expect(
-            runHandler(removeAttachment as unknown as HandlerExport, ctx, {
-                id: ATTACHMENT_ID,
-            }),
-        ).rejects.toThrow("Not found");
-    });
-
     test("chats.create rejects creating chat for another user id", async () => {
         const { ctx } = createAuthenticatedContext();
 
@@ -233,35 +177,5 @@ describe("cross-user auth isolation", () => {
                 contextContent: "hello",
             }),
         ).rejects.toThrow("Unauthorized");
-    });
-
-    test("attachments.create rejects userId mismatch before reading storage metadata", async () => {
-        const { ctx, getMetadataCalls } = createAuthenticatedContext(
-            {},
-            {
-                onGetMetadata: async () => ({
-                    storageId: STORAGE_ID,
-                    sha256: "abc",
-                    size: 12,
-                    contentType: "image/png",
-                }),
-            },
-        );
-
-        await expect(
-            runHandler(createAttachment as unknown as HandlerExport, ctx, {
-                userId: OTHER_USER_ID,
-                messageId: MESSAGE_ID,
-                localId: "local-1",
-                type: "image",
-                mimeType: "image/png",
-                storageId: STORAGE_ID,
-                width: 1,
-                height: 1,
-                size: 12,
-            }),
-        ).rejects.toThrow("Unauthorized");
-
-        expect(getMetadataCalls).toHaveLength(0);
     });
 });

@@ -8,10 +8,9 @@ import {
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { requireAuthUserId, requireUserMatches } from "./lib/authz";
 import { requireCloudSync } from "./lib/subscription";
-import { drainBatches, safeStorageDelete } from "./lib/batch";
+import { drainBatches } from "./lib/batch";
 import {
     cloudUsageCountersToPatch,
-    computeCloudAttachmentUsage,
     computeCloudChatCount,
     computeCloudMessageCount,
     computeCloudUsageCounters,
@@ -53,20 +52,19 @@ export const getStorageUsage = query({
         const cached = readCloudUsageCountersFromUser(user);
         if (cached) {
             return {
-                bytes: cached.attachmentBytes,
+                bytes: 0,
                 messageCount: cached.messageCount,
                 sessionCount: cached.chatCount,
             };
         }
 
-        const [attachments, sessionCount, messageCount] = await Promise.all([
-            computeCloudAttachmentUsage(ctx, authenticatedUserId),
+        const [sessionCount, messageCount] = await Promise.all([
             computeCloudChatCount(ctx, authenticatedUserId),
             computeCloudMessageCount(ctx, authenticatedUserId),
         ]);
 
         return {
-            bytes: attachments.attachmentBytes,
+            bytes: 0,
             messageCount,
             sessionCount,
         };
@@ -84,8 +82,6 @@ export const create = internalMutation({
             initialSync: false,
             cloudChatCount: 0,
             cloudMessageCount: 0,
-            cloudAttachmentCount: 0,
-            cloudAttachmentBytes: 0,
             createdAt: now,
             updatedAt: now,
         });
@@ -99,19 +95,6 @@ export const resetCloudData = mutation({
         if (!userId) {
             throw new Error("Not authenticated");
         }
-
-        // Clear attachments first so we don't have to do nested deletions.
-        await drainBatches(
-            () =>
-                ctx.db
-                    .query("attachments")
-                    .withIndex("by_user", (q) => q.eq("userId", userId))
-                    .take(200),
-            async (attachment: any) => {
-                await safeStorageDelete(ctx, attachment.storageId);
-                await ctx.db.delete(attachment._id);
-            },
-        );
 
         await drainBatches(
             () =>

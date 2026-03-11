@@ -22,8 +22,6 @@ export default defineSchema({
         // Cloud usage counters (anti-abuse + cheap usage queries)
         cloudChatCount: v.optional(v.number()),
         cloudMessageCount: v.optional(v.number()),
-        cloudAttachmentCount: v.optional(v.number()),
-        cloudAttachmentBytes: v.optional(v.number()),
         createdAt: v.optional(v.number()),
         updatedAt: v.optional(v.number()),
     })
@@ -57,29 +55,10 @@ export default defineSchema({
         modelId: v.optional(v.string()),
         thinkingLevel: v.optional(v.string()),
         searchLevel: v.optional(v.string()),
-        attachmentIds: v.optional(v.array(v.string())),
         createdAt: v.number(),
     })
         .index("by_chat", ["chatId"])
         .index("by_chat_created", ["chatId", "createdAt"])
         .index("by_user", ["userId"])
-        .index("by_local_id", ["userId", "localId"]),
-    attachments: defineTable({
-        userId: v.id("users"),
-        messageId: v.id("messages"),
-        localId: v.optional(v.string()),
-        type: v.literal("image"),
-        mimeType: v.string(),
-        storageId: v.id("_storage"),
-        width: v.number(),
-        height: v.number(),
-        size: v.number(),
-        purgedAt: v.optional(v.number()),
-        createdAt: v.number(),
-    })
-        .index("by_message", ["messageId"])
-        .index("by_user", ["userId"])
-        .index("by_user_storage", ["userId", "storageId"])
-        .index("by_user_created", ["userId", "createdAt"])
         .index("by_local_id", ["userId", "localId"]),
 });

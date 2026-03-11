@@ -5,7 +5,7 @@ import { isOwner, requireUserMatches } from "./lib/authz";
 import { requireCloudSync } from "./lib/subscription";
 import { assertMaxLen, LIMITS } from "./lib/limits";
 import { clampPaginationOpts } from "./lib/pagination";
-import { drainBatches, safeStorageDelete } from "./lib/batch";
+import { drainBatches } from "./lib/batch";
 import {
     applyCloudUsageDelta,
     ensureCloudUsageCounters,
@@ -161,7 +161,7 @@ export const update = mutation({
     },
 });
 
-// Delete a chat and all associated messages/attachments
+// Delete a chat and all associated messages
 export const remove = mutation({
     args: { id: v.id("chats") },
     handler: async (ctx, args) => {
@@ -172,8 +172,6 @@ export const remove = mutation({
         }
 
         let deletedMessages = 0;
-        let deletedAttachments = 0;
-        let freedAttachmentBytes = 0;
 
         await drainBatches(
             () =>
@@ -183,24 +181,6 @@ export const remove = mutation({
                     .take(100),
             async (message: any) => {
                 deletedMessages++;
-                await drainBatches(
-                    () =>
-                        ctx.db
-                            .query("attachments")
-                            .withIndex("by_message", (q) =>
-                                q.eq("messageId", message._id),
-                            )
-                            .take(100),
-                    async (attachment: any) => {
-                        if (!attachment?.purgedAt) {
-                            deletedAttachments++;
-                            freedAttachmentBytes += attachment?.size ?? 0;
-                        }
-                        await safeStorageDelete(ctx, attachment.storageId);
-                        await ctx.db.delete(attachment._id);
-                    },
-                );
-
                 await ctx.db.delete(message._id);
             },
         );
@@ -211,8 +191,6 @@ export const remove = mutation({
         await applyCloudUsageDelta(ctx, authenticatedUserId, {
             chatCount: -1,
             messageCount: -deletedMessages,
-            attachmentCount: -deletedAttachments,
-            attachmentBytes: -freedAttachmentBytes,
         });
     },
 });
