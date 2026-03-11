@@ -9,14 +9,14 @@
 - Bundle ID: `com.agentchat.app` (configured in `app.json`).
 - Monorepo paths: use `@shared/*` for `packages/shared/src/*` and ensure `metro.config.js` includes `watchFolders` pointing to the workspace root.
 
-## Credential Storage (API Keys And Tokens)
+## Credential Storage (Tokens)
 
-Sensitive credentials are stored using `expo-secure-store`.
+Sensitive auth credentials are stored using `expo-secure-store`.
 
 ### Credential Storage Location
 
 - Storage: Expo SecureStore (encrypted key-value storage)
-- Keys: `routerchat-api-key`, `routerchat-auth-token`, `routerchat-refresh-token`
+- Keys: `routerchat-auth-token`, `routerchat-refresh-token`
 
 ### Credential Storage Module
 
@@ -24,9 +24,6 @@ Use `lib/storage/credential-storage.ts` for credential operations:
 
 ```typescript
 import {
-    getApiKey,
-    setApiKey,
-    clearApiKey,
     getAuthToken,
     setAuthToken,
     clearAuthToken,
@@ -36,13 +33,6 @@ import {
     clearAllCredentials,
 } from "@/lib/storage";
 
-const apiKey = await getApiKey();
-if (apiKey) {
-    // Use API key for requests
-}
-
-await setApiKey("sk-...");
-
 await clearAllCredentials();
 ```
 
@@ -51,7 +41,7 @@ await clearAllCredentials();
 - All credential storage functions are async (unlike web's localStorage which is sync).
 - Expo SecureStore automatically encrypts data on Android and iOS.
 - Keys are still prefixed with `routerchat-` for backward compatibility with existing installs.
-- Always use `clearAllCredentials()` for complete logout, not just `clearApiKey()`.
+- Always use `clearAllCredentials()` for complete logout.
 
 ## Google OAuth Via Convex Auth
 
@@ -68,7 +58,7 @@ The mobile app uses Expo Auth Session with Convex Auth for Google sign-in.
 - Convex URL is stored in SecureStore under `routerchat-convex-url`.
 - Env var: `EXPO_PUBLIC_GOOGLE_CLIENT_ID` (set in `app.config.js` or `app.config.ts`).
 - Redirect URI: `agentchat://convex-auth`.
-- API key validation works independently of Convex Auth.
+- OpenRouter access is configured by the instance owner in Convex.
 
 ### Auth Context
 
@@ -168,13 +158,10 @@ The mobile settings page should maintain parity with the web settings page.
 ### Required Settings Sections
 
 1. Account (Google OAuth sign-in/sign-out, user profile info)
-2. Sync (cloud sync status with enable/disable toggle)
-3. OpenRouter API (API key validation with save/clear functionality)
-4. Theme (Light/Dark/System toggle)
-5. Storage (cloud storage status and sync information, no local storage UI)
-6. Skills (list of user-created skills, read-only in settings)
-7. Keybindings (list of keyboard shortcuts)
-8. About (app version and description)
+2. Model Provider (instance-managed provider information)
+3. Theme (Light/Dark/System toggle)
+4. Storage (cloud storage status and sync information, no local storage UI)
+5. About (app version and description)
 
 ### Theme Selection
 
@@ -193,27 +180,11 @@ await setTheme("dark");
 ### Storage Section
 
 ```typescript
-{syncState === "cloud-enabled" && (
-    <View style={styles.storageContainer}>
-        <Text style={styles.storageInfoText}>
-            Your attachments are stored in the cloud and sync across devices.
-        </Text>
-        <Text style={styles.storageComingSoon}>
-            Cloud storage management coming soon.
-        </Text>
-    </View>
-)}
-
-{syncState !== "cloud-enabled" && (
-    <View style={styles.storageContainer}>
-        <Text style={styles.storageInfoText}>
-            Your chats and attachments are stored only on this device.
-        </Text>
-        <Text style={styles.storageInfoSubtext}>
-            Enable cloud sync to access your data across devices.
-        </Text>
-    </View>
-)}
+<View style={styles.storageContainer}>
+    <Text style={styles.storageInfoText}>
+        Workspace attachments live in Convex and follow the signed-in account.
+    </Text>
+</View>
 ```
 
 ### Keybindings Section
@@ -226,42 +197,6 @@ const KEYBINDINGS = [
     { key: "Enter", description: "Send message" },
     { key: "Shift + Enter", description: "New line in message" },
 ];
-```
-
-### Skills Display
-
-Show up to 3 skills with a "+X more" indicator:
-
-```typescript
-import { useSkillsContext } from "../src/contexts/SkillsContext";
-
-const { skills } = useSkillsContext();
-
-skills.slice(0, 3).map(skill => (
-    <SkillCard key={skill.id} skill={skill} />
-));
-
-{skills.length > 3 && (
-    <Text>+{skills.length - 3} more skills</Text>
-)}
-```
-
-### API Key Validation
-
-```typescript
-import { validateApiKey } from "@shared/core/openrouter";
-
-const handleValidate = async () => {
-    setIsValidating(true);
-    try {
-        const valid = await validateApiKey(apiKey);
-        setIsValid(valid);
-    } catch {
-        setIsValid(false);
-    } finally {
-        setIsValidating(false);
-    }
-};
 ```
 
 ### Settings Screen Layout

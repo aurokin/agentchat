@@ -1,10 +1,10 @@
 # Agentchat
 
-A web application for chatting with AI models through OpenRouter. Users provide their own OpenRouter API key. Agentchat is now being shaped as a self-hosted, Convex-backed app.
+A self-hosted chat app for connecting users to the agents and model stack you expose from your own deployment. Agentchat currently uses Convex for workspace data and an instance-managed OpenRouter credential for model access.
 
 ## Try It Now
 
-Visit https://www.routerchat.chat to start chatting with Agentchat using your OpenRouter API key.
+Visit https://www.routerchat.chat to see the current hosted build.
 
 ## Features
 
@@ -14,7 +14,7 @@ Visit https://www.routerchat.chat to start chatting with Agentchat using your Op
 - **Web Search** - Enable web search for online-capable models
 - **Markdown Support** - Rich text rendering for code blocks, lists, and formatting
 - **Copy Messages** - One-click copy for any message
-- **Convex Workspace** - Chats and encrypted API keys stored in Convex
+- **Convex Workspace** - Chats and attachments stored in Convex
 - **Self-Hosted Direction** - Built for deployments you run and control
 - **Theme Support** - Light, dark, and system theme options
 - **Android Share Intent** - Share text, links, and images from other Android apps directly into a new Agentchat draft
@@ -24,8 +24,8 @@ Visit https://www.routerchat.chat to start chatting with Agentchat using your Op
 Agentchat is designed to keep you in control of your data and model choices.
 
 - **Self-hosted** - Run Agentchat on infrastructure you control.
-- **Convex-backed** - Chats and encrypted API keys live in Convex.
-- **User-empowered** - Choose any model available through OpenRouter and customize your experience.
+- **Convex-backed** - Chats and attachments live in Convex.
+- **Operator-controlled** - Instance owners configure the model provider and access controls.
 
 ## Tech Stack
 
@@ -36,15 +36,15 @@ Agentchat is designed to keep you in control of your data and model choices.
 | Language  | TypeScript 5.x                                    |
 | UI        | Tailwind CSS 4                                    |
 | State     | React Context + Hooks                             |
-| Storage   | Convex + encrypted API key storage                 |
+| Storage   | Convex workspace storage                           |
 | API       | OpenRouter API                                    |
 | Linting   | ESLint                                            |
 | Testing   | Bun Test                                          |
 
 ## Using the App
 
-1. Open https://www.routerchat.chat
-2. Add your OpenRouter API key in Settings
+1. Open your Agentchat deployment
+2. Sign in with an approved account
 3. Start a new chat and choose a model
 
 ## Getting Started
@@ -54,7 +54,7 @@ For local development and self-hosting.
 ### Prerequisites
 
 - Bun 1.x
-- OpenRouter account (for API access)
+- OpenRouter account (for instance-level API access)
 
 ### Installation
 
@@ -74,10 +74,9 @@ cd apps/web && bun dev
 
 ### Configuration
 
-1. Create an application and get your API keys
-2. Create an OpenRouter account at https://openrouter.ai/
-3. Generate an API key from https://openrouter.ai/keys
-4. Enter the key in the app's Settings page
+1. Create an OpenRouter account at https://openrouter.ai/
+2. Generate an API key for the deployment operator
+3. Set that key in the Convex deployment environment as `OPENROUTER_API_KEY`
 
 ### Hosting
 
@@ -116,7 +115,7 @@ Set these as Railway service variables (preview/production) or in `apps/web/.env
 Set these in EAS build env (see `apps/mobile/eas.json`) or in `apps/mobile/.env` for local runs. A template lives at `apps/mobile/.env.example`.
 
 - `EXPO_PUBLIC_CONVEX_URL` - Convex deployment URL for this build (same as web `NEXT_PUBLIC_CONVEX_URL`, from the Convex dashboard).
-- `EXPO_PUBLIC_GOOGLE_CLIENT_ID` - Optional. Only needed for client-side Google OAuth flows (the current Convex-hosted sign-in does not require it).
+- `EXPO_PUBLIC_GOOGLE_CLIENT_ID` - Optional. Only needed if you later add client-side Google OAuth flows.
 
 **Convex CLI (`packages/convex`)**
 
@@ -132,9 +131,9 @@ These are Convex-managed environment variables (not Railway vars). Set them in t
 - `SITE_URL` - Base URL for this deployment (no trailing slash, typically your Railway domain). Used to validate auth redirects.
 - `AUTH_GOOGLE_ID` - Google OAuth client ID (from Google Cloud Console).
 - `AUTH_GOOGLE_SECRET` - Google OAuth client secret (from Google Cloud Console).
+- `OPENROUTER_API_KEY` - Instance-level OpenRouter API key used for all model requests from this deployment.
 - `JWKS` - JSON Web Key Set used by Convex auth.
 - `JWT_PRIVATE_KEY` - Private key used by Convex auth for JWT signing.
-- `ENCRYPTION_KEY` - AES-256 key for encrypting sensitive data (API keys).
 Convex also provides some runtime variables that you can read but do not set:
 
 - `CONVEX_SITE_URL` - Convex-provided base URL for this deployment's "site" (used by Convex Auth in `packages/convex/convex/auth.config.ts`).
@@ -149,13 +148,6 @@ These are Convex-managed environment variables used by `packages/convex/convex/l
 - Pagination: `ROUTERCHAT_MAX_PAGE_CHATS`, `ROUTERCHAT_MAX_PAGE_MESSAGES`, `ROUTERCHAT_MAX_PAGE_SKILLS`
 
 Note: Convex requires environment variable names to be < 40 characters.
-
-**Generating the encryption key:**
-
-```bash
-# Generate and set in one command
-bunx convex env set ENCRYPTION_KEY "$(openssl rand -base64 32)"
-```
 
 ## Development
 
@@ -192,8 +184,8 @@ Agent instructions live in `AGENTS.md` and the linked docs under `docs/agents/`.
 
 ## Architecture Notes
 
-- **Direct API calls**: OpenRouter API calls are made directly from the client
-- **Convex-only runtime**: Chats and API keys are stored through Convex during the current development phase
+- **Backend model access**: OpenRouter API calls are made through a Convex action using the deployment's server-side credential
+- **Convex-only runtime**: Chats and attachments are stored through Convex during the current development phase
 - **Storage adapter pattern**: The local adapter remains in the codebase, but runtime paths now use Convex
 - **Monorepo**: Designed for future mobile expansion with shared types
 

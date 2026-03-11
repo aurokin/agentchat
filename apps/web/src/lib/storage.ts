@@ -3,7 +3,6 @@ import type { SyncState, SyncMetadata } from "./sync/types";
 import { DEFAULT_SYNC_METADATA } from "./sync/types";
 
 const STORAGE_KEYS = {
-    API_KEY: "routerchat-api-key",
     THEME: "routerchat-theme",
     DEFAULT_MODEL: "routerchat-default-model",
     DEFAULT_THINKING: "routerchat-default-thinking",
@@ -14,21 +13,6 @@ const STORAGE_KEYS = {
     SYNC_METADATA: "routerchat-sync-metadata",
     SYNC_AUTO_ENABLE: "routerchat-sync-auto-enable",
 } as const;
-
-export function getApiKey(): string | null {
-    if (typeof window === "undefined") return null;
-    return localStorage.getItem(STORAGE_KEYS.API_KEY);
-}
-
-export function setApiKey(key: string): void {
-    if (typeof window === "undefined") return;
-    localStorage.setItem(STORAGE_KEYS.API_KEY, key);
-}
-
-export function clearApiKey(): void {
-    if (typeof window === "undefined") return;
-    localStorage.removeItem(STORAGE_KEYS.API_KEY);
-}
 
 export function getTheme(): "light" | "dark" | "system" {
     if (typeof window === "undefined") return "system";

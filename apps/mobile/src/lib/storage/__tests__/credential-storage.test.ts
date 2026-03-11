@@ -43,7 +43,7 @@ describe("credential-storage", () => {
             throw new Error("boom");
         });
 
-        expect(await credentialStorage.getApiKey()).toBeNull();
+        expect(await credentialStorage.getAuthToken()).toBeNull();
     });
 
     it("throws when SecureStore set fails", async () => {
@@ -52,7 +52,7 @@ describe("credential-storage", () => {
         });
         let caught: unknown;
         try {
-            await credentialStorage.setApiKey("key");
+            await credentialStorage.setAuthToken("token");
         } catch (error) {
             caught = error;
         }
@@ -67,7 +67,7 @@ describe("credential-storage", () => {
         });
         let caught: unknown;
         try {
-            await credentialStorage.clearApiKey();
+            await credentialStorage.clearAuthToken();
         } catch (error) {
             caught = error;
         }

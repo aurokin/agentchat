@@ -33,7 +33,6 @@ export interface ChatSession {
 }
 
 export interface UserSettings {
-    apiKey: string | null;
     defaultModel: string;
     defaultThinking: ThinkingLevel;
     defaultSearchLevel: SearchLevel;

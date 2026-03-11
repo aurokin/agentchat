@@ -23,15 +23,15 @@ import {
     type NativeSyntheticEvent,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useAction } from "convex/react";
+import { api } from "@convex/_generated/api";
 import { useChatContext } from "@/contexts/ChatContext";
 import { useModelContext } from "@/contexts/ModelContext";
 import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
 import { loadAttachmentData, saveFile } from "@/lib/storage";
-import { useApiKey } from "@/hooks/useApiKey";
 import { useStorageAdapter } from "@/contexts/SyncContext";
 import { ConvexStorageAdapter } from "@/lib/sync/convex-adapter";
 import {
-    sendMessage,
     buildMessageContent,
     OpenRouterApiErrorImpl,
     type OpenRouterMessage,
@@ -61,6 +61,7 @@ import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { MessageInput } from "@/components/chat/MessageInput";
 import { AttachmentGallery } from "@/components/chat/AttachmentGallery";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
+import { useIsConvexAvailable } from "@/lib/convex/ConvexProvider";
 import { v4 as uuidv4 } from "uuid";
 import { consumePendingSharePayload } from "@/lib/share-intent/pending-share";
 import { importSharedImageFiles } from "@/lib/share-intent/attachments";
@@ -127,8 +128,9 @@ export default function ChatScreen(): ReactElement {
 
     const [inputText, setInputText] = useState("");
     const [isLoading, setIsLoading] = useState(false);
-    const { apiKey } = useApiKey();
     const storageAdapter = useStorageAdapter();
+    const isConvexAvailable = useIsConvexAvailable();
+    const sendOpenRouterMessage = useAction(api.openrouter.sendMessage);
     const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
     const [attachmentsById, setAttachmentsById] = useState<
         Record<string, Attachment>
@@ -526,17 +528,17 @@ export default function ChatScreen(): ReactElement {
         let assistantContent = "";
         let assistantThinking = "";
 
-        if (!apiKey) {
-            setError({
-                message: "Please add your OpenRouter API key in Settings",
-                isRetryable: false,
-            });
+        if (!chatSnapshot) {
+            setError({ message: "No chat selected", isRetryable: false });
             setRetryPayload(null);
             return;
         }
 
-        if (!chatSnapshot) {
-            setError({ message: "No chat selected", isRetryable: false });
+        if (!isConvexAvailable) {
+            setError({
+                message: "Convex isn't configured for this build.",
+                isRetryable: false,
+            });
             setRetryPayload(null);
             return;
         }
@@ -718,26 +720,23 @@ export default function ChatScreen(): ReactElement {
                 }));
             };
 
-            const response = await sendMessage(
-                apiKey,
-                openRouterMessages,
-                {
+            const response = await sendOpenRouterMessage({
+                messages: openRouterMessages,
+                session: {
                     id: chatSnapshot.id,
                     modelId: chatSnapshot.modelId,
                     thinking: effectiveThinking,
                     searchLevel: effectiveSearchLevel,
                 },
-                activeModel,
-                (chunk: string, thinking?: string) => {
-                    if (thinking !== undefined) {
-                        assistantThinking += thinking;
-                        markThinkingStreaming(thinking);
-                    } else {
-                        assistantContent += chunk;
-                        appendContent(chunk);
-                    }
-                },
-            );
+                model: activeModel ?? undefined,
+            });
+
+            assistantContent = response.choices[0]?.message?.content ?? "";
+            assistantThinking = response.choices[0]?.message?.thinking ?? "";
+            appendContent(assistantContent);
+            if (assistantThinking) {
+                markThinkingStreaming(assistantThinking);
+            }
 
             const finalContent =
                 assistantContent || response.choices[0]?.message?.content || "";

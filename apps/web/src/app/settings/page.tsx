@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Sidebar } from "@/components/chat/Sidebar";
 import { KeybindingsContent } from "@/components/keybindings/KeybindingsContent";
 import { useChat } from "@/contexts/ChatContext";
 import { useSync } from "@/contexts/SyncContext";
 import { useSettings } from "@/contexts/SettingsContext";
-import { validateApiKey } from "@/lib/openrouter";
 import {
     Settings,
     Key,
@@ -15,10 +14,7 @@ import {
     Sun,
     Monitor,
     Check,
-    X,
     Loader2,
-    Shield,
-    ExternalLink,
     Trash2,
     Info,
     Hexagon,
@@ -26,7 +22,7 @@ import {
     Keyboard,
     ChevronDown,
 } from "lucide-react";
-import { cn, externalLinkProps } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 const isKeybindingBlocked = () => {
     if (typeof document === "undefined") return false;
@@ -55,22 +51,11 @@ function SettingsPageContent() {
         refreshQuotaStatus,
         syncState,
     } = useSync();
-    const { apiKey, setApiKey, clearApiKey, theme, setTheme } = useSettings();
-    const [newApiKey, setNewApiKey] = useState(apiKey || "");
-    const lastApiKeyRef = useRef<string | null>(apiKey ?? null);
-    const [validating, setValidating] = useState(false);
-    const [validationResult, setValidationResult] = useState<boolean | null>(
-        null,
-    );
-    const [saving, setSaving] = useState(false);
+    const { theme, setTheme } = useSettings();
     const searchParams = useSearchParams();
-    const [highlightApiKey, setHighlightApiKey] = useState(false);
 
     useEffect(() => {
         if (typeof window === "undefined") return;
-        const highlight = searchParams.get("highlight");
-        setHighlightApiKey(highlight === "api-key");
-
         const hash = window.location.hash.replace("#", "");
         if (hash) {
             const target = document.getElementById(hash);
@@ -83,25 +68,9 @@ function SettingsPageContent() {
                 });
             }
         }
-
-        if (!highlight) return;
-        const timeout = window.setTimeout(() => {
-            setHighlightApiKey(false);
-        }, 4000);
-        return () => window.clearTimeout(timeout);
     }, [searchParams]);
 
     const [clearingCloudStorage, setClearingCloudStorage] = useState(false);
-
-    useEffect(() => {
-        if (apiKey !== lastApiKeyRef.current) {
-            const lastApiKey = lastApiKeyRef.current ?? "";
-            if (!newApiKey || newApiKey === lastApiKey) {
-                setNewApiKey(apiKey ?? "");
-            }
-            lastApiKeyRef.current = apiKey ?? null;
-        }
-    }, [apiKey, newApiKey]);
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
@@ -157,47 +126,6 @@ function SettingsPageContent() {
         return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
     };
 
-    const validateCurrentKey = async (key: string) => {
-        setValidating(true);
-        setValidationResult(null);
-        const isValid = await validateApiKey(key);
-        setValidationResult(isValid);
-        setValidating(false);
-        return isValid;
-    };
-
-    const handleValidate = async () => {
-        const trimmedKey = newApiKey.trim();
-        if (!trimmedKey) return;
-        await validateCurrentKey(trimmedKey);
-    };
-
-    const handleSave = async () => {
-        const trimmedKey = newApiKey.trim();
-        setSaving(true);
-        try {
-            // Only allow saving an unvalidated key if the user is explicitly clearing it.
-            if (!trimmedKey) {
-                clearApiKey();
-                setValidationResult(null);
-                return;
-            }
-
-            const isValid = await validateCurrentKey(trimmedKey);
-            if (!isValid) return;
-
-            setApiKey(trimmedKey);
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    const handleClear = () => {
-        setNewApiKey("");
-        clearApiKey();
-        setValidationResult(null);
-    };
-
     return (
         <div className="flex h-screen">
             <Sidebar />
@@ -235,139 +163,39 @@ function SettingsPageContent() {
                         <div className="h-px bg-gradient-to-r from-primary/30 via-primary/10 to-transparent" />
                     </div>
 
-                    {/* OpenRouter API Key */}
-                    <section
-                        id="api-key"
-                        className={cn(
-                            "card-deco mb-6",
-                            highlightApiKey &&
-                                "ring-2 ring-primary/40 shadow-deco",
-                        )}
-                    >
+                    <section id="model-provider" className="card-deco mb-6">
                         <div className="flex items-center gap-3 mb-4">
                             <div className="w-8 h-8 bg-primary/10 flex items-center justify-center">
                                 <Key size={16} className="text-primary" />
                             </div>
                             <h2 className="text-lg font-medium">
-                                OpenRouter API Key
+                                Model Provider
                             </h2>
                         </div>
 
                         <p className="text-sm text-muted-foreground mb-5 leading-relaxed">
-                            Enter your OpenRouter API key to enable AI model
-                            access. Requests are sent directly to OpenRouter
-                            from your device.
+                            Agentchat now uses the deployment&apos;s OpenRouter
+                            credential. End users do not add or manage their own
+                            keys in the app.
                         </p>
 
                         <div className="space-y-4">
-                            <div>
-                                <label htmlFor="apiKey" className="label-deco">
-                                    API Key
-                                </label>
-                                <input
-                                    id="apiKey"
-                                    type="password"
-                                    value={newApiKey}
-                                    onChange={(e) => {
-                                        setNewApiKey(e.target.value);
-                                        setValidationResult(null);
-                                    }}
-                                    placeholder="sk-or-..."
-                                    className="input-deco font-mono"
-                                />
-                                <div className="mt-2 text-xs text-muted-foreground">
-                                    {syncState === "cloud-enabled"
-                                        ? "Stored in your Convex workspace (encrypted)."
-                                        : "Sign in to store your key in Convex."}
+                            <div className="border border-border bg-muted/20 p-4 space-y-2">
+                                <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                                    Request Path
                                 </div>
+                                <p className="text-sm text-muted-foreground leading-relaxed">
+                                    Chat requests are sent through Convex and
+                                    authenticated with the instance-level
+                                    OpenRouter key configured by the operator.
+                                </p>
                             </div>
-
-                            {apiKey && newApiKey.trim() === apiKey && (
-                                <div className="flex items-center gap-2 text-success px-3 py-2 bg-success/5 border border-success/20">
-                                    <Check size={14} />
-                                    <span className="text-sm font-medium">
-                                        API key saved
-                                    </span>
-                                </div>
-                            )}
-
-                            <div className="flex flex-wrap gap-3">
-                                <button
-                                    onClick={handleValidate}
-                                    disabled={
-                                        validating ||
-                                        saving ||
-                                        !newApiKey.trim()
-                                    }
-                                    className="btn-deco btn-deco-secondary cursor-pointer"
-                                >
-                                    {validating ? (
-                                        <Loader2
-                                            size={14}
-                                            className="animate-spin"
-                                        />
-                                    ) : (
-                                        <Shield size={14} />
-                                    )}
-                                    <span className="text-sm">Validate</span>
-                                </button>
-
-                                <button
-                                    onClick={handleSave}
-                                    disabled={saving || validating}
-                                    className="btn-deco btn-deco-primary cursor-pointer"
-                                >
-                                    <span className="text-sm">
-                                        {validating
-                                            ? "Validating..."
-                                            : saving
-                                              ? "Saving..."
-                                              : "Save Key"}
-                                    </span>
-                                </button>
-
-                                {apiKey && (
-                                    <button
-                                        onClick={handleClear}
-                                        className="px-4 py-2 text-error border border-error/30 hover:bg-error/10 transition-colors text-sm cursor-pointer"
-                                    >
-                                        Clear
-                                    </button>
-                                )}
-                            </div>
-
-                            {validationResult === true && (
-                                <div className="flex items-center gap-2 text-success px-3 py-2 bg-success/5 border border-success/20">
-                                    <Check size={14} />
-                                    <span className="text-sm font-medium">
-                                        Valid API key
-                                    </span>
-                                </div>
-                            )}
-
-                            {validationResult === false && (
-                                <div className="flex items-center gap-2 text-error px-3 py-2 bg-error/5 border border-error/20">
-                                    <X size={14} />
-                                    <span className="text-sm font-medium">
-                                        Invalid API key
-                                    </span>
-                                </div>
-                            )}
-
                             <div className="flex items-center gap-2 text-muted-foreground text-sm p-3 bg-muted/30 border border-border">
-                                <ExternalLink
-                                    size={14}
-                                    className="flex-shrink-0"
-                                />
+                                <Check size={14} className="text-success" />
                                 <span>
-                                    Get your API key from{" "}
-                                    <a
-                                        href="https://openrouter.ai/keys"
-                                        {...externalLinkProps}
-                                        className="text-primary hover:underline"
-                                    >
-                                        openrouter.ai/keys
-                                    </a>
+                                    Keep Google sign-in restricted to approved
+                                    emails if you want to control who can use
+                                    the hosted agents.
                                 </span>
                             </div>
                         </div>
@@ -623,9 +451,10 @@ function SettingsPageContent() {
                                         Data Model
                                     </div>
                                     <p className="text-sm text-muted-foreground leading-relaxed">
-                                        Chats and encrypted API keys are stored
-                                        in Convex while the app is running in
-                                        Convex-only mode.
+                                        Chats and attachments are stored in
+                                        Convex while model requests are sent
+                                        through the deployment&apos;s backend
+                                        credential.
                                     </p>
                                 </div>
                                 <div className="border border-border bg-muted/20 p-4 space-y-2">

@@ -44,17 +44,17 @@ export default function OnboardingScreen({
     const steps = [
         {
             title: "Welcome to Agentchat",
-            subtitle: "An offline-first chat app powered by OpenRouter",
+            subtitle: "A self-hosted chat app for your own agent stack",
             content: [],
         },
         {
             title: "Self-Hosted Design",
             subtitle: "Connect the app to your own backend",
             content: [
-                "• Chats and API keys live in your Convex deployment",
+                "• Chats and attachments live in your Convex deployment",
                 "• Bring your own infrastructure and agent stack",
                 "• Keep full control of storage and auth",
-                "• Your API key is stored encrypted in Convex",
+                "• The instance owner configures model provider access",
             ],
         },
         {
@@ -64,7 +64,6 @@ export default function OnboardingScreen({
                 "• Sign in with Google to access your workspace",
                 "• Chats sync across mobile and web",
                 "• Settings follow your account",
-                "• Encrypted API keys are available on every signed-in device",
                 "• Agentchat stays aligned with its Convex backend",
             ],
         },

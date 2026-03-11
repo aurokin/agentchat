@@ -14,9 +14,6 @@ export {
     type PendingAttachment,
 } from "@/lib/storage/attachment-storage";
 export {
-    getApiKey,
-    setApiKey,
-    clearApiKey,
     getAuthToken,
     setAuthToken,
     clearAuthToken,

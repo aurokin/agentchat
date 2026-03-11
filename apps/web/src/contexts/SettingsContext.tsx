@@ -17,11 +17,8 @@ import type {
 import { APP_DEFAULT_MODEL } from "@shared/core/models";
 import * as storage from "@/lib/storage";
 import { fetchModels } from "@/lib/openrouter";
-import { useApiKey } from "@/hooks/useApiKey";
 
 interface SettingsContextType extends UserSettings {
-    setApiKey: (key: string) => void;
-    clearApiKey: () => void;
     setDefaultModel: (modelId: string) => void;
     setDefaultThinking: (value: ThinkingLevel) => void;
     setDefaultSearchLevel: (level: SearchLevel) => void;
@@ -33,7 +30,6 @@ interface SettingsContextType extends UserSettings {
 }
 
 const defaultSettings: UserSettings = {
-    apiKey: null,
     defaultModel: "",
     defaultThinking: "none",
     defaultSearchLevel: "none",
@@ -67,13 +63,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     const [loadingModels, setLoadingModels] = useState(false);
     const [mounted, setMounted] = useState(false);
     const refreshPromiseRef = useRef<Promise<void> | null>(null);
-
-    // Use the useApiKey hook for cloud-synced API key management
-    const {
-        apiKey: cloudApiKey,
-        setApiKey: setCloudApiKey,
-        clearApiKey: clearCloudApiKey,
-    } = useApiKey();
 
     const refreshModels = useCallback(async () => {
         // Prevent duplicate requests
@@ -109,7 +98,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         }
     }, []);
 
-    // Initialize non-API-key settings from localStorage
     useEffect(() => {
         setSettings((prev) => ({
             ...prev,
@@ -122,30 +110,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         setMounted(true);
     }, []);
 
-    // Sync API key from the useApiKey hook (handles cloud sync automatically)
-    useEffect(() => {
-        setSettings((prev) => ({
-            ...prev,
-            apiKey: cloudApiKey,
-        }));
-    }, [cloudApiKey]);
-
     useEffect(() => {
         if (mounted) {
             refreshModels();
         }
     }, [mounted, refreshModels]);
-
-    const setApiKey = useCallback(
-        (key: string) => {
-            void setCloudApiKey(key);
-        },
-        [setCloudApiKey],
-    );
-
-    const clearApiKey = useCallback(() => {
-        void clearCloudApiKey();
-    }, [clearCloudApiKey]);
 
     const setDefaultModel = (modelId: string) => {
         storage.setDefaultModel(modelId);
@@ -204,8 +173,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         <SettingsContext.Provider
             value={{
                 ...settings,
-                setApiKey,
-                clearApiKey,
                 setDefaultModel,
                 setDefaultThinking,
                 setDefaultSearchLevel,

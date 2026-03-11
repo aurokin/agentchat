@@ -13,7 +13,7 @@ describe("errors", () => {
             "Invalid request. Please check your input.",
         );
         expect(getUserMessage(401)).toBe(
-            "Invalid API key. Please check your settings.",
+            "This deployment's OpenRouter credential is invalid.",
         );
         expect(getUserMessage(429)).toBe(
             "Too many requests. Please wait before trying again.",

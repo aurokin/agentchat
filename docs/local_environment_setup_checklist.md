@@ -1,8 +1,8 @@
 # Local Development Setup
 
-Goal: get RouterChat running locally for development.
+Goal: get Agentchat running locally for development.
 
-RouterChat runs in **local-only** mode by default (no Cloud Sync, no Billing). If you need end-to-end Cloud Sync + Billing, use the preview runbook: `docs/preview_environment_setup_checklist.md`.
+Agentchat runs against Convex. If you need the hosted preview environment, use `docs/preview_environment_setup_checklist.md`.
 
 ## 1) Local-Only (Fast Path)
 
@@ -22,11 +22,11 @@ cd apps/web && bun dev
 
 - `http://localhost:4040`
 
-1D) In Settings, add your OpenRouter API key.
+1D) Sign in with an allowed Google account if the local deployment has auth enabled.
 
 ## 2) Optional: Local Dev With Cloud Sync (Convex)
 
-Only do this if you need to develop Cloud Sync features locally. Otherwise, stick to Step 1.
+Only do this if you need to develop against a real Convex deployment. Otherwise, stick to Step 1.
 
 2A) Manual step: create or choose a Convex dev deployment for local development.
 
@@ -42,9 +42,10 @@ Notes:
 - Fill in:
     - `CONVEX_DEPLOYMENT=dev:<your-deployment>`
     - `AUTH_GOOGLE_ID=...` and `AUTH_GOOGLE_SECRET=...`
-    - `JWKS=...`, `JWT_PRIVATE_KEY=...`, `ENCRYPTION_KEY=...` (generate below)
+    - `JWKS=...`, `JWT_PRIVATE_KEY=...`
+    - `OPENROUTER_API_KEY=...`
 
-2C) Generate Convex Auth + encryption secrets and paste them into `./.env.convex.dev.local`:
+2C) Generate Convex Auth secrets and paste them into `./.env.convex.dev.local`:
 
 ```bash
 bun run convex:gen-secrets
@@ -78,4 +79,3 @@ bun run dev:web
 
 - If sign-in fails with `Error 400: redirect_uri_mismatch`, add this Authorized redirect URI to the OAuth client matching `AUTH_GOOGLE_ID`:
     - `https://<your-deployment>.convex.site/api/auth/callback/google`
-

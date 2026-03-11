@@ -12,7 +12,6 @@ import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 import { Hexagon, Plus, Settings, Trash2 } from "lucide-react";
 import { useChat } from "@/contexts/ChatContext";
-import { useSettings } from "@/contexts/SettingsContext";
 import {
     useIsCloudSyncAvailable,
     useStorageAdapter,
@@ -47,7 +46,6 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
         currentChat,
         messages,
     } = useChat();
-    const { apiKey } = useSettings();
     const isMobile = useIsMobile();
     const isTablet = useIsTablet();
     const isTouchDevice = useTouchDevice();
@@ -446,16 +444,6 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                             Settings
                         </span>
                     </Link>
-                    {!apiKey && (
-                        <div className="mt-3 p-3 bg-warning/5 border border-warning/20">
-                            <p className="text-warning text-xs font-medium">
-                                API Key Required
-                            </p>
-                            <p className="text-warning/70 text-xs mt-0.5">
-                                Add your OpenRouter API key in Settings
-                            </p>
-                        </div>
-                    )}
                 </div>
 
                 <div className="absolute bottom-0 right-0 w-12 h-12 opacity-10">

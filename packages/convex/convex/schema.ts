@@ -19,10 +19,6 @@ export default defineSchema({
         phoneVerificationTime: v.optional(v.number()),
         isAnonymous: v.optional(v.boolean()),
         initialSync: v.optional(v.boolean()),
-        // Encrypted API key storage (AES-256-GCM)
-        encryptedApiKey: v.optional(v.string()), // Base64 ciphertext
-        apiKeyNonce: v.optional(v.string()), // Base64 IV/nonce
-        apiKeyUpdatedAt: v.optional(v.number()), // For sync conflict resolution
         // Cloud usage counters (anti-abuse + cheap usage queries)
         cloudChatCount: v.optional(v.number()),
         cloudMessageCount: v.optional(v.number()),

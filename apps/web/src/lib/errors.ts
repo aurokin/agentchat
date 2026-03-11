@@ -27,9 +27,9 @@ export function getUserMessage(
         case 400:
             return "Invalid request. Please check your input.";
         case 401:
-            return "Invalid API key. Please check your settings.";
+            return "This deployment's OpenRouter credential is invalid.";
         case 402:
-            return "Insufficient credits. Please add credits to your account.";
+            return "This deployment does not have enough OpenRouter credits.";
         case 403:
             const reasons = metadata?.reasons as string[] | undefined;
             if (reasons && reasons.length > 0) {

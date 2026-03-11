@@ -14,15 +14,15 @@ describe("getUserMessage", () => {
         );
     });
 
-    test("returns_invalid_api_key_for_401", () => {
+    test("returns_invalid_provider_credential_for_401", () => {
         expect(getUserMessage(401)).toBe(
-            "Invalid API key. Please check your settings.",
+            "This deployment's OpenRouter credential is invalid.",
         );
     });
 
-    test("returns_insufficient_credits_for_402", () => {
+    test("returns_instance_credit_error_for_402", () => {
         expect(getUserMessage(402)).toBe(
-            "Insufficient credits. Please add credits to your account.",
+            "This deployment does not have enough OpenRouter credits.",
         );
     });
 
@@ -125,7 +125,7 @@ describe("parseOpenRouterError", () => {
         expect(error.code).toBe(401);
         expect(error.message).toBe("Invalid API key");
         expect(error.userMessage).toBe(
-            "Invalid API key. Please check your settings.",
+            "This deployment's OpenRouter credential is invalid.",
         );
         expect(error.isRetryable).toBe(false);
     });
@@ -143,7 +143,7 @@ describe("parseOpenRouterError", () => {
 
         expect(error.code).toBe(402);
         expect(error.userMessage).toBe(
-            "Insufficient credits. Please add credits to your account.",
+            "This deployment does not have enough OpenRouter credits.",
         );
         expect(error.isRetryable).toBe(false);
     });

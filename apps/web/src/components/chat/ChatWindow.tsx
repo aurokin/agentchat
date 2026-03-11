@@ -9,15 +9,16 @@ import {
     startTransition,
 } from "react";
 import { useRouter } from "next/navigation";
+import { api } from "@convex/_generated/api";
 import { useChat } from "@/contexts/ChatContext";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useStorageAdapter } from "@/contexts/SyncContext";
 import {
-    sendMessage,
     OpenRouterApiError,
     buildMessageContent,
     type MessageContent,
 } from "@/lib/openrouter";
+import { useActionSafe } from "@/hooks/useConvexSafe";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import {
@@ -153,7 +154,6 @@ export function ChatWindow() {
         createChat,
     } = useChat();
     const {
-        apiKey,
         defaultModel,
         defaultThinking,
         defaultSearchLevel,
@@ -164,6 +164,7 @@ export function ChatWindow() {
         favoriteModels,
     } = useSettings();
     const storageAdapter = useStorageAdapter();
+    const sendOpenRouterMessage = useActionSafe(api.openrouter.sendMessage);
 
     const [sending, setSending] = useState(false);
     const [error, setError] = useState<ErrorState | null>(null);
@@ -466,14 +467,6 @@ export function ChatWindow() {
         const chatSnapshot = currentChat;
         const messagesSnapshot = messages;
 
-        if (!apiKey) {
-            setError({
-                message: "Please add your OpenRouter API key in Settings",
-                isRetryable: false,
-            });
-            return;
-        }
-
         if (!chatSnapshot) {
             setError({ message: "No chat selected", isRetryable: false });
             return;
@@ -660,25 +653,24 @@ export function ChatWindow() {
                 thinking: undefined,
             });
 
-            await sendMessage(
-                apiKey,
-                currentMessages,
-                chatSnapshot,
-                currentModel,
-                (chunk, thinking) => {
-                    if (thinking !== undefined) {
-                        fullThinking += thinking;
-                    } else {
-                        fullResponse += chunk;
-                    }
-
-                    queueStreamingMessageUpdate({
-                        id: assistantMessage.id,
-                        content: fullResponse,
-                        thinking: fullThinking || undefined,
-                    });
+            const response = await sendOpenRouterMessage({
+                messages: currentMessages,
+                session: {
+                    id: chatSnapshot.id,
+                    modelId: chatSnapshot.modelId,
+                    thinking: effectiveThinking,
+                    searchLevel: effectiveSearchLevel,
                 },
-            );
+                model: currentModel ?? undefined,
+            });
+            if (!response) {
+                throw new Error(
+                    "Convex is not configured for this deployment.",
+                );
+            }
+
+            fullResponse = response.choices[0]?.message?.content ?? "";
+            fullThinking = response.choices[0]?.message?.thinking ?? "";
 
             const trimmedResponse = trimTrailingEmptyLines(fullResponse) ?? "";
             const trimmedThinking = trimTrailingEmptyLines(fullThinking);

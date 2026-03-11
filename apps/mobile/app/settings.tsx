@@ -17,10 +17,8 @@ import { Feather } from "@expo/vector-icons";
 import { useSync } from "@/contexts/SyncContext";
 import { formatBytes, type UserTheme } from "@/lib/storage";
 import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
-import { validateApiKey } from "@shared/core/openrouter";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { useAuthContext } from "@/lib/convex/AuthContext";
-import { useApiKey } from "@/hooks/useApiKey";
 
 export default function SettingsScreen(): ReactElement {
     const router = useRouter();
@@ -40,76 +38,16 @@ export default function SettingsScreen(): ReactElement {
         isConvexAvailable,
     } = useAuthContext();
     const { colors, userTheme, setUserTheme, isMaterialYouActive } = useTheme();
-    const {
-        apiKey: storedApiKey,
-        isLoading: isApiKeyLoading,
-        setApiKey: persistApiKey,
-        clearApiKey: removeApiKey,
-        isCloudSynced,
-    } = useApiKey();
     const { width: windowWidth, height: windowHeight } = useWindowDimensions();
     const styles = useMemo(() => createStyles(colors), [colors]);
 
-    const [apiKey, setApiKeyValue] = useState("");
-    const [isValidating, setIsValidating] = useState(false);
-    const [isValid, setIsValid] = useState<boolean | null>(null);
     const [isSigningIn, setIsSigningIn] = useState(false);
 
     const convexUnavailableMessage = "Convex isn't configured for this build.";
 
     useEffect(() => {
-        if (isApiKeyLoading) return;
-        const key = storedApiKey ?? "";
-        setApiKeyValue(key);
-        if (key) {
-            setIsValidating(true);
-            validateApiKey(key)
-                .then((valid) => setIsValid(valid))
-                .finally(() => setIsValidating(false));
-        } else {
-            setIsValid(null);
-        }
-    }, [isApiKeyLoading, storedApiKey]);
-
-    useEffect(() => {
         void refreshQuotaStatus();
     }, [refreshQuotaStatus]);
-
-    const handleSaveApiKey = async () => {
-        if (!apiKey.trim()) {
-            await removeApiKey();
-            setIsValid(null);
-            Alert.alert("API Key Removed", "Your API key has been cleared.");
-            return;
-        }
-
-        setIsValidating(true);
-        try {
-            const valid = await validateApiKey(apiKey);
-            setIsValid(valid);
-
-            if (valid) {
-                await persistApiKey(apiKey.trim());
-                Alert.alert(
-                    "API Key Saved",
-                    "Your OpenRouter API key has been saved.",
-                );
-            } else {
-                Alert.alert(
-                    "Invalid API Key",
-                    "The API key you entered is not valid. Please check and try again.",
-                );
-            }
-        } catch {
-            setIsValid(false);
-            Alert.alert(
-                "Validation Error",
-                "Could not validate your API key. Please check your connection and try again.",
-            );
-        } finally {
-            setIsValidating(false);
-        }
-    };
 
     const handleSignOut = async () => {
         Alert.alert(
@@ -166,13 +104,6 @@ export default function SettingsScreen(): ReactElement {
         }
 
         await performSignIn();
-    };
-
-    const handleClearApiKey = async () => {
-        await removeApiKey();
-        setApiKeyValue("");
-        setIsValid(null);
-        Alert.alert("API Key Cleared", "Your API key has been removed.");
     };
 
     const handleClearCloudImages = async () => {
@@ -418,125 +349,19 @@ export default function SettingsScreen(): ReactElement {
 
                                 <View style={styles.section}>
                                     <Text style={styles.sectionTitle}>
-                                        OpenRouter API
+                                        Model Provider
                                     </Text>
-
-                                    {isApiKeyLoading ? (
-                                        <ActivityIndicator
-                                            style={styles.loading}
-                                            color={colors.accent}
-                                        />
-                                    ) : (
-                                        <>
-                                            <View style={styles.inputContainer}>
-                                                <Text style={styles.inputLabel}>
-                                                    API Key
-                                                </Text>
-                                                <TextInput
-                                                    style={styles.textInput}
-                                                    value={apiKey}
-                                                    onChangeText={
-                                                        setApiKeyValue
-                                                    }
-                                                    placeholder="sk-..."
-                                                    placeholderTextColor={
-                                                        colors.textFaint
-                                                    }
-                                                    secureTextEntry
-                                                    autoCapitalize="none"
-                                                    autoCorrect={false}
-                                                />
-                                                {isCloudSynced && (
-                                                    <Text
-                                                        style={
-                                                            styles.apiKeyStorageText
-                                                        }
-                                                    >
-                                                        Stored in Convex
-                                                    </Text>
-                                                )}
-                                            </View>
-
-                                            {apiKey.length > 0 && (
-                                                <View
-                                                    style={
-                                                        styles.validationContainer
-                                                    }
-                                                >
-                                                    {isValidating ? (
-                                                        <ActivityIndicator
-                                                            size="small"
-                                                            color={
-                                                                colors.accent
-                                                            }
-                                                        />
-                                                    ) : isValid === true ? (
-                                                        <Text
-                                                            style={
-                                                                styles.validText
-                                                            }
-                                                        >
-                                                            ✓ Valid API key
-                                                        </Text>
-                                                    ) : isValid === false ? (
-                                                        <Text
-                                                            style={
-                                                                styles.invalidText
-                                                            }
-                                                        >
-                                                            ✗ Invalid API key
-                                                        </Text>
-                                                    ) : null}
-                                                </View>
-                                            )}
-
-                                            <View style={styles.buttonRow}>
-                                                <TouchableOpacity
-                                                    style={styles.saveButton}
-                                                    onPress={handleSaveApiKey}
-                                                    disabled={isValidating}
-                                                >
-                                                    <Text
-                                                        style={
-                                                            styles.saveButtonText
-                                                        }
-                                                    >
-                                                        Save API Key
-                                                    </Text>
-                                                </TouchableOpacity>
-
-                                                {apiKey.length > 0 && (
-                                                    <TouchableOpacity
-                                                        style={
-                                                            styles.clearButton
-                                                        }
-                                                        onPress={
-                                                            handleClearApiKey
-                                                        }
-                                                        disabled={isValidating}
-                                                    >
-                                                        <Text
-                                                            style={
-                                                                styles.clearButtonText
-                                                            }
-                                                        >
-                                                            Clear
-                                                        </Text>
-                                                    </TouchableOpacity>
-                                                )}
-                                            </View>
-
-                                            <Text style={styles.helpText}>
-                                                Get your API key from{" "}
-                                                <Text
-                                                    style={styles.linkText}
-                                                    onPress={() => {}}
-                                                >
-                                                    openrouter.ai
-                                                </Text>
-                                            </Text>
-                                        </>
-                                    )}
+                                    <Text style={styles.sectionDescription}>
+                                        This deployment uses an instance-level
+                                        OpenRouter credential. End users do not
+                                        configure their own keys in the app.
+                                    </Text>
+                                    <View style={styles.storageContainer}>
+                                        <Text style={styles.storageInfoText}>
+                                            Sign-in controls who can access the
+                                            agents exposed by this deployment.
+                                        </Text>
+                                    </View>
                                 </View>
 
                                 <View style={styles.section}>
@@ -814,7 +639,8 @@ export default function SettingsScreen(): ReactElement {
                                     </View>
                                     <Text style={styles.settingDescription}>
                                         A self-hosted AI chat app powered by
-                                        OpenRouter and Convex.
+                                        Convex and an instance-managed
+                                        OpenRouter backend.
                                     </Text>
                                 </View>
                             </View>
@@ -974,41 +800,6 @@ const createStyles = (colors: ThemeColors) =>
             fontSize: 14,
             color: colors.textMuted,
             marginTop: 4,
-        },
-        inputContainer: {
-            marginBottom: 12,
-        },
-        inputLabel: {
-            fontSize: 14,
-            fontWeight: "500",
-            marginBottom: 8,
-            color: colors.text,
-        },
-        apiKeyStorageText: {
-            marginTop: 6,
-            fontSize: 12,
-            color: colors.textMuted,
-        },
-        textInput: {
-            borderWidth: 1,
-            borderColor: colors.inputBorder,
-            borderRadius: 8,
-            paddingHorizontal: 12,
-            paddingVertical: 10,
-            fontSize: 16,
-            backgroundColor: colors.inputBackground,
-            color: colors.text,
-        },
-        validationContainer: {
-            marginBottom: 12,
-        },
-        validText: {
-            color: colors.success,
-            fontSize: 14,
-        },
-        invalidText: {
-            color: colors.danger,
-            fontSize: 14,
         },
         buttonRow: {
             flexDirection: "row",
