@@ -1,0 +1,25 @@
+{
+    "name": "agentchat-server",
+    "version": "0.2.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "bun --watch src/index.ts",
+        "start": "bun src/index.ts",
+        "format": "prettier --write \"src/**/*.{js,jsx,ts,tsx,json,md}\" \"*.{json,md}\"",
+        "format:check": "prettier --check \"src/**/*.{js,jsx,ts,tsx,json,md}\" \"*.{json,md}\"",
+        "typecheck": "tsc --noEmit",
+        "lint": "eslint .",
+        "test": "bun test",
+        "health": "bun run format && bun run typecheck && bun run lint && bun test"
+    },
+    "dependencies": {
+        "zod": "^4.3.5"
+    },
+    "devDependencies": {
+        "@types/bun": "latest",
+        "eslint": "^9.39.2",
+        "typescript": "^5.9.3",
+        "typescript-eslint": "^8.53.1"
+    }
+}

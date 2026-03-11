@@ -5,6 +5,7 @@
 Agentchat is a monorepo with the primary app in `apps/web`.
 
 - Framework: Next.js 16 App Router + React 19 + TypeScript
+- Server runtime: Bun + TypeScript in `apps/server`
 - Styling: Tailwind CSS 4 (plus `tailwind-merge`)
 - Backend services: Convex today, with an instance-local backend server planned for the rewrite
 - Primary persistence: Convex
@@ -15,6 +16,7 @@ The canonical rewrite docs live in `docs/agentchat/`.
 ## Key Directories
 
 - `apps/web`: Next.js app, UI, client logic
+- `apps/server`: instance-local backend server for agent/provider runtime orchestration
 - `apps/mobile`: Expo app (React Native), uses Expo Router
 - `packages/convex`: Convex backend (schema, auth, sync, encryption)
 - `src/lib/sync`: Storage adapters and sync state

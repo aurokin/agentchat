@@ -15,6 +15,7 @@
 Always run the health task for each app you modify before finishing:
 
 - Web: `cd apps/web && bun run health`
+- Server: `cd apps/server && bun run health`
 - Mobile: `cd apps/mobile && bun run health`
 - Shared: `cd packages/shared && bun run health`
 - Convex: `cd packages/convex && bun run health`
@@ -22,6 +23,7 @@ Always run the health task for each app you modify before finishing:
 From the repo root, the equivalent commands are:
 
 - Web: `bun run health:web`
+- Server: `bun run health:server`
 - Mobile: `bun run health:mobile`
 - Shared: `bun run health:shared`
 - Convex: `bun run health:convex`

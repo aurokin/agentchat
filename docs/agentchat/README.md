@@ -20,6 +20,7 @@ It exists for both humans and agents:
 - [Convex Spec](./convex-spec.md)
 - [Backend API Spec](./backend-api-spec.md)
 - [Codex Runtime Spec](./codex-runtime-spec.md)
+- [Mobile Follow-Up](./mobile-followup.md)
 
 ## Scope
 

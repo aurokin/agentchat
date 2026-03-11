@@ -1,0 +1,43 @@
+{
+    "version": 1,
+    "auth": {
+        "allowlistMode": "email",
+        "allowedEmails": ["operator@example.com"],
+        "allowedDomains": [],
+        "googleHostedDomain": null
+    },
+    "providers": [
+        {
+            "id": "codex-main",
+            "kind": "codex",
+            "label": "Codex Main",
+            "enabled": true,
+            "idleTtlSeconds": 900,
+            "modelCacheTtlSeconds": 300,
+            "codex": {
+                "command": "codex",
+                "args": ["app-server"],
+                "baseEnv": {},
+                "cwd": "/srv/agentchat"
+            }
+        }
+    ],
+    "agents": [
+        {
+            "id": "example-agent",
+            "name": "Example Agent",
+            "description": "Example workspace exposed through the Agentchat server.",
+            "avatar": null,
+            "enabled": true,
+            "rootPath": "/srv/repos/example-agent",
+            "providerIds": ["codex-main"],
+            "defaultProviderId": "codex-main",
+            "defaultModel": "gpt-5.3-codex",
+            "defaultVariant": "balanced",
+            "modelAllowlist": [],
+            "variantAllowlist": [],
+            "tags": ["example"],
+            "sortOrder": 10
+        }
+    ]
+}
