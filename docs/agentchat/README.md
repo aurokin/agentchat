@@ -14,6 +14,13 @@ It exists for both humans and agents:
 - [Architecture V1](./architecture-v1.md)
 - [Roadmap](./roadmap.md)
 
+## Implementation Specs
+
+- [Server Config Spec](./server-config-spec.md)
+- [Convex Spec](./convex-spec.md)
+- [Backend API Spec](./backend-api-spec.md)
+- [Codex Runtime Spec](./codex-runtime-spec.md)
+
 ## Scope
 
 These docs describe the new Agentchat direction:
