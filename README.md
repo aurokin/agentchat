@@ -1,6 +1,6 @@
 # Agentchat
 
-A self-hosted chat app for connecting users to the agents and model stack you expose from your own deployment. Agentchat currently uses Convex for workspace data and an instance-managed OpenRouter credential for model access.
+A self-hosted chat app for connecting users to the agents you expose from your own deployment. Agentchat currently uses Convex for auth and conversation history, with a local backend server that talks to provider runtimes.
 
 ## Rewrite Direction
 
@@ -19,30 +19,26 @@ The canonical docs for that rewrite live in `docs/agentchat/`:
 - `docs/agentchat/architecture-v1.md`
 - `docs/agentchat/roadmap.md`
 
-## Try It Now
-
-Visit https://www.routerchat.chat to see the current hosted build.
-
 ## Features
 
-- **Chat Interface** - Clean, responsive chat UI with message history
-- **Model Selection** - Browse and select from available OpenRouter models
-- **Thinking Mode** - Toggle reasoning mode for supported models
-- **Web Search** - Enable web search for online-capable models
+- **Agent-Scoped Conversations** - Switch agents and work inside separate conversation spaces for each one
+- **Chat Interface** - Clean, responsive chat UI with persistent message history
+- **Provider-Driven Model Selection** - Choose from the provider, model, and variant options exposed by your deployment
+- **Realtime Streaming** - Stream assistant output through the Agentchat backend server
 - **Markdown Support** - Rich text rendering for code blocks, lists, and formatting
 - **Copy Messages** - One-click copy for any message
-- **Convex Workspace** - Chats and attachments stored in Convex
+- **Convex Workspace** - Auth and conversations stored in Convex
 - **Self-Hosted Direction** - Built for deployments you run and control
 - **Theme Support** - Light, dark, and system theme options
-- **Android Share Intent** - Share text, links, and images from other Android apps directly into a new Agentchat draft
+- **Android Share Intent** - Share text and links from other Android apps into a new Agentchat draft
 
 ## About Agentchat
 
-Agentchat is designed to keep you in control of your data and model choices.
+Agentchat is designed to keep you in control of your users, agents, and runtime infrastructure.
 
 - **Self-hosted** - Run Agentchat on infrastructure you control.
-- **Convex-backed** - Chats and attachments live in Convex.
-- **Operator-controlled** - Instance owners configure the model provider and access controls.
+- **Convex-backed** - Auth and conversation history live in Convex.
+- **Operator-controlled** - Instance owners configure providers, agents, and access controls.
 
 ## Tech Stack
 
@@ -53,8 +49,8 @@ Agentchat is designed to keep you in control of your data and model choices.
 | Language  | TypeScript 5.x                                    |
 | UI        | Tailwind CSS 4                                    |
 | State     | React Context + Hooks                             |
-| Storage   | Convex workspace storage                           |
-| API       | OpenRouter API                                    |
+| Storage   | Convex workspace storage                          |
+| API       | Agentchat backend server + provider runtimes      |
 | Linting   | ESLint                                            |
 | Testing   | Bun Test                                          |
 
@@ -62,7 +58,8 @@ Agentchat is designed to keep you in control of your data and model choices.
 
 1. Open your Agentchat deployment
 2. Sign in with an approved account
-3. Start a new chat and choose a model
+3. Select an agent
+4. Start a new conversation and choose a provider/model if needed
 
 ## Getting Started
 
@@ -71,7 +68,8 @@ For local development and self-hosting.
 ### Prerequisites
 
 - Bun 1.x
-- OpenRouter account (for instance-level API access)
+- Convex deployment with Google auth configured
+- A locally running provider runtime such as Codex app-server
 
 ### Installation
 
@@ -79,7 +77,10 @@ For local development and self-hosting.
 # Install dependencies
 bun install
 
-# Start development server
+# Start the backend server
+cd apps/server && bun dev
+
+# In another shell, start the web app
 cd apps/web && bun dev
 ```
 
@@ -95,6 +96,7 @@ cd apps/web && bun dev
 2. Set the same `BACKEND_TOKEN_SECRET` in the Convex deployment environment and `apps/server/.env.local`
 3. Set the same `RUNTIME_INGRESS_SECRET` in the Convex deployment environment and `apps/server/.env.local`
 4. Point `AGENTCHAT_CONVEX_SITE_URL` in `apps/server/.env.local` at the deployment's Convex site URL
+5. Create your server config from `apps/server/agentchat.config.example.json`
 
 ### Hosting
 
@@ -126,7 +128,7 @@ Set these as Railway service variables (preview/production) or in `apps/web/.env
 
 - `NEXT_PUBLIC_CONVEX_URL` - Convex deployment URL (from the Convex dashboard).
 - `NEXT_PUBLIC_AGENTCHAT_SERVER_URL` - Base URL for the self-hosted Agentchat backend server used for provider/agent metadata. Example: `http://localhost:8787` in local dev.
-- `CANONICAL_HOST` - Optional canonical host redirect enforced by web middleware in deployed environments. Example: `CANONICAL_HOST=www.routerchat.chat` to redirect apex requests to `www`. For preview consistency, you can set `CANONICAL_HOST=preview.routerchat.chat` (optional).
+- `CANONICAL_HOST` - Optional canonical host redirect enforced by web middleware in deployed environments. Example: `CANONICAL_HOST=chat.example.com` to redirect apex requests to `www` or another canonical host. For preview consistency, use your preview hostname if needed.
 - `DISABLE_CSP` - Optional debug flag (preview/prod only). Set to `true` to disable only the `Content-Security-Policy` header in middleware; other security headers remain enabled. Avoid enabling this in production.
 
 **Mobile app runtime (`apps/mobile`)**
@@ -212,11 +214,11 @@ Agent instructions live in `AGENTS.md` and the linked docs under `docs/agents/`.
 
 ## Architecture Notes
 
-- **Backend transport**: `apps/server` exposes authenticated WebSocket scaffolding using short-lived backend tokens minted by Convex
-- **Backend model access**: OpenRouter API calls are still made through a Convex action during the transition
-- **Convex-only runtime**: Chats and attachments are stored through Convex during the current development phase
-- **Storage adapter pattern**: The local adapter remains in the codebase, but runtime paths now use Convex
-- **Monorepo**: Designed for future mobile expansion with shared types
+- **Backend transport**: `apps/server` exposes authenticated HTTP and WebSocket endpoints using short-lived backend tokens minted by Convex
+- **Provider runtime**: `apps/server` owns live provider sessions and currently targets Codex first behind a provider abstraction
+- **Convex source of truth**: Auth, conversations, runs, and runtime bindings are persisted in Convex
+- **Storage adapter pattern**: The local adapter remains in the codebase, but active runtime paths currently use Convex
+- **Monorepo**: Designed for web-first migration now, with mobile follow-up tracked in `docs/agentchat/mobile-followup.md`
 
 ## License
 

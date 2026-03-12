@@ -58,7 +58,7 @@ The mobile app uses Expo Auth Session with Convex Auth for Google sign-in.
 - Convex URL is stored in SecureStore under `routerchat-convex-url`.
 - Env var: `EXPO_PUBLIC_GOOGLE_CLIENT_ID` (set in `app.config.js` or `app.config.ts`).
 - Redirect URI: `agentchat://convex-auth`.
-- OpenRouter access is configured by the instance owner in Convex.
+- Provider access is configured by the instance owner on the Agentchat backend.
 
 ### Auth Context
 
@@ -89,13 +89,11 @@ const { user, isAuthenticated, isLoading, signIn, signOut, isConvexAvailable } =
 
 ## Sync State Management
 
-The shared sync types still expose three states:
+The shared sync types still expose older sync-state names during the transition, but the intended product model is simpler:
 
-- `local-only`
-- `cloud-enabled`
-- `cloud-disabled`
-
-Current mobile runtime behavior is Convex-first: signed-in users operate in `cloud-enabled`, and signed-out users are treated as disconnected rather than local-first.
+- Convex is the active persistence backend.
+- Signed-in users operate against the Convex-backed workspace.
+- Signed-out users should be treated as disconnected, not local-first.
 
 ### Sync State Storage
 
@@ -137,19 +135,17 @@ const available = isConvexConfigured();
 
 ### State Transitions
 
-- Initial launch defaults to `local-only`.
-- After Convex configuration, state loads from storage.
-- After successful sign-in, user can enable cloud sync.
-- After sign-out, state reverts to `local-only`.
+- Initial launch restores the last known Convex configuration state.
+- After successful sign-in, the Convex-backed workspace becomes available.
+- After sign-out, the user returns to a signed-out/disconnected state.
 
 ### Graceful Degradation
 
 When Convex is unavailable:
 
-- App operates in `local-only` mode.
-- All features work without cloud sync.
-- UI indicates cloud sync is not available.
-- No errors thrown for cloud operations.
+- The signed-in workspace should be treated as unavailable.
+- UI should explain that the backend workspace cannot currently be reached.
+- Do not describe this as a first-class local-only product mode.
 
 ## Settings Page Patterns
 
@@ -160,7 +156,7 @@ The mobile settings page should maintain parity with the web settings page.
 1. Account (Google OAuth sign-in/sign-out, user profile info)
 2. Model Provider (instance-managed provider information)
 3. Theme (Light/Dark/System toggle)
-4. Storage (cloud storage status and sync information, no local storage UI)
+4. Storage (Convex workspace status, no local storage UI)
 5. About (app version and description)
 
 ### Theme Selection

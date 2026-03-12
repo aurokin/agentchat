@@ -24,7 +24,7 @@ Goals:
 
 Planned work:
 
-- Remove remaining OpenRouter-specific user-facing flows
+- Remove remaining provider-specific user-facing flows
 - Remove web search toggles
 - Remove attachment assumptions from the primary chat flow
 - Reduce settings to provider, model, and variant where needed
