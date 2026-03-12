@@ -6,11 +6,13 @@ import type {
 import {
     modelSupportsReasoning,
     type ChatSession,
+    type ConversationRuntimeState,
     type Message,
     type OpenRouterModel,
 } from "@/lib/types";
 import { generateUUID } from "@/lib/utils";
 import {
+    createRecoveredActiveRunFromRuntimeState,
     createRecoveredActiveRunFromSocket,
     type ActiveRunState,
     type RetryChatState,
@@ -163,6 +165,11 @@ export type SocketEventResolution =
           retryChat: RetryChatState;
       };
 
+export type RuntimeSyncResolution = {
+    shouldReset: boolean;
+    recoveredRun: ActiveRunState | null;
+};
+
 export function resolveConversationSocketEvent(params: {
     currentChatId: string | null;
     event: AgentchatSocketEvent;
@@ -280,4 +287,39 @@ export function resolveConversationSocketEvent(params: {
     }
 
     return { type: "ignore" };
+}
+
+export function resolveConversationRuntimeSync(params: {
+    currentChat: ChatSession | null;
+    isMessagesLoading: boolean;
+    messages: Message[];
+    runtimeState: ConversationRuntimeState;
+    activeRun: ActiveRunState | null;
+}): RuntimeSyncResolution {
+    if (!params.currentChat || params.isMessagesLoading) {
+        return {
+            shouldReset: false,
+            recoveredRun: null,
+        };
+    }
+
+    const shouldReset =
+        !!params.activeRun &&
+        params.activeRun.conversationId !== params.currentChat.id;
+
+    if (params.activeRun && !shouldReset) {
+        return {
+            shouldReset: false,
+            recoveredRun: null,
+        };
+    }
+
+    return {
+        shouldReset,
+        recoveredRun: createRecoveredActiveRunFromRuntimeState({
+            currentChat: params.currentChat,
+            messages: params.messages,
+            runtimeState: params.runtimeState,
+        }),
+    };
 }

@@ -15,7 +15,6 @@ import {
 import { trimTrailingEmptyLines } from "@shared/core/text";
 import {
     applyStreamingMessageOverlay,
-    createRecoveredActiveRunFromRuntimeState,
     type ActiveRunState,
     type RetryChatState,
     type RuntimeErrorState,
@@ -24,6 +23,7 @@ import {
 import {
     buildInterruptCommand,
     prepareConversationSend,
+    resolveConversationRuntimeSync,
     resolveConversationSocketEvent,
 } from "./conversation-runtime-controller";
 
@@ -262,12 +262,15 @@ export function useConversationRuntime({
     }, [currentChat, getBackendSessionToken, socketClient]);
 
     useEffect(() => {
-        if (!currentChat || isMessagesLoading) {
-            return;
-        }
+        const syncResolution = resolveConversationRuntimeSync({
+            currentChat,
+            isMessagesLoading,
+            messages,
+            runtimeState,
+            activeRun: activeRunRef.current,
+        });
 
-        const existing = activeRunRef.current;
-        if (existing && existing.conversationId !== currentChat.id) {
+        if (syncResolution.shouldReset) {
             activeRunRef.current = null;
             pendingStreamingUpdateRef.current = null;
             if (streamingFrameRef.current !== null) {
@@ -281,19 +284,11 @@ export function useConversationRuntime({
             });
         }
 
-        if (activeRunRef.current) {
+        if (!syncResolution.recoveredRun) {
             return;
         }
 
-        const recoveredRun = createRecoveredActiveRunFromRuntimeState({
-            currentChat,
-            messages,
-            runtimeState,
-        });
-        if (!recoveredRun) {
-            return;
-        }
-
+        const recoveredRun = syncResolution.recoveredRun;
         activeRunRef.current = recoveredRun;
         queueMicrotask(() => {
             setSending(true);

@@ -11,6 +11,7 @@ import {
     buildInterruptCommand,
     getChatTitleUpdate,
     prepareConversationSend,
+    resolveConversationRuntimeSync,
     resolveConversationSocketEvent,
 } from "@/components/chat/conversation-runtime-controller";
 
@@ -297,5 +298,141 @@ describe("conversation runtime controller", () => {
         expect(
             getChatTitleUpdate(createChat({ title: "Pinned" }), "Prompt", 1),
         ).toBeNull();
+    });
+
+    test("requests a local runtime reset when the active run belongs to another chat", () => {
+        expect(
+            resolveConversationRuntimeSync({
+                currentChat: createChat({ id: "chat-2" }),
+                isMessagesLoading: false,
+                messages: createMessages(),
+                runtimeState: {
+                    phase: "idle",
+                    runId: null,
+                    assistantMessageId: null,
+                    provider: null,
+                    errorMessage: null,
+                    startedAt: null,
+                    completedAt: null,
+                    lastEventAt: null,
+                },
+                activeRun: {
+                    conversationId: "chat-1",
+                    assistantMessageId: "assistant-1",
+                    userContent: "Old run",
+                    content: "Old content",
+                    runId: "run-1",
+                },
+            }),
+        ).toEqual({
+            shouldReset: true,
+            recoveredRun: null,
+        });
+    });
+
+    test("recovers persisted runtime state for the current chat", () => {
+        const messages: Message[] = [
+            {
+                id: "user-1",
+                sessionId: "chat-1",
+                role: "user",
+                content: "Recover me",
+                contextContent: "Recover me",
+                createdAt: 1,
+            },
+            {
+                id: "assistant-1",
+                sessionId: "chat-1",
+                role: "assistant",
+                content: "Partial persisted output",
+                contextContent: "Partial persisted output",
+                createdAt: 2,
+                runId: "run-1",
+            },
+        ];
+
+        expect(
+            resolveConversationRuntimeSync({
+                currentChat: createChat(),
+                isMessagesLoading: false,
+                messages,
+                runtimeState: {
+                    phase: "active",
+                    runId: "run-1",
+                    assistantMessageId: "assistant-1",
+                    provider: "codex-default",
+                    errorMessage: null,
+                    startedAt: 1,
+                    completedAt: null,
+                    lastEventAt: 2,
+                },
+                activeRun: null,
+            }),
+        ).toEqual({
+            shouldReset: false,
+            recoveredRun: {
+                conversationId: "chat-1",
+                assistantMessageId: "assistant-1",
+                userContent: "Recover me",
+                content: "Partial persisted output",
+                runId: "run-1",
+            },
+        });
+    });
+
+    test("can reset and recover in the same sync pass after a conversation switch", () => {
+        const messages: Message[] = [
+            {
+                id: "user-2",
+                sessionId: "chat-2",
+                role: "user",
+                content: "New conversation prompt",
+                contextContent: "New conversation prompt",
+                createdAt: 1,
+            },
+            {
+                id: "assistant-2",
+                sessionId: "chat-2",
+                role: "assistant",
+                content: "Recovered output",
+                contextContent: "Recovered output",
+                createdAt: 2,
+                runId: "run-2",
+            },
+        ];
+
+        expect(
+            resolveConversationRuntimeSync({
+                currentChat: createChat({ id: "chat-2", agentId: "agent-2" }),
+                isMessagesLoading: false,
+                messages,
+                runtimeState: {
+                    phase: "active",
+                    runId: "run-2",
+                    assistantMessageId: "assistant-2",
+                    provider: "codex-default",
+                    errorMessage: null,
+                    startedAt: 1,
+                    completedAt: null,
+                    lastEventAt: 2,
+                },
+                activeRun: {
+                    conversationId: "chat-1",
+                    assistantMessageId: "assistant-1",
+                    userContent: "Old prompt",
+                    content: "Old output",
+                    runId: "run-1",
+                },
+            }),
+        ).toEqual({
+            shouldReset: true,
+            recoveredRun: {
+                conversationId: "chat-2",
+                assistantMessageId: "assistant-2",
+                userContent: "New conversation prompt",
+                content: "Recovered output",
+                runId: "run-2",
+            },
+        });
     });
 });
