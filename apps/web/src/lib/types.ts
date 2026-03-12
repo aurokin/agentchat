@@ -38,6 +38,7 @@ export enum SupportedParameter {
 export interface OpenRouterModel {
     id: string;
     name: string;
+    providerId?: string;
     provider: string;
     supportedParameters?: SupportedParameter[];
     variants?: Array<{

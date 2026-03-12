@@ -10,7 +10,9 @@ import React, {
 } from "react";
 
 import {
+    fetchAgentOptions,
     fetchBootstrap,
+    type AgentOptionsResponse,
     type BootstrapAgent,
     type BootstrapResponse,
 } from "@/lib/agentchat-server";
@@ -21,7 +23,9 @@ interface AgentContextType {
     agents: BootstrapAgent[];
     selectedAgentId: string | null;
     selectedAgent: BootstrapAgent | null;
+    selectedAgentOptions: AgentOptionsResponse | null;
     loadingAgents: boolean;
+    loadingAgentOptions: boolean;
     bootstrap: BootstrapResponse | null;
     setSelectedAgentId: (agentId: string) => void;
     refreshBootstrap: () => Promise<void>;
@@ -31,10 +35,13 @@ const AgentContext = createContext<AgentContextType | null>(null);
 
 export function AgentProvider({ children }: { children: React.ReactNode }) {
     const [bootstrap, setBootstrap] = useState<BootstrapResponse | null>(null);
+    const [selectedAgentOptions, setSelectedAgentOptions] =
+        useState<AgentOptionsResponse | null>(null);
     const [selectedAgentId, setSelectedAgentIdState] = useState<string | null>(
         null,
     );
     const [loadingAgents, setLoadingAgents] = useState(false);
+    const [loadingAgentOptions, setLoadingAgentOptions] = useState(false);
 
     const refreshBootstrap = useCallback(async () => {
         setLoadingAgents(true);
@@ -90,13 +97,45 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
         );
     }, [bootstrap, selectedAgentId]);
 
+    useEffect(() => {
+        if (!selectedAgentId) {
+            setSelectedAgentOptions(null);
+            setLoadingAgentOptions(false);
+            return;
+        }
+
+        let cancelled = false;
+        setLoadingAgentOptions(true);
+
+        void fetchAgentOptions(selectedAgentId)
+            .then((options) => {
+                if (cancelled) return;
+                setSelectedAgentOptions(options);
+            })
+            .catch((error) => {
+                if (cancelled) return;
+                console.error("Failed to load agent options:", error);
+                setSelectedAgentOptions(null);
+            })
+            .finally(() => {
+                if (cancelled) return;
+                setLoadingAgentOptions(false);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [selectedAgentId]);
+
     return (
         <AgentContext.Provider
             value={{
                 agents: bootstrap?.agents ?? [],
                 selectedAgentId,
                 selectedAgent,
+                selectedAgentOptions,
                 loadingAgents,
+                loadingAgentOptions,
                 bootstrap,
                 setSelectedAgentId,
                 refreshBootstrap,

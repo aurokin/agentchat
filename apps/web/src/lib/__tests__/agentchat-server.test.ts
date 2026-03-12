@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { SupportedParameter } from "@/lib/types";
 import {
+    fetchAgentOptions,
     fetchAvailableModels,
     fetchBootstrap,
     fetchProviderModels,
@@ -66,6 +67,36 @@ describe("agentchat-server", () => {
         expect(payload.providerId).toBe("codex-main");
         expect(fetchMock.mock.calls[0]?.[0]).toBe(
             "http://localhost:8787/api/providers/codex-main/models",
+        );
+    });
+
+    test("fetches agent options payload", async () => {
+        process.env.NEXT_PUBLIC_AGENTCHAT_SERVER_URL = "http://localhost:8787";
+        fetchMock.mockResolvedValueOnce(
+            new Response(
+                JSON.stringify({
+                    agentId: "example-agent",
+                    allowedProviders: [
+                        {
+                            id: "codex-main",
+                            kind: "codex",
+                            label: "Codex Main",
+                        },
+                    ],
+                    defaultProviderId: "codex-main",
+                    defaultModel: "gpt-5.3-codex",
+                    defaultVariant: "balanced",
+                    modelAllowlist: [],
+                    variantAllowlist: [],
+                }),
+                { status: 200 },
+            ),
+        );
+
+        const payload = await fetchAgentOptions("example-agent");
+        expect(payload.agentId).toBe("example-agent");
+        expect(fetchMock.mock.calls[0]?.[0]).toBe(
+            "http://localhost:8787/api/agents/example-agent/options",
         );
     });
 

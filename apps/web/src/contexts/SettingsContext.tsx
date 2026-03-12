@@ -4,14 +4,19 @@ import React, {
     createContext,
     useContext,
     useEffect,
+    useMemo,
     useState,
     useCallback,
     useRef,
 } from "react";
 import type { UserSettings, OpenRouterModel, ThinkingLevel } from "@/lib/types";
-import { APP_DEFAULT_MODEL } from "@shared/core/models";
 import * as storage from "@/lib/storage";
 import { fetchAvailableModels } from "@/lib/agentchat-server";
+import { useAgent } from "@/contexts/AgentContext";
+import {
+    filterModelsForAgent,
+    selectScopedDefaultModel,
+} from "@/contexts/settings-helpers";
 
 interface SettingsContextType extends UserSettings {
     setDefaultModel: (modelId: string) => void;
@@ -35,27 +40,32 @@ const SettingsContext = createContext<SettingsContextType | null>(null);
 export function selectInitialDefaultModel(params: {
     fetchedModels: OpenRouterModel[];
     userPreferredModel: string | null;
+    agentDefaultModel: string | null;
 }): string | null {
-    const { fetchedModels, userPreferredModel } = params;
-    const modelIds = fetchedModels.map((model) => model.id);
-
-    if (userPreferredModel && modelIds.includes(userPreferredModel)) {
-        return userPreferredModel;
-    }
-
-    if (modelIds.includes(APP_DEFAULT_MODEL)) {
-        return APP_DEFAULT_MODEL;
-    }
-
-    return fetchedModels[0]?.id ?? null;
+    return selectScopedDefaultModel({
+        models: params.fetchedModels,
+        userPreferredModel: params.userPreferredModel,
+        agentDefaultModel: params.agentDefaultModel,
+    });
 }
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
+    const { selectedAgent, selectedAgentOptions } = useAgent();
     const [settings, setSettings] = useState<UserSettings>(defaultSettings);
-    const [models, setModels] = useState<OpenRouterModel[]>([]);
+    const [allModels, setAllModels] = useState<OpenRouterModel[]>([]);
     const [loadingModels, setLoadingModels] = useState(false);
     const [mounted, setMounted] = useState(false);
     const refreshPromiseRef = useRef<Promise<void> | null>(null);
+
+    const models = useMemo(
+        () =>
+            filterModelsForAgent({
+                models: allModels,
+                selectedAgent,
+                selectedAgentOptions,
+            }),
+        [allModels, selectedAgent, selectedAgentOptions],
+    );
 
     const refreshModels = useCallback(async () => {
         // Prevent duplicate requests
@@ -66,20 +76,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         setLoadingModels(true);
         try {
             const promise = fetchAvailableModels().then((fetchedModels) => {
-                setModels(fetchedModels);
-
-                const selectedModelId = selectInitialDefaultModel({
-                    fetchedModels,
-                    userPreferredModel: storage.getDefaultModel(),
-                });
-
-                if (selectedModelId) {
-                    storage.setDefaultModel(selectedModelId);
-                    setSettings((prev) => ({
-                        ...prev,
-                        defaultModel: selectedModelId,
-                    }));
-                }
+                setAllModels(fetchedModels);
             });
             refreshPromiseRef.current = promise;
             await promise;
@@ -107,6 +104,38 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
             refreshModels();
         }
     }, [mounted, refreshModels]);
+
+    useEffect(() => {
+        if (!mounted) return;
+
+        const selectedModelId = selectInitialDefaultModel({
+            fetchedModels: models,
+            userPreferredModel: storage.getDefaultModel(),
+            agentDefaultModel:
+                selectedAgentOptions?.defaultModel ??
+                selectedAgent?.defaultModel ??
+                null,
+        });
+
+        if (!selectedModelId) {
+            return;
+        }
+
+        storage.setDefaultModel(selectedModelId);
+        setSettings((prev) =>
+            prev.defaultModel === selectedModelId
+                ? prev
+                : {
+                      ...prev,
+                      defaultModel: selectedModelId,
+                  },
+        );
+    }, [
+        models,
+        mounted,
+        selectedAgent?.defaultModel,
+        selectedAgentOptions?.defaultModel,
+    ]);
 
     const setDefaultModel = (modelId: string) => {
         storage.setDefaultModel(modelId);
