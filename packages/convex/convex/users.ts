@@ -99,6 +99,45 @@ export const resetCloudData = mutation({
         await drainBatches(
             () =>
                 ctx.db
+                    .query("run_events")
+                    .withIndex("by_userId_and_createdAt", (q) =>
+                        q.eq("userId", userId),
+                    )
+                    .take(500),
+            async (event: any) => {
+                await ctx.db.delete(event._id);
+            },
+        );
+
+        await drainBatches(
+            () =>
+                ctx.db
+                    .query("runs")
+                    .withIndex("by_userId_and_startedAt", (q) =>
+                        q.eq("userId", userId),
+                    )
+                    .take(200),
+            async (run: any) => {
+                await ctx.db.delete(run._id);
+            },
+        );
+
+        await drainBatches(
+            () =>
+                ctx.db
+                    .query("runtime_bindings")
+                    .withIndex("by_userId_and_updatedAt", (q) =>
+                        q.eq("userId", userId),
+                    )
+                    .take(100),
+            async (binding: any) => {
+                await ctx.db.delete(binding._id);
+            },
+        );
+
+        await drainBatches(
+            () =>
+                ctx.db
                     .query("messages")
                     .withIndex("by_user", (q) => q.eq("userId", userId))
                     .take(500),

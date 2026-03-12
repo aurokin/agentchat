@@ -5,17 +5,21 @@ import {
 import { ConfigStore } from "./config.ts";
 import { CodexRuntimeManager } from "./codexRuntime.ts";
 import { createFetchHandler } from "./http.ts";
+import { RuntimePersistenceClient } from "./runtimePersistence.ts";
 import { parseClientCommand, type ServerEvent } from "./socketProtocol.ts";
 
 const configStore = new ConfigStore();
 configStore.watch();
+const runtimePersistence = new RuntimePersistenceClient();
 const runtimeManager = new CodexRuntimeManager({
     getConfig: () => configStore.snapshot,
+    persistence: runtimePersistence,
 });
 
 type WebSocketData = {
     session: {
         sub: string;
+        userId: string;
         email: string;
         iat: number;
         exp: number;
@@ -137,6 +141,7 @@ const server = Bun.serve<WebSocketData>({
 
                 await runtimeManager.sendMessage({
                     userSub: session.sub,
+                    userId: session.userId,
                     command,
                     sendEvent: (event) => {
                         ws.send(toServerEventJson(event));

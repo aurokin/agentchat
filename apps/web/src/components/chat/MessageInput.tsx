@@ -14,6 +14,7 @@ interface MessageInputProps {
     disabled?: boolean;
     canSend?: boolean;
     isSending?: boolean;
+    settingsLocked?: boolean;
     selectedModel: string;
     onModelChange: (modelId: string) => void;
     thinkingLevel: ThinkingLevel;
@@ -29,6 +30,7 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
             disabled,
             canSend = true,
             isSending = false,
+            settingsLocked = false,
             selectedModel,
             onModelChange,
             thinkingLevel,
@@ -100,13 +102,14 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
                         <ModelSelector
                             selectedModel={selectedModel}
                             onModelChange={onModelChange}
+                            disabled={settingsLocked || disabled}
                         />
                         <div className="flex-1" />
                         {reasoningSupported && (
                             <ThinkingToggle
                                 value={thinkingLevel}
                                 onChange={onThinkingChange}
-                                disabled={disabled}
+                                disabled={settingsLocked || disabled}
                             />
                         )}
                     </div>

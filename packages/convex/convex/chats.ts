@@ -1,6 +1,12 @@
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
-import { mutation, query } from "./_generated/server";
+import {
+    internalMutation,
+    internalQuery,
+    mutation,
+    query,
+} from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { isOwner, requireUserMatches } from "./lib/authz";
 import { requireCloudSync } from "./lib/subscription";
 import { assertMaxLen, LIMITS } from "./lib/limits";
@@ -117,6 +123,23 @@ export const getByLocalId = query({
     },
 });
 
+export const getByLocalIdInternal = internalQuery({
+    args: {
+        userId: v.id("users"),
+        localId: v.string(),
+    },
+    handler: async (ctx, args) => {
+        assertMaxLen(args.localId, LIMITS.maxLocalIdChars, "localId");
+
+        return await ctx.db
+            .query("chats")
+            .withIndex("by_local_id", (q) =>
+                q.eq("userId", args.userId).eq("localId", args.localId),
+            )
+            .unique();
+    },
+});
+
 // Create a new chat
 export const create = mutation({
     args: {
@@ -150,6 +173,7 @@ export const create = mutation({
             title: args.title,
             modelId: args.modelId,
             thinking: args.thinking,
+            settingsLockedAt: null,
             createdAt: args.createdAt ?? now,
             updatedAt: args.updatedAt ?? now,
         });
@@ -170,11 +194,24 @@ export const update = mutation({
     handler: async (ctx, args) => {
         const authenticatedUserId = await requireCloudSync(ctx);
         const chat = await ctx.db.get(args.id);
-        if (!isOwner(chat, authenticatedUserId)) {
+        if (!chat || !isOwner(chat, authenticatedUserId)) {
             throw new Error("Not found");
         }
 
         assertMaxLen(args.title, LIMITS.maxChatTitleChars, "title");
+
+        const modelChanged =
+            args.modelId !== undefined && args.modelId !== chat.modelId;
+        const thinkingChanged =
+            args.thinking !== undefined && args.thinking !== chat.thinking;
+        if (
+            chat.settingsLockedAt !== null &&
+            (modelChanged || thinkingChanged)
+        ) {
+            throw new Error(
+                "Conversation settings are locked after the first message.",
+            );
+        }
 
         const { id, ...updates } = args;
         const filteredUpdates = Object.fromEntries(
@@ -184,6 +221,40 @@ export const update = mutation({
             ...filteredUpdates,
             updatedAt: Date.now(),
         });
+    },
+});
+
+export const lockSettingsIfNeeded = internalMutation({
+    args: {
+        userId: v.id("users"),
+        localId: v.string(),
+        lockedAt: v.number(),
+    },
+    handler: async (ctx, args) => {
+        const chat = await ctx.db
+            .query("chats")
+            .withIndex("by_local_id", (q) =>
+                q.eq("userId", args.userId).eq("localId", args.localId),
+            )
+            .unique();
+        if (!chat) {
+            throw new Error("Conversation not found");
+        }
+
+        if (chat.settingsLockedAt !== null) {
+            return chat;
+        }
+
+        await ctx.db.patch(chat._id, {
+            settingsLockedAt: args.lockedAt,
+            updatedAt: Math.max(chat.updatedAt, args.lockedAt),
+        });
+
+        return {
+            ...chat,
+            settingsLockedAt: args.lockedAt,
+            updatedAt: Math.max(chat.updatedAt, args.lockedAt),
+        };
     },
 });
 
@@ -198,6 +269,43 @@ export const remove = mutation({
         }
 
         let deletedMessages = 0;
+
+        await drainBatches(
+            () =>
+                ctx.db
+                    .query("run_events")
+                    .withIndex("by_chatId_and_createdAt", (q) =>
+                        q.eq("chatId", args.id),
+                    )
+                    .take(200),
+            async (event: { _id: string }) => {
+                await ctx.db.delete(event._id as Id<"run_events">);
+            },
+        );
+
+        await drainBatches(
+            () =>
+                ctx.db
+                    .query("runs")
+                    .withIndex("by_chatId_and_startedAt", (q) =>
+                        q.eq("chatId", args.id),
+                    )
+                    .take(100),
+            async (run: { _id: string }) => {
+                await ctx.db.delete(run._id as Id<"runs">);
+            },
+        );
+
+        await drainBatches(
+            () =>
+                ctx.db
+                    .query("runtime_bindings")
+                    .withIndex("by_chatId", (q) => q.eq("chatId", args.id))
+                    .take(10),
+            async (binding: { _id: string }) => {
+                await ctx.db.delete(binding._id as Id<"runtime_bindings">);
+            },
+        );
 
         await drainBatches(
             () =>

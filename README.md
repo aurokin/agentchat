@@ -91,10 +91,10 @@ cd apps/web && bun dev
 
 ### Configuration
 
-1. Create an OpenRouter account at https://openrouter.ai/
-2. Generate an API key for the deployment operator
-3. Set that key in the Convex deployment environment as `OPENROUTER_API_KEY`
-4. Set the same `BACKEND_TOKEN_SECRET` in the Convex deployment environment and `apps/server/.env.local`
+1. Configure Google auth for the Convex deployment
+2. Set the same `BACKEND_TOKEN_SECRET` in the Convex deployment environment and `apps/server/.env.local`
+3. Set the same `RUNTIME_INGRESS_SECRET` in the Convex deployment environment and `apps/server/.env.local`
+4. Point `AGENTCHAT_CONVEX_SITE_URL` in `apps/server/.env.local` at the deployment's Convex site URL
 
 ### Hosting
 
@@ -150,8 +150,8 @@ These are Convex-managed environment variables (not Railway vars). Set them in t
 - `SITE_URL` - Base URL for this deployment (no trailing slash, typically your Railway domain). Used to validate auth redirects.
 - `AUTH_GOOGLE_ID` - Google OAuth client ID (from Google Cloud Console).
 - `AUTH_GOOGLE_SECRET` - Google OAuth client secret (from Google Cloud Console).
-- `OPENROUTER_API_KEY` - Instance-level OpenRouter API key used for all model requests from this deployment.
 - `BACKEND_TOKEN_SECRET` - Shared secret used to mint short-lived backend session tokens for `apps/server`.
+- `RUNTIME_INGRESS_SECRET` - Shared secret used by `apps/server` to persist run/runtime state into Convex HTTP ingress.
 - `JWKS` - JSON Web Key Set used by Convex auth.
 - `JWT_PRIVATE_KEY` - Private key used by Convex auth for JWT signing.
 Convex also provides some runtime variables that you can read but do not set:
@@ -163,6 +163,8 @@ Convex also provides some runtime variables that you can read but do not set:
 Set these in `apps/server/.env.local` for local development. A template lives at `apps/server/.env.example`.
 
 - `BACKEND_TOKEN_SECRET` - Must exactly match the Convex deployment value so `apps/server` can verify backend session tokens.
+- `AGENTCHAT_CONVEX_SITE_URL` - Convex site URL for the deployment used by `apps/server` runtime persistence ingress. Example: `https://<deployment>.convex.site`.
+- `RUNTIME_INGRESS_SECRET` - Must exactly match the Convex deployment value so `apps/server` can persist runs, run events, and runtime bindings.
 
 **Optional Convex limits (anti-abuse knobs)**
 

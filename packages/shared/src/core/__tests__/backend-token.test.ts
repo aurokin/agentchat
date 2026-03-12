@@ -7,6 +7,7 @@ import {
 
 const claims = {
     sub: "user-123",
+    userId: "users:123",
     email: "user@example.com",
     iat: 1_700_000_000,
     exp: 1_700_000_300,

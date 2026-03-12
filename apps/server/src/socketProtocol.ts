@@ -12,6 +12,7 @@ export interface ConversationSendCommand {
         modelId: string;
         thinking: "xhigh" | "high" | "medium" | "low" | "minimal" | "none";
         content: string;
+        userMessageId: string;
         assistantMessageId: string;
         history: ConversationHistoryEntry[];
     };
@@ -97,6 +98,7 @@ export function parseClientCommand(raw: string): ClientCommand {
             typeof payload.agentId !== "string" ||
             typeof payload.modelId !== "string" ||
             typeof payload.content !== "string" ||
+            typeof payload.userMessageId !== "string" ||
             typeof payload.assistantMessageId !== "string" ||
             !Array.isArray(payload.history) ||
             !payload.history.every(isHistoryEntry)

@@ -464,8 +464,15 @@ export function ChatWindow() {
             }
 
             if (!currentChat) return;
+            const settingsLocked = currentChat.settingsLockedAt != null;
 
-            if (hasModifier && hasAlt && !event.shiftKey && code === "keym") {
+            if (
+                !settingsLocked &&
+                hasModifier &&
+                hasAlt &&
+                !event.shiftKey &&
+                code === "keym"
+            ) {
                 const availableFavorites = favoriteModels.filter((modelId) =>
                     models.some((model) => model.id === modelId),
                 );
@@ -500,6 +507,7 @@ export function ChatWindow() {
             }
 
             if (
+                !settingsLocked &&
                 hasModifier &&
                 hasAlt &&
                 !event.shiftKey &&
@@ -515,7 +523,7 @@ export function ChatWindow() {
                 return;
             }
 
-            if (hasModifier && hasAlt && !event.shiftKey) {
+            if (!settingsLocked && hasModifier && hasAlt && !event.shiftKey) {
                 const level = getDigitFromEvent(event);
                 if (level !== null && level >= 1 && level <= 5) {
                     const currentModel = models.find(
@@ -640,6 +648,7 @@ export function ChatWindow() {
                     modelId: chatSnapshot.modelId,
                     thinking: effectiveThinking,
                     content: contextContent,
+                    userMessageId: messageId,
                     assistantMessageId: assistantMessage.id,
                     history: messagesSnapshot.map((message) => ({
                         role: message.role,
@@ -711,6 +720,7 @@ export function ChatWindow() {
 
     const handleModelChange = async (modelId: string) => {
         if (!currentChat) return;
+        if (currentChat.settingsLockedAt != null) return;
         const nextModel = models.find((model) => model.id === modelId);
         const supportsReasoning = nextModel
             ? modelSupportsReasoning(nextModel)
@@ -726,6 +736,7 @@ export function ChatWindow() {
 
     const handleThinkingChange = async (value: ThinkingLevel) => {
         if (!currentChat) return;
+        if (currentChat.settingsLockedAt != null) return;
         await updateChat({ ...currentChat, thinking: value });
         setDefaultThinking(value);
     };
@@ -846,6 +857,7 @@ export function ChatWindow() {
                     disabled={false}
                     canSend={!sending}
                     isSending={sending}
+                    settingsLocked={currentChat.settingsLockedAt != null}
                     selectedModel={currentChat.modelId}
                     onModelChange={handleModelChange}
                     thinkingLevel={currentChat.thinking}

@@ -1,6 +1,7 @@
 "use node";
 
 import { action } from "./_generated/server";
+import { api } from "./_generated/api";
 import { createBackendSessionToken } from "../../shared/src/core/backend-token";
 
 const BACKEND_TOKEN_TTL_SECONDS = 60 * 5;
@@ -11,6 +12,14 @@ export const issue = action({
         const identity = await ctx.auth.getUserIdentity();
         if (!identity) {
             throw new Error("Not authenticated");
+        }
+
+        const userId: string | null = await ctx.runQuery(
+            api.users.getCurrentUserId,
+            {},
+        );
+        if (!userId) {
+            throw new Error("Authenticated user is missing a Convex user id.");
         }
 
         const email = identity.email?.trim();
@@ -30,6 +39,7 @@ export const issue = action({
         const token = await createBackendSessionToken({
             claims: {
                 sub: identity.subject,
+                userId,
                 email,
                 iat,
                 exp,

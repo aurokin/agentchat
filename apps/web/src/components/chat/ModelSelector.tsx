@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 interface ModelSelectorProps {
     selectedModel: string;
     onModelChange: (modelId: string) => void;
+    disabled?: boolean;
     /** Variant controls styling: 'compact' for chat input, 'settings' for settings page */
     variant?: "compact" | "settings";
 }
@@ -16,6 +17,7 @@ interface ModelSelectorProps {
 export function ModelSelector({
     selectedModel,
     onModelChange,
+    disabled = false,
     variant = "compact",
 }: ModelSelectorProps) {
     const { models, loadingModels, favoriteModels, toggleFavoriteModel } =
@@ -131,13 +133,16 @@ export function ModelSelector({
         >
             <button
                 type="button"
-                onClick={() => !loadingModels && setIsOpen(!isOpen)}
-                disabled={loadingModels}
+                onClick={() =>
+                    !loadingModels && !disabled && setIsOpen(!isOpen)
+                }
+                disabled={loadingModels || disabled}
                 className={cn(
                     "flex items-center gap-2.5 bg-background-elevated border border-border transition-all duration-200 cursor-pointer",
                     "hover:border-primary/30 hover:bg-muted/50",
                     isOpen && "border-primary/50",
-                    loadingModels && "opacity-50 cursor-not-allowed",
+                    (loadingModels || disabled) &&
+                        "opacity-50 cursor-not-allowed",
                     // Variant-specific styles
                     variant === "compact" && "px-4 py-2.5",
                     variant === "settings" &&

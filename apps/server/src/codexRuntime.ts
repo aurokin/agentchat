@@ -7,6 +7,7 @@ import type {
     ConversationSendCommand,
     ServerEvent,
 } from "./socketProtocol.ts";
+import type { RuntimePersistenceClient } from "./runtimePersistence.ts";
 
 type JsonRpcResponse = {
     id?: number | string;
@@ -23,9 +24,14 @@ type JsonRpcNotification = {
 
 type ActiveTurn = {
     runId: string;
+    userId: string;
+    triggerMessageId: string;
     assistantMessageId: string;
     turnId: string | null;
     text: string;
+    nextSequence: number;
+    lastPersistedContent: string;
+    pendingDeltaFlush: ReturnType<typeof setTimeout> | null;
     sendEvent: (event: ServerEvent) => void;
     reject: (error: Error) => void;
     resolve: () => void;
@@ -34,6 +40,7 @@ type ActiveTurn = {
 type ConversationRuntime = {
     key: string;
     userSub: string;
+    userId: string;
     conversationId: string;
     agentId: string;
     modelId: string;
@@ -273,13 +280,19 @@ class CodexAppServerClient {
 export class CodexRuntimeManager {
     private readonly runtimes = new Map<string, ConversationRuntime>();
     private readonly getConfig: () => AgentchatConfig;
+    private readonly persistence: RuntimePersistenceClient;
 
-    constructor(params: { getConfig: () => AgentchatConfig }) {
+    constructor(params: {
+        getConfig: () => AgentchatConfig;
+        persistence: RuntimePersistenceClient;
+    }) {
         this.getConfig = params.getConfig;
+        this.persistence = params.persistence;
     }
 
     async sendMessage(params: {
         userSub: string;
+        userId: string;
         command: ConversationSendCommand;
         sendEvent: (event: ServerEvent) => void;
     }): Promise<void> {
@@ -305,15 +318,35 @@ export class CodexRuntimeManager {
         await new Promise<void>(async (resolve, reject) => {
             runtime.activeTurn = {
                 runId,
+                userId: params.userId,
+                triggerMessageId: params.command.payload.userMessageId,
                 assistantMessageId: params.command.payload.assistantMessageId,
                 turnId: null,
                 text: "",
+                nextSequence: 2,
+                lastPersistedContent: "",
+                pendingDeltaFlush: null,
                 sendEvent: params.sendEvent,
                 resolve,
                 reject,
             };
 
             try {
+                const startedAt = Date.now();
+                await this.persistence.runtimeBinding({
+                    userId: params.userId,
+                    conversationLocalId: params.command.payload.conversationId,
+                    provider: runtime.provider.id,
+                    status: "active",
+                    providerThreadId: runtime.threadId,
+                    providerResumeToken: null,
+                    activeRunId: null,
+                    lastError: null,
+                    lastEventAt: startedAt,
+                    expiresAt: null,
+                    updatedAt: startedAt,
+                });
+
                 const inputText = isNew
                     ? buildInitialTurnText(
                           params.command.payload.history,
@@ -336,7 +369,36 @@ export class CodexRuntimeManager {
 
                 runtime.activeTurn.turnId = extractTurnId(turnResult);
                 runtime.modelId = params.command.payload.modelId;
+
+                await this.persistence.runStarted({
+                    userId: params.userId,
+                    conversationLocalId: params.command.payload.conversationId,
+                    triggerMessageLocalId: params.command.payload.userMessageId,
+                    assistantMessageLocalId:
+                        params.command.payload.assistantMessageId,
+                    externalRunId: runId,
+                    provider: runtime.provider.id,
+                    providerThreadId: runtime.threadId,
+                    providerTurnId: runtime.activeTurn.turnId,
+                    startedAt,
+                });
             } catch (error) {
+                if (runtime.activeTurn?.turnId) {
+                    try {
+                        await runtime.client.request("turn/interrupt", {
+                            threadId: runtime.threadId,
+                            turnId: runtime.activeTurn.turnId,
+                        });
+                    } catch (interruptError) {
+                        console.error(
+                            "[agentchat-server] failed to interrupt turn after send failure",
+                            interruptError,
+                        );
+                    }
+                }
+                if (runtime.activeTurn?.pendingDeltaFlush) {
+                    clearTimeout(runtime.activeTurn.pendingDeltaFlush);
+                }
                 runtime.activeTurn = null;
                 params.sendEvent(
                     createServerEvent("run.failed", {
@@ -378,6 +440,7 @@ export class CodexRuntimeManager {
 
     private async ensureRuntime(params: {
         userSub: string;
+        userId: string;
         command: ConversationSendCommand;
         sendEvent: (event: ServerEvent) => void;
     }): Promise<{ runtime: ConversationRuntime; isNew: boolean }> {
@@ -395,6 +458,7 @@ export class CodexRuntimeManager {
             } else {
                 existing.agent = resources.agent;
                 existing.provider = resources.provider;
+                existing.userId = params.userId;
                 return { runtime: existing, isNew: false };
             }
         }
@@ -417,6 +481,7 @@ export class CodexRuntimeManager {
         const runtime: ConversationRuntime = {
             key,
             userSub: params.userSub,
+            userId: params.userId,
             conversationId: params.command.payload.conversationId,
             agentId: resources.agent.id,
             modelId: params.command.payload.modelId,
@@ -450,6 +515,9 @@ export class CodexRuntimeManager {
 
         if (runtime.activeTurn) {
             const activeTurn = runtime.activeTurn;
+            if (activeTurn.pendingDeltaFlush) {
+                clearTimeout(activeTurn.pendingDeltaFlush);
+            }
             if (activeTurn.text) {
                 activeTurn.sendEvent(
                     createServerEvent("message.completed", {
@@ -459,6 +527,26 @@ export class CodexRuntimeManager {
                     }),
                 );
             }
+
+            const sequence = activeTurn.nextSequence;
+            activeTurn.nextSequence += 2;
+            void this.persistence
+                .runFailed({
+                    userId: activeTurn.userId,
+                    conversationLocalId: runtime.conversationId,
+                    assistantMessageLocalId: activeTurn.assistantMessageId,
+                    externalRunId: activeTurn.runId,
+                    sequence,
+                    content: activeTurn.text,
+                    completedAt: Date.now(),
+                    errorMessage: error.message,
+                })
+                .catch((persistError) => {
+                    console.error(
+                        "[agentchat-server] failed to persist crashed run",
+                        persistError,
+                    );
+                });
 
             activeTurn.sendEvent(
                 createServerEvent("run.failed", {
@@ -472,6 +560,27 @@ export class CodexRuntimeManager {
             runtime.activeTurn = null;
             activeTurn.reject(error);
         }
+
+        void this.persistence
+            .runtimeBinding({
+                userId: runtime.userId,
+                conversationLocalId: runtime.conversationId,
+                provider: runtime.provider.id,
+                status: "errored",
+                providerThreadId: runtime.threadId,
+                providerResumeToken: null,
+                activeRunId: null,
+                lastError: error.message,
+                lastEventAt: Date.now(),
+                expiresAt: null,
+                updatedAt: Date.now(),
+            })
+            .catch((persistError) => {
+                console.error(
+                    "[agentchat-server] failed to persist errored runtime binding",
+                    persistError,
+                );
+            });
 
         this.runtimes.delete(runtime.key);
     }
@@ -500,6 +609,7 @@ export class CodexRuntimeManager {
                     content: activeTurn.text,
                 }),
             );
+            this.scheduleMessageDeltaPersistence(runtime, activeTurn);
             return;
         }
 
@@ -524,7 +634,27 @@ export class CodexRuntimeManager {
             }),
         );
 
+        this.cancelPendingMessageDelta(activeTurn);
+
         if (status === "completed") {
+            const sequence = activeTurn.nextSequence;
+            activeTurn.nextSequence += 2;
+            void this.persistence
+                .runCompleted({
+                    userId: activeTurn.userId,
+                    conversationLocalId: runtime.conversationId,
+                    assistantMessageLocalId: activeTurn.assistantMessageId,
+                    externalRunId: activeTurn.runId,
+                    sequence,
+                    content: activeTurn.text,
+                    completedAt: Date.now(),
+                })
+                .catch((error) => {
+                    console.error(
+                        "[agentchat-server] failed to persist run completion",
+                        error,
+                    );
+                });
             activeTurn.sendEvent(
                 createServerEvent("run.completed", {
                     conversationId: runtime.conversationId,
@@ -538,6 +668,24 @@ export class CodexRuntimeManager {
         }
 
         if (status === "interrupted") {
+            const sequence = activeTurn.nextSequence;
+            activeTurn.nextSequence += 2;
+            void this.persistence
+                .runInterrupted({
+                    userId: activeTurn.userId,
+                    conversationLocalId: runtime.conversationId,
+                    assistantMessageLocalId: activeTurn.assistantMessageId,
+                    externalRunId: activeTurn.runId,
+                    sequence,
+                    content: activeTurn.text,
+                    completedAt: Date.now(),
+                })
+                .catch((error) => {
+                    console.error(
+                        "[agentchat-server] failed to persist interrupted run",
+                        error,
+                    );
+                });
             activeTurn.sendEvent(
                 createServerEvent("run.interrupted", {
                     conversationId: runtime.conversationId,
@@ -550,6 +698,25 @@ export class CodexRuntimeManager {
             return;
         }
 
+        const sequence = activeTurn.nextSequence;
+        activeTurn.nextSequence += 2;
+        void this.persistence
+            .runFailed({
+                userId: activeTurn.userId,
+                conversationLocalId: runtime.conversationId,
+                assistantMessageLocalId: activeTurn.assistantMessageId,
+                externalRunId: activeTurn.runId,
+                sequence,
+                content: activeTurn.text,
+                completedAt: Date.now(),
+                errorMessage,
+            })
+            .catch((error) => {
+                console.error(
+                    "[agentchat-server] failed to persist failed run",
+                    error,
+                );
+            });
         activeTurn.sendEvent(
             createServerEvent("run.failed", {
                 conversationId: runtime.conversationId,
@@ -570,9 +737,80 @@ export class CodexRuntimeManager {
         }
 
         runtime.idleTimer = setTimeout(() => {
+            void this.persistence
+                .runtimeBinding({
+                    userId: runtime.userId,
+                    conversationLocalId: runtime.conversationId,
+                    provider: runtime.provider.id,
+                    status: "expired",
+                    providerThreadId: runtime.threadId,
+                    providerResumeToken: null,
+                    activeRunId: null,
+                    lastError: null,
+                    lastEventAt: Date.now(),
+                    expiresAt: Date.now(),
+                    updatedAt: Date.now(),
+                })
+                .catch((error) => {
+                    console.error(
+                        "[agentchat-server] failed to persist expired runtime binding",
+                        error,
+                    );
+                });
             runtime.client.stop();
             this.runtimes.delete(runtime.key);
         }, runtime.provider.idleTtlSeconds * 1000);
+    }
+
+    private scheduleMessageDeltaPersistence(
+        runtime: ConversationRuntime,
+        activeTurn: ActiveTurn,
+    ): void {
+        if (activeTurn.pendingDeltaFlush) {
+            return;
+        }
+
+        activeTurn.pendingDeltaFlush = setTimeout(() => {
+            activeTurn.pendingDeltaFlush = null;
+            void this.flushMessageDelta(runtime, activeTurn).catch((error) => {
+                console.error(
+                    "[agentchat-server] failed to persist message delta",
+                    error,
+                );
+            });
+        }, 250);
+    }
+
+    private cancelPendingMessageDelta(activeTurn: ActiveTurn): void {
+        if (activeTurn.pendingDeltaFlush) {
+            clearTimeout(activeTurn.pendingDeltaFlush);
+            activeTurn.pendingDeltaFlush = null;
+        }
+    }
+
+    private async flushMessageDelta(
+        runtime: ConversationRuntime,
+        activeTurn: ActiveTurn,
+    ): Promise<void> {
+        if (activeTurn.text === activeTurn.lastPersistedContent) {
+            return;
+        }
+
+        const delta = activeTurn.text.slice(
+            activeTurn.lastPersistedContent.length,
+        );
+        activeTurn.lastPersistedContent = activeTurn.text;
+
+        await this.persistence.messageDelta({
+            userId: activeTurn.userId,
+            conversationLocalId: runtime.conversationId,
+            assistantMessageLocalId: activeTurn.assistantMessageId,
+            externalRunId: activeTurn.runId,
+            sequence: activeTurn.nextSequence++,
+            content: activeTurn.text,
+            delta,
+            createdAt: Date.now(),
+        });
     }
 }
 

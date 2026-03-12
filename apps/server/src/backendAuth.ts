@@ -41,6 +41,7 @@ export function toConnectionReadyEvent(session: BackendSessionClaims) {
         payload: {
             user: {
                 sub: session.sub,
+                userId: session.userId,
                 email: session.email,
             },
             transport: "websocket",

@@ -31,6 +31,7 @@ describe("backend auth helpers", () => {
         const token = await createBackendSessionToken({
             claims: {
                 sub: "user-123",
+                userId: "users:123",
                 email: "user@example.com",
                 iat: Math.floor(Date.now() / 1000),
                 exp: Math.floor(Date.now() / 1000) + 60,
@@ -47,6 +48,7 @@ describe("backend auth helpers", () => {
             authenticateBackendRequest(request),
         ).resolves.toMatchObject({
             sub: "user-123",
+            userId: "users:123",
             email: "user@example.com",
         });
     });
@@ -56,6 +58,7 @@ describe("backend auth helpers", () => {
             JSON.parse(
                 toConnectionReadyEvent({
                     sub: "user-123",
+                    userId: "users:123",
                     email: "user@example.com",
                     iat: 1,
                     exp: 2,
@@ -66,6 +69,7 @@ describe("backend auth helpers", () => {
             payload: {
                 user: {
                     sub: "user-123",
+                    userId: "users:123",
                     email: "user@example.com",
                 },
                 transport: "websocket",

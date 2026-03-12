@@ -190,13 +190,18 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             const allChats = await storageAdapter.getAllChats();
             const migratedChats = await Promise.all(
                 allChats.map(async (chat) => {
-                    if (chat.agentId) {
+                    const needsAgentId = !chat.agentId;
+                    const needsSettingsLock =
+                        chat.settingsLockedAt === undefined;
+
+                    if (!needsAgentId && !needsSettingsLock) {
                         return chat;
                     }
 
                     const migratedChat = {
                         ...chat,
-                        agentId: selectedAgentId,
+                        agentId: chat.agentId || selectedAgentId,
+                        settingsLockedAt: chat.settingsLockedAt ?? null,
                     };
                     await storageAdapter.updateChat(migratedChat);
                     return migratedChat;
@@ -286,6 +291,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 title: title || "New Chat",
                 modelId: modelId || defaultModel,
                 thinking: defaultThinking,
+                settingsLockedAt: null,
                 createdAt: Date.now(),
                 updatedAt: Date.now(),
             };

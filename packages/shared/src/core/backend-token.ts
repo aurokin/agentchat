@@ -1,5 +1,6 @@
 export interface BackendSessionClaims {
     sub: string;
+    userId: string;
     email: string;
     exp: number;
     iat: number;
@@ -40,6 +41,7 @@ function assertClaimsShape(value: unknown): BackendSessionClaims {
     const claims = value as Partial<BackendSessionClaims>;
     if (
         typeof claims.sub !== "string" ||
+        typeof claims.userId !== "string" ||
         typeof claims.email !== "string" ||
         typeof claims.exp !== "number" ||
         typeof claims.iat !== "number"
@@ -49,6 +51,7 @@ function assertClaimsShape(value: unknown): BackendSessionClaims {
 
     return {
         sub: claims.sub,
+        userId: claims.userId,
         email: claims.email,
         exp: claims.exp,
         iat: claims.iat,

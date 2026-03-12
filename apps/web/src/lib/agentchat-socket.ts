@@ -17,6 +17,7 @@ export interface ConversationSendCommand {
         modelId: string;
         thinking: ThinkingLevel;
         content: string;
+        userMessageId: string;
         assistantMessageId: string;
         history: ConversationHistoryEntry[];
     };
@@ -40,6 +41,7 @@ export type AgentchatSocketEvent =
           payload: {
               user: {
                   sub: string;
+                  userId: string;
                   email: string;
               };
               transport: "websocket";

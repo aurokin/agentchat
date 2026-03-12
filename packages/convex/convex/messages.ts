@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
-import { mutation, query } from "./_generated/server";
+import { internalQuery, mutation, query } from "./_generated/server";
 import { isOwner, requireUserMatches } from "./lib/authz";
 import { requireCloudSync } from "./lib/subscription";
 import { drainBatches } from "./lib/batch";
@@ -97,6 +97,23 @@ export const getByLocalId = query({
     },
 });
 
+export const getByLocalIdInternal = internalQuery({
+    args: {
+        userId: v.id("users"),
+        localId: v.string(),
+    },
+    handler: async (ctx, args) => {
+        assertMaxLen(args.localId, LIMITS.maxLocalIdChars, "localId");
+
+        return await ctx.db
+            .query("messages")
+            .withIndex("by_local_id", (q) =>
+                q.eq("userId", args.userId).eq("localId", args.localId),
+            )
+            .unique();
+    },
+});
+
 // Create a new message
 export const create = mutation({
     args: {
@@ -148,10 +165,20 @@ export const create = mutation({
             role: args.role,
             content: args.content,
             contextContent: args.contextContent,
+            status:
+                args.role === "assistant" && !args.content
+                    ? "draft"
+                    : "completed",
+            runId: null,
             thinking: args.thinking,
             modelId: args.modelId,
             thinkingLevel: args.thinkingLevel,
             createdAt: args.createdAt ?? now,
+            updatedAt: args.createdAt ?? now,
+            completedAt:
+                args.role === "assistant" && !args.content
+                    ? null
+                    : (args.createdAt ?? now),
         });
 
         // Update the chat's updatedAt timestamp
