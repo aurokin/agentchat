@@ -109,7 +109,7 @@ Primary runbooks:
 
 References:
 
-- `docs/deploy/railway.md` for Railway deployment configuration.
+- `docs/preview_environment_setup_checklist.md` and `docs/prod_environment_setup_checklist.md` for environment-specific deployment setup.
 - `docs/cloud_dashboard_setup.md` for the Convex dashboard checklist.
 - `docs/mobile_dev_setup.md` for mobile dev builds.
 
