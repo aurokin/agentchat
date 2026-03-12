@@ -6,7 +6,6 @@ import type {
     AgentchatSocketEvent,
 } from "@/lib/agentchat-socket";
 import {
-    modelSupportsReasoning,
     type ChatSession,
     type ConversationRuntimeState,
     type Message,
@@ -14,29 +13,19 @@ import {
     type ThinkingLevel,
 } from "@/lib/types";
 import { trimTrailingEmptyLines } from "@shared/core/text";
-import { generateUUID } from "@/lib/utils";
 import {
     applyStreamingMessageOverlay,
     createRecoveredActiveRunFromRuntimeState,
-    createRecoveredActiveRunFromSocket,
     type ActiveRunState,
     type RetryChatState,
     type RuntimeErrorState,
     type StreamingMessageState,
 } from "./conversation-runtime-helpers";
-
-function getChatTitleUpdate(
-    chat: ChatSession | null,
-    content: string,
-    messageCount: number,
-): ChatSession | null {
-    if (!chat || chat.title !== "New Chat" || messageCount !== 0) {
-        return null;
-    }
-
-    const title = content.slice(0, 50) + (content.length > 50 ? "..." : "");
-    return { ...chat, title };
-}
+import {
+    buildInterruptCommand,
+    prepareConversationSend,
+    resolveConversationSocketEvent,
+} from "./conversation-runtime-controller";
 
 type UseConversationRuntimeParams = {
     currentChat: ChatSession | null;
@@ -181,118 +170,60 @@ export function useConversationRuntime({
 
     const handleSocketEvent = useCallback(
         (event: AgentchatSocketEvent) => {
-            const currentChat = currentChatRef.current;
-            if (
-                !currentChat ||
-                !("conversationId" in event.payload) ||
-                event.payload.conversationId !== currentChat.id
-            ) {
+            const resolution = resolveConversationSocketEvent({
+                currentChatId: currentChatRef.current?.id ?? null,
+                event,
+                activeRun: activeRunRef.current,
+                messages: messagesRef.current,
+            });
+
+            if (resolution.type === "ignore") {
                 return;
             }
 
-            let activeRun = activeRunRef.current;
-
-            if (event.type === "run.started") {
-                if (!activeRun) {
-                    const recoveredRun = createRecoveredActiveRunFromSocket({
-                        conversationId: event.payload.conversationId,
-                        messageId: event.payload.messageId,
-                        runId: event.payload.runId,
-                        messages: messagesRef.current,
-                    });
-                    if (!recoveredRun) {
-                        return;
-                    }
-
-                    activeRun = recoveredRun;
-                    activeRunRef.current = recoveredRun;
+            if (resolution.type === "run.started") {
+                activeRunRef.current = resolution.activeRun;
+                if (resolution.recovered) {
                     setSending(true);
                     setRecoveredRunNotice(true);
-
-                    if (recoveredRun.content) {
-                        queueStreamingMessageUpdate({
-                            id: recoveredRun.assistantMessageId,
-                            content: recoveredRun.content,
-                        });
+                    if (resolution.streamingMessage) {
+                        queueStreamingMessageUpdate(
+                            resolution.streamingMessage,
+                        );
                     }
-                    return;
                 }
-
-                activeRun.runId = event.payload.runId;
                 return;
             }
 
-            if (!activeRun) {
+            if (resolution.type === "message.updated") {
+                activeRunRef.current = resolution.activeRun;
+                queueStreamingMessageUpdate(resolution.streamingMessage);
                 return;
             }
 
             if (
-                "runId" in event.payload &&
-                activeRun.runId &&
-                event.payload.runId !== activeRun.runId
+                resolution.type === "run.completed" ||
+                resolution.type === "run.interrupted"
             ) {
-                return;
-            }
-
-            if (event.type === "message.delta") {
-                activeRun.content = event.payload.content;
-                queueStreamingMessageUpdate({
-                    id: activeRun.assistantMessageId,
-                    content: event.payload.content,
-                });
-                return;
-            }
-
-            if (event.type === "message.completed") {
-                activeRun.content = event.payload.content;
-                queueStreamingMessageUpdate({
-                    id: activeRun.assistantMessageId,
-                    content: event.payload.content,
-                });
-                return;
-            }
-
-            if (event.type === "run.completed") {
-                void persistActiveAssistantMessage().finally(() => {
+                activeRunRef.current = resolution.activeRun;
+                void persistActiveAssistantMessage(
+                    resolution.finalContent,
+                ).finally(() => {
                     clearActiveRun();
                 });
                 return;
             }
 
-            if (event.type === "run.interrupted") {
-                void persistActiveAssistantMessage().finally(() => {
-                    clearActiveRun();
-                });
-                return;
-            }
-
-            if (event.type === "run.failed") {
-                const message = event.payload.error.message;
-                void persistActiveAssistantMessage().finally(() => {
-                    setError({
-                        message,
-                        isRetryable: true,
-                    });
-                    setRetryChat({
-                        content: activeRun.userContent,
-                        contextContent: activeRun.userContent,
-                    });
-                    clearActiveRun();
-                });
-                return;
-            }
-
-            if (event.type === "connection.error") {
-                const message = event.payload.message;
-                void persistActiveAssistantMessage().finally(() => {
-                    setError({
-                        message,
-                        isRetryable: true,
-                    });
-                    setRetryChat({
-                        content: activeRun.userContent,
-                        contextContent: activeRun.userContent,
-                    });
+            if (
+                resolution.type === "run.failed" ||
+                resolution.type === "connection.error"
+            ) {
+                activeRunRef.current = resolution.activeRun;
+                void persistActiveAssistantMessage(
+                    resolution.finalContent,
+                ).finally(() => {
+                    setError(resolution.error);
+                    setRetryChat(resolution.retryChat);
                     clearActiveRun();
                 });
             }
@@ -399,79 +330,34 @@ export function useConversationRuntime({
             let assistantMessageId: string | null = null;
 
             try {
-                const currentModel = models.find(
-                    (model) => model.id === chatSnapshot.modelId,
-                );
-                const supportsReasoning = modelSupportsReasoning(currentModel);
-                const effectiveThinking = supportsReasoning
-                    ? chatSnapshot.thinking
-                    : "none";
-
-                const userMessageId = generateUUID();
-                await addMessage({
-                    id: userMessageId,
-                    role: "user",
+                const sendPlan = prepareConversationSend({
+                    chat: chatSnapshot,
+                    messages: messagesSnapshot,
+                    models,
                     content,
-                    contextContent: content,
-                    modelId: chatSnapshot.modelId,
-                    thinkingLevel: effectiveThinking,
-                    chatId: chatSnapshot.id,
                 });
+                assistantMessageId = sendPlan.assistantMessage.id;
 
+                await addMessage(sendPlan.userMessage);
                 setDefaultModel(chatSnapshot.modelId);
-                if (supportsReasoning) {
-                    setDefaultThinking(effectiveThinking);
+                if (sendPlan.shouldPersistDefaultThinking) {
+                    setDefaultThinking(sendPlan.effectiveThinking);
                 }
 
-                const updatedChat = getChatTitleUpdate(
-                    chatSnapshot,
-                    content,
-                    messagesSnapshot.length,
-                );
-                if (updatedChat) {
-                    await updateChat(updatedChat);
+                if (sendPlan.titleUpdate) {
+                    await updateChat(sendPlan.titleUpdate);
                 }
 
-                const assistantMessage = await addMessage({
-                    role: "assistant",
-                    content: "",
-                    contextContent: "",
-                    modelId: chatSnapshot.modelId,
-                    thinkingLevel: effectiveThinking,
-                    chatId: chatSnapshot.id,
-                });
-                assistantMessageId = assistantMessage.id;
+                await addMessage(sendPlan.assistantMessage);
                 queueStreamingMessageUpdate({
-                    id: assistantMessage.id,
+                    id: sendPlan.assistantMessage.id,
                     content: "",
                     thinking: undefined,
                 });
-                activeRunRef.current = {
-                    conversationId: chatSnapshot.id,
-                    assistantMessageId: assistantMessage.id,
-                    userContent: content,
-                    content: "",
-                    runId: null,
-                };
+                activeRunRef.current = sendPlan.activeRun;
 
                 await socketClient.ensureConnected(getBackendSessionToken);
-                socketClient.send({
-                    id: generateUUID(),
-                    type: "conversation.send",
-                    payload: {
-                        conversationId: chatSnapshot.id,
-                        agentId: chatSnapshot.agentId,
-                        modelId: chatSnapshot.modelId,
-                        thinking: effectiveThinking,
-                        content,
-                        userMessageId,
-                        assistantMessageId: assistantMessage.id,
-                        history: messagesSnapshot.map((message) => ({
-                            role: message.role,
-                            content: message.contextContent,
-                        })),
-                    },
-                });
+                socketClient.send(sendPlan.command);
             } catch (sendError) {
                 activeRunRef.current = null;
                 setSending(false);
@@ -523,13 +409,7 @@ export function useConversationRuntime({
         }
 
         try {
-            socketClient.send({
-                id: generateUUID(),
-                type: "conversation.interrupt",
-                payload: {
-                    conversationId: activeRun.conversationId,
-                },
-            });
+            socketClient.send(buildInterruptCommand(activeRun.conversationId));
         } catch (cancelError) {
             setError({
                 message:
