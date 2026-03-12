@@ -4,11 +4,11 @@ import {
     modelSupportsReasoning,
     modelSupportsVision,
     SupportedParameter,
-    type OpenRouterModel,
+    type ProviderModel,
 } from "../models";
 
 describe("model capabilities", () => {
-    const model: OpenRouterModel = {
+    const model: ProviderModel = {
         id: "provider/model",
         name: "model",
         provider: "provider",

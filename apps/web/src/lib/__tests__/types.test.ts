@@ -1,7 +1,7 @@
 import { test, expect, describe } from "bun:test";
 import {
     SupportedParameter,
-    OpenRouterModel,
+    ProviderModel,
     modelSupportsSearch,
     modelSupportsReasoning,
     modelSupportsVision,
@@ -14,7 +14,7 @@ describe("types.ts", () => {
         });
 
         test("returns false for model without tools parameter", () => {
-            const model: OpenRouterModel = {
+            const model: ProviderModel = {
                 id: "test/model",
                 name: "test",
                 provider: "test",
@@ -24,7 +24,7 @@ describe("types.ts", () => {
         });
 
         test("returns false for model with empty supportedParameters", () => {
-            const model: OpenRouterModel = {
+            const model: ProviderModel = {
                 id: "test/model",
                 name: "test",
                 provider: "test",
@@ -34,7 +34,7 @@ describe("types.ts", () => {
         });
 
         test("returns true for model with tools parameter", () => {
-            const model: OpenRouterModel = {
+            const model: ProviderModel = {
                 id: "test/model",
                 name: "test",
                 provider: "test",
@@ -44,7 +44,7 @@ describe("types.ts", () => {
         });
 
         test("returns true for model with tools and reasoning", () => {
-            const model: OpenRouterModel = {
+            const model: ProviderModel = {
                 id: "test/model",
                 name: "test",
                 provider: "test",
@@ -57,7 +57,7 @@ describe("types.ts", () => {
         });
 
         test("returns false for model with only reasoning", () => {
-            const model: OpenRouterModel = {
+            const model: ProviderModel = {
                 id: "test/model",
                 name: "test",
                 provider: "test",
@@ -73,7 +73,7 @@ describe("types.ts", () => {
         });
 
         test("returns false for model without reasoning parameter", () => {
-            const model: OpenRouterModel = {
+            const model: ProviderModel = {
                 id: "test/model",
                 name: "test",
                 provider: "test",
@@ -83,7 +83,7 @@ describe("types.ts", () => {
         });
 
         test("returns false for model with empty supportedParameters", () => {
-            const model: OpenRouterModel = {
+            const model: ProviderModel = {
                 id: "test/model",
                 name: "test",
                 provider: "test",
@@ -93,7 +93,7 @@ describe("types.ts", () => {
         });
 
         test("returns true for model with reasoning parameter", () => {
-            const model: OpenRouterModel = {
+            const model: ProviderModel = {
                 id: "test/model",
                 name: "test",
                 provider: "test",
@@ -103,7 +103,7 @@ describe("types.ts", () => {
         });
 
         test("returns true for model with reasoning and tools", () => {
-            const model: OpenRouterModel = {
+            const model: ProviderModel = {
                 id: "test/model",
                 name: "test",
                 provider: "test",
@@ -116,7 +116,7 @@ describe("types.ts", () => {
         });
 
         test("returns false for model with only tools", () => {
-            const model: OpenRouterModel = {
+            const model: ProviderModel = {
                 id: "test/model",
                 name: "test",
                 provider: "test",
@@ -132,7 +132,7 @@ describe("types.ts", () => {
         });
 
         test("returns false for model without vision parameter", () => {
-            const model: OpenRouterModel = {
+            const model: ProviderModel = {
                 id: "test/model",
                 name: "test",
                 provider: "test",
@@ -142,7 +142,7 @@ describe("types.ts", () => {
         });
 
         test("returns false for model with empty supportedParameters", () => {
-            const model: OpenRouterModel = {
+            const model: ProviderModel = {
                 id: "test/model",
                 name: "test",
                 provider: "test",
@@ -152,7 +152,7 @@ describe("types.ts", () => {
         });
 
         test("returns true for model with vision parameter", () => {
-            const model: OpenRouterModel = {
+            const model: ProviderModel = {
                 id: "test/model",
                 name: "test",
                 provider: "test",
@@ -162,7 +162,7 @@ describe("types.ts", () => {
         });
 
         test("returns true for model with vision and other parameters", () => {
-            const model: OpenRouterModel = {
+            const model: ProviderModel = {
                 id: "test/model",
                 name: "test",
                 provider: "test",
@@ -176,7 +176,7 @@ describe("types.ts", () => {
         });
 
         test("returns false for model with only tools and reasoning", () => {
-            const model: OpenRouterModel = {
+            const model: ProviderModel = {
                 id: "test/model",
                 name: "test",
                 provider: "test",
@@ -189,9 +189,9 @@ describe("types.ts", () => {
         });
     });
 
-    describe("OpenRouterModel interface", () => {
+    describe("ProviderModel interface", () => {
         test("can create model with all properties", () => {
-            const model: OpenRouterModel = {
+            const model: ProviderModel = {
                 id: "anthropic/claude-3-5-sonnet",
                 name: "claude-3-5-sonnet",
                 provider: "Anthropic",
@@ -207,7 +207,7 @@ describe("types.ts", () => {
         });
 
         test("can create model without optional supportedParameters", () => {
-            const model: OpenRouterModel = {
+            const model: ProviderModel = {
                 id: "test/model",
                 name: "test",
                 provider: "test",

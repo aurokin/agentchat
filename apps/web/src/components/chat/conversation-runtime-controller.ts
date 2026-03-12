@@ -8,7 +8,7 @@ import {
     type ChatSession,
     type ConversationRuntimeState,
     type Message,
-    type OpenRouterModel,
+    type ProviderModel,
 } from "@/lib/types";
 import { generateUUID } from "@/lib/utils";
 import {
@@ -92,7 +92,7 @@ export function getChatTitleUpdate(
 export function prepareConversationSend(params: {
     chat: ChatSession;
     messages: Message[];
-    models: OpenRouterModel[];
+    models: ProviderModel[];
     content: string;
     createId?: RuntimeIdFactory;
 }): PreparedConversationSend {
@@ -192,7 +192,7 @@ export function connectConversationSocket(params: {
 export async function runConversationSend(params: {
     chat: ChatSession;
     messages: Message[];
-    models: OpenRouterModel[];
+    models: ProviderModel[];
     content: string;
     dependencies: ConversationSendRuntimeDependencies;
 }): Promise<ConversationSendRuntimeResult> {

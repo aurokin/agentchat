@@ -2,14 +2,14 @@ import type {
     AgentOptionsResponse,
     BootstrapAgent,
 } from "@/lib/agentchat-server";
-import type { OpenRouterModel } from "@/lib/types";
+import type { ProviderModel } from "@/lib/types";
 import { APP_DEFAULT_MODEL } from "@shared/core/models";
 
 export function filterModelsForAgent(params: {
-    models: OpenRouterModel[];
+    models: ProviderModel[];
     selectedAgent: BootstrapAgent | null;
     selectedAgentOptions: AgentOptionsResponse | null;
-}): OpenRouterModel[] {
+}): ProviderModel[] {
     const { models, selectedAgent, selectedAgentOptions } = params;
     if (!selectedAgent) {
         return models;
@@ -44,7 +44,7 @@ export function filterModelsForAgent(params: {
 }
 
 export function selectScopedDefaultModel(params: {
-    models: OpenRouterModel[];
+    models: ProviderModel[];
     userPreferredModel: string | null;
     agentDefaultModel: string | null;
 }): string | null {

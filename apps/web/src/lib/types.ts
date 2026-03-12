@@ -83,7 +83,7 @@ export enum SupportedParameter {
     Vision = "vision",
 }
 
-export interface OpenRouterModel {
+export interface ProviderModel {
     id: string;
     name: string;
     providerId?: string;
@@ -95,16 +95,14 @@ export interface OpenRouterModel {
     }>;
 }
 
-export function modelSupportsSearch(
-    model: OpenRouterModel | undefined,
-): boolean {
+export function modelSupportsSearch(model: ProviderModel | undefined): boolean {
     return (
         model?.supportedParameters?.includes(SupportedParameter.Tools) ?? false
     );
 }
 
 export function modelSupportsReasoning(
-    model: OpenRouterModel | undefined,
+    model: ProviderModel | undefined,
 ): boolean {
     return (
         model?.supportedParameters?.includes(SupportedParameter.Reasoning) ??
@@ -112,9 +110,7 @@ export function modelSupportsReasoning(
     );
 }
 
-export function modelSupportsVision(
-    model: OpenRouterModel | undefined,
-): boolean {
+export function modelSupportsVision(model: ProviderModel | undefined): boolean {
     return (
         model?.supportedParameters?.includes(SupportedParameter.Vision) ?? false
     );

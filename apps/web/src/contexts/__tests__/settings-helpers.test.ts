@@ -4,9 +4,9 @@ import {
     filterModelsForAgent,
     selectScopedDefaultModel,
 } from "@/contexts/settings-helpers";
-import type { OpenRouterModel } from "@/lib/types";
+import type { ProviderModel } from "@/lib/types";
 
-const models: OpenRouterModel[] = [
+const models: ProviderModel[] = [
     {
         id: "gpt-5.3-codex",
         name: "GPT-5.3 Codex",

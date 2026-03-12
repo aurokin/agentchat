@@ -1,8 +1,8 @@
 import { test, expect, describe } from "bun:test";
-import type { OpenRouterModel } from "@shared/core/models";
+import type { ProviderModel } from "@shared/core/models";
 
 describe("ModelSelector logic", () => {
-    const mockModels: OpenRouterModel[] = [
+    const mockModels: ProviderModel[] = [
         {
             id: "anthropic/claude-3-5-sonnet",
             name: "claude-3-5-sonnet",
@@ -200,7 +200,7 @@ describe("ModelSelector logic", () => {
                     acc[provider].push(model);
                     return acc;
                 },
-                {} as Record<string, OpenRouterModel[]>,
+                {} as Record<string, ProviderModel[]>,
             );
 
             expect(Object.keys(grouped)).toEqual([
@@ -225,7 +225,7 @@ describe("ModelSelector logic", () => {
                     acc[provider].push(model);
                     return acc;
                 },
-                {} as Record<string, OpenRouterModel[]>,
+                {} as Record<string, ProviderModel[]>,
             );
 
             expect(grouped["anthropic"]).toHaveLength(2);
@@ -235,7 +235,7 @@ describe("ModelSelector logic", () => {
         });
 
         test("handles model without provider prefix", () => {
-            const modelsWithNoProvider: OpenRouterModel[] = [
+            const modelsWithNoProvider: ProviderModel[] = [
                 {
                     id: "no-slash-model",
                     name: "no-slash-model",
@@ -253,7 +253,7 @@ describe("ModelSelector logic", () => {
                     acc[provider].push(model);
                     return acc;
                 },
-                {} as Record<string, OpenRouterModel[]>,
+                {} as Record<string, ProviderModel[]>,
             );
 
             expect(grouped["other"]).toBeDefined();

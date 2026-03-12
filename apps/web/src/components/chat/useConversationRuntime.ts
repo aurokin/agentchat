@@ -9,7 +9,7 @@ import {
     type ChatSession,
     type ConversationRuntimeState,
     type Message,
-    type OpenRouterModel,
+    type ProviderModel,
     type ThinkingLevel,
 } from "@/lib/types";
 import { trimTrailingEmptyLines } from "@shared/core/text";
@@ -33,7 +33,7 @@ type UseConversationRuntimeParams = {
     messages: Message[];
     isMessagesLoading: boolean;
     runtimeState: ConversationRuntimeState;
-    models: OpenRouterModel[];
+    models: ProviderModel[];
     socketClient: AgentchatSocketClient;
     getBackendSessionToken: () => Promise<string>;
     addMessage: (message: {

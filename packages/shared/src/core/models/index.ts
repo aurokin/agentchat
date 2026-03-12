@@ -1,6 +1,6 @@
 export const APP_DEFAULT_MODEL = "moonshotai/kimi-k2.5";
 
-export interface OpenRouterModel {
+export interface ProviderModel {
     id: string;
     name: string;
     provider: string;
@@ -13,16 +13,14 @@ export enum SupportedParameter {
     Vision = "vision",
 }
 
-export function modelSupportsSearch(
-    model: OpenRouterModel | undefined,
-): boolean {
+export function modelSupportsSearch(model: ProviderModel | undefined): boolean {
     return (
         model?.supportedParameters?.includes(SupportedParameter.Tools) ?? false
     );
 }
 
 export function modelSupportsReasoning(
-    model: OpenRouterModel | undefined,
+    model: ProviderModel | undefined,
 ): boolean {
     return (
         model?.supportedParameters?.includes(SupportedParameter.Reasoning) ??
@@ -30,9 +28,7 @@ export function modelSupportsReasoning(
     );
 }
 
-export function modelSupportsVision(
-    model: OpenRouterModel | undefined,
-): boolean {
+export function modelSupportsVision(model: ProviderModel | undefined): boolean {
     return (
         model?.supportedParameters?.includes(SupportedParameter.Vision) ?? false
     );

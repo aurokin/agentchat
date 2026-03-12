@@ -9,7 +9,7 @@ import React, {
     useCallback,
     useRef,
 } from "react";
-import type { UserSettings, OpenRouterModel, ThinkingLevel } from "@/lib/types";
+import type { UserSettings, ProviderModel, ThinkingLevel } from "@/lib/types";
 import * as storage from "@/lib/storage";
 import { fetchAvailableModels } from "@/lib/agentchat-server";
 import { useAgent } from "@/contexts/AgentContext";
@@ -23,7 +23,7 @@ interface SettingsContextType extends UserSettings {
     setDefaultThinking: (value: ThinkingLevel) => void;
     setTheme: (theme: UserSettings["theme"]) => void;
     toggleFavoriteModel: (modelId: string) => void;
-    models: OpenRouterModel[];
+    models: ProviderModel[];
     loadingModels: boolean;
     refreshModels: () => Promise<void>;
 }
@@ -38,7 +38,7 @@ const defaultSettings: UserSettings = {
 const SettingsContext = createContext<SettingsContextType | null>(null);
 
 export function selectInitialDefaultModel(params: {
-    fetchedModels: OpenRouterModel[];
+    fetchedModels: ProviderModel[];
     userPreferredModel: string | null;
     agentDefaultModel: string | null;
 }): string | null {
@@ -52,7 +52,7 @@ export function selectInitialDefaultModel(params: {
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
     const { selectedAgentId, selectedAgent, selectedAgentOptions } = useAgent();
     const [settings, setSettings] = useState<UserSettings>(defaultSettings);
-    const [allModels, setAllModels] = useState<OpenRouterModel[]>([]);
+    const [allModels, setAllModels] = useState<ProviderModel[]>([]);
     const [loadingModels, setLoadingModels] = useState(false);
     const [mounted, setMounted] = useState(false);
     const refreshPromiseRef = useRef<Promise<void> | null>(null);

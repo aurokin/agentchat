@@ -3,7 +3,7 @@ export enum SupportedParameter {
     Reasoning = "reasoning",
 }
 
-export interface OpenRouterModel {
+export interface ProviderModel {
     id: string;
     name: string;
     provider: string;

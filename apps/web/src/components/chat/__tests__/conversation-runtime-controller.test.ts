@@ -5,7 +5,7 @@ import {
     SupportedParameter,
     type ChatSession,
     type Message,
-    type OpenRouterModel,
+    type ProviderModel,
 } from "@/lib/types";
 import {
     buildInterruptCommand,
@@ -52,7 +52,7 @@ function createMessages(): Message[] {
     ];
 }
 
-function createModels(): OpenRouterModel[] {
+function createModels(): ProviderModel[] {
     return [
         {
             id: "gpt-5.3-codex",

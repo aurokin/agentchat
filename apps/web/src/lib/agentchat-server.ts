@@ -1,4 +1,4 @@
-import { type OpenRouterModel, SupportedParameter } from "@/lib/types";
+import { type ProviderModel, SupportedParameter } from "@/lib/types";
 import { APP_DEFAULT_MODEL } from "@shared/core/models";
 
 type BootstrapProvider = {
@@ -109,7 +109,7 @@ export async function fetchAgentOptions(
     );
 }
 
-export async function fetchAvailableModels(): Promise<OpenRouterModel[]> {
+export async function fetchAvailableModels(): Promise<ProviderModel[]> {
     const bootstrap = await fetchBootstrap();
     const visibleProviders = bootstrap.providers.filter(
         (provider) => provider.enabled,
@@ -118,7 +118,7 @@ export async function fetchAvailableModels(): Promise<OpenRouterModel[]> {
     const responses = await Promise.all(
         visibleProviders.map(async (provider) => {
             const payload = await fetchProviderModels(provider.id);
-            return payload.models.map<OpenRouterModel>((model) => ({
+            return payload.models.map<ProviderModel>((model) => ({
                 id: model.id,
                 name: model.label,
                 providerId: provider.id,
