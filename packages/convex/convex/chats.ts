@@ -60,6 +60,32 @@ export const listByUserPaginated = query({
     },
 });
 
+export const listByUserAndAgentPaginated = query({
+    args: {
+        userId: v.id("users"),
+        agentId: v.string(),
+        paginationOpts: paginationOptsValidator,
+    },
+    handler: async (ctx, args) => {
+        const authenticatedUserId = await requireCloudSync(ctx);
+        requireUserMatches(authenticatedUserId, args.userId);
+        assertMaxLen(args.agentId, LIMITS.maxLocalIdChars, "agentId");
+
+        const paginationOpts = clampPaginationOpts(
+            args.paginationOpts,
+            LIMITS.maxPageChats,
+        );
+
+        return await ctx.db
+            .query("chats")
+            .withIndex("by_userId_and_agentId_and_updatedAt", (q) =>
+                q.eq("userId", authenticatedUserId).eq("agentId", args.agentId),
+            )
+            .order("desc")
+            .paginate(paginationOpts);
+    },
+});
+
 // Get a single chat by ID
 export const get = query({
     args: { id: v.id("chats") },
@@ -96,6 +122,7 @@ export const create = mutation({
     args: {
         userId: v.id("users"),
         localId: v.optional(v.string()),
+        agentId: v.string(),
         title: v.string(),
         modelId: v.string(),
         thinking: v.string(),
@@ -107,6 +134,7 @@ export const create = mutation({
         requireUserMatches(authenticatedUserId, args.userId);
 
         assertMaxLen(args.localId, LIMITS.maxLocalIdChars, "localId");
+        assertMaxLen(args.agentId, LIMITS.maxLocalIdChars, "agentId");
         assertMaxLen(args.title, LIMITS.maxChatTitleChars, "title");
 
         const usage = await ensureCloudUsageCounters(ctx, authenticatedUserId);
@@ -118,6 +146,7 @@ export const create = mutation({
         const chatId = await ctx.db.insert("chats", {
             userId: authenticatedUserId,
             localId: args.localId,
+            agentId: args.agentId,
             title: args.title,
             modelId: args.modelId,
             thinking: args.thinking,

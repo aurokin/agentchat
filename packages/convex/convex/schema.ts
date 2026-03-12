@@ -30,6 +30,7 @@ export default defineSchema({
     chats: defineTable({
         userId: v.id("users"),
         localId: v.optional(v.string()),
+        agentId: v.string(),
         title: v.string(),
         modelId: v.string(),
         thinking: v.string(),
@@ -38,6 +39,11 @@ export default defineSchema({
     })
         .index("by_user", ["userId"])
         .index("by_user_updated", ["userId", "updatedAt"])
+        .index("by_userId_and_agentId_and_updatedAt", [
+            "userId",
+            "agentId",
+            "updatedAt",
+        ])
         .index("by_local_id", ["userId", "localId"]),
     messages: defineTable({
         userId: v.id("users"),

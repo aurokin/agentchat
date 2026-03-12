@@ -21,6 +21,7 @@ export interface Message {
 
 export interface ChatSession {
     id: string;
+    agentId: string;
     title: string;
     modelId: string;
     thinking: ThinkingLevel;

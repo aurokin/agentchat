@@ -8,8 +8,23 @@ type BootstrapProvider = {
     enabled: boolean;
 };
 
-type BootstrapResponse = {
+export type BootstrapAgent = {
+    id: string;
+    name: string;
+    description: string | null;
+    avatar: string | null;
+    enabled: boolean;
+    providerIds: string[];
+    defaultProviderId: string;
+    defaultModel: string | null;
+    defaultVariant: string | null;
+    tags: string[];
+    sortOrder: number;
+};
+
+export type BootstrapResponse = {
     providers: BootstrapProvider[];
+    agents: BootstrapAgent[];
 };
 
 type ProviderModelsResponse = {

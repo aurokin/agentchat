@@ -4,28 +4,29 @@ import React, { useEffect, useState } from "react";
 import { useConvexAuth } from "convex/react";
 import { ChatLayout } from "@/components/chat/ChatLayout";
 import { useChat } from "@/contexts/ChatContext";
+import { useAgent } from "@/contexts/AgentContext";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { Loader2 } from "lucide-react";
 import { useIsConvexAvailable } from "@/contexts/ConvexProvider";
 
 export default function ChatPage() {
-    const { chats, loading, createChat, selectChat, currentChat } = useChat();
+    const { chats, loading, selectChat, currentChat } = useChat();
+    const { loadingAgents } = useAgent();
     const isConvexAvailable = useIsConvexAvailable();
     const { isAuthenticated, isLoading: isAuthLoading } = useConvexAuth();
     const { signIn } = useAuthActions() ?? {};
     const [initialized, setInitialized] = useState(false);
 
-    // Create or select a chat on first load
+    // Select a chat on first load for the active agent.
     useEffect(() => {
         if (!isAuthenticated) return;
+        if (loadingAgents) return;
         if (!initialized && !loading) {
             requestAnimationFrame(() => {
                 setInitialized(true);
                 if (!currentChat) {
                     if (chats.length > 0) {
-                        selectChat(chats[0].id);
-                    } else {
-                        createChat();
+                        void selectChat(chats[0].id);
                     }
                 }
             });
@@ -33,9 +34,9 @@ export default function ChatPage() {
     }, [
         initialized,
         currentChat,
+        loadingAgents,
         loading,
         chats,
-        createChat,
         isAuthenticated,
         selectChat,
     ]);
@@ -43,12 +44,21 @@ export default function ChatPage() {
     // If data loads later, select the latest chat when empty.
     useEffect(() => {
         if (!isAuthenticated) return;
+        if (loadingAgents) return;
         if (loading || !initialized) return;
         if (currentChat || chats.length === 0) return;
-        selectChat(chats[0].id);
-    }, [chats, currentChat, initialized, isAuthenticated, loading, selectChat]);
+        void selectChat(chats[0].id);
+    }, [
+        chats,
+        currentChat,
+        initialized,
+        isAuthenticated,
+        loading,
+        loadingAgents,
+        selectChat,
+    ]);
 
-    if (isAuthLoading) {
+    if (isAuthLoading || loadingAgents) {
         return (
             <div className="flex h-dvh items-center justify-center bg-background">
                 <Loader2 size={24} className="animate-spin text-primary" />

@@ -10,6 +10,7 @@ This document tracks mobile work that should happen after the web-first migratio
 
 ## Pending Mobile Work
 
+- Mirror the new web agent bootstrap and selected-agent persistence flow.
 - Replace the current chat and settings flows with the new agent-centric model.
 - Add agent selection UI and keep it aligned with the web information architecture.
 - Update conversation lists so they are scoped to the selected agent.

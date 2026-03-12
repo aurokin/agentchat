@@ -6,6 +6,7 @@ const STORAGE_KEYS = {
     DEFAULT_MODEL: "routerchat-default-model",
     DEFAULT_THINKING: "routerchat-default-thinking",
     FAVORITE_MODELS: "routerchat-favorite-models",
+    SELECTED_AGENT: "agentchat-selected-agent",
     // Cloud sync keys
     SYNC_STATE: "routerchat-sync-state",
     SYNC_METADATA: "routerchat-sync-metadata",
@@ -53,6 +54,21 @@ export function setFavoriteModels(modelIds: string[]): void {
         STORAGE_KEYS.FAVORITE_MODELS,
         JSON.stringify(modelIds),
     );
+}
+
+export function getSelectedAgentId(): string | null {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem(STORAGE_KEYS.SELECTED_AGENT);
+}
+
+export function setSelectedAgentId(agentId: string): void {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(STORAGE_KEYS.SELECTED_AGENT, agentId);
+}
+
+export function clearSelectedAgentId(): void {
+    if (typeof window === "undefined") return;
+    localStorage.removeItem(STORAGE_KEYS.SELECTED_AGENT);
 }
 
 export function getDefaultThinking():

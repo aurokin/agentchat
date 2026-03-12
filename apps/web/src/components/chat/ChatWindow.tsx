@@ -11,6 +11,7 @@ import {
 import { useRouter } from "next/navigation";
 import { api } from "@convex/_generated/api";
 import { useChat } from "@/contexts/ChatContext";
+import { useAgent } from "@/contexts/AgentContext";
 import { useSettings } from "@/contexts/SettingsContext";
 import { OpenRouterApiError, type MessageContent } from "@/lib/openrouter";
 import { useActionSafe } from "@/hooks/useConvexSafe";
@@ -141,6 +142,7 @@ export function ChatWindow() {
         updateChat,
         createChat,
     } = useChat();
+    const { agents, selectedAgent } = useAgent();
     const {
         defaultModel,
         defaultThinking,
@@ -608,7 +610,7 @@ export function ChatWindow() {
                                 strokeWidth={1}
                             />
                             <span className="absolute inset-0 flex items-center justify-center text-2xl font-semibold text-primary">
-                                R
+                                A
                             </span>
                         </div>
 
@@ -619,19 +621,30 @@ export function ChatWindow() {
                             </span>
                         </h2>
                         <p className="text-foreground-muted text-lg mb-8">
-                            Your gateway to AI-powered conversations
+                            {agents.length === 0
+                                ? "Configure an agent on the server to begin."
+                                : selectedAgent
+                                  ? `Conversations for ${selectedAgent.name} stay isolated from your other agents.`
+                                  : "Choose an agent in the sidebar to load its conversations."}
                         </p>
 
                         <button
                             onClick={() => createChat()}
-                            className="btn-deco btn-deco-primary text-base px-8 py-3 cursor-pointer"
+                            disabled={!selectedAgent}
+                            className="btn-deco btn-deco-primary text-base px-8 py-3 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
                         >
                             <Sparkles size={18} />
-                            <span>Start New Conversation</span>
+                            <span>
+                                {selectedAgent
+                                    ? `Start ${selectedAgent.name} Conversation`
+                                    : "Select an Agent First"}
+                            </span>
                         </button>
 
                         <p className="mt-6 text-sm text-muted-foreground">
-                            Or select an existing conversation from the sidebar
+                            {selectedAgent
+                                ? "Or select an existing conversation from the sidebar"
+                                : "Existing conversations appear after you choose an agent"}
                         </p>
                     </div>
                 </div>

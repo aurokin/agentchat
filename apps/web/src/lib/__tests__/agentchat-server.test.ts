@@ -36,6 +36,7 @@ describe("agentchat-server", () => {
             new Response(
                 JSON.stringify({
                     providers: [{ id: "codex-main", enabled: true }],
+                    agents: [{ id: "example-agent", name: "Example Agent" }],
                 }),
                 { status: 200 },
             ),
@@ -43,6 +44,7 @@ describe("agentchat-server", () => {
 
         const payload = await fetchBootstrap();
         expect(payload.providers[0]?.id).toBe("codex-main");
+        expect(payload.agents[0]?.id).toBe("example-agent");
         expect(fetchMock.mock.calls[0]?.[0]).toBe(
             "http://localhost:8787/api/bootstrap",
         );
@@ -81,6 +83,7 @@ describe("agentchat-server", () => {
                                 enabled: true,
                             },
                         ],
+                        agents: [],
                     }),
                     { status: 200 },
                 ),

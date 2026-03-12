@@ -157,6 +157,7 @@ describe("cross-user auth isolation", () => {
         await expect(
             runHandler(createChat as unknown as HandlerExport, ctx, {
                 userId: OTHER_USER_ID,
+                agentId: "agent-a",
                 title: "Chat",
                 modelId: "openrouter/model",
                 thinking: "none",

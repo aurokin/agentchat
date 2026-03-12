@@ -12,10 +12,8 @@ import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 import { Hexagon, Plus, Settings, Trash2 } from "lucide-react";
 import { useChat } from "@/contexts/ChatContext";
-import {
-    useIsCloudSyncAvailable,
-    useStorageAdapter,
-} from "@/contexts/SyncContext";
+import { useAgent } from "@/contexts/AgentContext";
+import { useStorageAdapter } from "@/contexts/SyncContext";
 import { cn } from "@/lib/utils";
 
 import { ChatListSkeleton } from "./ChatListSkeleton";
@@ -34,6 +32,8 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
     const router = useRouter();
+    const { agents, selectedAgentId, setSelectedAgentId, loadingAgents } =
+        useAgent();
     const {
         chats,
         loading,
@@ -66,12 +66,13 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
     const isMobileActionMode = isMobile || isTablet || isTouchDevice;
 
     const handleNewChat = useCallback(async () => {
+        if (!selectedAgentId) return;
         await createChat();
         router.push("/chat");
         if (isMobile) {
             onClose?.();
         }
-    }, [createChat, isMobile, onClose, router]);
+    }, [createChat, isMobile, onClose, router, selectedAgentId]);
 
     const isKeybindingBlocked = useCallback(() => {
         if (typeof document === "undefined") return false;
@@ -303,7 +304,7 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                                 strokeWidth={1.5}
                             />
                             <span className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-primary">
-                                R
+                                A
                             </span>
                         </div>
                         <div>
@@ -319,6 +320,7 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                         className="w-full btn-deco btn-deco-primary group cursor-pointer"
                         title={isMac ? "Cmd+Shift+O" : "Ctrl+Shift+O"}
                         suppressHydrationWarning
+                        disabled={!selectedAgentId}
                     >
                         <Plus
                             size={16}
@@ -339,10 +341,14 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                     ) : chats.length === 0 ? (
                         <div className="p-6 text-center">
                             <p className="text-sm text-foreground-muted">
-                                No conversations yet
+                                {selectedAgentId
+                                    ? "No conversations for this agent"
+                                    : "Select an agent to start"}
                             </p>
                             <p className="text-xs text-muted-foreground mt-1">
-                                Start a new conversation above
+                                {selectedAgentId
+                                    ? "Start a new conversation above"
+                                    : "Choose an agent below to load its conversations"}
                             </p>
                         </div>
                     ) : (
@@ -432,6 +438,33 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
 
                 <div className="p-4 bg-muted/30 relative">
                     <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
+                    <div className="mb-3">
+                        <label
+                            htmlFor="sidebar-agent-select"
+                            className="mb-2 block text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground"
+                        >
+                            Active Agent
+                        </label>
+                        <select
+                            id="sidebar-agent-select"
+                            value={selectedAgentId ?? ""}
+                            onChange={(event) =>
+                                setSelectedAgentId(event.target.value)
+                            }
+                            disabled={loadingAgents || agents.length === 0}
+                            className="w-full border border-border bg-background-elevated px-3 py-2 text-sm text-foreground outline-hidden transition-colors focus:border-primary/40 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            {agents.length === 0 ? (
+                                <option value="">No agents configured</option>
+                            ) : (
+                                agents.map((agent) => (
+                                    <option key={agent.id} value={agent.id}>
+                                        {agent.name}
+                                    </option>
+                                ))
+                            )}
+                        </select>
+                    </div>
                     <Link
                         href="/settings"
                         className="flex items-center gap-3 text-sm p-3 border border-border hover:border-primary/30 hover:bg-muted/50 transition-all duration-200 group"
