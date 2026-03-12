@@ -16,7 +16,7 @@ Sensitive auth credentials are stored using `expo-secure-store`.
 ### Credential Storage Location
 
 - Storage: Expo SecureStore (encrypted key-value storage)
-- Keys: `routerchat-auth-token`, `routerchat-refresh-token`
+- Keys: `agentchat-auth-token`, `agentchat-refresh-token`
 
 ### Credential Storage Module
 
@@ -55,7 +55,7 @@ The mobile app uses Expo Auth Session with Convex Auth for Google sign-in.
 
 ### Auth Configuration
 
-- Convex URL is stored in SecureStore under `routerchat-convex-url`.
+- Convex URL is stored in SecureStore under `agentchat-convex-url`.
 - Env var: `EXPO_PUBLIC_GOOGLE_CLIENT_ID` (set in `app.config.js` or `app.config.ts`).
 - Redirect URI: `agentchat://convex-auth`.
 - Provider access is configured by the instance owner on the Agentchat backend.
@@ -97,7 +97,7 @@ The shared sync types still expose older sync-state names during the transition,
 
 ### Sync State Storage
 
-Sync state is stored in SecureStore under `routerchat-sync-state`.
+Sync state is stored in SecureStore under `agentchat-sync-state`.
 
 Use `lib/storage/sync-storage.ts` for sync state operations:
 
@@ -161,7 +161,7 @@ The mobile settings page should maintain parity with the web settings page.
 
 ### Theme Selection
 
-Theme is stored in SecureStore under `routerchat-theme`:
+Theme is stored in SecureStore under `agentchat-theme`:
 
 ```typescript
 import { getTheme, setTheme, type UserTheme } from "@/lib/storage";
@@ -204,9 +204,7 @@ const KEYBINDINGS = [
 
 ## First-Run Onboarding
 
-Onboarding completion is stored in SecureStore under `routerchat-has-completed-onboarding`.
-
-The app brand is now `Agentchat`, but persisted SecureStore keys remain on the legacy `routerchat-*` namespace until an explicit migration is added.
+Onboarding completion is stored in SecureStore under `agentchat-has-completed-onboarding`.
 
 ```typescript
 import {

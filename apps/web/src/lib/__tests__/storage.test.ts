@@ -5,6 +5,8 @@ import {
     getDefaultThinking,
     setDefaultModel,
     setDefaultThinking,
+    setTheme,
+    setSyncState,
 } from "@/lib/storage";
 
 class MockLocalStorage implements Storage {
@@ -95,5 +97,21 @@ describe("storage scoped defaults", () => {
 
         expect(getDefaultModel("agent-a")).toBe("global-model");
         expect(getDefaultThinking("agent-a")).toBe("none");
+    });
+
+    test("uses the agentchat namespace for top-level web storage keys", () => {
+        setTheme("dark");
+        setDefaultModel("global-model");
+        setDefaultThinking("high");
+        setSyncState("cloud-enabled");
+
+        expect(localStorage.getItem("agentchat-theme")).toBe("dark");
+        expect(localStorage.getItem("agentchat-default-model")).toBe(
+            "global-model",
+        );
+        expect(localStorage.getItem("agentchat-default-thinking")).toBe("high");
+        expect(localStorage.getItem("agentchat-sync-state")).toBe(
+            "cloud-enabled",
+        );
     });
 });

@@ -1,10 +1,10 @@
 import * as SecureStore from "expo-secure-store";
 import type { ThinkingLevel, SearchLevel } from "@shared/core/types";
 
-const DEFAULT_THINKING_KEY = "routerchat-default-thinking";
-const DEFAULT_SEARCH_KEY = "routerchat-default-search";
-const DEFAULT_MODEL_KEY = "routerchat-selected-model";
-const FAVORITE_MODELS_KEY = "routerchat-favorite-models";
+const DEFAULT_THINKING_KEY = "agentchat-default-thinking";
+const DEFAULT_SEARCH_KEY = "agentchat-default-search";
+const DEFAULT_MODEL_KEY = "agentchat-selected-model";
+const FAVORITE_MODELS_KEY = "agentchat-favorite-models";
 
 const THINKING_LEVELS: ThinkingLevel[] = [
     "xhigh",

@@ -35,16 +35,16 @@ describe("user-settings-storage", () => {
     });
 
     it("handles legacy true/false search values", async () => {
-        store.set("routerchat-default-search", "true");
+        store.set("agentchat-default-search", "true");
         expect(await storage.getDefaultSearchLevel()).toBe("medium");
 
-        store.set("routerchat-default-search", "false");
+        store.set("agentchat-default-search", "false");
         expect(await storage.getDefaultSearchLevel()).toBe("none");
     });
 
     it("filters favorite model list entries", async () => {
         store.set(
-            "routerchat-favorite-models",
+            "agentchat-favorite-models",
             JSON.stringify(["model-a", 123, null, "model-b"]),
         );
 

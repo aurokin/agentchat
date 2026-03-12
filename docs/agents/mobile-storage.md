@@ -27,10 +27,9 @@ The mobile app uses `expo-sqlite` with `better-sqlite3` for offline-first storag
 
 ## Database Location
 
-- File: `routerchat.db` in the app's document directory.
+- File: `agentchat.db` in the app's document directory.
 - Access via `getDatabase()` from `lib/db/database.ts`.
 - Database initializes automatically on first access.
-- The app brand is `Agentchat`, but the SQLite filename remains `routerchat.db` for backward compatibility with existing local data.
 
 ## Migration Pattern
 

@@ -46,6 +46,14 @@ describe("credential-storage", () => {
         expect(await credentialStorage.getAuthToken()).toBeNull();
     });
 
+    it("stores tokens under the agentchat secure-store keys", async () => {
+        await credentialStorage.setAuthToken("access-token");
+        await credentialStorage.setRefreshToken("refresh-token");
+
+        expect(store.get("agentchat-auth-token")).toBe("access-token");
+        expect(store.get("agentchat-refresh-token")).toBe("refresh-token");
+    });
+
     it("throws when SecureStore set fails", async () => {
         setItemAsync.mockImplementationOnce(() => {
             throw new Error("set-fail");

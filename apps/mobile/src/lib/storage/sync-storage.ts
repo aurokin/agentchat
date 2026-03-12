@@ -5,10 +5,10 @@ import { DEFAULT_SYNC_METADATA } from "@/lib/sync/types";
 
 export type UserTheme = "light" | "dark" | "system";
 
-const SYNC_STATE_KEY = "routerchat-sync-state";
-const SYNC_METADATA_KEY = "routerchat-sync-metadata";
-const THEME_KEY = "routerchat-theme";
-const ONBOARDING_KEY = "routerchat-has-completed-onboarding";
+const SYNC_STATE_KEY = "agentchat-sync-state";
+const SYNC_METADATA_KEY = "agentchat-sync-metadata";
+const THEME_KEY = "agentchat-theme";
+const ONBOARDING_KEY = "agentchat-has-completed-onboarding";
 
 export async function getSyncState(): Promise<SyncState | null> {
     try {

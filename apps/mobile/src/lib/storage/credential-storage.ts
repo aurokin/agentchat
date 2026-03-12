@@ -1,8 +1,8 @@
 import * as SecureStore from "expo-secure-store";
 
 const CREDENTIAL_KEYS = {
-    AUTH_TOKEN: "routerchat-auth-token",
-    REFRESH_TOKEN: "routerchat-refresh-token",
+    AUTH_TOKEN: "agentchat-auth-token",
+    REFRESH_TOKEN: "agentchat-refresh-token",
 } as const;
 
 export async function getAuthToken(): Promise<string | null> {

@@ -2,18 +2,18 @@ import type { SyncState, SyncMetadata } from "./sync/types";
 import { DEFAULT_SYNC_METADATA } from "./sync/types";
 
 const STORAGE_KEYS = {
-    THEME: "routerchat-theme",
-    DEFAULT_MODEL: "routerchat-default-model",
+    THEME: "agentchat-theme",
+    DEFAULT_MODEL: "agentchat-default-model",
     DEFAULT_MODEL_BY_AGENT: "agentchat-default-model-by-agent",
-    DEFAULT_THINKING: "routerchat-default-thinking",
+    DEFAULT_THINKING: "agentchat-default-thinking",
     DEFAULT_THINKING_BY_AGENT: "agentchat-default-thinking-by-agent",
-    FAVORITE_MODELS: "routerchat-favorite-models",
+    FAVORITE_MODELS: "agentchat-favorite-models",
     SELECTED_AGENT: "agentchat-selected-agent",
     SELECTED_CHAT_BY_AGENT: "agentchat-selected-chat-by-agent",
     // Cloud sync keys
-    SYNC_STATE: "routerchat-sync-state",
-    SYNC_METADATA: "routerchat-sync-metadata",
-    SYNC_AUTO_ENABLE: "routerchat-sync-auto-enable",
+    SYNC_STATE: "agentchat-sync-state",
+    SYNC_METADATA: "agentchat-sync-metadata",
+    SYNC_AUTO_ENABLE: "agentchat-sync-auto-enable",
 } as const;
 
 export function getTheme(): "light" | "dark" | "system" {

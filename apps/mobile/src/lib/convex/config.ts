@@ -1,6 +1,6 @@
 import * as SecureStore from "expo-secure-store";
 
-const CONVEX_URL_KEY = "routerchat-convex-url";
+const CONVEX_URL_KEY = "agentchat-convex-url";
 
 function normalizeConvexUrl(url?: string | null): string | null {
     if (!url) {
