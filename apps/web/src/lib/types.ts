@@ -47,6 +47,24 @@ export interface ChatRunSummary {
     latestEventAt: number | null;
 }
 
+export type ConversationRuntimePhase =
+    | "idle"
+    | "active"
+    | "recovering"
+    | "interrupted"
+    | "failed";
+
+export interface ConversationRuntimeState {
+    phase: ConversationRuntimePhase;
+    runId: string | null;
+    assistantMessageId: string | null;
+    provider: string | null;
+    errorMessage: string | null;
+    startedAt: number | null;
+    completedAt: number | null;
+    lastEventAt: number | null;
+}
+
 export type ImageMimeType =
     | "image/jpeg"
     | "image/png"

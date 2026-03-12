@@ -14,6 +14,7 @@ import { api } from "@convex/_generated/api";
 import type { FunctionReference } from "convex/server";
 import type {
     ChatRunSummary,
+    ConversationRuntimeState,
     ChatSession,
     Message,
     ThinkingLevel,
@@ -31,6 +32,7 @@ import {
     filterChatsForAgent,
     resolveCurrentChatForAgent,
 } from "@/contexts/chat-helpers";
+import { deriveConversationRuntimeState } from "@/contexts/runtime-helpers";
 import * as storage from "@/lib/storage";
 import { v4 as uuid } from "uuid";
 
@@ -39,6 +41,7 @@ interface ChatContextType {
     currentChat: ChatSession | null;
     messages: Message[];
     runSummaries: ChatRunSummary[];
+    runtimeState: ConversationRuntimeState;
     loading: boolean;
     isMessagesLoading: boolean;
     canLoadMoreChats: boolean;
@@ -133,6 +136,14 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     const runSummaries = useMemo(
         () => cloudRunSummaries ?? [],
         [cloudRunSummaries],
+    );
+    const runtimeState = useMemo(
+        () =>
+            deriveConversationRuntimeState({
+                messages,
+                runSummaries,
+            }),
+        [messages, runSummaries],
     );
 
     useEffect(() => {
@@ -527,6 +538,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 currentChat,
                 messages,
                 runSummaries,
+                runtimeState,
                 loading,
                 isMessagesLoading,
                 canLoadMoreChats,

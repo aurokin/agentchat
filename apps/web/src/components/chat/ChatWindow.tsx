@@ -156,6 +156,7 @@ export function ChatWindow() {
         currentChat,
         messages,
         runSummaries,
+        runtimeState,
         isMessagesLoading,
         addMessage,
         updateMessage,
@@ -460,6 +461,16 @@ export function ChatWindow() {
         }
         return byMessageId;
     }, [runSummaries]);
+    const effectiveRuntimeState = useMemo(
+        () =>
+            recoveredRunNotice && runtimeState.phase === "active"
+                ? {
+                      ...runtimeState,
+                      phase: "recovering" as const,
+                  }
+                : runtimeState,
+        [recoveredRunNotice, runtimeState],
+    );
 
     useEffect(() => {
         if (!currentChat || isMessagesLoading) return;
@@ -525,20 +536,23 @@ export function ChatWindow() {
             return;
         }
 
+        if (
+            runtimeState.phase !== "active" ||
+            !runtimeState.assistantMessageId
+        ) {
+            return;
+        }
+
         const activeAssistantMessage =
-            [...messages]
-                .reverse()
-                .find(
-                    (message) =>
-                        message.role === "assistant" &&
-                        message.status === "streaming",
-                ) ?? null;
+            messages.find(
+                (message) => message.id === runtimeState.assistantMessageId,
+            ) ?? null;
         if (!activeAssistantMessage) {
             return;
         }
 
         const assistantIndex = messages.findIndex(
-            (message) => message.id === activeAssistantMessage.id,
+            (message) => message.id === runtimeState.assistantMessageId,
         );
         const userContent =
             messages
@@ -551,7 +565,7 @@ export function ChatWindow() {
             assistantMessageId: activeAssistantMessage.id,
             userContent,
             content: activeAssistantMessage.content,
-            runId: activeAssistantMessage.runId ?? null,
+            runId: runtimeState.runId ?? activeAssistantMessage.runId ?? null,
         };
         setSending(true);
         setRecoveredRunNotice(true);
@@ -565,6 +579,7 @@ export function ChatWindow() {
         isMessagesLoading,
         messages,
         queueStreamingMessageUpdate,
+        runtimeState,
     ]);
 
     useEffect(() => {
@@ -986,7 +1001,7 @@ export function ChatWindow() {
                 </div>
             )}
 
-            {!error && recoveredRunNotice && (
+            {!error && effectiveRuntimeState.phase === "recovering" && (
                 <div className="px-6 py-3 bg-primary/5 border-b border-primary/20 flex items-center gap-3 relative z-20">
                     <RefreshCw
                         size={16}
@@ -994,6 +1009,31 @@ export function ChatWindow() {
                     />
                     <p className="text-sm text-primary">
                         Reconnected to the active run for this conversation.
+                    </p>
+                </div>
+            )}
+
+            {!error && effectiveRuntimeState.phase === "failed" && (
+                <div className="px-6 py-3 bg-error/5 border-b border-error/20 flex items-center gap-3 relative z-20">
+                    <AlertCircle
+                        size={16}
+                        className="text-error flex-shrink-0"
+                    />
+                    <p className="text-sm text-error">
+                        {effectiveRuntimeState.errorMessage ??
+                            "The last run for this conversation failed."}
+                    </p>
+                </div>
+            )}
+
+            {!error && effectiveRuntimeState.phase === "interrupted" && (
+                <div className="px-6 py-3 bg-warning/5 border-b border-warning/20 flex items-center gap-3 relative z-20">
+                    <AlertCircle
+                        size={16}
+                        className="text-warning flex-shrink-0"
+                    />
+                    <p className="text-sm text-warning">
+                        The last run for this conversation was interrupted.
                     </p>
                 </div>
             )}
