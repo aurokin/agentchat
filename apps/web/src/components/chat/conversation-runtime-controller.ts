@@ -41,6 +41,34 @@ export type PreparedConversationSend = {
 };
 
 type RuntimeIdFactory = () => string;
+type MessageUpdate = Partial<
+    Pick<Message, "content" | "contextContent" | "thinking" | "attachmentIds">
+>;
+
+export type ConversationSendRuntimeDependencies = {
+    addMessage: (message: ConversationMessageDraft) => Promise<Message>;
+    updateChat: (chat: ChatSession) => Promise<void>;
+    updateMessage: (id: string, updates: MessageUpdate) => Promise<void>;
+    setDefaultModel: (modelId: string) => void;
+    setDefaultThinking: (thinking: ChatSession["thinking"]) => void;
+    queueStreamingMessageUpdate: (
+        update: StreamingMessageState | null,
+    ) => void | Promise<void>;
+    ensureConnected: () => Promise<void>;
+    sendCommand: (command: ConversationSendCommand) => void;
+};
+
+export type ConversationSendRuntimeResult =
+    | {
+          status: "sent";
+          activeRun: ActiveRunState;
+      }
+    | {
+          status: "failed";
+          error: RuntimeErrorState;
+          retryChat: RetryChatState;
+          assistantMessageId: string | null;
+      };
 
 export function getChatTitleUpdate(
     chat: ChatSession | null,
@@ -135,6 +163,101 @@ export function buildInterruptCommand(
             conversationId,
         },
     };
+}
+
+export async function runConversationSend(params: {
+    chat: ChatSession;
+    messages: Message[];
+    models: OpenRouterModel[];
+    content: string;
+    dependencies: ConversationSendRuntimeDependencies;
+}): Promise<ConversationSendRuntimeResult> {
+    let assistantMessageId: string | null = null;
+
+    try {
+        const sendPlan = prepareConversationSend({
+            chat: params.chat,
+            messages: params.messages,
+            models: params.models,
+            content: params.content,
+        });
+        assistantMessageId = sendPlan.assistantMessage.id;
+
+        await params.dependencies.addMessage(sendPlan.userMessage);
+        params.dependencies.setDefaultModel(params.chat.modelId);
+        if (sendPlan.shouldPersistDefaultThinking) {
+            params.dependencies.setDefaultThinking(sendPlan.effectiveThinking);
+        }
+
+        if (sendPlan.titleUpdate) {
+            await params.dependencies.updateChat(sendPlan.titleUpdate);
+        }
+
+        await params.dependencies.addMessage(sendPlan.assistantMessage);
+        await params.dependencies.queueStreamingMessageUpdate({
+            id: sendPlan.assistantMessage.id,
+            content: "",
+            thinking: undefined,
+        });
+        await params.dependencies.ensureConnected();
+        params.dependencies.sendCommand(sendPlan.command);
+
+        return {
+            status: "sent",
+            activeRun: sendPlan.activeRun,
+        };
+    } catch (sendError) {
+        if (assistantMessageId) {
+            try {
+                await params.dependencies.updateMessage(assistantMessageId, {
+                    content: "",
+                    contextContent: "",
+                });
+            } catch {
+                // Preserve the original send error as the surfaced failure.
+            }
+        }
+
+        return {
+            status: "failed",
+            assistantMessageId,
+            error: {
+                message:
+                    sendError instanceof Error
+                        ? sendError.message
+                        : "Failed to send message",
+                isRetryable: true,
+            },
+            retryChat: {
+                content: params.content,
+                contextContent: params.content,
+            },
+        };
+    }
+}
+
+export function interruptConversationRun(params: {
+    activeRun: ActiveRunState | null;
+    sendCommand: (command: ConversationInterruptCommand) => void;
+}): RuntimeErrorState | null {
+    if (!params.activeRun) {
+        return null;
+    }
+
+    try {
+        params.sendCommand(
+            buildInterruptCommand(params.activeRun.conversationId),
+        );
+        return null;
+    } catch (cancelError) {
+        return {
+            message:
+                cancelError instanceof Error
+                    ? cancelError.message
+                    : "Failed to interrupt the active run",
+            isRetryable: true,
+        };
+    }
 }
 
 export type SocketEventResolution =

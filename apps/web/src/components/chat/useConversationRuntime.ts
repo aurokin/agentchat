@@ -21,10 +21,10 @@ import {
     type StreamingMessageState,
 } from "./conversation-runtime-helpers";
 import {
-    buildInterruptCommand,
-    prepareConversationSend,
+    interruptConversationRun,
     resolveConversationRuntimeSync,
     resolveConversationSocketEvent,
+    runConversationSend,
 } from "./conversation-runtime-controller";
 
 type UseConversationRuntimeParams = {
@@ -324,62 +324,35 @@ export function useConversationRuntime({
 
             let assistantMessageId: string | null = null;
 
-            try {
-                const sendPlan = prepareConversationSend({
-                    chat: chatSnapshot,
-                    messages: messagesSnapshot,
-                    models,
-                    content,
-                });
-                assistantMessageId = sendPlan.assistantMessage.id;
+            const result = await runConversationSend({
+                chat: chatSnapshot,
+                messages: messagesSnapshot,
+                models,
+                content,
+                dependencies: {
+                    addMessage,
+                    updateChat,
+                    updateMessage,
+                    setDefaultModel,
+                    setDefaultThinking,
+                    queueStreamingMessageUpdate,
+                    ensureConnected: () =>
+                        socketClient.ensureConnected(getBackendSessionToken),
+                    sendCommand: (command) => socketClient.send(command),
+                },
+            });
 
-                await addMessage(sendPlan.userMessage);
-                setDefaultModel(chatSnapshot.modelId);
-                if (sendPlan.shouldPersistDefaultThinking) {
-                    setDefaultThinking(sendPlan.effectiveThinking);
-                }
-
-                if (sendPlan.titleUpdate) {
-                    await updateChat(sendPlan.titleUpdate);
-                }
-
-                await addMessage(sendPlan.assistantMessage);
-                queueStreamingMessageUpdate({
-                    id: sendPlan.assistantMessage.id,
-                    content: "",
-                    thinking: undefined,
-                });
-                activeRunRef.current = sendPlan.activeRun;
-
-                await socketClient.ensureConnected(getBackendSessionToken);
-                socketClient.send(sendPlan.command);
-            } catch (sendError) {
-                activeRunRef.current = null;
-                setSending(false);
-                clearStreamingMessage();
-                if (assistantMessageId) {
-                    try {
-                        await updateMessage(assistantMessageId, {
-                            content: "",
-                            contextContent: "",
-                        });
-                    } catch {
-                        // Preserve the original error surfaced below.
-                    }
-                }
-
-                setError({
-                    message:
-                        sendError instanceof Error
-                            ? sendError.message
-                            : "Failed to send message",
-                    isRetryable: true,
-                });
-                setRetryChat({
-                    content,
-                    contextContent: content,
-                });
+            if (result.status === "sent") {
+                activeRunRef.current = result.activeRun;
+                return;
             }
+
+            assistantMessageId = result.assistantMessageId;
+            activeRunRef.current = null;
+            setSending(false);
+            clearStreamingMessage();
+            setError(result.error);
+            setRetryChat(result.retryChat);
         },
         [
             addMessage,
@@ -398,21 +371,12 @@ export function useConversationRuntime({
     );
 
     const handleCancel = useCallback(() => {
-        const activeRun = activeRunRef.current;
-        if (!activeRun) {
-            return;
-        }
-
-        try {
-            socketClient.send(buildInterruptCommand(activeRun.conversationId));
-        } catch (cancelError) {
-            setError({
-                message:
-                    cancelError instanceof Error
-                        ? cancelError.message
-                        : "Failed to interrupt the active run",
-                isRetryable: true,
-            });
+        const error = interruptConversationRun({
+            activeRun: activeRunRef.current,
+            sendCommand: (command) => socketClient.send(command),
+        });
+        if (error) {
+            setError(error);
         }
     }, [socketClient]);
 

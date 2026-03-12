@@ -10,9 +10,11 @@ import {
 import {
     buildInterruptCommand,
     getChatTitleUpdate,
+    interruptConversationRun,
     prepareConversationSend,
     resolveConversationRuntimeSync,
     resolveConversationSocketEvent,
+    runConversationSend,
 } from "@/components/chat/conversation-runtime-controller";
 
 function createChat(overrides: Partial<ChatSession> = {}): ChatSession {
@@ -165,6 +167,157 @@ describe("conversation runtime controller", () => {
             payload: {
                 conversationId: "chat-1",
             },
+        });
+    });
+
+    test("runs a successful send flow and returns the active run", async () => {
+        const calls: string[] = [];
+        const result = await runConversationSend({
+            chat: createChat(),
+            messages: [],
+            models: createModels(),
+            content: "Ship it",
+            dependencies: {
+                addMessage: async (message) => {
+                    calls.push(`add:${message.role}:${message.id}`);
+                    return {
+                        id: message.id,
+                        sessionId: message.chatId,
+                        role: message.role,
+                        content: message.content,
+                        contextContent: message.contextContent,
+                        modelId: message.modelId,
+                        thinkingLevel: message.thinkingLevel,
+                        createdAt: 1,
+                    };
+                },
+                updateChat: async (chat) => {
+                    calls.push(`updateChat:${chat.title}`);
+                },
+                updateMessage: async () => {
+                    calls.push("updateMessage");
+                },
+                setDefaultModel: (modelId) => {
+                    calls.push(`defaultModel:${modelId}`);
+                },
+                setDefaultThinking: (thinking) => {
+                    calls.push(`defaultThinking:${thinking}`);
+                },
+                queueStreamingMessageUpdate: (update) => {
+                    calls.push(`stream:${update?.id ?? "none"}`);
+                },
+                ensureConnected: async () => {
+                    calls.push("ensureConnected");
+                },
+                sendCommand: (command) => {
+                    calls.push(`send:${command.type}`);
+                },
+            },
+        });
+
+        expect(result.status).toBe("sent");
+        expect(result).toMatchObject({
+            activeRun: {
+                conversationId: "chat-1",
+                userContent: "Ship it",
+                content: "",
+                runId: null,
+            },
+        });
+        expect(calls).toEqual([
+            expect.stringMatching(/^add:user:/),
+            "defaultModel:gpt-5.3-codex",
+            "defaultThinking:high",
+            "updateChat:Ship it",
+            expect.stringMatching(/^add:assistant:/),
+            expect.stringMatching(/^stream:/),
+            "ensureConnected",
+            "send:conversation.send",
+        ]);
+    });
+
+    test("cleans up the assistant draft when connection setup fails", async () => {
+        const updates: Array<{ id: string; content: string; context: string }> =
+            [];
+        const result = await runConversationSend({
+            chat: createChat(),
+            messages: [],
+            models: createModels(),
+            content: "Break it",
+            dependencies: {
+                addMessage: async (message) => ({
+                    id: message.id,
+                    sessionId: message.chatId,
+                    role: message.role,
+                    content: message.content,
+                    contextContent: message.contextContent,
+                    modelId: message.modelId,
+                    thinkingLevel: message.thinkingLevel,
+                    createdAt: 1,
+                }),
+                updateChat: async () => {},
+                updateMessage: async (id, update) => {
+                    updates.push({
+                        id,
+                        content: update.content ?? "",
+                        context: update.contextContent ?? "",
+                    });
+                },
+                setDefaultModel: () => {},
+                setDefaultThinking: () => {},
+                queueStreamingMessageUpdate: () => {},
+                ensureConnected: async () => {
+                    throw new Error("socket unavailable");
+                },
+                sendCommand: () => {},
+            },
+        });
+
+        expect(result.status).toBe("failed");
+        if (result.status !== "failed") {
+            throw new Error("Expected failed result");
+        }
+        if (!result.assistantMessageId) {
+            throw new Error("Expected an assistant message id for cleanup");
+        }
+        expect(result).toEqual({
+            status: "failed",
+            assistantMessageId: expect.any(String),
+            error: {
+                message: "socket unavailable",
+                isRetryable: true,
+            },
+            retryChat: {
+                content: "Break it",
+                contextContent: "Break it",
+            },
+        });
+        expect(updates).toEqual([
+            {
+                id: result.assistantMessageId,
+                content: "",
+                context: "",
+            },
+        ]);
+    });
+
+    test("returns an interrupt error when the socket command throws", () => {
+        expect(
+            interruptConversationRun({
+                activeRun: {
+                    conversationId: "chat-1",
+                    assistantMessageId: "assistant-1",
+                    userContent: "Hello",
+                    content: "",
+                    runId: "run-1",
+                },
+                sendCommand: () => {
+                    throw new Error("cannot interrupt");
+                },
+            }),
+        ).toEqual({
+            message: "cannot interrupt",
+            isRetryable: true,
         });
     });
 
