@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, forwardRef } from "react";
-import { Send } from "lucide-react";
+import { Send, Square } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ModelSelector } from "./ModelSelector";
 import { ThinkingToggle } from "./ThinkingToggle";
@@ -10,8 +10,10 @@ import type { ThinkingLevel } from "@/lib/types";
 
 interface MessageInputProps {
     onSend: (content: string) => void;
+    onCancel?: () => void;
     disabled?: boolean;
     canSend?: boolean;
+    isSending?: boolean;
     selectedModel: string;
     onModelChange: (modelId: string) => void;
     thinkingLevel: ThinkingLevel;
@@ -23,8 +25,10 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
     (props, ref) => {
         const {
             onSend,
+            onCancel,
             disabled,
             canSend = true,
+            isSending = false,
             selectedModel,
             onModelChange,
             thinkingLevel,
@@ -122,18 +126,28 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
                         />
                         <div className="absolute right-3 bottom-3 flex items-center gap-1">
                             <KeybindingsHelp />
-                            <button
-                                type="submit"
-                                disabled={!canSubmit}
-                                className={cn(
-                                    "p-2.5 transition-all duration-200",
-                                    canSubmit
-                                        ? "bg-primary text-primary-foreground hover:shadow-deco-glow"
-                                        : "bg-muted text-muted-foreground cursor-not-allowed",
-                                )}
-                            >
-                                <Send size={16} />
-                            </button>
+                            {isSending && onCancel ? (
+                                <button
+                                    type="button"
+                                    onClick={onCancel}
+                                    className="p-2.5 transition-all duration-200 bg-error/10 text-error hover:bg-error/20"
+                                >
+                                    <Square size={16} />
+                                </button>
+                            ) : (
+                                <button
+                                    type="submit"
+                                    disabled={!canSubmit}
+                                    className={cn(
+                                        "p-2.5 transition-all duration-200",
+                                        canSubmit
+                                            ? "bg-primary text-primary-foreground hover:shadow-deco-glow"
+                                            : "bg-muted text-muted-foreground cursor-not-allowed",
+                                    )}
+                                >
+                                    <Send size={16} />
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>

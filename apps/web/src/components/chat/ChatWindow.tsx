@@ -10,10 +10,14 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@convex/_generated/api";
+import type { FunctionReference } from "convex/server";
 import { useChat } from "@/contexts/ChatContext";
 import { useAgent } from "@/contexts/AgentContext";
 import { useSettings } from "@/contexts/SettingsContext";
-import { OpenRouterApiError, type MessageContent } from "@/lib/openrouter";
+import {
+    getSharedAgentchatSocketClient,
+    type AgentchatSocketEvent,
+} from "@/lib/agentchat-socket";
 import { useActionSafe } from "@/hooks/useConvexSafe";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
@@ -33,6 +37,12 @@ import { trimTrailingEmptyLines } from "@shared/core/text";
 import { generateUUID } from "@/lib/utils";
 import { Hexagon, Sparkles, AlertCircle, RefreshCw } from "lucide-react";
 
+const convexApi = api as typeof api & {
+    backendTokens: {
+        issue: FunctionReference<"action">;
+    };
+};
+
 interface ErrorState {
     message: string;
     isRetryable: boolean;
@@ -42,6 +52,14 @@ interface StreamingMessageState {
     id: string;
     content: string;
     thinking?: string;
+}
+
+interface ActiveRunState {
+    conversationId: string;
+    assistantMessageId: string;
+    userContent: string;
+    content: string;
+    runId: string | null;
 }
 
 export function applyStreamingMessageOverlay(
@@ -151,7 +169,10 @@ export function ChatWindow() {
         models,
         favoriteModels,
     } = useSettings();
-    const sendOpenRouterMessage = useActionSafe(api.openrouter.sendMessage);
+    const issueBackendSessionToken = useActionSafe(
+        convexApi.backendTokens.issue,
+    );
+    const socketClient = useMemo(() => getSharedAgentchatSocketClient(), []);
 
     const [sending, setSending] = useState(false);
     const [error, setError] = useState<ErrorState | null>(null);
@@ -167,6 +188,7 @@ export function ChatWindow() {
     );
     const streamingFrameRef = useRef<number | null>(null);
     const lastInitializedChatIdRef = useRef<string | null>(null);
+    const activeRunRef = useRef<ActiveRunState | null>(null);
 
     const queueStreamingMessageUpdate = useCallback(
         (nextState: StreamingMessageState | null) => {
@@ -205,6 +227,143 @@ export function ChatWindow() {
             }
         };
     }, []);
+
+    const persistActiveAssistantMessage = useCallback(
+        async (contentOverride?: string) => {
+            const activeRun = activeRunRef.current;
+            if (!activeRun) {
+                return;
+            }
+
+            const finalContent =
+                trimTrailingEmptyLines(contentOverride ?? activeRun.content) ??
+                "";
+            await updateMessage(activeRun.assistantMessageId, {
+                content: finalContent,
+                contextContent: finalContent,
+            });
+        },
+        [updateMessage],
+    );
+
+    const clearActiveRun = useCallback(() => {
+        activeRunRef.current = null;
+        clearStreamingMessage();
+        setSending(false);
+    }, [clearStreamingMessage]);
+
+    const getBackendSessionToken = useCallback(async () => {
+        const result = await issueBackendSessionToken({});
+        if (!result || typeof result.token !== "string") {
+            throw new Error(
+                "Unable to create an authenticated Agentchat server session.",
+            );
+        }
+
+        return result.token;
+    }, [issueBackendSessionToken]);
+
+    const handleSocketEvent = useCallback(
+        (event: AgentchatSocketEvent) => {
+            const activeRun = activeRunRef.current;
+            if (!activeRun) {
+                return;
+            }
+
+            if (
+                "conversationId" in event.payload &&
+                event.payload.conversationId !== activeRun.conversationId
+            ) {
+                return;
+            }
+
+            if (event.type === "run.started") {
+                activeRun.runId = event.payload.runId;
+                return;
+            }
+
+            if (
+                "runId" in event.payload &&
+                activeRun.runId &&
+                event.payload.runId !== activeRun.runId
+            ) {
+                return;
+            }
+
+            if (event.type === "message.delta") {
+                activeRun.content = event.payload.content;
+                queueStreamingMessageUpdate({
+                    id: activeRun.assistantMessageId,
+                    content: event.payload.content,
+                });
+                return;
+            }
+
+            if (event.type === "message.completed") {
+                activeRun.content = event.payload.content;
+                queueStreamingMessageUpdate({
+                    id: activeRun.assistantMessageId,
+                    content: event.payload.content,
+                });
+                return;
+            }
+
+            if (event.type === "run.completed") {
+                void persistActiveAssistantMessage().finally(() => {
+                    clearActiveRun();
+                });
+                return;
+            }
+
+            if (event.type === "run.interrupted") {
+                void persistActiveAssistantMessage().finally(() => {
+                    clearActiveRun();
+                });
+                return;
+            }
+
+            if (event.type === "run.failed") {
+                const message = event.payload.error.message;
+                void persistActiveAssistantMessage().finally(() => {
+                    setError({
+                        message,
+                        isRetryable: true,
+                    });
+                    setRetryChat({
+                        content: activeRun.userContent,
+                        contextContent: activeRun.userContent,
+                    });
+                    clearActiveRun();
+                });
+                return;
+            }
+
+            if (event.type === "connection.error") {
+                const message = event.payload.message;
+                void persistActiveAssistantMessage().finally(() => {
+                    setError({
+                        message,
+                        isRetryable: true,
+                    });
+                    setRetryChat({
+                        content: activeRun.userContent,
+                        contextContent: activeRun.userContent,
+                    });
+                    clearActiveRun();
+                });
+            }
+        },
+        [
+            clearActiveRun,
+            persistActiveAssistantMessage,
+            queueStreamingMessageUpdate,
+        ],
+    );
+
+    useEffect(() => {
+        const unsubscribe = socketClient.subscribe(handleSocketEvent);
+        return unsubscribe;
+    }, [handleSocketEvent, socketClient]);
 
     useEffect(() => {
         if (!currentChat) {
@@ -411,8 +570,6 @@ export function ChatWindow() {
         clearStreamingMessage();
 
         let assistantMessageId: string | null = null;
-        let fullResponse = "";
-        let fullThinking = "";
 
         try {
             const currentModel = models.find(
@@ -451,23 +608,6 @@ export function ChatWindow() {
                 await updateChat(updatedChat);
             }
 
-            const currentMessages: Array<{
-                role: string;
-                content: MessageContent;
-            }> = [];
-
-            for (const m of messagesSnapshot) {
-                currentMessages.push({
-                    role: m.role,
-                    content: m.contextContent,
-                });
-            }
-
-            currentMessages.push({
-                role: "user",
-                content: contextContent,
-            });
-
             const assistantMessage = await addMessage({
                 role: "assistant",
                 content: "",
@@ -482,73 +622,84 @@ export function ChatWindow() {
                 content: "",
                 thinking: undefined,
             });
+            activeRunRef.current = {
+                conversationId: chatSnapshot.id,
+                assistantMessageId: assistantMessage.id,
+                userContent: content,
+                content: "",
+                runId: null,
+            };
 
-            const response = await sendOpenRouterMessage({
-                messages: currentMessages,
-                session: {
-                    id: chatSnapshot.id,
+            await socketClient.ensureConnected(getBackendSessionToken);
+            socketClient.send({
+                id: generateUUID(),
+                type: "conversation.send",
+                payload: {
+                    conversationId: chatSnapshot.id,
+                    agentId: chatSnapshot.agentId,
                     modelId: chatSnapshot.modelId,
                     thinking: effectiveThinking,
+                    content: contextContent,
+                    assistantMessageId: assistantMessage.id,
+                    history: messagesSnapshot.map((message) => ({
+                        role: message.role,
+                        content: message.contextContent,
+                    })),
                 },
-                model: currentModel ?? undefined,
-            });
-            if (!response) {
-                throw new Error(
-                    "Convex is not configured for this deployment.",
-                );
-            }
-
-            fullResponse = response.choices[0]?.message?.content ?? "";
-            fullThinking = response.choices[0]?.message?.thinking ?? "";
-
-            const trimmedResponse = trimTrailingEmptyLines(fullResponse) ?? "";
-            const trimmedThinking = trimTrailingEmptyLines(fullThinking);
-            await updateMessage(assistantMessage.id, {
-                content: trimmedResponse,
-                contextContent: trimmedResponse,
-                thinking: trimmedThinking || undefined,
             });
         } catch (err) {
-            if (assistantMessageId && (fullResponse || fullThinking)) {
-                const partialResponse =
-                    trimTrailingEmptyLines(fullResponse) ?? "";
-                const partialThinking = trimTrailingEmptyLines(fullThinking);
+            activeRunRef.current = null;
+            setSending(false);
+            clearStreamingMessage();
+            if (assistantMessageId) {
                 try {
                     await updateMessage(assistantMessageId, {
-                        content: partialResponse,
-                        contextContent: partialResponse,
-                        thinking: partialThinking || undefined,
+                        content: "",
+                        contextContent: "",
                     });
                 } catch {
-                    // Preserve the original streaming error as the surfaced failure.
+                    // Preserve the original error surfaced below.
                 }
             }
 
-            if (err instanceof OpenRouterApiError) {
-                setError({
-                    message: err.message,
-                    isRetryable: err.isRetryable,
-                });
-                if (err.isRetryable) {
-                    setRetryChat({
-                        content: content,
-                        contextContent: content,
-                    });
-                }
-            } else {
-                setError({
-                    message:
-                        err instanceof Error
-                            ? err.message
-                            : "Failed to send message",
-                    isRetryable: true,
-                });
-            }
-        } finally {
-            setSending(false);
-            clearStreamingMessage();
+            setError({
+                message:
+                    err instanceof Error
+                        ? err.message
+                        : "Failed to send message",
+                isRetryable: true,
+            });
+            setRetryChat({
+                content,
+                contextContent: content,
+            });
         }
     };
+
+    const handleCancel = useCallback(() => {
+        const activeRun = activeRunRef.current;
+        if (!activeRun) {
+            return;
+        }
+
+        try {
+            socketClient.send({
+                id: generateUUID(),
+                type: "conversation.interrupt",
+                payload: {
+                    conversationId: activeRun.conversationId,
+                },
+            });
+        } catch (error) {
+            setError({
+                message:
+                    error instanceof Error
+                        ? error.message
+                        : "Failed to interrupt the active run",
+                isRetryable: true,
+            });
+        }
+    }, [socketClient]);
 
     const handleRetry = async () => {
         if (!retryChat || !currentChat) return;
@@ -691,8 +842,10 @@ export function ChatWindow() {
                 <MessageInput
                     ref={inputRef}
                     onSend={handleSendMessage}
+                    onCancel={handleCancel}
                     disabled={false}
                     canSend={!sending}
+                    isSending={sending}
                     selectedModel={currentChat.modelId}
                     onModelChange={handleModelChange}
                     thinkingLevel={currentChat.thinking}
