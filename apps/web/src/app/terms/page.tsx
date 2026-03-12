@@ -80,10 +80,10 @@ export default function TermsPage() {
 
                     <h2>Limitation of Liability</h2>
                     <p>
-                        TO THE MAXIMUM EXTENT PERMITTED BY LAW, ROUTERCHAT WILL
-                        NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL,
-                        CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF
-                        PROFITS OR REVENUES.
+                        TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE AUTHORS,
+                        CONTRIBUTORS, AND INSTANCE OPERATORS WILL NOT BE LIABLE
+                        FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR
+                        PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS OR REVENUES.
                     </p>
 
                     <h2>Termination</h2>
@@ -103,11 +103,8 @@ export default function TermsPage() {
 
                     <h2>Contact</h2>
                     <p>
-                        Questions about these Terms:{" "}
-                        <a href="mailto:support@routerchat.chat">
-                            support@routerchat.chat
-                        </a>
-                        .
+                        Questions about these Terms should be directed to the
+                        operator of the deployment you are using.
                     </p>
                 </div>
             </div>

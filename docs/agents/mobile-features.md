@@ -1,6 +1,6 @@
 # Mobile Features And UI Patterns
 
-This document should reflect the current Agentchat product direction, not the old Routerchat mobile feature set.
+This document should reflect the current Agentchat product direction, not the old hosted mobile feature set.
 
 ## Current Direction
 

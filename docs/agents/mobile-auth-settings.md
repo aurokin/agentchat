@@ -40,7 +40,6 @@ await clearAllCredentials();
 
 - All credential storage functions are async (unlike web's localStorage which is sync).
 - Expo SecureStore automatically encrypts data on Android and iOS.
-- Keys are still prefixed with `routerchat-` for backward compatibility with existing installs.
 - Always use `clearAllCredentials()` for complete logout.
 
 ## Google OAuth Via Convex Auth

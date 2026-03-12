@@ -352,9 +352,10 @@ export default function SettingsScreen(): ReactElement {
                                         Model Provider
                                     </Text>
                                     <Text style={styles.sectionDescription}>
-                                        This deployment uses an instance-level
-                                        OpenRouter credential. End users do not
-                                        configure their own keys in the app.
+                                        This deployment uses a server-managed
+                                        provider backend. End users do not
+                                        configure provider credentials in the
+                                        app.
                                     </Text>
                                     <View style={styles.storageContainer}>
                                         <Text style={styles.storageInfoText}>
@@ -639,8 +640,8 @@ export default function SettingsScreen(): ReactElement {
                                     </View>
                                     <Text style={styles.settingDescription}>
                                         A self-hosted AI chat app powered by
-                                        Convex and an instance-managed
-                                        OpenRouter backend.
+                                        Convex and a server-managed provider
+                                        backend.
                                     </Text>
                                 </View>
                             </View>
