@@ -124,6 +124,7 @@ Agentchat requires Convex for synced data and authentication:
 Set these as Railway service variables (preview/production) or in `apps/web/.env.local` for local dev. A template lives at `apps/web/.env.example`.
 
 - `NEXT_PUBLIC_CONVEX_URL` - Convex deployment URL (from the Convex dashboard).
+- `NEXT_PUBLIC_AGENTCHAT_SERVER_URL` - Base URL for the self-hosted Agentchat backend server used for provider/agent metadata. Example: `http://localhost:8787` in local dev.
 - `CANONICAL_HOST` - Optional canonical host redirect enforced by web middleware in deployed environments. Example: `CANONICAL_HOST=www.routerchat.chat` to redirect apex requests to `www`. For preview consistency, you can set `CANONICAL_HOST=preview.routerchat.chat` (optional).
 - `DISABLE_CSP` - Optional debug flag (preview/prod only). Set to `true` to disable only the `Content-Security-Policy` header in middleware; other security headers remain enabled. Avoid enabling this in production.
 

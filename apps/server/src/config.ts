@@ -11,6 +11,20 @@ const AuthConfigSchema = z.object({
     googleHostedDomain: z.union([z.string(), z.null()]),
 });
 
+const ProviderVariantSchema = z.object({
+    id: z.string().min(1),
+    label: z.string().min(1),
+    enabled: z.boolean(),
+});
+
+const ProviderModelSchema = z.object({
+    id: z.string().min(1),
+    label: z.string().min(1),
+    enabled: z.boolean(),
+    supportsReasoning: z.boolean(),
+    variants: z.array(ProviderVariantSchema).default([]),
+});
+
 const CodexProviderSchema = z.object({
     id: z.string().min(1),
     kind: z.literal("codex"),
@@ -18,6 +32,7 @@ const CodexProviderSchema = z.object({
     enabled: z.boolean(),
     idleTtlSeconds: z.number().int().positive(),
     modelCacheTtlSeconds: z.number().int().positive(),
+    models: z.array(ProviderModelSchema).default([]),
     codex: z.object({
         command: z.string().min(1),
         args: z.array(z.string()).default([]),

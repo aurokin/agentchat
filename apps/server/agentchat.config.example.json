@@ -14,6 +14,44 @@
             "enabled": true,
             "idleTtlSeconds": 900,
             "modelCacheTtlSeconds": 300,
+            "models": [
+                {
+                    "id": "gpt-5.3-codex",
+                    "label": "GPT-5.3 Codex",
+                    "enabled": true,
+                    "supportsReasoning": true,
+                    "variants": [
+                        {
+                            "id": "fast",
+                            "label": "Fast",
+                            "enabled": true
+                        },
+                        {
+                            "id": "balanced",
+                            "label": "Balanced",
+                            "enabled": true
+                        },
+                        {
+                            "id": "deep",
+                            "label": "Deep",
+                            "enabled": true
+                        }
+                    ]
+                },
+                {
+                    "id": "gpt-5.3-codex-lite",
+                    "label": "GPT-5.3 Codex Lite",
+                    "enabled": true,
+                    "supportsReasoning": false,
+                    "variants": [
+                        {
+                            "id": "fast",
+                            "label": "Fast",
+                            "enabled": true
+                        }
+                    ]
+                }
+            ],
             "codex": {
                 "command": "codex",
                 "args": ["app-server"],

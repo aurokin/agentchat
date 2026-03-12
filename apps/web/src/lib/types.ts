@@ -40,6 +40,10 @@ export interface OpenRouterModel {
     name: string;
     provider: string;
     supportedParameters?: SupportedParameter[];
+    variants?: Array<{
+        id: string;
+        label: string;
+    }>;
 }
 
 export function modelSupportsSearch(

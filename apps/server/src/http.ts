@@ -103,7 +103,19 @@ function getProviderModels(config: AgentchatConfig, providerId: string) {
         providerId: provider.id,
         fetchedAt: null,
         expiresAt: null,
-        models: [],
+        models: provider.models
+            .filter((model) => model.enabled)
+            .map((model) => ({
+                id: model.id,
+                label: model.label,
+                supportsReasoning: model.supportsReasoning,
+                variants: model.variants
+                    .filter((variant) => variant.enabled)
+                    .map((variant) => ({
+                        id: variant.id,
+                        label: variant.label,
+                    })),
+            })),
     };
 }
 

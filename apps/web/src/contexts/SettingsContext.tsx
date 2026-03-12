@@ -11,7 +11,7 @@ import React, {
 import type { UserSettings, OpenRouterModel, ThinkingLevel } from "@/lib/types";
 import { APP_DEFAULT_MODEL } from "@shared/core/models";
 import * as storage from "@/lib/storage";
-import { fetchModels } from "@/lib/openrouter";
+import { fetchAvailableModels } from "@/lib/agentchat-server";
 
 interface SettingsContextType extends UserSettings {
     setDefaultModel: (modelId: string) => void;
@@ -65,7 +65,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
         setLoadingModels(true);
         try {
-            const promise = fetchModels().then((fetchedModels) => {
+            const promise = fetchAvailableModels().then((fetchedModels) => {
                 setModels(fetchedModels);
 
                 const selectedModelId = selectInitialDefaultModel({

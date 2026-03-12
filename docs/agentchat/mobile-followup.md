@@ -20,6 +20,7 @@ This document tracks mobile work that should happen after the web-first migratio
 - Remove mobile image quota, cloud image clearing, and attachment cache code to match the web/Convex cleanup.
 - Remove any remaining mobile dependency on Convex attachment APIs once the mobile runtime is switched to the new provider architecture.
 - Replace current OpenRouter-specific assumptions with backend-driven provider options.
+- Add mobile runtime config for the Agentchat backend base URL, mirroring web `NEXT_PUBLIC_AGENTCHAT_SERVER_URL`.
 - Add backend token handling and a single authenticated WebSocket connection to `apps/server`.
 - Update mobile auth/session handling to work with backend-minted tokens from Convex.
 - Revisit local database tables and sync helpers once the Convex schema migration is defined.

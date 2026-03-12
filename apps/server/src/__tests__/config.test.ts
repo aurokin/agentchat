@@ -21,9 +21,10 @@ describe("server config", () => {
         expect(exampleConfig.providers).toHaveLength(1);
         expect(exampleConfig.agents).toHaveLength(1);
         expect(exampleConfig.agents[0]?.defaultProviderId).toBe("codex-main");
+        expect(exampleConfig.providers[0]?.models[0]?.id).toBe("gpt-5.3-codex");
     });
 
-    test("serves bootstrap and agent options routes", async () => {
+    test("serves bootstrap, provider models, and agent options routes", async () => {
         const fetch = createFetchHandler({
             getConfig: () => exampleConfig,
         });
@@ -38,6 +39,25 @@ describe("server config", () => {
         };
         expect(bootstrap.agents[0]?.id).toBe("example-agent");
         expect(bootstrap.providers[0]?.id).toBe("codex-main");
+
+        const modelsResponse = await fetch(
+            new Request("http://localhost/api/providers/codex-main/models"),
+        );
+        expect(modelsResponse.status).toBe(200);
+        const modelsPayload = (await modelsResponse.json()) as {
+            providerId: string;
+            models: Array<{
+                id: string;
+                supportsReasoning: boolean;
+                variants: Array<{ id: string }>;
+            }>;
+        };
+        expect(modelsPayload.providerId).toBe("codex-main");
+        expect(modelsPayload.models[0]?.id).toBe("gpt-5.3-codex");
+        expect(modelsPayload.models[0]?.supportsReasoning).toBe(true);
+        expect(
+            modelsPayload.models[0]?.variants.map((item) => item.id),
+        ).toEqual(["fast", "balanced", "deep"]);
 
         const optionsResponse = await fetch(
             new Request("http://localhost/api/agents/example-agent/options"),
