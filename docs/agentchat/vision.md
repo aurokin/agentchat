@@ -23,7 +23,7 @@ An agent is an operator-defined workspace on the server with a configured provid
 - Provider abstraction: the backend API should not hardcode Codex into the product model.
 - Codex first: v1 ships with Codex support only, while leaving room for OpenCode later.
 - Realtime by default: users should see live streaming output over WebSocket.
-- Simplicity over knobs: remove product complexity that only existed for the hosted Routerchat model.
+- Simplicity over knobs: remove product complexity that only existed for the earlier hosted product model.
 
 ## Non-Goals For V1
 

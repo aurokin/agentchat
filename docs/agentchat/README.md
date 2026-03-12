@@ -5,7 +5,7 @@ This directory is the canonical reference for the Agentchat rewrite.
 It exists for both humans and agents:
 
 - Humans should use it to understand the product direction, architecture, and delivery plan.
-- Agents should use it to avoid rebuilding old Routerchat assumptions into the new system.
+- Agents should use it to avoid rebuilding old hosted-product assumptions into the new system.
 
 ## Read First
 

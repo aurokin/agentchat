@@ -26,5 +26,5 @@ The canonical rewrite docs live in `docs/agentchat/`.
 
 - Major feature additions must be documented in `README.md`.
 - Environment variable requirements must be listed in `README.md`.
-- Use the product name `Agentchat` (not OpenRouter Chat).
+- Use the product name `Agentchat` consistently.
 - Product direction, rules, and roadmap for the rewrite belong under `docs/agentchat/`.
