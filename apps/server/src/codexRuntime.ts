@@ -7,7 +7,10 @@ import type {
     ConversationSendCommand,
     ServerEvent,
 } from "./socketProtocol.ts";
-import type { RuntimePersistenceClient } from "./runtimePersistence.ts";
+import type {
+    PersistedRuntimeBinding,
+    RuntimePersistenceClient,
+} from "./runtimePersistence.ts";
 
 type JsonRpcResponse = {
     id?: number | string;
@@ -46,7 +49,7 @@ type ConversationRuntime = {
     modelId: string;
     provider: ProviderConfig;
     agent: AgentConfig;
-    client: CodexAppServerClient;
+    client: CodexClient;
     threadId: string;
     activeTurn: ActiveTurn | null;
     idleTimer: ReturnType<typeof setTimeout> | null;
@@ -56,6 +59,21 @@ type ResolvedRuntimeResources = {
     agent: AgentConfig;
     provider: ProviderConfig;
 };
+
+type CodexClient = {
+    initialize: () => Promise<void>;
+    request: (method: string, params: unknown) => Promise<unknown>;
+    onNotification: (
+        handler: (notification: JsonRpcNotification) => void,
+    ) => void;
+    onExit: (handler: (error: Error) => void) => void;
+    stop: () => void;
+};
+
+type CreateCodexClient = (params: {
+    provider: ProviderConfig;
+    agent: AgentConfig;
+}) => CodexClient;
 
 function invariant(condition: unknown, message: string): asserts condition {
     if (!condition) {
@@ -88,6 +106,28 @@ function extractTurnId(result: unknown): string {
     const turnId = (result as { turn?: { id?: unknown } })?.turn?.id;
     invariant(typeof turnId === "string", "Codex turn id missing");
     return turnId;
+}
+
+const RECOVERABLE_THREAD_RESUME_ERROR_SNIPPETS = [
+    "not found",
+    "missing thread",
+    "no such thread",
+    "unknown thread",
+    "does not exist",
+    "is closing",
+];
+
+export function isRecoverableThreadResumeError(error: unknown): boolean {
+    const message = (
+        error instanceof Error ? error.message : String(error)
+    ).toLowerCase();
+    if (!message.includes("thread/resume")) {
+        return false;
+    }
+
+    return RECOVERABLE_THREAD_RESUME_ERROR_SNIPPETS.some((snippet) =>
+        message.includes(snippet),
+    );
 }
 
 export function buildInitialTurnText(
@@ -281,13 +321,18 @@ export class CodexRuntimeManager {
     private readonly runtimes = new Map<string, ConversationRuntime>();
     private readonly getConfig: () => AgentchatConfig;
     private readonly persistence: RuntimePersistenceClient;
+    private readonly createClient: CreateCodexClient;
 
     constructor(params: {
         getConfig: () => AgentchatConfig;
         persistence: RuntimePersistenceClient;
+        createClient?: CreateCodexClient;
     }) {
         this.getConfig = params.getConfig;
         this.persistence = params.persistence;
+        this.createClient =
+            params.createClient ??
+            ((clientParams) => new CodexAppServerClient(clientParams));
     }
 
     async sendMessage(params: {
@@ -463,19 +508,20 @@ export class CodexRuntimeManager {
             }
         }
 
-        const client = new CodexAppServerClient({
+        const client = this.createClient({
             provider: resources.provider,
             agent: resources.agent,
         });
         await client.initialize();
-        const threadResult = await client.request("thread/start", {
-            model: params.command.payload.modelId,
-            cwd: resources.agent.rootPath,
-            approvalPolicy: "never",
-            sandbox: "danger-full-access",
-            personality: "pragmatic",
-            experimentalRawEvents: false,
-            persistExtendedHistory: true,
+        const persistedBinding = await this.persistence.readRuntimeBinding({
+            userId: params.userId,
+            conversationLocalId: params.command.payload.conversationId,
+        });
+        const { threadId, isNew } = await this.openThread({
+            client,
+            resources,
+            binding: persistedBinding,
+            modelId: params.command.payload.modelId,
         });
 
         const runtime: ConversationRuntime = {
@@ -488,7 +534,7 @@ export class CodexRuntimeManager {
             provider: resources.provider,
             agent: resources.agent,
             client,
-            threadId: extractThreadId(threadResult),
+            threadId,
             activeTurn: null,
             idleTimer: null,
         };
@@ -501,7 +547,59 @@ export class CodexRuntimeManager {
         });
 
         this.runtimes.set(key, runtime);
-        return { runtime, isNew: true };
+        return { runtime, isNew };
+    }
+
+    private async openThread(params: {
+        client: CodexClient;
+        resources: ResolvedRuntimeResources;
+        binding: PersistedRuntimeBinding | null;
+        modelId: string;
+    }): Promise<{ threadId: string; isNew: boolean }> {
+        const threadOpenParams = {
+            model: params.modelId,
+            cwd: params.resources.agent.rootPath,
+            approvalPolicy: "never",
+            sandbox: "danger-full-access",
+            personality: "pragmatic",
+            experimentalRawEvents: false,
+            persistExtendedHistory: true,
+        };
+
+        const persistedThreadId =
+            params.binding?.provider === params.resources.provider.id
+                ? params.binding.providerThreadId
+                : null;
+
+        if (persistedThreadId) {
+            try {
+                const threadResult = await params.client.request(
+                    "thread/resume",
+                    {
+                        ...threadOpenParams,
+                        threadId: persistedThreadId,
+                    },
+                );
+                return {
+                    threadId: extractThreadId(threadResult),
+                    isNew: false,
+                };
+            } catch (error) {
+                if (!isRecoverableThreadResumeError(error)) {
+                    params.client.stop();
+                    throw error;
+                }
+            }
+        }
+
+        const threadResult = await params.client.request(
+            "thread/start",
+            threadOpenParams,
+        );
+        return {
+            threadId: extractThreadId(threadResult),
+            isNew: true,
+        };
     }
 
     private handleRuntimeExit(

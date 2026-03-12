@@ -15,6 +15,7 @@ const runtimeInternal = internal as unknown as {
         runInterrupted: any;
         runFailed: any;
         runtimeBinding: any;
+        readRuntimeBinding: any;
     };
 };
 
@@ -63,6 +64,32 @@ function runtimeRoute(params: { path: string; mutation: any }) {
     });
 }
 
+function runtimeQueryRoute(params: { path: string; query: any }) {
+    http.route({
+        path: params.path,
+        method: "POST",
+        handler: httpAction(async (ctx, request) => {
+            try {
+                assertRuntimeIngressAuthorized(request);
+            } catch (error) {
+                return Response.json(
+                    {
+                        error:
+                            error instanceof Error
+                                ? error.message
+                                : "Unauthorized",
+                    },
+                    { status: 401 },
+                );
+            }
+
+            const payload = (await request.json()) as unknown;
+            const result = await ctx.runQuery(params.query, payload as any);
+            return Response.json(result);
+        }),
+    });
+}
+
 runtimeRoute({
     path: "/runtime/run-started",
     mutation: runtimeInternal.runtimeIngress.runStarted,
@@ -86,6 +113,10 @@ runtimeRoute({
 runtimeRoute({
     path: "/runtime/runtime-binding",
     mutation: runtimeInternal.runtimeIngress.runtimeBinding,
+});
+runtimeQueryRoute({
+    path: "/runtime/runtime-binding/read",
+    query: runtimeInternal.runtimeIngress.readRuntimeBinding,
 });
 
 export default http;

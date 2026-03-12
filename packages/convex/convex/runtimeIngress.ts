@@ -1,5 +1,10 @@
 import { v } from "convex/values";
-import { internalMutation, type MutationCtx } from "./_generated/server";
+import {
+    internalMutation,
+    internalQuery,
+    type MutationCtx,
+    type QueryCtx,
+} from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 
 type RuntimeStatus = "idle" | "active" | "expired" | "errored";
@@ -30,6 +35,7 @@ type RunEventKind =
     | "provider_status";
 
 type RuntimeMutationCtx = MutationCtx;
+type RuntimeQueryCtx = QueryCtx;
 
 const runtimeStatusValidator = v.union(
     v.literal("idle"),
@@ -78,6 +84,28 @@ async function getRunByExternalId(
 
 async function getRuntimeBindingByChatId(
     ctx: RuntimeMutationCtx,
+    chatId: Id<"chats">,
+): Promise<Doc<"runtime_bindings"> | null> {
+    return await ctx.db
+        .query("runtime_bindings")
+        .withIndex("by_chatId", (q) => q.eq("chatId", chatId))
+        .unique();
+}
+
+async function getChatByLocalIdForQuery(
+    ctx: RuntimeQueryCtx,
+    args: { userId: Id<"users">; localId: string },
+): Promise<Doc<"chats"> | null> {
+    return await ctx.db
+        .query("chats")
+        .withIndex("by_local_id", (q) =>
+            q.eq("userId", args.userId).eq("localId", args.localId),
+        )
+        .unique();
+}
+
+async function getRuntimeBindingByChatIdForQuery(
+    ctx: RuntimeQueryCtx,
     chatId: Id<"chats">,
 ): Promise<Doc<"runtime_bindings"> | null> {
     return await ctx.db
@@ -293,6 +321,39 @@ export const runStarted = internalMutation({
         });
 
         return { runId };
+    },
+});
+
+export const readRuntimeBinding = internalQuery({
+    args: {
+        userId: v.id("users"),
+        conversationLocalId: v.string(),
+    },
+    handler: async (ctx, args) => {
+        const chat = await getChatByLocalIdForQuery(ctx, {
+            userId: args.userId,
+            localId: args.conversationLocalId,
+        });
+        if (!chat) {
+            return null;
+        }
+
+        const binding = await getRuntimeBindingByChatIdForQuery(ctx, chat._id);
+        if (!binding) {
+            return null;
+        }
+
+        return {
+            provider: binding.provider,
+            status: binding.status,
+            providerThreadId: binding.providerThreadId,
+            providerResumeToken: binding.providerResumeToken,
+            activeRunId: binding.activeRunId,
+            lastError: binding.lastError,
+            lastEventAt: binding.lastEventAt,
+            expiresAt: binding.expiresAt,
+            updatedAt: binding.updatedAt,
+        };
     },
 });
 

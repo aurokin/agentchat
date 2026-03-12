@@ -1,5 +1,17 @@
 type RuntimeEventPayload = Record<string, unknown>;
 
+export type PersistedRuntimeBinding = {
+    provider: string;
+    status: "idle" | "active" | "expired" | "errored";
+    providerThreadId: string | null;
+    providerResumeToken: string | null;
+    activeRunId: string | null;
+    lastError: string | null;
+    lastEventAt: number | null;
+    expiresAt: number | null;
+    updatedAt: number;
+};
+
 function trimTrailingSlash(value: string): string {
     return value.replace(/\/+$/, "");
 }
@@ -53,10 +65,23 @@ export class RuntimePersistenceClient {
         await this.post("/runtime/runtime-binding", payload);
     }
 
+    async readRuntimeBinding(payload: {
+        userId: string;
+        conversationLocalId: string;
+    }): Promise<PersistedRuntimeBinding | null> {
+        const response = await this.post(
+            "/runtime/runtime-binding/read",
+            payload,
+        );
+        const result =
+            (await response.json()) as PersistedRuntimeBinding | null;
+        return result;
+    }
+
     private async post(
         path: string,
         payload: RuntimeEventPayload,
-    ): Promise<void> {
+    ): Promise<Response> {
         const response = await fetch(`${this.baseUrl}${path}`, {
             method: "POST",
             headers: {
@@ -72,5 +97,7 @@ export class RuntimePersistenceClient {
                 `Runtime persistence request failed (${response.status}) for ${path}: ${body}`,
             );
         }
+
+        return response;
     }
 }
