@@ -44,6 +44,7 @@ Notes:
     - `AUTH_GOOGLE_ID=...` and `AUTH_GOOGLE_SECRET=...`
     - `JWKS=...`, `JWT_PRIVATE_KEY=...`
     - `OPENROUTER_API_KEY=...`
+    - `BACKEND_TOKEN_SECRET=...`
 
 2C) Generate Convex Auth secrets and paste them into `./.env.convex.dev.local`:
 
@@ -69,13 +70,19 @@ bun run convex:env -- --env dev
 - Set:
     - `NEXT_PUBLIC_CONVEX_URL=https://<your-deployment>.convex.cloud`
 
-2G) Start local development (Convex + web):
+2G) Configure the local Agentchat backend server runtime:
+
+- Copy `apps/server/.env.example` to `apps/server/.env.local`
+- Set:
+    - `BACKEND_TOKEN_SECRET=<same value you set in Convex>`
+
+2H) Start local development (Convex + backend server + web):
 
 ```bash
 bun run dev:web
 ```
 
-2H) Manual step (only if needed): fix Google OAuth redirect URI.
+2I) Manual step (only if needed): fix Google OAuth redirect URI.
 
 - If sign-in fails with `Error 400: redirect_uri_mismatch`, add this Authorized redirect URI to the OAuth client matching `AUTH_GOOGLE_ID`:
     - `https://<your-deployment>.convex.site/api/auth/callback/google`

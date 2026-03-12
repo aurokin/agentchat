@@ -94,6 +94,7 @@ cd apps/web && bun dev
 1. Create an OpenRouter account at https://openrouter.ai/
 2. Generate an API key for the deployment operator
 3. Set that key in the Convex deployment environment as `OPENROUTER_API_KEY`
+4. Set the same `BACKEND_TOKEN_SECRET` in the Convex deployment environment and `apps/server/.env.local`
 
 ### Hosting
 
@@ -150,11 +151,18 @@ These are Convex-managed environment variables (not Railway vars). Set them in t
 - `AUTH_GOOGLE_ID` - Google OAuth client ID (from Google Cloud Console).
 - `AUTH_GOOGLE_SECRET` - Google OAuth client secret (from Google Cloud Console).
 - `OPENROUTER_API_KEY` - Instance-level OpenRouter API key used for all model requests from this deployment.
+- `BACKEND_TOKEN_SECRET` - Shared secret used to mint short-lived backend session tokens for `apps/server`.
 - `JWKS` - JSON Web Key Set used by Convex auth.
 - `JWT_PRIVATE_KEY` - Private key used by Convex auth for JWT signing.
 Convex also provides some runtime variables that you can read but do not set:
 
 - `CONVEX_SITE_URL` - Convex-provided base URL for this deployment's "site" (used by Convex Auth in `packages/convex/convex/auth.config.ts`).
+
+**Agentchat backend server (`apps/server`)**
+
+Set these in `apps/server/.env.local` for local development. A template lives at `apps/server/.env.example`.
+
+- `BACKEND_TOKEN_SECRET` - Must exactly match the Convex deployment value so `apps/server` can verify backend session tokens.
 
 **Optional Convex limits (anti-abuse knobs)**
 
@@ -202,7 +210,8 @@ Agent instructions live in `AGENTS.md` and the linked docs under `docs/agents/`.
 
 ## Architecture Notes
 
-- **Backend model access**: OpenRouter API calls are made through a Convex action using the deployment's server-side credential
+- **Backend transport**: `apps/server` exposes authenticated WebSocket scaffolding using short-lived backend tokens minted by Convex
+- **Backend model access**: OpenRouter API calls are still made through a Convex action during the transition
 - **Convex-only runtime**: Chats and attachments are stored through Convex during the current development phase
 - **Storage adapter pattern**: The local adapter remains in the codebase, but runtime paths now use Convex
 - **Monorepo**: Designed for future mobile expansion with shared types
