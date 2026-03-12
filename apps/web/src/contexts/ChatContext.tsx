@@ -327,9 +327,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
             const defaultModel = getDefaultModelForAgent({
                 agent: selectedAgent,
-                fallbackModel: storage.getDefaultModel() || APP_DEFAULT_MODEL,
+                fallbackModel:
+                    storage.getDefaultModel(selectedAgentId) ||
+                    APP_DEFAULT_MODEL,
             });
-            const defaultThinking = storage.getDefaultThinking();
+            const defaultThinking = storage.getDefaultThinking(selectedAgentId);
             const chat: ChatSession = {
                 id: uuid(),
                 agentId: selectedAgentId,

@@ -50,7 +50,7 @@ export function selectInitialDefaultModel(params: {
 }
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
-    const { selectedAgent, selectedAgentOptions } = useAgent();
+    const { selectedAgentId, selectedAgent, selectedAgentOptions } = useAgent();
     const [settings, setSettings] = useState<UserSettings>(defaultSettings);
     const [allModels, setAllModels] = useState<OpenRouterModel[]>([]);
     const [loadingModels, setLoadingModels] = useState(false);
@@ -110,7 +110,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
         const selectedModelId = selectInitialDefaultModel({
             fetchedModels: models,
-            userPreferredModel: storage.getDefaultModel(),
+            userPreferredModel: storage.getDefaultModel(selectedAgentId),
             agentDefaultModel:
                 selectedAgentOptions?.defaultModel ??
                 selectedAgent?.defaultModel ??
@@ -121,29 +121,37 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
             return;
         }
 
-        storage.setDefaultModel(selectedModelId);
-        setSettings((prev) =>
-            prev.defaultModel === selectedModelId
-                ? prev
-                : {
-                      ...prev,
-                      defaultModel: selectedModelId,
-                  },
-        );
+        const selectedThinking = storage.getDefaultThinking(selectedAgentId);
+        storage.setDefaultModel(selectedModelId, selectedAgentId);
+        setSettings((prev) => {
+            if (
+                prev.defaultModel === selectedModelId &&
+                prev.defaultThinking === selectedThinking
+            ) {
+                return prev;
+            }
+
+            return {
+                ...prev,
+                defaultModel: selectedModelId,
+                defaultThinking: selectedThinking,
+            };
+        });
     }, [
         models,
         mounted,
+        selectedAgentId,
         selectedAgent?.defaultModel,
         selectedAgentOptions?.defaultModel,
     ]);
 
     const setDefaultModel = (modelId: string) => {
-        storage.setDefaultModel(modelId);
+        storage.setDefaultModel(modelId, selectedAgentId);
         setSettings((prev) => ({ ...prev, defaultModel: modelId }));
     };
 
     const setDefaultThinking = (value: ThinkingLevel) => {
-        storage.setDefaultThinking(value);
+        storage.setDefaultThinking(value, selectedAgentId);
         setSettings((prev) => ({ ...prev, defaultThinking: value }));
     };
 
