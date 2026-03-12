@@ -2,7 +2,7 @@ import { test, expect, describe, beforeEach } from "bun:test";
 import {
     getUserMessage,
     isRetryableError,
-    parseOpenRouterError,
+    parseProviderError,
     parseMidStreamError,
     createErrorFromException,
 } from "@/lib/errors";
@@ -16,13 +16,13 @@ describe("getUserMessage", () => {
 
     test("returns_invalid_provider_credential_for_401", () => {
         expect(getUserMessage(401)).toBe(
-            "This deployment's OpenRouter credential is invalid.",
+            "This deployment's provider credential is invalid.",
         );
     });
 
     test("returns_instance_credit_error_for_402", () => {
         expect(getUserMessage(402)).toBe(
-            "This deployment does not have enough OpenRouter credits.",
+            "This deployment does not have enough provider quota.",
         );
     });
 
@@ -97,7 +97,7 @@ describe("isRetryableError", () => {
         expect(isRetryableError(401)).toBe(false);
     });
 
-    test("returns_false_for_insufficient_credits_402", () => {
+    test("returns_false_for_insufficient_provider_quota_402", () => {
         expect(isRetryableError(402)).toBe(false);
     });
 
@@ -110,7 +110,7 @@ describe("isRetryableError", () => {
     });
 });
 
-describe("parseOpenRouterError", () => {
+describe("parseProviderError", () => {
     test("parses_401_invalid_key_error", () => {
         const response = new Response(null, { status: 401 });
         const body = {
@@ -120,17 +120,17 @@ describe("parseOpenRouterError", () => {
             },
         };
 
-        const error = parseOpenRouterError(response, body);
+        const error = parseProviderError(response, body);
 
         expect(error.code).toBe(401);
         expect(error.message).toBe("Invalid API key");
         expect(error.userMessage).toBe(
-            "This deployment's OpenRouter credential is invalid.",
+            "This deployment's provider credential is invalid.",
         );
         expect(error.isRetryable).toBe(false);
     });
 
-    test("parses_402_no_credits_error", () => {
+    test("parses_402_insufficient_provider_quota_error", () => {
         const response = new Response(null, { status: 402 });
         const body = {
             error: {
@@ -139,11 +139,11 @@ describe("parseOpenRouterError", () => {
             },
         };
 
-        const error = parseOpenRouterError(response, body);
+        const error = parseProviderError(response, body);
 
         expect(error.code).toBe(402);
         expect(error.userMessage).toBe(
-            "This deployment does not have enough OpenRouter credits.",
+            "This deployment does not have enough provider quota.",
         );
         expect(error.isRetryable).toBe(false);
     });
@@ -157,7 +157,7 @@ describe("parseOpenRouterError", () => {
             },
         };
 
-        const error = parseOpenRouterError(response, body);
+        const error = parseProviderError(response, body);
 
         expect(error.code).toBe(429);
         expect(error.userMessage).toBe(
@@ -179,7 +179,7 @@ describe("parseOpenRouterError", () => {
             },
         };
 
-        const error = parseOpenRouterError(response, body);
+        const error = parseProviderError(response, body);
 
         expect(error.code).toBe(403);
         expect(error.metadata?.moderationReasons).toEqual(["hate", "violence"]);
@@ -199,7 +199,7 @@ describe("parseOpenRouterError", () => {
             },
         };
 
-        const error = parseOpenRouterError(response, body);
+        const error = parseProviderError(response, body);
 
         expect(error.code).toBe(502);
         expect(error.metadata?.providerName).toBe("OpenAI");
@@ -214,7 +214,7 @@ describe("parseOpenRouterError", () => {
             statusText: "Internal Server Error",
         });
 
-        const error = parseOpenRouterError(response);
+        const error = parseProviderError(response);
 
         expect(error.code).toBe(500);
         expect(error.message).toBe("Internal Server Error");
@@ -225,7 +225,7 @@ describe("parseOpenRouterError", () => {
         const response = new Response(null, { status: 500 });
         const body = { invalid: "json" };
 
-        const error = parseOpenRouterError(response, body);
+        const error = parseProviderError(response, body);
 
         expect(error.code).toBe(500);
     });

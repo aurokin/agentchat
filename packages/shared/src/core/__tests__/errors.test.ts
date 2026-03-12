@@ -4,7 +4,7 @@ import {
     getUserMessage,
     isRetryableError,
     parseMidStreamError,
-    parseOpenRouterError,
+    parseProviderError,
 } from "../errors";
 
 describe("errors", () => {
@@ -13,7 +13,7 @@ describe("errors", () => {
             "Invalid request. Please check your input.",
         );
         expect(getUserMessage(401)).toBe(
-            "This deployment's OpenRouter credential is invalid.",
+            "This deployment's provider credential is invalid.",
         );
         expect(getUserMessage(429)).toBe(
             "Too many requests. Please wait before trying again.",
@@ -52,7 +52,7 @@ describe("errors", () => {
             },
         };
 
-        const error = parseOpenRouterError(response, body);
+        const error = parseProviderError(response, body);
         expect(error.code).toBe(502);
         expect(error.metadata?.providerName).toBe("OpenAI");
         expect(error.metadata?.rawError).toEqual({
@@ -72,7 +72,7 @@ describe("errors", () => {
             },
         };
 
-        const error = parseOpenRouterError(response, body);
+        const error = parseProviderError(response, body);
         expect(error.metadata?.moderationReasons).toEqual(["violence"]);
         expect(error.metadata?.flaggedInput).toBe("bad prompt");
     });

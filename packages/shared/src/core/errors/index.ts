@@ -1,4 +1,4 @@
-export interface OpenRouterError {
+export interface ProviderError {
     code: number;
     message: string;
     userMessage: string;
@@ -19,9 +19,9 @@ export function getUserMessage(
         case 400:
             return "Invalid request. Please check your input.";
         case 401:
-            return "This deployment's OpenRouter credential is invalid.";
+            return "This deployment's provider credential is invalid.";
         case 402:
-            return "This deployment does not have enough OpenRouter credits.";
+            return "This deployment does not have enough provider quota.";
         case 403:
             const reasons = metadata?.reasons as string[] | undefined;
             if (reasons && reasons.length > 0) {
@@ -48,13 +48,13 @@ export function isRetryableError(code: number): boolean {
     return [408, 429, 502, 503].includes(code);
 }
 
-export function parseOpenRouterError(
+export function parseProviderError(
     response: Response,
     body?: unknown,
-): OpenRouterError {
+): ProviderError {
     const code = response.status;
     let message = response.statusText;
-    let metadata: OpenRouterError["metadata"];
+    let metadata: ProviderError["metadata"];
 
     if (body && typeof body === "object") {
         const errorBody = body as {
@@ -102,7 +102,7 @@ export function parseOpenRouterError(
 
 export function parseMidStreamError(
     chunk: Record<string, unknown>,
-): OpenRouterError | null {
+): ProviderError | null {
     const error = chunk.error as
         | { code?: string | number; message?: string }
         | undefined;
@@ -123,7 +123,7 @@ export function parseMidStreamError(
     return null;
 }
 
-export function createErrorFromException(error: unknown): OpenRouterError {
+export function createErrorFromException(error: unknown): ProviderError {
     if (error instanceof Error) {
         return {
             code: 0,

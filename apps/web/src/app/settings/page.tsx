@@ -136,7 +136,7 @@ function SettingsPageContent() {
                                 </div>
                                 <p className="text-sm text-muted-foreground leading-relaxed">
                                     The web client is being migrated away from
-                                    Routerchat-era OpenRouter and image-upload
+                                    legacy provider-specific and image-upload
                                     assumptions toward the new Agentchat server
                                     architecture.
                                 </p>
