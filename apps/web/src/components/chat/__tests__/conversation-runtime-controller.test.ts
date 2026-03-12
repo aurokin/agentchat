@@ -9,6 +9,7 @@ import {
 } from "@/lib/types";
 import {
     buildInterruptCommand,
+    connectConversationSocket,
     getChatTitleUpdate,
     interruptConversationRun,
     prepareConversationSend,
@@ -168,6 +169,71 @@ describe("conversation runtime controller", () => {
                 conversationId: "chat-1",
             },
         });
+    });
+
+    test("connects and subscribes the current conversation socket session", async () => {
+        const calls: string[] = [];
+        const cleanup = connectConversationSocket({
+            currentChatId: "chat-1",
+            dependencies: {
+                subscribeToConversation: (conversationId) => {
+                    calls.push(`subscribe:${conversationId}`);
+                    return () => {
+                        calls.push(`unsubscribe:${conversationId}`);
+                    };
+                },
+                ensureConnected: async () => {
+                    calls.push("ensureConnected");
+                },
+            },
+        });
+
+        await Promise.resolve();
+        expect(calls).toEqual(["subscribe:chat-1", "ensureConnected"]);
+        cleanup?.();
+        expect(calls).toEqual([
+            "subscribe:chat-1",
+            "ensureConnected",
+            "unsubscribe:chat-1",
+        ]);
+    });
+
+    test("reports socket bootstrap failures through the provided error handler", async () => {
+        const errors: string[] = [];
+        connectConversationSocket({
+            currentChatId: "chat-1",
+            dependencies: {
+                subscribeToConversation: () => () => {},
+                ensureConnected: async () => {
+                    throw new Error("connect failed");
+                },
+                onConnectionError: (error) => {
+                    errors.push(
+                        error instanceof Error ? error.message : String(error),
+                    );
+                },
+            },
+        });
+
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(errors).toEqual(["connect failed"]);
+    });
+
+    test("skips socket setup when no conversation is selected", () => {
+        const cleanup = connectConversationSocket({
+            currentChatId: null,
+            dependencies: {
+                subscribeToConversation: () => {
+                    throw new Error("should not subscribe");
+                },
+                ensureConnected: async () => {
+                    throw new Error("should not connect");
+                },
+            },
+        });
+
+        expect(cleanup).toBeNull();
     });
 
     test("runs a successful send flow and returns the active run", async () => {

@@ -58,6 +58,12 @@ export type ConversationSendRuntimeDependencies = {
     sendCommand: (command: ConversationSendCommand) => void;
 };
 
+export type ConversationSocketSessionDependencies = {
+    subscribeToConversation: (conversationId: string) => () => void;
+    ensureConnected: () => Promise<void>;
+    onConnectionError?: (error: unknown) => void;
+};
+
 export type ConversationSendRuntimeResult =
     | {
           status: "sent";
@@ -163,6 +169,24 @@ export function buildInterruptCommand(
             conversationId,
         },
     };
+}
+
+export function connectConversationSocket(params: {
+    currentChatId: string | null;
+    dependencies: ConversationSocketSessionDependencies;
+}): (() => void) | null {
+    if (!params.currentChatId) {
+        return null;
+    }
+
+    const unsubscribe = params.dependencies.subscribeToConversation(
+        params.currentChatId,
+    );
+    void params.dependencies.ensureConnected().catch((error) => {
+        params.dependencies.onConnectionError?.(error);
+    });
+
+    return unsubscribe;
 }
 
 export async function runConversationSend(params: {

@@ -21,6 +21,7 @@ import {
     type StreamingMessageState,
 } from "./conversation-runtime-helpers";
 import {
+    connectConversationSocket,
     interruptConversationRun,
     resolveConversationRuntimeSync,
     resolveConversationSocketEvent,
@@ -241,24 +242,23 @@ export function useConversationRuntime({
     }, [handleSocketEvent, socketClient]);
 
     useEffect(() => {
-        if (!currentChat) {
-            return;
-        }
-
-        const unsubscribeConversation = socketClient.subscribeToConversation(
-            currentChat.id,
+        return (
+            connectConversationSocket({
+                currentChatId: currentChat?.id ?? null,
+                dependencies: {
+                    subscribeToConversation: (conversationId) =>
+                        socketClient.subscribeToConversation(conversationId),
+                    ensureConnected: () =>
+                        socketClient.ensureConnected(getBackendSessionToken),
+                    onConnectionError: (connectError) => {
+                        console.error(
+                            "Failed to connect Agentchat socket:",
+                            connectError,
+                        );
+                    },
+                },
+            }) ?? undefined
         );
-
-        void socketClient
-            .ensureConnected(getBackendSessionToken)
-            .catch((connectError) => {
-                console.error(
-                    "Failed to connect Agentchat socket:",
-                    connectError,
-                );
-            });
-
-        return unsubscribeConversation;
     }, [currentChat, getBackendSessionToken, socketClient]);
 
     useEffect(() => {
