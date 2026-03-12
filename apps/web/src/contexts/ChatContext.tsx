@@ -136,9 +136,12 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             resolveCurrentChatForAgent({
                 chats: mapped,
                 currentChat: prev,
+                storedChatId: selectedAgentId
+                    ? storage.getSelectedChatId(selectedAgentId)
+                    : null,
             }),
         );
-    }, [cloudChats, isCloudSyncActive]);
+    }, [cloudChats, isCloudSyncActive, selectedAgentId]);
 
     useEffect(() => {
         if (!isCloudSyncActive || !cloudCurrentChat || !cloudMessages) {
@@ -213,32 +216,39 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             );
             setChats(scopedChats);
 
-            const activeChatId = currentChatIdRef.current;
-            if (activeChatId) {
-                setIsMessagesLoading(true);
-                const refreshedChat =
-                    await storageAdapter.getChat(activeChatId);
+            const storedChatId = storage.getSelectedChatId(selectedAgentId);
+            const activeChatId = currentChatIdRef.current ?? storedChatId;
+            if (!activeChatId) {
+                setCurrentChat(null);
+                setMessages([]);
+                setIsMessagesLoading(false);
+                return;
+            }
 
-                if (
-                    !refreshedChat ||
-                    refreshedChat.agentId !== selectedAgentId
-                ) {
-                    if (currentChatIdRef.current === activeChatId) {
-                        setCurrentChat(null);
-                        setMessages([]);
-                    }
-                    setIsMessagesLoading(false);
-                } else {
-                    setCurrentChat(refreshedChat);
-                    const chatMessages = await storageAdapter.getMessagesByChat(
-                        refreshedChat.id,
-                    );
-                    if (currentChatIdRef.current === refreshedChat.id) {
-                        setMessages(chatMessages);
-                    }
-                    setIsMessagesLoading(false);
+            setIsMessagesLoading(true);
+            const refreshedChat = await storageAdapter.getChat(activeChatId);
+
+            if (!refreshedChat || refreshedChat.agentId !== selectedAgentId) {
+                if (storedChatId === activeChatId) {
+                    storage.clearSelectedChatId(selectedAgentId);
                 }
+                if (currentChatIdRef.current === activeChatId || storedChatId) {
+                    setCurrentChat(null);
+                    setMessages([]);
+                }
+                setIsMessagesLoading(false);
             } else {
+                storage.setSelectedChatId(selectedAgentId, refreshedChat.id);
+                setCurrentChat(refreshedChat);
+                const chatMessages = await storageAdapter.getMessagesByChat(
+                    refreshedChat.id,
+                );
+                if (
+                    currentChatIdRef.current === refreshedChat.id ||
+                    storedChatId
+                ) {
+                    setMessages(chatMessages);
+                }
                 setIsMessagesLoading(false);
             }
         } finally {
@@ -304,6 +314,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             setCurrentChat(chat);
             setMessages([]);
             setIsMessagesLoading(false);
+            storage.setSelectedChatId(selectedAgentId, chat.id);
 
             return chat;
         },
@@ -316,6 +327,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 const chat = chats.find((candidate) => candidate.id === chatId);
                 if (!chat) return;
                 setCurrentChat(chat);
+                storage.setSelectedChatId(chat.agentId, chat.id);
                 // `cloudMessages` will populate `messages` reactively.
                 setIsMessagesLoading(true);
                 return;
@@ -324,6 +336,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             const chat = await storageAdapter.getChat(chatId);
             if (chat && chat.agentId === selectedAgentId) {
                 setCurrentChat(chat);
+                storage.setSelectedChatId(chat.agentId, chat.id);
                 setIsMessagesLoading(true);
                 const chatMessages =
                     await storageAdapter.getMessagesByChat(chatId);
@@ -341,13 +354,22 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             await storageAdapter.deleteChat(chatId);
             setChats((prev) => prev.filter((c) => c.id !== chatId));
 
+            const deletedChat =
+                currentChat?.id === chatId
+                    ? currentChat
+                    : (chats.find((candidate) => candidate.id === chatId) ??
+                      null);
+            if (deletedChat) {
+                storage.clearSelectedChatId(deletedChat.agentId);
+            }
+
             if (currentChat?.id === chatId) {
                 setCurrentChat(null);
                 setMessages([]);
                 setIsMessagesLoading(false);
             }
         },
-        [currentChat, storageAdapter],
+        [chats, currentChat, storageAdapter],
     );
 
     const updateChat = useCallback(

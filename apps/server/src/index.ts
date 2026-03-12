@@ -17,6 +17,7 @@ const runtimeManager = new CodexRuntimeManager({
 });
 
 type WebSocketData = {
+    connectionId: string;
     session: {
         sub: string;
         userId: string;
@@ -74,7 +75,10 @@ const server = Bun.serve<WebSocketData>({
             try {
                 const session = await authenticateBackendRequest(request);
                 const upgraded = serverRef.upgrade(request, {
-                    data: { session },
+                    data: {
+                        session,
+                        connectionId: crypto.randomUUID(),
+                    },
                 });
 
                 if (upgraded) {
@@ -131,6 +135,28 @@ const server = Bun.serve<WebSocketData>({
 
             try {
                 const command = parseClientCommand(commandText);
+                const sendEvent = (event: ServerEvent) => {
+                    ws.send(toServerEventJson(event));
+                };
+
+                if (command.type === "conversation.subscribe") {
+                    runtimeManager.subscribe({
+                        userSub: session.sub,
+                        conversationId: command.payload.conversationId,
+                        subscriberId: ws.data.connectionId,
+                        sendEvent,
+                    });
+                    return;
+                }
+
+                if (command.type === "conversation.unsubscribe") {
+                    runtimeManager.unsubscribe({
+                        subscriberId: ws.data.connectionId,
+                        conversationId: command.payload.conversationId,
+                    });
+                    return;
+                }
+
                 if (command.type === "conversation.interrupt") {
                     await runtimeManager.interrupt({
                         userSub: session.sub,
@@ -139,13 +165,16 @@ const server = Bun.serve<WebSocketData>({
                     return;
                 }
 
+                if (command.type !== "conversation.send") {
+                    throw new Error("Unsupported websocket command");
+                }
+
                 await runtimeManager.sendMessage({
                     userSub: session.sub,
                     userId: session.userId,
+                    subscriberId: ws.data.connectionId,
                     command,
-                    sendEvent: (event) => {
-                        ws.send(toServerEventJson(event));
-                    },
+                    sendEvent,
                 });
             } catch (error) {
                 ws.send(
@@ -156,6 +185,11 @@ const server = Bun.serve<WebSocketData>({
                     ),
                 );
             }
+        },
+        close(ws) {
+            runtimeManager.unsubscribe({
+                subscriberId: ws.data.connectionId,
+            });
         },
     },
 });

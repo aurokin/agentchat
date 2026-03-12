@@ -189,6 +189,8 @@ export function ChatWindow() {
     const streamingFrameRef = useRef<number | null>(null);
     const lastInitializedChatIdRef = useRef<string | null>(null);
     const activeRunRef = useRef<ActiveRunState | null>(null);
+    const currentChatRef = useRef<ChatSession | null>(null);
+    const messagesRef = useRef<Message[]>([]);
 
     const queueStreamingMessageUpdate = useCallback(
         (nextState: StreamingMessageState | null) => {
@@ -228,6 +230,14 @@ export function ChatWindow() {
         };
     }, []);
 
+    useEffect(() => {
+        currentChatRef.current = currentChat;
+    }, [currentChat]);
+
+    useEffect(() => {
+        messagesRef.current = messages;
+    }, [messages]);
+
     const persistActiveAssistantMessage = useCallback(
         async (contentOverride?: string) => {
             const activeRun = activeRunRef.current;
@@ -265,26 +275,69 @@ export function ChatWindow() {
 
     const handleSocketEvent = useCallback(
         (event: AgentchatSocketEvent) => {
-            const activeRun = activeRunRef.current;
+            const currentChatSnapshot = currentChatRef.current;
+            if (
+                !currentChatSnapshot ||
+                !("conversationId" in event.payload) ||
+                event.payload.conversationId !== currentChatSnapshot.id
+            ) {
+                return;
+            }
+
+            let activeRun = activeRunRef.current;
+
+            if (event.type === "run.started") {
+                if (!activeRun) {
+                    const assistantMessage = messagesRef.current.find(
+                        (message) => message.id === event.payload.messageId,
+                    );
+                    const assistantMessageIndex = messagesRef.current.findIndex(
+                        (message) => message.id === event.payload.messageId,
+                    );
+                    const userContent =
+                        (
+                            messagesRef.current
+                                .slice(
+                                    0,
+                                    assistantMessageIndex >= 0
+                                        ? assistantMessageIndex
+                                        : undefined,
+                                )
+                                .filter((message) => message.role === "user")
+                                .at(-1) ?? messagesRef.current.at(-1)
+                        )?.content ?? "";
+
+                    activeRun = {
+                        conversationId: event.payload.conversationId,
+                        assistantMessageId: event.payload.messageId,
+                        userContent,
+                        content: assistantMessage?.content ?? "",
+                        runId: event.payload.runId,
+                    };
+                    activeRunRef.current = activeRun;
+                    setSending(true);
+
+                    if (assistantMessage?.content) {
+                        queueStreamingMessageUpdate({
+                            id: activeRun.assistantMessageId,
+                            content: assistantMessage.content,
+                        });
+                    }
+                    return;
+                }
+
+                activeRun.runId = event.payload.runId;
+                return;
+            }
+
             if (!activeRun) {
                 return;
             }
 
             if (
-                "conversationId" in event.payload &&
-                event.payload.conversationId !== activeRun.conversationId
-            ) {
-                return;
-            }
-
-            if (event.type === "run.started") {
-                activeRun.runId = event.payload.runId;
-                return;
-            }
-
-            if (
-                "runId" in event.payload &&
+                ("runId" in event.payload || event.type === "run.completed") &&
                 activeRun.runId &&
+                "runId" in event.payload &&
                 event.payload.runId !== activeRun.runId
             ) {
                 return;
@@ -367,6 +420,24 @@ export function ChatWindow() {
 
     useEffect(() => {
         if (!currentChat) {
+            return;
+        }
+
+        const unsubscribeConversation = socketClient.subscribeToConversation(
+            currentChat.id,
+        );
+
+        void socketClient
+            .ensureConnected(getBackendSessionToken)
+            .catch((error) => {
+                console.error("Failed to connect Agentchat socket:", error);
+            });
+
+        return unsubscribeConversation;
+    }, [currentChat, getBackendSessionToken, socketClient]);
+
+    useEffect(() => {
+        if (!currentChat) {
             lastInitializedChatIdRef.current = null;
         }
     }, [currentChat]);
@@ -423,6 +494,61 @@ export function ChatWindow() {
         messages,
         models,
         updateChat,
+    ]);
+
+    useEffect(() => {
+        if (!currentChat || isMessagesLoading) {
+            return;
+        }
+
+        const existing = activeRunRef.current;
+        if (existing && existing.conversationId !== currentChat.id) {
+            clearActiveRun();
+        }
+
+        if (activeRunRef.current) {
+            return;
+        }
+
+        const activeAssistantMessage =
+            [...messages]
+                .reverse()
+                .find(
+                    (message) =>
+                        message.role === "assistant" &&
+                        message.status === "streaming",
+                ) ?? null;
+        if (!activeAssistantMessage) {
+            return;
+        }
+
+        const assistantIndex = messages.findIndex(
+            (message) => message.id === activeAssistantMessage.id,
+        );
+        const userContent =
+            messages
+                .slice(0, assistantIndex >= 0 ? assistantIndex : undefined)
+                .filter((message) => message.role === "user")
+                .at(-1)?.content ?? "";
+
+        activeRunRef.current = {
+            conversationId: currentChat.id,
+            assistantMessageId: activeAssistantMessage.id,
+            userContent,
+            content: activeAssistantMessage.content,
+            runId: activeAssistantMessage.runId ?? null,
+        };
+        setSending(true);
+        queueStreamingMessageUpdate({
+            id: activeAssistantMessage.id,
+            content: activeAssistantMessage.content,
+        });
+    }, [
+        clearActiveRun,
+        currentChat,
+        isMessagesLoading,
+        messages,
+        queueStreamingMessageUpdate,
     ]);
 
     useEffect(() => {

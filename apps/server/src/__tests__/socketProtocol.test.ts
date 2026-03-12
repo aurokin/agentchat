@@ -67,4 +67,24 @@ describe("socket protocol parsing", () => {
             },
         });
     });
+
+    test("parses subscribe commands", () => {
+        expect(
+            parseClientCommand(
+                JSON.stringify({
+                    id: "cmd-3",
+                    type: "conversation.subscribe",
+                    payload: {
+                        conversationId: "chat-1",
+                    },
+                }),
+            ),
+        ).toEqual({
+            id: "cmd-3",
+            type: "conversation.subscribe",
+            payload: {
+                conversationId: "chat-1",
+            },
+        });
+    });
 });

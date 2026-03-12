@@ -26,9 +26,18 @@ export interface ConversationInterruptCommand {
     };
 }
 
+export interface ConversationSubscribeCommand {
+    id: string;
+    type: "conversation.subscribe" | "conversation.unsubscribe";
+    payload: {
+        conversationId: string;
+    };
+}
+
 export type ClientCommand =
     | ConversationSendCommand
-    | ConversationInterruptCommand;
+    | ConversationInterruptCommand
+    | ConversationSubscribeCommand;
 
 export interface ServerEvent {
     type:
@@ -71,6 +80,24 @@ export function parseClientCommand(raw: string): ClientCommand {
 
     if (typeof command.id !== "string" || typeof command.type !== "string") {
         throw new Error("Invalid client command envelope");
+    }
+
+    if (
+        command.type === "conversation.subscribe" ||
+        command.type === "conversation.unsubscribe"
+    ) {
+        const payload = command.payload as
+            | ConversationSubscribeCommand["payload"]
+            | undefined;
+        if (!payload || typeof payload.conversationId !== "string") {
+            throw new Error("Invalid conversation subscription payload");
+        }
+
+        return {
+            id: command.id,
+            type: command.type,
+            payload,
+        };
     }
 
     if (command.type === "conversation.interrupt") {

@@ -31,9 +31,18 @@ export interface ConversationInterruptCommand {
     };
 }
 
+export interface ConversationSubscriptionCommand {
+    id: string;
+    type: "conversation.subscribe" | "conversation.unsubscribe";
+    payload: {
+        conversationId: string;
+    };
+}
+
 export type AgentchatSocketCommand =
     | ConversationSendCommand
-    | ConversationInterruptCommand;
+    | ConversationInterruptCommand
+    | ConversationSubscriptionCommand;
 
 export type AgentchatSocketEvent =
     | {
@@ -130,9 +139,17 @@ export class AgentchatSocketClient {
     private socket: WebSocket | null = null;
     private connectPromise: Promise<void> | null = null;
     private readonly listeners = new Set<AgentchatSocketListener>();
+    private readonly conversationSubscriptions = new Set<string>();
     private ready = false;
+    private tokenIssuer: TokenIssuer | null = null;
+    private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    private reconnectDelayMs = 500;
+    private explicitlyClosed = false;
 
     async ensureConnected(tokenIssuer: TokenIssuer): Promise<void> {
+        this.tokenIssuer = tokenIssuer;
+        this.explicitlyClosed = false;
+
         if (this.socket?.readyState === WebSocket.OPEN && this.ready) {
             return;
         }
@@ -155,6 +172,22 @@ export class AgentchatSocketClient {
         };
     }
 
+    subscribeToConversation(conversationId: string): () => void {
+        this.conversationSubscriptions.add(conversationId);
+        this.sendConversationSubscription(
+            "conversation.subscribe",
+            conversationId,
+        );
+
+        return () => {
+            this.conversationSubscriptions.delete(conversationId);
+            this.sendConversationSubscription(
+                "conversation.unsubscribe",
+                conversationId,
+            );
+        };
+    }
+
     send(command: AgentchatSocketCommand): void {
         if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
             throw new Error("Agentchat socket is not connected.");
@@ -164,6 +197,11 @@ export class AgentchatSocketClient {
     }
 
     close(): void {
+        this.explicitlyClosed = true;
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+        }
         this.socket?.close();
         this.socket = null;
         this.ready = false;
@@ -209,6 +247,8 @@ export class AgentchatSocketClient {
 
                 if (parsed.type === "connection.ready") {
                     this.ready = true;
+                    this.reconnectDelayMs = 500;
+                    this.replayConversationSubscriptions();
                     settleResolve();
                 }
 
@@ -240,8 +280,63 @@ export class AgentchatSocketClient {
                         ),
                     );
                 }
+
+                this.scheduleReconnect();
             };
         });
+    }
+
+    private replayConversationSubscriptions(): void {
+        for (const conversationId of this.conversationSubscriptions) {
+            this.sendConversationSubscription(
+                "conversation.subscribe",
+                conversationId,
+            );
+        }
+    }
+
+    private sendConversationSubscription(
+        type: "conversation.subscribe" | "conversation.unsubscribe",
+        conversationId: string,
+    ): void {
+        if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+            return;
+        }
+
+        this.socket.send(
+            JSON.stringify({
+                id: crypto.randomUUID(),
+                type,
+                payload: {
+                    conversationId,
+                },
+            } satisfies ConversationSubscriptionCommand),
+        );
+    }
+
+    private scheduleReconnect(): void {
+        if (this.explicitlyClosed || !this.tokenIssuer || this.reconnectTimer) {
+            return;
+        }
+
+        this.reconnectTimer = setTimeout(() => {
+            this.reconnectTimer = null;
+            if (this.explicitlyClosed || !this.tokenIssuer) {
+                return;
+            }
+
+            this.ensureConnected(this.tokenIssuer).catch((error) => {
+                console.error(
+                    "Failed to reconnect to Agentchat server:",
+                    error,
+                );
+                this.reconnectDelayMs = Math.min(
+                    this.reconnectDelayMs * 2,
+                    5000,
+                );
+                this.scheduleReconnect();
+            });
+        }, this.reconnectDelayMs);
     }
 }
 

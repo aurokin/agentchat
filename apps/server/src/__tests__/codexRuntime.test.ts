@@ -64,6 +64,7 @@ type FakeClientOptions = {
     resumedThreadId?: string;
     startedThreadId?: string;
     turnId?: string;
+    autoComplete?: boolean;
 };
 
 class FakeCodexClient {
@@ -71,7 +72,6 @@ class FakeCodexClient {
     readonly options: FakeClientOptions;
     stopped = false;
     private notificationHandler: ((notification: any) => void) | null = null;
-    private exitHandler: ((error: Error) => void) | null = null;
 
     constructor(options: FakeClientOptions = {}) {
         this.options = options;
@@ -104,16 +104,18 @@ class FakeCodexClient {
         }
 
         if (method === "turn/start") {
-            setTimeout(() => {
-                this.notificationHandler?.({
-                    method: "turn/completed",
-                    params: {
-                        turn: {
-                            status: "completed",
+            if (this.options.autoComplete !== false) {
+                setTimeout(() => {
+                    this.notificationHandler?.({
+                        method: "turn/completed",
+                        params: {
+                            turn: {
+                                status: "completed",
+                            },
                         },
-                    },
-                });
-            }, 0);
+                    });
+                }, 0);
+            }
             return {
                 turn: {
                     id: this.options.turnId ?? "turn-1",
@@ -133,11 +135,15 @@ class FakeCodexClient {
     }
 
     onExit(handler: (error: Error) => void): void {
-        this.exitHandler = handler;
+        void handler;
     }
 
     stop(): void {
         this.stopped = true;
+    }
+
+    emit(notification: unknown): void {
+        this.notificationHandler?.(notification);
     }
 }
 
@@ -291,6 +297,7 @@ describe("CodexRuntimeManager", () => {
         await manager.sendMessage({
             userSub: "sub-1",
             userId: "user-1",
+            subscriberId: "socket-1",
             command: createCommand(),
             sendEvent: (event) => {
                 events.push(event);
@@ -340,6 +347,7 @@ describe("CodexRuntimeManager", () => {
         await manager.sendMessage({
             userSub: "sub-1",
             userId: "user-1",
+            subscriberId: "socket-1",
             command: createCommand(),
             sendEvent: () => undefined,
         });
@@ -384,6 +392,7 @@ describe("CodexRuntimeManager", () => {
             manager.sendMessage({
                 userSub: "sub-1",
                 userId: "user-1",
+                subscriberId: "socket-1",
                 command: createCommand(),
                 sendEvent: () => undefined,
             }),
@@ -392,5 +401,79 @@ describe("CodexRuntimeManager", () => {
             "thread/resume",
         ]);
         expect(fakeClient.stopped).toBe(true);
+    });
+
+    test("replays the active run snapshot to newly subscribed clients", async () => {
+        const config = createConfig();
+        const persistence = createPersistence(null);
+        const fakeClient = new FakeCodexClient({
+            startedThreadId: "thread-fresh",
+            autoComplete: false,
+        });
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: () => fakeClient,
+        });
+
+        const sendPromise = manager.sendMessage({
+            userSub: "sub-1",
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        await Bun.sleep(0);
+        fakeClient.emit({
+            method: "item/agentMessage/delta",
+            params: {
+                delta: "Working on it",
+            },
+        });
+
+        const replayedEvents: Array<{
+            type: string;
+            payload: Record<string, unknown>;
+        }> = [];
+
+        manager.subscribe({
+            userSub: "sub-1",
+            conversationId: "chat-1",
+            subscriberId: "socket-2",
+            sendEvent: (event) => {
+                replayedEvents.push(event);
+            },
+        });
+
+        expect(replayedEvents).toEqual([
+            {
+                type: "run.started",
+                payload: {
+                    conversationId: "chat-1",
+                    runId: expect.any(String),
+                    messageId: "assistant-1",
+                },
+            },
+            {
+                type: "message.delta",
+                payload: {
+                    conversationId: "chat-1",
+                    messageId: "assistant-1",
+                    delta: "Working on it",
+                    content: "Working on it",
+                },
+            },
+        ]);
+
+        fakeClient.emit({
+            method: "turn/completed",
+            params: {
+                turn: {
+                    status: "completed",
+                },
+            },
+        });
+        await sendPromise;
     });
 });

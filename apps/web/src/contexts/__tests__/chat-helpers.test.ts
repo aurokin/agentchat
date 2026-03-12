@@ -55,4 +55,14 @@ describe("chat helpers", () => {
             })?.id,
         ).toBe("chat-a");
     });
+
+    test("falls back to the stored chat when no current chat is loaded", () => {
+        expect(
+            resolveCurrentChatForAgent({
+                chats: filterChatsForAgent(chats, "agent-a"),
+                currentChat: null,
+                storedChatId: "chat-a",
+            })?.id,
+        ).toBe("chat-a");
+    });
 });

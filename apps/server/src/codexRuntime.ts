@@ -35,7 +35,6 @@ type ActiveTurn = {
     nextSequence: number;
     lastPersistedContent: string;
     pendingDeltaFlush: ReturnType<typeof setTimeout> | null;
-    sendEvent: (event: ServerEvent) => void;
     reject: (error: Error) => void;
     resolve: () => void;
 };
@@ -53,6 +52,7 @@ type ConversationRuntime = {
     threadId: string;
     activeTurn: ActiveTurn | null;
     idleTimer: ReturnType<typeof setTimeout> | null;
+    subscribers: Map<string, (event: ServerEvent) => void>;
 };
 
 type ResolvedRuntimeResources = {
@@ -338,10 +338,12 @@ export class CodexRuntimeManager {
     async sendMessage(params: {
         userSub: string;
         userId: string;
+        subscriberId: string;
         command: ConversationSendCommand;
         sendEvent: (event: ServerEvent) => void;
     }): Promise<void> {
         const { runtime, isNew } = await this.ensureRuntime(params);
+        this.attachSubscriber(runtime, params.subscriberId, params.sendEvent);
         if (runtime.activeTurn) {
             throw new Error("Conversation already has an active run.");
         }
@@ -352,7 +354,8 @@ export class CodexRuntimeManager {
         }
 
         const runId = crypto.randomUUID();
-        params.sendEvent(
+        this.emitToSubscribers(
+            runtime,
             createServerEvent("run.started", {
                 conversationId: params.command.payload.conversationId,
                 runId,
@@ -371,7 +374,6 @@ export class CodexRuntimeManager {
                 nextSequence: 2,
                 lastPersistedContent: "",
                 pendingDeltaFlush: null,
-                sendEvent: params.sendEvent,
                 resolve,
                 reject,
             };
@@ -445,7 +447,8 @@ export class CodexRuntimeManager {
                     clearTimeout(runtime.activeTurn.pendingDeltaFlush);
                 }
                 runtime.activeTurn = null;
-                params.sendEvent(
+                this.emitToSubscribers(
+                    runtime,
                     createServerEvent("run.failed", {
                         conversationId: params.command.payload.conversationId,
                         runId,
@@ -481,6 +484,59 @@ export class CodexRuntimeManager {
             threadId: runtime.threadId,
             turnId: runtime.activeTurn.turnId,
         });
+    }
+
+    subscribe(params: {
+        userSub: string;
+        conversationId: string;
+        subscriberId: string;
+        sendEvent: (event: ServerEvent) => void;
+    }): void {
+        const runtime = this.runtimes.get(
+            getRuntimeKey(params.userSub, params.conversationId),
+        );
+        if (!runtime) {
+            return;
+        }
+
+        this.attachSubscriber(runtime, params.subscriberId, params.sendEvent);
+        if (!runtime.activeTurn) {
+            return;
+        }
+
+        params.sendEvent(
+            createServerEvent("run.started", {
+                conversationId: runtime.conversationId,
+                runId: runtime.activeTurn.runId,
+                messageId: runtime.activeTurn.assistantMessageId,
+            }),
+        );
+
+        if (runtime.activeTurn.text) {
+            params.sendEvent(
+                createServerEvent("message.delta", {
+                    conversationId: runtime.conversationId,
+                    messageId: runtime.activeTurn.assistantMessageId,
+                    delta: runtime.activeTurn.text,
+                    content: runtime.activeTurn.text,
+                }),
+            );
+        }
+    }
+
+    unsubscribe(params: {
+        subscriberId: string;
+        conversationId?: string;
+    }): void {
+        for (const runtime of this.runtimes.values()) {
+            if (
+                params.conversationId &&
+                runtime.conversationId !== params.conversationId
+            ) {
+                continue;
+            }
+            runtime.subscribers.delete(params.subscriberId);
+        }
     }
 
     private async ensureRuntime(params: {
@@ -537,6 +593,7 @@ export class CodexRuntimeManager {
             threadId,
             activeTurn: null,
             idleTimer: null,
+            subscribers: new Map(),
         };
 
         client.onNotification((notification) => {
@@ -548,6 +605,23 @@ export class CodexRuntimeManager {
 
         this.runtimes.set(key, runtime);
         return { runtime, isNew };
+    }
+
+    private attachSubscriber(
+        runtime: ConversationRuntime,
+        subscriberId: string,
+        sendEvent: (event: ServerEvent) => void,
+    ): void {
+        runtime.subscribers.set(subscriberId, sendEvent);
+    }
+
+    private emitToSubscribers(
+        runtime: ConversationRuntime,
+        event: ServerEvent,
+    ): void {
+        for (const sendEvent of runtime.subscribers.values()) {
+            sendEvent(event);
+        }
     }
 
     private async openThread(params: {
@@ -617,7 +691,8 @@ export class CodexRuntimeManager {
                 clearTimeout(activeTurn.pendingDeltaFlush);
             }
             if (activeTurn.text) {
-                activeTurn.sendEvent(
+                this.emitToSubscribers(
+                    runtime,
                     createServerEvent("message.completed", {
                         conversationId: runtime.conversationId,
                         messageId: activeTurn.assistantMessageId,
@@ -646,7 +721,8 @@ export class CodexRuntimeManager {
                     );
                 });
 
-            activeTurn.sendEvent(
+            this.emitToSubscribers(
+                runtime,
                 createServerEvent("run.failed", {
                     conversationId: runtime.conversationId,
                     runId: activeTurn.runId,
@@ -699,7 +775,8 @@ export class CodexRuntimeManager {
             }
 
             activeTurn.text += delta;
-            activeTurn.sendEvent(
+            this.emitToSubscribers(
+                runtime,
                 createServerEvent("message.delta", {
                     conversationId: runtime.conversationId,
                     messageId: activeTurn.assistantMessageId,
@@ -724,7 +801,8 @@ export class CodexRuntimeManager {
                 ? turn.error.message
                 : "Codex run failed";
 
-        activeTurn.sendEvent(
+        this.emitToSubscribers(
+            runtime,
             createServerEvent("message.completed", {
                 conversationId: runtime.conversationId,
                 messageId: activeTurn.assistantMessageId,
@@ -753,7 +831,8 @@ export class CodexRuntimeManager {
                         error,
                     );
                 });
-            activeTurn.sendEvent(
+            this.emitToSubscribers(
+                runtime,
                 createServerEvent("run.completed", {
                     conversationId: runtime.conversationId,
                     runId: activeTurn.runId,
@@ -784,7 +863,8 @@ export class CodexRuntimeManager {
                         error,
                     );
                 });
-            activeTurn.sendEvent(
+            this.emitToSubscribers(
+                runtime,
                 createServerEvent("run.interrupted", {
                     conversationId: runtime.conversationId,
                     runId: activeTurn.runId,
@@ -815,7 +895,8 @@ export class CodexRuntimeManager {
                     error,
                 );
             });
-        activeTurn.sendEvent(
+        this.emitToSubscribers(
+            runtime,
             createServerEvent("run.failed", {
                 conversationId: runtime.conversationId,
                 runId: activeTurn.runId,
