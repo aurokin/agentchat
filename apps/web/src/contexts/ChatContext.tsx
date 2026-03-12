@@ -4,13 +4,20 @@ import React, {
     createContext,
     useContext,
     useEffect,
+    useMemo,
     useState,
     useCallback,
     useRef,
 } from "react";
 import { usePaginatedQuery, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
-import type { ChatSession, Message, ThinkingLevel } from "@/lib/types";
+import type { FunctionReference } from "convex/server";
+import type {
+    ChatRunSummary,
+    ChatSession,
+    Message,
+    ThinkingLevel,
+} from "@/lib/types";
 import { APP_DEFAULT_MODEL } from "@shared/core/models";
 import {
     mapConvexChatToLocal,
@@ -31,6 +38,7 @@ interface ChatContextType {
     chats: ChatSession[];
     currentChat: ChatSession | null;
     messages: Message[];
+    runSummaries: ChatRunSummary[];
     loading: boolean;
     isMessagesLoading: boolean;
     canLoadMoreChats: boolean;
@@ -66,6 +74,12 @@ interface ChatContextType {
 const ChatContext = createContext<ChatContextType | null>(null);
 
 const CLOUD_CHAT_PAGE_SIZE = 50;
+
+const convexApi = api as typeof api & {
+    runs: {
+        listByChat: FunctionReference<"query">;
+    };
+};
 
 export function ChatProvider({ children }: { children: React.ReactNode }) {
     const storageAdapter = useStorageAdapter();
@@ -109,6 +123,16 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         isCloudSyncActive && cloudCurrentChat?._id
             ? { chatId: cloudCurrentChat._id }
             : "skip",
+    );
+    const cloudRunSummaries = useQuery(
+        convexApi.runs.listByChat,
+        isCloudSyncActive && cloudCurrentChat?._id
+            ? { chatId: cloudCurrentChat._id }
+            : "skip",
+    );
+    const runSummaries = useMemo(
+        () => cloudRunSummaries ?? [],
+        [cloudRunSummaries],
     );
 
     useEffect(() => {
@@ -502,6 +526,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 chats,
                 currentChat,
                 messages,
+                runSummaries,
                 loading,
                 isMessagesLoading,
                 canLoadMoreChats,

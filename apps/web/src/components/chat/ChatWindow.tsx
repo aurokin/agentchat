@@ -23,6 +23,7 @@ import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import {
     modelSupportsReasoning,
+    type ChatRunSummary,
     type ThinkingLevel,
     type ChatSession,
     type Message,
@@ -154,6 +155,7 @@ export function ChatWindow() {
     const {
         currentChat,
         messages,
+        runSummaries,
         isMessagesLoading,
         addMessage,
         updateMessage,
@@ -183,6 +185,7 @@ export function ChatWindow() {
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const [streamingMessage, setStreamingMessage] =
         useState<StreamingMessageState | null>(null);
+    const [recoveredRunNotice, setRecoveredRunNotice] = useState(false);
     const pendingStreamingUpdateRef = useRef<StreamingMessageState | null>(
         null,
     );
@@ -259,6 +262,7 @@ export function ChatWindow() {
     const clearActiveRun = useCallback(() => {
         activeRunRef.current = null;
         clearStreamingMessage();
+        setRecoveredRunNotice(false);
         setSending(false);
     }, [clearStreamingMessage]);
 
@@ -316,6 +320,7 @@ export function ChatWindow() {
                     };
                     activeRunRef.current = activeRun;
                     setSending(true);
+                    setRecoveredRunNotice(true);
 
                     if (assistantMessage?.content) {
                         queueStreamingMessageUpdate({
@@ -446,6 +451,16 @@ export function ChatWindow() {
         return applyStreamingMessageOverlay(messages, streamingMessage);
     }, [messages, streamingMessage]);
 
+    const runSummariesByMessageId = useMemo(() => {
+        const byMessageId = new Map<string, ChatRunSummary>();
+        for (const runSummary of runSummaries) {
+            if (runSummary.outputMessageLocalId) {
+                byMessageId.set(runSummary.outputMessageLocalId, runSummary);
+            }
+        }
+        return byMessageId;
+    }, [runSummaries]);
+
     useEffect(() => {
         if (!currentChat || isMessagesLoading) return;
         if (lastInitializedChatIdRef.current === currentChat.id) return;
@@ -539,6 +554,7 @@ export function ChatWindow() {
             runId: activeAssistantMessage.runId ?? null,
         };
         setSending(true);
+        setRecoveredRunNotice(true);
         queueStreamingMessageUpdate({
             id: activeAssistantMessage.id,
             content: activeAssistantMessage.content,
@@ -701,6 +717,7 @@ export function ChatWindow() {
         setSending(true);
         setError(null);
         setRetryChat(null);
+        setRecoveredRunNotice(false);
         clearStreamingMessage();
 
         let assistantMessageId: string | null = null;
@@ -969,9 +986,25 @@ export function ChatWindow() {
                 </div>
             )}
 
+            {!error && recoveredRunNotice && (
+                <div className="px-6 py-3 bg-primary/5 border-b border-primary/20 flex items-center gap-3 relative z-20">
+                    <RefreshCw
+                        size={16}
+                        className="text-primary flex-shrink-0"
+                    />
+                    <p className="text-sm text-primary">
+                        Reconnected to the active run for this conversation.
+                    </p>
+                </div>
+            )}
+
             {/* Messages */}
             <div className="flex-1 overflow-y-auto relative z-10">
-                <MessageList messages={displayedMessages} sending={sending} />
+                <MessageList
+                    messages={displayedMessages}
+                    sending={sending}
+                    runSummariesByMessageId={runSummariesByMessageId}
+                />
             </div>
 
             {/* Unified input bar with all controls */}

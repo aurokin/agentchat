@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useEffect, useState } from "react";
-import type { Message } from "@/lib/types";
+import type { ChatRunSummary, Message } from "@/lib/types";
 import { format } from "date-fns";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -20,6 +20,7 @@ interface MessageListProps {
     messages: Message[];
     sending?: boolean;
     loading?: boolean;
+    runSummariesByMessageId?: Map<string, ChatRunSummary>;
 }
 
 const markdownComponents: Components = {
@@ -30,7 +31,55 @@ const markdownComponents: Components = {
     ),
 };
 
-export function MessageList({ messages, sending, loading }: MessageListProps) {
+export type MessageRunDisplayState = {
+    label: string;
+    tone: "live" | "warning" | "error";
+    detail: string | null;
+};
+
+export function resolveMessageRunDisplayState(params: {
+    message: Message;
+    runSummary?: ChatRunSummary;
+}): MessageRunDisplayState | null {
+    const { message, runSummary } = params;
+    const status = runSummary?.status ?? message.status ?? null;
+
+    if (status === "running" || status === "streaming") {
+        return {
+            label:
+                runSummary?.latestEventKind === "message_delta"
+                    ? "Streaming"
+                    : "Running",
+            tone: "live",
+            detail: null,
+        };
+    }
+
+    if (status === "interrupted") {
+        return {
+            label: "Interrupted",
+            tone: "warning",
+            detail: null,
+        };
+    }
+
+    if (status === "errored") {
+        return {
+            label: "Failed",
+            tone: "error",
+            detail: runSummary?.errorMessage ?? null,
+        };
+    }
+
+    return null;
+}
+
+export function MessageList({
+    messages,
+    sending,
+    loading,
+    runSummariesByMessageId,
+}: MessageListProps) {
     const bottomRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -70,6 +119,7 @@ export function MessageList({ messages, sending, loading }: MessageListProps) {
                     message={message}
                     index={index}
                     sending={sending && index === messages.length - 1}
+                    runSummary={runSummariesByMessageId?.get(message.id)}
                 />
             ))}
 
@@ -128,12 +178,18 @@ function MessageItem({
     message,
     index,
     sending,
+    runSummary,
 }: {
     message: Message;
     index: number;
     sending?: boolean;
+    runSummary?: ChatRunSummary;
 }) {
     const isUser = message.role === "user";
+    const runState =
+        !isUser && !sending
+            ? resolveMessageRunDisplayState({ message, runSummary })
+            : null;
 
     const getModelDisplayName = (modelId?: string) => {
         if (!modelId) return "Unknown model";
@@ -238,7 +294,29 @@ function MessageItem({
                             </span>
                         </span>
                     )}
+
+                    {runState && (
+                        <span
+                            className={cn(
+                                "inline-flex items-center gap-1 px-1.5 py-0.5 border text-[10px] uppercase tracking-wider font-medium",
+                                runState.tone === "live" &&
+                                    "bg-primary/10 border-primary/20 text-primary",
+                                runState.tone === "warning" &&
+                                    "bg-warning/10 border-warning/20 text-warning",
+                                runState.tone === "error" &&
+                                    "bg-error/10 border-error/20 text-error",
+                            )}
+                        >
+                            {runState.label}
+                        </span>
+                    )}
                 </div>
+
+                {runState?.detail && (
+                    <p className="mt-2 max-w-[90%] text-xs text-error/90">
+                        {runState.detail}
+                    </p>
+                )}
             </div>
         </div>
     );
