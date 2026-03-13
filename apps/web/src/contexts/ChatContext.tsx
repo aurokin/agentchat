@@ -59,16 +59,12 @@ interface ChatContextType {
         thinking?: string;
         modelId?: string;
         thinkingLevel?: ThinkingLevel;
-        attachmentIds?: string[];
         chatId?: string;
     }) => Promise<Message>;
     updateMessage: (
         id: string,
         updates: Partial<
-            Pick<
-                Message,
-                "content" | "contextContent" | "thinking" | "attachmentIds"
-            >
+            Pick<Message, "content" | "contextContent" | "thinking">
         >,
     ) => Promise<void>;
     clearCurrentChat: () => void;
@@ -432,7 +428,6 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             thinking?: string;
             modelId?: string;
             thinkingLevel?: ThinkingLevel;
-            attachmentIds?: string[];
             chatId?: string;
         }): Promise<Message> => {
             const targetChatId = message.chatId ?? currentChat?.id;
@@ -447,7 +442,6 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 thinking: message.thinking,
                 modelId: message.modelId,
                 thinkingLevel: message.thinkingLevel,
-                attachmentIds: message.attachmentIds,
                 sessionId: targetChatId,
                 id: message.id ?? uuid(),
                 createdAt: Date.now(),
@@ -488,10 +482,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         async (
             id: string,
             updates: Partial<
-                Pick<
-                    Message,
-                    "content" | "contextContent" | "thinking" | "attachmentIds"
-                >
+                Pick<Message, "content" | "contextContent" | "thinking">
             >,
         ) => {
             let updatedMessage: Message | undefined;

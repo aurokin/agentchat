@@ -39,7 +39,7 @@ export type {
 };
 
 type MessageUpdate = Partial<
-    Pick<Message, "content" | "contextContent" | "thinking" | "attachmentIds">
+    Pick<Message, "content" | "contextContent" | "thinking">
 >;
 
 export type ConversationSendRuntimeDependencies = {

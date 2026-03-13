@@ -48,10 +48,7 @@ type UseConversationRuntimeParams = {
     updateMessage: (
         id: string,
         updates: Partial<
-            Pick<
-                Message,
-                "content" | "contextContent" | "thinking" | "attachmentIds"
-            >
+            Pick<Message, "content" | "contextContent" | "thinking">
         >,
     ) => Promise<void>;
     updateChat: (chat: ChatSession) => Promise<void>;

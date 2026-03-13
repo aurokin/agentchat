@@ -297,9 +297,9 @@ function SettingsPageContent() {
                                         Current Scope
                                     </div>
                                     <p className="text-sm text-muted-foreground leading-relaxed">
-                                        Image attachments and user-facing web
-                                        search controls are being removed while
-                                        the app migrates toward provider-driven
+                                        User-facing attachment uploads and web
+                                        search controls are removed while the
+                                        app migrates toward provider-driven
                                         agent conversations.
                                     </p>
                                 </div>
