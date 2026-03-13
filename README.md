@@ -2,16 +2,16 @@
 
 A self-hosted chat app for connecting users to the agents you expose from your own server. Agentchat currently uses Convex for auth and conversation history, with a local backend server that talks to provider runtimes.
 
-## Rewrite Direction
+## Architecture
 
-The product is currently being refactored into an agent-centric architecture with:
+Agentchat is organized around an agent-centric architecture:
 
 - operator-managed agents defined on the server
 - Convex-owned auth and conversation history
 - an instance-local backend server that talks to provider runtimes
 - Codex as the first provider, behind a provider abstraction
 
-The canonical docs for that rewrite live in `docs/agentchat/`:
+The canonical product and architecture docs live in `docs/agentchat/`:
 
 - `docs/agentchat/README.md`
 - `docs/agentchat/vision.md`
@@ -28,13 +28,13 @@ The canonical docs for that rewrite live in `docs/agentchat/`:
 - **Markdown Support** - Rich text rendering for code blocks, lists, and formatting
 - **Copy Messages** - One-click copy for any message
 - **Convex Workspace** - Auth and conversations stored in Convex
-- **Self-Hosted Direction** - Built for deployments you run and control
+- **Self-Hosted** - Built for infrastructure you run and control
 - **Theme Support** - Light, dark, and system theme options
 - **Android Share Intent** - Share text and links from other Android apps into a new Agentchat draft
 
 ## About Agentchat
 
-Agentchat is designed to keep you in control of your users, agents, and runtime infrastructure.
+Agentchat is designed to keep you in control of users, agents, and runtime infrastructure.
 
 - **Self-hosted** - Run Agentchat on infrastructure you control.
 - **Convex-backed** - Auth and conversation history live in Convex.
@@ -103,7 +103,7 @@ Helpful references:
 
 #### Environment variables
 
-Agentchat requires Convex for workspace data and authentication:
+Agentchat uses a small set of local/runtime environment surfaces:
 
 - Web app runtime (`apps/web/.env.local`)
 - Mobile app runtime (`apps/mobile/.env`)
@@ -205,7 +205,14 @@ Agent instructions live in `AGENTS.md` and the linked docs under `docs/agents/`.
 - **Provider runtime**: `apps/server` owns live provider sessions and currently targets Codex first behind a provider abstraction
 - **Convex source of truth**: Auth, conversations, runs, and runtime bindings are persisted in Convex
 - **Browser storage**: Web local storage is limited to UI preferences like selected agent, theme, and per-agent defaults
-- **Monorepo**: Web and server are the primary implementation surfaces, with remaining mobile cleanup tracked in `docs/agentchat/mobile-followup.md`
+- **Monorepo**: Web and server are the primary implementation surfaces; remaining mobile cleanup is tracked in `docs/agentchat/mobile-followup.md`
+
+## Non-Goals
+
+- No hosted deployment platform assumptions in the active app path
+- No billing or analytics
+- No attachment/image support right now
+- No browser-local or SQLite-backed product data mode
 
 ## License
 
