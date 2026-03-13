@@ -1,8 +1,7 @@
 import * as SecureStore from "expo-secure-store";
-import type { ThinkingLevel, SearchLevel } from "@shared/core/types";
+import type { ThinkingLevel } from "@shared/core/types";
 
 const DEFAULT_THINKING_KEY = "agentchat-default-thinking";
-const DEFAULT_SEARCH_KEY = "agentchat-default-search";
 const DEFAULT_MODEL_KEY = "agentchat-selected-model";
 const FAVORITE_MODELS_KEY = "agentchat-favorite-models";
 
@@ -14,8 +13,6 @@ const THINKING_LEVELS: ThinkingLevel[] = [
     "minimal",
     "none",
 ];
-
-const SEARCH_LEVELS: SearchLevel[] = ["none", "low", "medium", "high"];
 
 export async function getDefaultThinking(): Promise<ThinkingLevel> {
     try {
@@ -34,28 +31,6 @@ export async function setDefaultThinking(value: ThinkingLevel): Promise<void> {
         await SecureStore.setItemAsync(DEFAULT_THINKING_KEY, value);
     } catch (error) {
         console.error("Failed to save default thinking:", error);
-    }
-}
-
-export async function getDefaultSearchLevel(): Promise<SearchLevel> {
-    try {
-        const stored = await SecureStore.getItemAsync(DEFAULT_SEARCH_KEY);
-        if (stored === "true") return "medium";
-        if (stored === "false" || stored === null) return "none";
-        if (stored && SEARCH_LEVELS.includes(stored as SearchLevel)) {
-            return stored as SearchLevel;
-        }
-        return "none";
-    } catch {
-        return "none";
-    }
-}
-
-export async function setDefaultSearchLevel(value: SearchLevel): Promise<void> {
-    try {
-        await SecureStore.setItemAsync(DEFAULT_SEARCH_KEY, value);
-    } catch (error) {
-        console.error("Failed to save default search level:", error);
     }
 }
 

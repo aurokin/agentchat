@@ -9,12 +9,7 @@ import React, {
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { useStorageAdapter, useSync } from "@/contexts/SyncContext";
-import type {
-    ChatSession,
-    Message,
-    ThinkingLevel,
-    SearchLevel,
-} from "@shared/core/types";
+import type { ChatSession, Message, ThinkingLevel } from "@shared/core/types";
 import {
     mapConvexChatToLocal,
     mapConvexMessageToLocal,
@@ -24,8 +19,6 @@ import { v4 as uuidv4 } from "uuid";
 import {
     getDefaultThinking,
     setDefaultThinking as persistDefaultThinking,
-    getDefaultSearchLevel,
-    setDefaultSearchLevel as persistDefaultSearchLevel,
 } from "@/lib/storage";
 import { APP_DEFAULT_MODEL } from "@shared/core/models";
 import { useModelContext } from "@/contexts/ModelContext";
@@ -38,7 +31,6 @@ interface ChatContextValue {
     error: string | null;
     defaultModel: string;
     defaultThinking: ThinkingLevel;
-    defaultSearchLevel: SearchLevel;
     loadChats: () => Promise<void>;
     createChat: (title?: string, modelId?: string) => Promise<ChatSession>;
     selectChat: (chatId: string) => Promise<void>;
@@ -52,14 +44,11 @@ interface ChatContextValue {
     updateMessage: (message: Message) => Promise<void>;
     setDefaultModel: (modelId: string) => void;
     setDefaultThinking: (thinking: ThinkingLevel) => void;
-    setDefaultSearchLevel: (searchLevel: SearchLevel) => void;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
 
 const DEFAULT_THINKING: ThinkingLevel = "none";
-const DEFAULT_SEARCH_LEVEL: SearchLevel = "none";
-
 export function useChatContext(): ChatContextValue {
     const context = useContext(ChatContext);
     if (!context) {
@@ -82,9 +71,8 @@ export function ChatProvider({
     const [error, setError] = useState<string | null>(null);
     const [defaultThinking, setDefaultThinkingState] =
         useState<ThinkingLevel>(DEFAULT_THINKING);
-    const [defaultSearchLevel, setDefaultSearchLevelState] =
-        useState<SearchLevel>(DEFAULT_SEARCH_LEVEL);
-    const { selectedModel, selectModel, models } = useModelContext();
+    const { defaultAgentId, selectedModel, selectModel, models } =
+        useModelContext();
     const validatedSelectedModel =
         selectedModel && models.some((model) => model.id === selectedModel)
             ? selectedModel
@@ -194,10 +182,11 @@ export function ChatProvider({
 
             const chat: ChatSession = {
                 id: chatId,
+                agentId: defaultAgentId ?? "mobile-default-agent",
                 title: title || "New Chat",
                 modelId: modelId || defaultModelId,
                 thinking: defaultThinking,
-                searchLevel: defaultSearchLevel,
+                settingsLockedAt: null,
                 createdAt: now,
                 updatedAt: now,
             };
@@ -217,8 +206,8 @@ export function ChatProvider({
             adapter,
             defaultModelId,
             defaultThinking,
-            defaultSearchLevel,
             isCloudSyncActive,
+            defaultAgentId,
         ],
     );
 
@@ -352,11 +341,6 @@ export function ChatProvider({
         void persistDefaultThinking(thinking);
     }, []);
 
-    const setDefaultSearchLevel = useCallback((searchLevel: SearchLevel) => {
-        setDefaultSearchLevelState(searchLevel);
-        void persistDefaultSearchLevel(searchLevel);
-    }, []);
-
     useEffect(() => {
         setCurrentChat(null);
         setMessages({});
@@ -366,16 +350,12 @@ export function ChatProvider({
     useEffect(() => {
         let isMounted = true;
         const loadDefaults = async () => {
-            const [thinking, search] = await Promise.all([
-                getDefaultThinking(),
-                getDefaultSearchLevel(),
-            ]);
+            const thinking = await getDefaultThinking();
             if (isMounted) {
                 setDefaultThinkingState(thinking);
-                setDefaultSearchLevelState(search);
             }
         };
-        loadDefaults();
+        void loadDefaults();
         return () => {
             isMounted = false;
         };
@@ -391,7 +371,6 @@ export function ChatProvider({
                 error,
                 defaultModel: defaultModelId,
                 defaultThinking,
-                defaultSearchLevel,
                 loadChats,
                 createChat,
                 selectChat,
@@ -403,7 +382,6 @@ export function ChatProvider({
                 updateMessage,
                 setDefaultModel,
                 setDefaultThinking,
-                setDefaultSearchLevel,
             }}
         >
             {children}

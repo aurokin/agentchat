@@ -1,9 +1,9 @@
-import type { OpenRouterModel } from "@shared/core/models";
+import type { ProviderModel } from "@shared/core/models";
 
 export function filterModels(
-    models: OpenRouterModel[],
+    models: ProviderModel[],
     query: string,
-): OpenRouterModel[] {
+): ProviderModel[] {
     if (!query.trim()) return models;
     const normalizedQuery = query.toLowerCase();
     return models.filter(
@@ -15,11 +15,11 @@ export function filterModels(
 }
 
 export function splitFavoriteModels(
-    models: OpenRouterModel[],
+    models: ProviderModel[],
     favoriteModelIds: string[],
 ): {
-    favoriteModelList: OpenRouterModel[];
-    otherModels: OpenRouterModel[];
+    favoriteModelList: ProviderModel[];
+    otherModels: ProviderModel[];
 } {
     const favoriteSet = new Set(favoriteModelIds);
     const favoriteModelList = models
@@ -35,8 +35,8 @@ export function getProviderFromModelId(modelId: string): string {
 }
 
 export function groupModelsByProvider(
-    models: OpenRouterModel[],
-): Record<string, OpenRouterModel[]> {
+    models: ProviderModel[],
+): Record<string, ProviderModel[]> {
     return models.reduce(
         (acc, model) => {
             const provider = getProviderFromModelId(model.id);
@@ -46,11 +46,11 @@ export function groupModelsByProvider(
             acc[provider].push(model);
             return acc;
         },
-        {} as Record<string, OpenRouterModel[]>,
+        {} as Record<string, ProviderModel[]>,
     );
 }
 
-export function getProviderOrder(models: OpenRouterModel[]): string[] {
+export function getProviderOrder(models: ProviderModel[]): string[] {
     const order: string[] = [];
     const seen = new Set<string>();
 

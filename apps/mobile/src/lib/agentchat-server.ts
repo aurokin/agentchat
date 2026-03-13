@@ -1,0 +1,117 @@
+import {
+    APP_DEFAULT_MODEL,
+    SupportedParameter,
+    type ProviderModel,
+} from "@shared/core/models";
+
+type BootstrapProvider = {
+    id: string;
+    kind: string;
+    label: string;
+    enabled: boolean;
+};
+
+export type BootstrapAgent = {
+    id: string;
+    name: string;
+    description: string | null;
+    avatar: string | null;
+    enabled: boolean;
+    providerIds: string[];
+    defaultProviderId: string;
+    defaultModel: string | null;
+    defaultVariant: string | null;
+    tags: string[];
+    sortOrder: number;
+};
+
+export type BootstrapResponse = {
+    providers: BootstrapProvider[];
+    agents: BootstrapAgent[];
+};
+
+type ProviderModelsResponse = {
+    providerId: string;
+    models: Array<{
+        id: string;
+        label: string;
+        supportsReasoning: boolean;
+        variants: Array<{
+            id: string;
+            label: string;
+        }>;
+    }>;
+};
+
+function trimTrailingSlash(value: string): string {
+    return value.replace(/\/+$/, "");
+}
+
+export function getAgentchatServerUrl(): string | null {
+    const value = process.env.EXPO_PUBLIC_AGENTCHAT_SERVER_URL?.trim();
+    if (!value) return null;
+    return trimTrailingSlash(value);
+}
+
+async function fetchJson<T>(path: string): Promise<T> {
+    const baseUrl = getAgentchatServerUrl();
+    if (!baseUrl) {
+        throw new Error(
+            "EXPO_PUBLIC_AGENTCHAT_SERVER_URL is not configured for the mobile app.",
+        );
+    }
+
+    const response = await fetch(`${baseUrl}${path}`, {
+        method: "GET",
+        headers: {
+            Accept: "application/json",
+        },
+    });
+
+    if (!response.ok) {
+        throw new Error(
+            `Agentchat server request failed (${response.status}) for ${path}.`,
+        );
+    }
+
+    return (await response.json()) as T;
+}
+
+export async function fetchBootstrap(): Promise<BootstrapResponse> {
+    return await fetchJson<BootstrapResponse>("/api/bootstrap");
+}
+
+export async function fetchProviderModels(
+    providerId: string,
+): Promise<ProviderModelsResponse> {
+    return await fetchJson<ProviderModelsResponse>(
+        `/api/providers/${encodeURIComponent(providerId)}/models`,
+    );
+}
+
+export async function fetchAvailableModels(): Promise<ProviderModel[]> {
+    const bootstrap = await fetchBootstrap();
+    const visibleProviders = bootstrap.providers.filter(
+        (provider) => provider.enabled,
+    );
+
+    const responses = await Promise.all(
+        visibleProviders.map(async (provider) => {
+            const payload = await fetchProviderModels(provider.id);
+            return payload.models.map<ProviderModel>((model) => ({
+                id: model.id,
+                name: model.label,
+                provider: provider.label,
+                supportedParameters: model.supportsReasoning
+                    ? [SupportedParameter.Reasoning]
+                    : [],
+            }));
+        }),
+    );
+
+    return responses.flat().sort((a, b) => {
+        if (a.id === APP_DEFAULT_MODEL) return -1;
+        if (b.id === APP_DEFAULT_MODEL) return 1;
+        return a.name.localeCompare(b.name);
+    });
+}

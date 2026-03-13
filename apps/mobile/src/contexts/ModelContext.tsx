@@ -8,10 +8,11 @@ import React, {
 } from "react";
 import {
     APP_DEFAULT_MODEL,
-    type OpenRouterModel,
-    SupportedParameter,
+    modelSupportsReasoning as providerSupportsReasoning,
+    modelSupportsVision as providerSupportsVision,
+    type ProviderModel,
 } from "@shared/core/models";
-import { fetchModels } from "@shared/core/openrouter";
+import { fetchAvailableModels, fetchBootstrap } from "@/lib/agentchat-server";
 import {
     getDefaultModel,
     setDefaultModel,
@@ -20,9 +21,10 @@ import {
 } from "@/lib/storage";
 
 interface ModelContextValue {
-    models: OpenRouterModel[];
+    models: ProviderModel[];
     isLoading: boolean;
     error: string | null;
+    defaultAgentId: string | null;
     selectedModel: string | null;
     selectModel: (modelId: string) => Promise<void>;
     refreshModels: () => Promise<void>;
@@ -47,9 +49,10 @@ interface ModelProviderProps {
 export function ModelProvider({
     children,
 }: ModelProviderProps): React.ReactElement {
-    const [models, setModels] = useState<OpenRouterModel[]>([]);
+    const [models, setModels] = useState<ProviderModel[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [defaultAgentId, setDefaultAgentId] = useState<string | null>(null);
     const [selectedModel, setSelectedModel] = useState<string | null>(null);
     const [favoriteModels, setFavoriteModelsState] = useState<string[]>([]);
     const [hasLoadedSelectedModel, setHasLoadedSelectedModel] = useState(false);
@@ -81,7 +84,16 @@ export function ModelProvider({
         setError(null);
 
         try {
-            const fetchedModels = await fetchModels();
+            const [bootstrap, fetchedModels] = await Promise.all([
+                fetchBootstrap(),
+                fetchAvailableModels(),
+            ]);
+            const primaryAgent =
+                bootstrap.agents
+                    .filter((agent) => agent.enabled)
+                    .sort((a, b) => a.sortOrder - b.sortOrder)[0] ?? null;
+
+            setDefaultAgentId(primaryAgent?.id ?? null);
             setModels(fetchedModels);
 
             const modelIds = fetchedModels.map((model) => model.id);
@@ -145,6 +157,7 @@ export function ModelProvider({
                 models,
                 isLoading,
                 error,
+                defaultAgentId,
                 selectedModel,
                 selectModel,
                 refreshModels,
@@ -159,31 +172,16 @@ export function ModelProvider({
 
 export function modelSupportsVision(
     modelId: string,
-    models: OpenRouterModel[],
+    models: ProviderModel[],
 ): boolean {
     const model = models.find((m) => m.id === modelId);
-    return (
-        model?.supportedParameters?.includes(SupportedParameter.Vision) ?? false
-    );
-}
-
-export function modelSupportsSearch(
-    modelId: string,
-    models: OpenRouterModel[],
-): boolean {
-    const model = models.find((m) => m.id === modelId);
-    return (
-        model?.supportedParameters?.includes(SupportedParameter.Tools) ?? false
-    );
+    return providerSupportsVision(model);
 }
 
 export function modelSupportsReasoning(
     modelId: string,
-    models: OpenRouterModel[],
+    models: ProviderModel[],
 ): boolean {
     const model = models.find((m) => m.id === modelId);
-    return (
-        model?.supportedParameters?.includes(SupportedParameter.Reasoning) ??
-        false
-    );
+    return providerSupportsReasoning(model);
 }

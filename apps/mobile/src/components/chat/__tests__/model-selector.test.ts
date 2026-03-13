@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import type { OpenRouterModel } from "@shared/core/models";
+import type { ProviderModel } from "@shared/core/models";
 import {
     filterModels,
     splitFavoriteModels,
@@ -8,7 +8,7 @@ import {
 } from "@/components/chat/model-selector-utils";
 
 describe("ModelSelector logic (mobile)", () => {
-    const mockModels: OpenRouterModel[] = [
+    const mockModels: ProviderModel[] = [
         {
             id: "anthropic/claude-3-5-sonnet",
             name: "claude-3-5-sonnet",
@@ -127,7 +127,7 @@ describe("ModelSelector logic (mobile)", () => {
         });
 
         test("handles model without provider prefix", () => {
-            const modelsWithNoProvider: OpenRouterModel[] = [
+            const modelsWithNoProvider: ProviderModel[] = [
                 {
                     id: "no-slash-model",
                     name: "no-slash-model",

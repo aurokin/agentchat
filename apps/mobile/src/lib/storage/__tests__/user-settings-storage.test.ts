@@ -30,16 +30,7 @@ describe("user-settings-storage", () => {
 
     it("returns defaults when nothing stored", async () => {
         expect(await storage.getDefaultThinking()).toBe("none");
-        expect(await storage.getDefaultSearchLevel()).toBe("none");
         expect(await storage.getDefaultModel()).toBeNull();
-    });
-
-    it("handles legacy true/false search values", async () => {
-        store.set("agentchat-default-search", "true");
-        expect(await storage.getDefaultSearchLevel()).toBe("medium");
-
-        store.set("agentchat-default-search", "false");
-        expect(await storage.getDefaultSearchLevel()).toBe("none");
     });
 
     it("filters favorite model list entries", async () => {

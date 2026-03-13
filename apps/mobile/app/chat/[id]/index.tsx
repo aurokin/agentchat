@@ -1,4 +1,5 @@
 import React, {
+    startTransition,
     useEffect,
     useState,
     useRef,
@@ -23,30 +24,19 @@ import {
     type NativeSyntheticEvent,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useAction } from "convex/react";
-import { api } from "@convex/_generated/api";
 import { useChatContext } from "@/contexts/ChatContext";
 import { useModelContext } from "@/contexts/ModelContext";
 import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
-import { loadAttachmentData, saveFile } from "@/lib/storage";
+import { saveFile } from "@/lib/storage";
 import { useStorageAdapter } from "@/contexts/SyncContext";
-import { ConvexStorageAdapter } from "@/lib/sync/convex-adapter";
-import {
-    buildMessageContent,
-    OpenRouterApiErrorImpl,
-    type OpenRouterMessage,
-    type MessageContent,
-} from "@shared/core/openrouter";
 import {
     modelSupportsReasoning,
-    modelSupportsSearch,
-    type OpenRouterModel,
+    type ProviderModel,
 } from "@shared/core/models";
 import type {
     ChatSession,
     Message,
     ThinkingLevel,
-    SearchLevel,
     Attachment,
     PendingAttachment,
 } from "@shared/core/types";
@@ -55,14 +45,11 @@ import {
     getLastUserSettings,
     resolveInitialChatSettings,
 } from "@shared/core/defaults";
-import { trimTrailingEmptyLines } from "@shared/core/text";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { MessageInput } from "@/components/chat/MessageInput";
 import { AttachmentGallery } from "@/components/chat/AttachmentGallery";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
-import { useIsConvexAvailable } from "@/lib/convex/ConvexProvider";
-import { v4 as uuidv4 } from "uuid";
 import { consumePendingSharePayload } from "@/lib/share-intent/pending-share";
 import { importSharedImageFiles } from "@/lib/share-intent/attachments";
 
@@ -80,8 +67,6 @@ interface StreamingDraft {
     hasReceivedChunk: boolean;
     isThinkingStreaming: boolean;
 }
-
-const THINKING_STREAM_TIMEOUT_MS = 800;
 
 const getChatTitleUpdate = (
     chat: ChatSession | null,
@@ -106,9 +91,7 @@ export default function ChatScreen(): ReactElement {
         messages,
         defaultModel,
         defaultThinking,
-        defaultSearchLevel,
         setDefaultThinking,
-        setDefaultSearchLevel,
         selectChat,
         addMessage,
         updateMessage,
@@ -127,10 +110,8 @@ export default function ChatScreen(): ReactElement {
     const styles = useMemo(() => createStyles(colors), [colors]);
 
     const [inputText, setInputText] = useState("");
-    const [isLoading, setIsLoading] = useState(false);
+    const isLoading = false;
     const storageAdapter = useStorageAdapter();
-    const isConvexAvailable = useIsConvexAvailable();
-    const sendOpenRouterMessage = useAction(api.openrouter.sendMessage);
     const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
     const [attachmentsById, setAttachmentsById] = useState<
         Record<string, Attachment>
@@ -142,15 +123,6 @@ export default function ChatScreen(): ReactElement {
 
     const flatListRef = useRef<FlatList<Message>>(null);
     const isAtBottomRef = useRef(true);
-    const [streamingMessageId, setStreamingMessageId] = useState<string | null>(
-        null,
-    );
-    const [streamingDraft, setStreamingDraft] = useState<StreamingDraft | null>(
-        null,
-    );
-    const thinkingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
-        null,
-    );
     const inputSuppressionTimeoutRef = useRef<ReturnType<
         typeof setTimeout
     > | null>(null);
@@ -190,9 +162,6 @@ export default function ChatScreen(): ReactElement {
 
     useEffect(() => {
         return () => {
-            if (thinkingTimeoutRef.current) {
-                clearTimeout(thinkingTimeoutRef.current);
-            }
             if (inputSuppressionTimeoutRef.current) {
                 clearTimeout(inputSuppressionTimeoutRef.current);
             }
@@ -215,7 +184,6 @@ export default function ChatScreen(): ReactElement {
 
     const currentModel = models.find((m) => m.id === currentChat?.modelId);
     const reasoningSupported = modelSupportsReasoning(currentModel);
-    const searchSupported = modelSupportsSearch(currentModel);
     const chatMessages = useMemo(() => {
         if (!chatId) return EMPTY_MESSAGES;
         return messages[chatId] ?? EMPTY_MESSAGES;
@@ -264,7 +232,9 @@ export default function ChatScreen(): ReactElement {
         sharePayloadAppliedRef.current = chatId;
 
         if (payload.text.trim()) {
-            setInputText(payload.text);
+            startTransition(() => {
+                setInputText(payload.text);
+            });
         }
 
         if (payload.files.length === 0) {
@@ -314,7 +284,6 @@ export default function ChatScreen(): ReactElement {
         const defaults = {
             modelId: defaultModel,
             thinking: defaultThinking,
-            searchLevel: defaultSearchLevel,
         };
         const lastUserSettings = getLastUserSettings(chatMessages);
         const resolvedSettings = resolveInitialChatSettings({
@@ -329,21 +298,16 @@ export default function ChatScreen(): ReactElement {
             supportsReasoning: modelForSettings
                 ? modelSupportsReasoning(modelForSettings)
                 : true,
-            supportsSearch: modelForSettings
-                ? modelSupportsSearch(modelForSettings)
-                : true,
         });
 
         if (
             constrainedSettings.modelId !== currentChat.modelId ||
-            constrainedSettings.thinking !== currentChat.thinking ||
-            constrainedSettings.searchLevel !== currentChat.searchLevel
+            constrainedSettings.thinking !== currentChat.thinking
         ) {
             void updateChat({
                 ...currentChat,
                 modelId: constrainedSettings.modelId,
                 thinking: constrainedSettings.thinking,
-                searchLevel: constrainedSettings.searchLevel,
             });
         }
         lastInitializedChatIdRef.current = currentChat.id;
@@ -352,7 +316,6 @@ export default function ChatScreen(): ReactElement {
         currentChat,
         defaultModel,
         defaultThinking,
-        defaultSearchLevel,
         hasLoadedMessages,
         models,
         updateChat,
@@ -361,26 +324,13 @@ export default function ChatScreen(): ReactElement {
     useEffect(() => {
         if (!currentChat || !currentModel) return;
         const nextThinking = reasoningSupported ? currentChat.thinking : "none";
-        const nextSearchLevel = searchSupported
-            ? currentChat.searchLevel
-            : "none";
-        if (
-            nextThinking !== currentChat.thinking ||
-            nextSearchLevel !== currentChat.searchLevel
-        ) {
+        if (nextThinking !== currentChat.thinking) {
             void updateChat({
                 ...currentChat,
                 thinking: nextThinking,
-                searchLevel: nextSearchLevel,
             });
         }
-    }, [
-        currentChat,
-        currentModel,
-        reasoningSupported,
-        searchSupported,
-        updateChat,
-    ]);
+    }, [currentChat, currentModel, reasoningSupported, updateChat]);
 
     const handleModelChange = async (modelId: string) => {
         if (!currentChat) return;
@@ -391,16 +341,10 @@ export default function ChatScreen(): ReactElement {
                 ? currentChat.thinking
                 : "none"
             : currentChat.thinking;
-        const nextSearchLevel = nextModel
-            ? modelSupportsSearch(nextModel)
-                ? currentChat.searchLevel
-                : "none"
-            : currentChat.searchLevel;
         const updatedChat = {
             ...currentChat,
             modelId,
             thinking: nextThinking,
-            searchLevel: nextSearchLevel,
         };
         await updateChat(updatedChat);
     };
@@ -412,35 +356,12 @@ export default function ChatScreen(): ReactElement {
         await updateChat(updatedChat);
     };
 
-    const handleSearchChange = async (searchLevel: SearchLevel) => {
-        if (!currentChat) return;
-        setDefaultSearchLevel(searchLevel);
-        const updatedChat = { ...currentChat, searchLevel };
-        await updateChat(updatedChat);
-    };
-
     const handleAttachmentsSelected = (newAttachments: PendingAttachment[]) => {
         setAttachments((prev) => [...prev, ...newAttachments]);
     };
 
     const handleRemoveAttachment = (attachmentId: string) => {
         setAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
-    };
-
-    const getAttachmentBase64 = async (
-        attachment: Attachment,
-    ): Promise<string | null> => {
-        if (attachment.data.startsWith("data:")) {
-            return attachment.data.split(",")[1] ?? "";
-        }
-        if (attachment.data.startsWith("file://")) {
-            try {
-                return await loadAttachmentData(attachment);
-            } catch {
-                return null;
-            }
-        }
-        return attachment.data;
     };
 
     const savePendingAttachmentsToStorage = useCallback(
@@ -475,323 +396,32 @@ export default function ChatScreen(): ReactElement {
         [storageAdapter],
     );
 
-    const buildOpenRouterMessages = async (
-        messageList: Message[],
-    ): Promise<OpenRouterMessage[]> => {
-        const openRouterMessages: OpenRouterMessage[] = [];
-
-        for (const message of messageList) {
-            let content: MessageContent = message.contextContent;
-
-            if (message.attachmentIds && message.attachmentIds.length > 0) {
-                const attachments =
-                    await storageAdapter.getAttachmentsByMessage(message.id);
-                if (attachments.length > 0) {
-                    const attachmentsWithData = (
-                        await Promise.all(
-                            attachments.map(async (attachment: Attachment) => {
-                                const data =
-                                    await getAttachmentBase64(attachment);
-                                if (!data) return null;
-                                return { ...attachment, data };
-                            }),
-                        )
-                    ).filter((attachment): attachment is Attachment =>
-                        Boolean(attachment),
-                    );
-
-                    if (attachmentsWithData.length > 0) {
-                        content = buildMessageContent(
-                            message.contextContent,
-                            attachmentsWithData,
-                        );
-                    }
-                }
-            }
-
-            openRouterMessages.push({
-                role: message.role,
-                content,
-            });
-        }
-
-        return openRouterMessages;
-    };
-
     const handleSendMessage = async (
         content: string,
         pendingAttachments?: PendingAttachment[],
-    ) => {
-        const chatSnapshot = currentChat;
-        const messagesSnapshot = [...chatMessages];
-        let streamingMessage: Message | null = null;
-        let assistantContent = "";
-        let assistantThinking = "";
-
-        if (!chatSnapshot) {
+    ): Promise<boolean> => {
+        if (!currentChat) {
             setError({ message: "No chat selected", isRetryable: false });
-            setRetryPayload(null);
-            return;
+            return false;
         }
 
-        if (!isConvexAvailable) {
+        if (pendingAttachments && pendingAttachments.length > 0) {
             setError({
-                message: "Convex isn't configured for this build.",
+                message:
+                    "Mobile attachments are being rebuilt for the Agentchat architecture. Use text-only messages for now.",
                 isRetryable: false,
             });
             setRetryPayload(null);
-            return;
+            return false;
         }
 
-        setIsLoading(true);
-        setError(null);
+        setError({
+            message:
+                "Mobile message execution is still migrating to the Agentchat server. Use the web app for active chats for now.",
+            isRetryable: false,
+        });
         setRetryPayload(null);
-        setStreamingMessageId(null);
-        setStreamingDraft(null);
-
-        try {
-            const activeModel = models.find(
-                (model) => model.id === chatSnapshot.modelId,
-            );
-            const supportsReasoning = modelSupportsReasoning(activeModel);
-            const supportsSearch = modelSupportsSearch(activeModel);
-
-            const effectiveThinking = supportsReasoning
-                ? chatSnapshot.thinking
-                : "none";
-            const effectiveSearchLevel =
-                supportsSearch && chatSnapshot.searchLevel !== "none"
-                    ? chatSnapshot.searchLevel
-                    : "none";
-
-            const contextContent = content;
-
-            const isCloudStorage =
-                storageAdapter instanceof ConvexStorageAdapter;
-            const messageId = uuidv4();
-            let attachmentIds: string[] | undefined;
-
-            if (pendingAttachments && pendingAttachments.length > 0) {
-                if (isCloudStorage) {
-                    // Cloud attachments must reference an existing message, so create the
-                    // message first, then upload attachments, then patch attachmentIds.
-                    const userMessage = await addMessage({
-                        id: messageId,
-                        sessionId: chatSnapshot.id,
-                        role: "user",
-                        content: content,
-                        contextContent: contextContent,
-                        modelId: chatSnapshot.modelId,
-                        thinkingLevel: effectiveThinking,
-                        searchLevel: effectiveSearchLevel,
-                    });
-
-                    const saved = await savePendingAttachmentsToStorage(
-                        pendingAttachments,
-                        messageId,
-                    );
-                    attachmentIds = saved.map((attachment) => attachment.id);
-                    await updateMessage({ ...userMessage, attachmentIds });
-                } else {
-                    const saved = await savePendingAttachmentsToStorage(
-                        pendingAttachments,
-                        messageId,
-                    );
-                    attachmentIds = saved.map((attachment) => attachment.id);
-
-                    await addMessage({
-                        id: messageId,
-                        sessionId: chatSnapshot.id,
-                        role: "user",
-                        content: content,
-                        contextContent: contextContent,
-                        modelId: chatSnapshot.modelId,
-                        thinkingLevel: effectiveThinking,
-                        searchLevel: effectiveSearchLevel,
-                        attachmentIds,
-                    });
-                }
-            } else {
-                await addMessage({
-                    id: messageId,
-                    sessionId: chatSnapshot.id,
-                    role: "user",
-                    content: content,
-                    contextContent: contextContent,
-                    modelId: chatSnapshot.modelId,
-                    thinkingLevel: effectiveThinking,
-                    searchLevel: effectiveSearchLevel,
-                });
-            }
-
-            void setSelectedModel(chatSnapshot.modelId);
-            if (supportsReasoning) {
-                setDefaultThinking(effectiveThinking);
-            }
-            if (supportsSearch) {
-                setDefaultSearchLevel(effectiveSearchLevel);
-            }
-
-            const updatedChat = getChatTitleUpdate(
-                chatSnapshot,
-                content,
-                messagesSnapshot.length,
-            );
-            if (updatedChat) {
-                await updateChat(updatedChat);
-            }
-
-            const openRouterMessages =
-                await buildOpenRouterMessages(messagesSnapshot);
-
-            const newUserAttachments = pendingAttachments?.length
-                ? pendingAttachments.map((attachment) => ({
-                      id: attachment.id,
-                      messageId,
-                      type: "image" as const,
-                      mimeType: attachment.mimeType,
-                      data: attachment.data,
-                      width: attachment.width,
-                      height: attachment.height,
-                      size: attachment.size,
-                      createdAt: Date.now(),
-                  }))
-                : undefined;
-
-            openRouterMessages.push({
-                role: "user",
-                content: newUserAttachments
-                    ? buildMessageContent(contextContent, newUserAttachments)
-                    : contextContent,
-            });
-
-            streamingMessage = await addMessage({
-                sessionId: chatSnapshot.id,
-                role: "assistant",
-                content: "",
-                contextContent: "",
-                thinking: undefined,
-                modelId: chatSnapshot.modelId,
-                thinkingLevel: effectiveThinking,
-                searchLevel: effectiveSearchLevel,
-            });
-            setStreamingMessageId(streamingMessage.id);
-            setStreamingDraft({
-                id: streamingMessage.id,
-                content: "",
-                thinking: "",
-                hasReceivedChunk: false,
-                isThinkingStreaming: false,
-            });
-
-            const streamingId = streamingMessage.id;
-            const updateDraft = (
-                updater: (draft: StreamingDraft) => StreamingDraft,
-            ) => {
-                setStreamingDraft((prev) => {
-                    if (!prev || prev.id !== streamingId) return prev;
-                    return updater(prev);
-                });
-            };
-
-            const markThinkingStreaming = (delta: string) => {
-                updateDraft((draft) => ({
-                    ...draft,
-                    thinking: draft.thinking + delta,
-                    hasReceivedChunk: true,
-                    isThinkingStreaming: true,
-                }));
-                if (thinkingTimeoutRef.current) {
-                    clearTimeout(thinkingTimeoutRef.current);
-                }
-                thinkingTimeoutRef.current = setTimeout(() => {
-                    setStreamingDraft((prev) => {
-                        if (!prev || prev.id !== streamingId) return prev;
-                        return { ...prev, isThinkingStreaming: false };
-                    });
-                }, THINKING_STREAM_TIMEOUT_MS);
-            };
-
-            const appendContent = (delta: string) => {
-                updateDraft((draft) => ({
-                    ...draft,
-                    content: draft.content + delta,
-                    hasReceivedChunk: true,
-                }));
-            };
-
-            const response = await sendOpenRouterMessage({
-                messages: openRouterMessages,
-                session: {
-                    id: chatSnapshot.id,
-                    modelId: chatSnapshot.modelId,
-                    thinking: effectiveThinking,
-                    searchLevel: effectiveSearchLevel,
-                },
-                model: activeModel ?? undefined,
-            });
-
-            assistantContent = response.choices[0]?.message?.content ?? "";
-            assistantThinking = response.choices[0]?.message?.thinking ?? "";
-            appendContent(assistantContent);
-            if (assistantThinking) {
-                markThinkingStreaming(assistantThinking);
-            }
-
-            const finalContent =
-                assistantContent || response.choices[0]?.message?.content || "";
-            const finalThinking =
-                assistantThinking || response.choices[0]?.message?.thinking;
-            const trimmedContent = trimTrailingEmptyLines(finalContent) ?? "";
-            const trimmedThinking = trimTrailingEmptyLines(finalThinking);
-
-            if (streamingMessage) {
-                const updated: Message = {
-                    ...streamingMessage,
-                    content: trimmedContent,
-                    contextContent: trimmedContent,
-                    thinking: trimmedThinking || undefined,
-                    modelId: response.model ?? streamingMessage.modelId,
-                };
-                streamingMessage = updated;
-                await updateMessage(updated);
-            }
-        } catch (err) {
-            if (streamingMessage && (assistantContent || assistantThinking)) {
-                const updated: Message = {
-                    ...streamingMessage,
-                    content: assistantContent,
-                    contextContent: assistantContent,
-                    thinking: assistantThinking || undefined,
-                };
-                streamingMessage = updated;
-                await updateMessage(updated);
-            }
-            if (err instanceof OpenRouterApiErrorImpl) {
-                setError({
-                    message: err.message,
-                    isRetryable: err.isRetryable,
-                });
-                if (err.isRetryable) {
-                    setRetryPayload({ content });
-                }
-            } else {
-                const message =
-                    err instanceof Error
-                        ? err.message
-                        : "Failed to send message";
-                setError({ message, isRetryable: true });
-                setRetryPayload({ content });
-            }
-        } finally {
-            setIsLoading(false);
-            setStreamingMessageId(null);
-            setStreamingDraft(null);
-            if (thinkingTimeoutRef.current) {
-                clearTimeout(thinkingTimeoutRef.current);
-                thinkingTimeoutRef.current = null;
-            }
-        }
+        return false;
     };
 
     const handleSend = async () => {
@@ -804,6 +434,11 @@ export default function ChatScreen(): ReactElement {
 
         const content = inputText.trim();
         const pending = attachments;
+        const didSend = await handleSendMessage(content, pending);
+        if (!didSend) {
+            return;
+        }
+
         if (inputSuppressionTimeoutRef.current) {
             clearTimeout(inputSuppressionTimeoutRef.current);
         }
@@ -814,8 +449,6 @@ export default function ChatScreen(): ReactElement {
             suppressInputRef.current = false;
             inputSuppressionTimeoutRef.current = null;
         }, 250);
-
-        await handleSendMessage(content, pending);
     };
 
     const handleInputChange = useCallback((text: string) => {
@@ -1084,16 +717,9 @@ export default function ChatScreen(): ReactElement {
         });
     };
 
-    const getSearchBadgeLabel = (level: SearchLevel): string => {
-        if (level === "low") return "WEB-3";
-        if (level === "medium") return "WEB-6";
-        if (level === "high") return "WEB-10";
-        return "WEB";
-    };
-
     const getModelDisplayName = (
         modelId: string | undefined,
-        modelList: OpenRouterModel[],
+        modelList: ProviderModel[],
     ): string => {
         if (!modelId) return "Unknown model";
         const model = modelList.find((entry) => entry.id === modelId);
@@ -1104,31 +730,16 @@ export default function ChatScreen(): ReactElement {
 
     const renderMessage = ({ item }: { item: Message }) => {
         const isUser = item.role === "user";
-        const isStreamingMessage = isLoading && streamingMessageId === item.id;
-        const draft =
-            isStreamingMessage && streamingDraft?.id === item.id
-                ? streamingDraft
-                : null;
-        const displayContent = draft ? draft.content : item.content;
-        const displayThinking = draft
-            ? draft.thinking || item.thinking
-            : item.thinking;
-        const hasReceivedChunk = draft
-            ? draft.hasReceivedChunk
-            : Boolean(item.content || item.thinking);
-        const showThinkingIndicator =
-            isStreamingMessage &&
-            Boolean(displayThinking) &&
-            (draft?.isThinkingStreaming ?? !displayContent);
-        const hideContentWhileReasoning =
-            isStreamingMessage && Boolean(displayThinking) && !displayContent;
-        const showGenerating = isStreamingMessage && !hasReceivedChunk;
-        const hasSearchBadge =
-            item.searchLevel !== undefined && item.searchLevel !== "none";
+        const displayContent = item.content;
+        const displayThinking = item.thinking;
+        const hasReceivedChunk = Boolean(item.content || item.thinking);
+        const showThinkingIndicator = false;
+        const hideContentWhileReasoning = false;
+        const showGenerating = false;
         const hasThinkingBadge =
             item.thinkingLevel !== undefined && item.thinkingLevel !== "none";
         const hasModelBadge = Boolean(item.modelId);
-        const showDivider = hasSearchBadge || hasThinkingBadge || hasModelBadge;
+        const showDivider = hasThinkingBadge || hasModelBadge;
         const modelDisplayName = getModelDisplayName(item.modelId, models);
         const hasAttachments =
             item.attachmentIds !== undefined && item.attachmentIds.length > 0;
@@ -1243,29 +854,6 @@ export default function ChatScreen(): ReactElement {
                         {formatMessageTime(item.createdAt)}
                     </Text>
                     {showDivider && <View style={styles.messageMetaDivider} />}
-                    {hasSearchBadge && (
-                        <View
-                            style={[
-                                styles.messageBadge,
-                                isUser
-                                    ? styles.searchBadgeUser
-                                    : styles.searchBadge,
-                            ]}
-                        >
-                            <Text
-                                style={[
-                                    styles.messageBadgeText,
-                                    isUser
-                                        ? styles.searchBadgeTextUser
-                                        : styles.searchBadgeText,
-                                ]}
-                            >
-                                {getSearchBadgeLabel(
-                                    item.searchLevel as SearchLevel,
-                                )}
-                            </Text>
-                        </View>
-                    )}
                     {hasThinkingBadge && (
                         <View
                             style={[styles.messageBadge, styles.thinkingBadge]}
@@ -1457,11 +1045,6 @@ export default function ChatScreen(): ReactElement {
                 <FlatList
                     ref={flatListRef}
                     data={chatMessages}
-                    extraData={{
-                        streamingDraft,
-                        streamingMessageId,
-                        isLoading,
-                    }}
                     keyExtractor={(item) => item.id}
                     renderItem={renderMessage}
                     contentContainerStyle={[
@@ -1495,9 +1078,6 @@ export default function ChatScreen(): ReactElement {
                     reasoningSupported={reasoningSupported}
                     thinkingLevel={currentChat.thinking}
                     onThinkingChange={handleThinkingChange}
-                    searchSupported={searchSupported}
-                    searchLevel={currentChat.searchLevel}
-                    onSearchChange={handleSearchChange}
                     attachments={attachments}
                     onAttachmentsChange={handleAttachmentsSelected}
                     onRemoveAttachment={handleRemoveAttachment}

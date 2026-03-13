@@ -19,12 +19,11 @@ import {
     ScrollView,
     useWindowDimensions,
 } from "react-native";
-import type { OpenRouterModel } from "@shared/core/models";
-import type { ThinkingLevel, SearchLevel } from "@shared/core/types";
+import type { ProviderModel } from "@shared/core/models";
+import type { ThinkingLevel } from "@shared/core/types";
 import type { PendingAttachment } from "@shared/core/types";
 import { ModelSelector } from "@/components/chat/ModelSelector";
 import { ThinkingToggle } from "@/components/chat/ThinkingToggle";
-import { SearchToggle } from "@/components/chat/SearchToggle";
 import { AttachmentPicker } from "@/components/chat/AttachmentPicker";
 import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
 import { modelSupportsVision } from "@/contexts/ModelContext";
@@ -38,7 +37,7 @@ interface MessageInputProps {
     onSend: () => void;
     isLoading: boolean;
     disabled?: boolean;
-    models: OpenRouterModel[];
+    models: ProviderModel[];
     selectedModelId: string | null;
     onModelChange: (modelId: string) => void;
     favoriteModels: string[];
@@ -46,9 +45,6 @@ interface MessageInputProps {
     reasoningSupported: boolean;
     thinkingLevel: ThinkingLevel;
     onThinkingChange: (value: ThinkingLevel) => void;
-    searchSupported: boolean;
-    searchLevel: SearchLevel;
-    onSearchChange: (value: SearchLevel) => void;
     attachments: PendingAttachment[];
     onAttachmentsChange: (attachments: PendingAttachment[]) => void;
     onRemoveAttachment: (attachmentId: string) => void;
@@ -77,9 +73,6 @@ export function MessageInput({
     reasoningSupported,
     thinkingLevel,
     onThinkingChange,
-    searchSupported,
-    searchLevel,
-    onSearchChange,
     attachments,
     onAttachmentsChange,
     onRemoveAttachment,
@@ -218,13 +211,6 @@ export function MessageInput({
                 onToggleFavoriteModel={onToggleFavoriteModel}
                 disabled={isLoading}
             />
-            {searchSupported && (
-                <SearchToggle
-                    value={searchLevel}
-                    onChange={onSearchChange}
-                    disabled={isLoading}
-                />
-            )}
             {reasoningSupported && (
                 <ThinkingToggle
                     value={thinkingLevel}

@@ -38,8 +38,6 @@ export {
 export {
     getDefaultThinking,
     setDefaultThinking,
-    getDefaultSearchLevel,
-    setDefaultSearchLevel,
     getDefaultModel,
     setDefaultModel,
     getFavoriteModels,

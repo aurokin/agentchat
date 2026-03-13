@@ -136,6 +136,7 @@ Set these as Railway service variables (preview/production) or in `apps/web/.env
 Set these in EAS build env (see `apps/mobile/eas.json`) or in `apps/mobile/.env` for local runs. A template lives at `apps/mobile/.env.example`.
 
 - `EXPO_PUBLIC_CONVEX_URL` - Convex deployment URL for this build (same as web `NEXT_PUBLIC_CONVEX_URL`, from the Convex dashboard).
+- `EXPO_PUBLIC_AGENTCHAT_SERVER_URL` - Base URL for the self-hosted Agentchat backend server used for provider/model metadata and the upcoming mobile runtime flow. Example: `http://localhost:8787` in local dev.
 - `EXPO_PUBLIC_GOOGLE_CLIENT_ID` - Optional. Only needed if you later add client-side Google OAuth flows.
 
 **Convex CLI (`packages/convex`)**

@@ -15,7 +15,7 @@ import {
     TextInput,
     type GestureResponderEvent,
 } from "react-native";
-import type { OpenRouterModel } from "@shared/core/models";
+import type { ProviderModel } from "@shared/core/models";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
 import {
@@ -26,7 +26,7 @@ import {
 } from "@/components/chat/model-selector-utils";
 
 interface ModelSelectorProps {
-    models: OpenRouterModel[];
+    models: ProviderModel[];
     selectedModelId: string | null;
     onModelChange: (modelId: string) => void;
     favoriteModels: string[];
@@ -80,7 +80,7 @@ export function ModelSelector({
         const results: {
             key: string;
             title: string;
-            models: OpenRouterModel[];
+            models: ProviderModel[];
             isFavorites?: boolean;
         }[] = [];
 
