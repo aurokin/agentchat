@@ -99,6 +99,7 @@ cd apps/web && bun dev
 Helpful references:
 
 - `docs/local_environment_setup_checklist.md` for local web, server, mobile, and Convex setup
+- `bun run doctor:server` for a manual readiness check against your current `apps/server/agentchat.config.json`
 
 #### Environment variables
 
@@ -197,6 +198,18 @@ bun run dev
 ```
 
 Agent instructions live in `AGENTS.md` and the linked docs under `docs/agents/`.
+
+### Manual Confidence
+
+Use these commands when you want a deliberate Codex confidence pass rather than always-on automation:
+
+```bash
+# Validate configured agent/provider paths and defaults
+bun run doctor:server
+
+# Run the targeted Codex confidence suites
+bun run test:manual:codex-confidence
+```
 
 ## Architecture Notes
 

@@ -84,7 +84,13 @@ bun run convex:env
 bun run dev:web
 ```
 
-2I) Manual step (only if needed): fix Google OAuth redirect URI.
+2I) Validate the configured agents and provider runtime paths before a manual confidence pass:
+
+```bash
+bun run doctor:server
+```
+
+2J) Manual step (only if needed): fix Google OAuth redirect URI.
 
 - If sign-in fails with `Error 400: redirect_uri_mismatch`, add this Authorized redirect URI to the OAuth client matching `AUTH_GOOGLE_ID`:
     - `https://<your-deployment>.convex.site/api/auth/callback/google`

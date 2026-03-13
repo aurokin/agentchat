@@ -87,6 +87,32 @@ function createConfig(): AgentchatConfig {
                 tags: [],
                 sortOrder: 10,
             },
+            {
+                id: "agent-fallback",
+                name: "Fallback Agent",
+                enabled: true,
+                rootPath: "/srv/agents/fallback",
+                providerIds: ["codex-disabled", "codex-main"],
+                defaultProviderId: "codex-disabled",
+                defaultModel: "missing-model",
+                defaultVariant: "missing-variant",
+                modelAllowlist: [],
+                variantAllowlist: [],
+                tags: [],
+                sortOrder: 30,
+            },
+            {
+                id: "agent-no-provider",
+                name: "Broken Agent",
+                enabled: true,
+                rootPath: "/srv/agents/broken",
+                providerIds: ["codex-disabled"],
+                defaultProviderId: "codex-disabled",
+                modelAllowlist: [],
+                variantAllowlist: [],
+                tags: [],
+                sortOrder: 40,
+            },
         ],
     };
 }
@@ -107,7 +133,15 @@ describe("createFetchHandler", () => {
 
         expect(response.status).toBe(200);
         expect(body.providers).toMatchObject([{ id: "codex-main" }]);
-        expect(body.agents).toMatchObject([{ id: "agent-visible" }]);
+        expect(body.agents).toMatchObject([
+            { id: "agent-visible" },
+            {
+                id: "agent-fallback",
+                defaultProviderId: "codex-main",
+                defaultModel: "gpt-5.3-codex",
+                defaultVariant: "balanced",
+            },
+        ]);
     });
 
     test("returns agent options for enabled agents only", async () => {
@@ -134,6 +168,28 @@ describe("createFetchHandler", () => {
         expect(body.defaultVariant).toBe("balanced");
     });
 
+    test("falls back to an enabled provider and valid defaults for agent options", async () => {
+        const fetchHandler = createFetchHandler({
+            getConfig: () => createConfig(),
+        });
+
+        const response = await fetchHandler(
+            new Request(
+                "http://localhost:3030/api/agents/agent-fallback/options",
+            ),
+        );
+        const body = (await response.json()) as {
+            defaultProviderId: string | null;
+            defaultModel: string | null;
+            defaultVariant: string | null;
+        };
+
+        expect(response.status).toBe(200);
+        expect(body.defaultProviderId).toBe("codex-main");
+        expect(body.defaultModel).toBe("gpt-5.3-codex");
+        expect(body.defaultVariant).toBe("balanced");
+    });
+
     test("returns 404 for disabled agents", async () => {
         const fetchHandler = createFetchHandler({
             getConfig: () => createConfig(),
@@ -142,6 +198,20 @@ describe("createFetchHandler", () => {
         const response = await fetchHandler(
             new Request(
                 "http://localhost:3030/api/agents/agent-disabled/options",
+            ),
+        );
+
+        expect(response.status).toBe(404);
+    });
+
+    test("returns 404 for enabled agents with no enabled providers", async () => {
+        const fetchHandler = createFetchHandler({
+            getConfig: () => createConfig(),
+        });
+
+        const response = await fetchHandler(
+            new Request(
+                "http://localhost:3030/api/agents/agent-no-provider/options",
             ),
         );
 
@@ -185,5 +255,46 @@ describe("createFetchHandler", () => {
         );
 
         expect(response.status).toBe(404);
+    });
+
+    test("returns diagnostics and health summary", async () => {
+        const fetchHandler = createFetchHandler({
+            getConfig: () => createConfig(),
+        });
+
+        const healthResponse = await fetchHandler(
+            new Request("http://localhost:3030/health"),
+        );
+        const healthBody = (await healthResponse.json()) as {
+            ok: boolean;
+            summary: {
+                enabledProviderCount: number;
+                enabledAgentCount: number;
+            };
+        };
+
+        expect(healthResponse.status).toBe(200);
+        expect(healthBody.ok).toBe(false);
+        expect(healthBody.summary.enabledProviderCount).toBe(1);
+        expect(healthBody.summary.enabledAgentCount).toBe(3);
+
+        const diagnosticsResponse = await fetchHandler(
+            new Request("http://localhost:3030/api/diagnostics"),
+        );
+        const diagnosticsBody = (await diagnosticsResponse.json()) as {
+            ok: boolean;
+            agents: Array<{ id: string; issues: string[] }>;
+        };
+
+        expect(diagnosticsResponse.status).toBe(200);
+        expect(diagnosticsBody.ok).toBe(false);
+        expect(diagnosticsBody.agents).toContainEqual(
+            expect.objectContaining({
+                id: "agent-no-provider",
+                issues: expect.arrayContaining([
+                    "Agent has no enabled providers.",
+                ]),
+            }),
+        );
     });
 });

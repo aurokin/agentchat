@@ -1,4 +1,9 @@
 import type { AgentchatConfig, AgentConfig, ProviderConfig } from "./config.ts";
+import {
+    getConfigDiagnostics,
+    getVisibleAgents,
+    resolveAgentDefaults,
+} from "./configDiagnostics.ts";
 
 type HandlerDependencies = {
     getConfig(): AgentchatConfig;
@@ -39,12 +44,6 @@ function toAgentSummary(agent: AgentConfig) {
     };
 }
 
-function getVisibleAgents(config: AgentchatConfig) {
-    return config.agents
-        .filter((agent) => agent.enabled)
-        .sort((a, b) => a.sortOrder - b.sortOrder);
-}
-
 function getVisibleProviders(config: AgentchatConfig) {
     return config.providers.filter((provider) => provider.enabled);
 }
@@ -74,6 +73,11 @@ function getAgentOptions(config: AgentchatConfig, agentId: string) {
     const agent = resolveAgent(config, agentId);
     if (!agent) return null;
 
+    const resolvedDefaults = resolveAgentDefaults(config, agent);
+    if (resolvedDefaults.allowedProviders.length === 0) {
+        return null;
+    }
+
     const providers = agent.providerIds
         .map((providerId) => resolveProvider(config, providerId))
         .filter((provider): provider is ProviderConfig => provider !== null)
@@ -86,9 +90,9 @@ function getAgentOptions(config: AgentchatConfig, agentId: string) {
     return {
         agentId: agent.id,
         allowedProviders: providers,
-        defaultProviderId: agent.defaultProviderId,
-        defaultModel: agent.defaultModel ?? null,
-        defaultVariant: agent.defaultVariant ?? null,
+        defaultProviderId: resolvedDefaults.defaultProviderId,
+        defaultModel: resolvedDefaults.defaultModel,
+        defaultVariant: resolvedDefaults.defaultVariant,
         modelAllowlist: agent.modelAllowlist,
         variantAllowlist: agent.variantAllowlist,
     };
@@ -126,10 +130,16 @@ export function createFetchHandler(deps: HandlerDependencies) {
         const pathname = url.pathname;
 
         if (request.method === "GET" && pathname === "/health") {
+            const diagnostics = getConfigDiagnostics(config);
             return jsonResponse({
-                ok: true,
+                ok: diagnostics.ok,
                 configVersion: config.version,
+                summary: diagnostics.summary,
             });
+        }
+
+        if (request.method === "GET" && pathname === "/api/diagnostics") {
+            return jsonResponse(getConfigDiagnostics(config));
         }
 
         if (request.method === "GET" && pathname === "/api/bootstrap") {
@@ -138,7 +148,18 @@ export function createFetchHandler(deps: HandlerDependencies) {
                     allowlistMode: config.auth.allowlistMode,
                 },
                 providers: getVisibleProviders(config).map(toProviderSummary),
-                agents: getVisibleAgents(config).map(toAgentSummary),
+                agents: getVisibleAgents(config).map((agent) => {
+                    const resolvedDefaults = resolveAgentDefaults(
+                        config,
+                        agent,
+                    );
+                    return {
+                        ...toAgentSummary(agent),
+                        defaultProviderId: resolvedDefaults.defaultProviderId,
+                        defaultModel: resolvedDefaults.defaultModel,
+                        defaultVariant: resolvedDefaults.defaultVariant,
+                    };
+                }),
                 capabilities: {
                     transport: "http+websocket",
                     providers: ["codex"],

@@ -14,11 +14,13 @@ Use this checklist for deliberate Codex confidence passes. These checks are manu
 - `apps/server` is running
 - the web app is running
 - the selected Google account is allowlisted
+- `bun run doctor:server` reports the configured Codex provider and target agents as ready
 
 ## 1. Smoke
 
 Use `/home/auro/agents/agentchat_test/smoke`.
 
+- Run `bun run doctor:server`
 - Sign in
 - Select the smoke agent
 - Start a new conversation
@@ -72,6 +74,7 @@ Use `/home/auro/agents/agentchat_test/workspace`.
 ## 7. Config Change Handling
 
 - Disable an agent or provider in `agentchat.config.json`
+- Refresh `/api/diagnostics` or rerun `bun run doctor:server`
 - Confirm the UI adapts safely
 - Confirm broken or removed resources do not produce silent failures
 

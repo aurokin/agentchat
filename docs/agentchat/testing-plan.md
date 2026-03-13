@@ -37,6 +37,7 @@ Primary fixture:
 
 Examples:
 
+- run `bun run doctor:server`
 - sign in
 - select the smoke agent
 - send a greeting
@@ -90,6 +91,7 @@ Coverage targets:
 - runtime persistence ingress into Convex
 - Codex thread start/resume fallback behavior
 - disabled provider / disabled agent handling
+- operator diagnostics for invalid paths and fallback defaults
 
 These tests should be manually invoked from scripts or package test commands when needed.
 
@@ -124,7 +126,7 @@ Current manual confidence command:
 
 - `bun run test:manual:codex-confidence`
 
-This runs the targeted server and web confidence suites without turning them into always-on checks.
+This runs the server doctor plus the targeted server and web confidence suites without turning them into always-on checks.
 
 ## Priority Order
 

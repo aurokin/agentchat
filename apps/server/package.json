@@ -6,12 +6,13 @@
     "scripts": {
         "dev": "bun --watch src/index.ts",
         "start": "bun src/index.ts",
+        "doctor": "bun src/doctor.ts",
         "format": "prettier --write \"src/**/*.{js,jsx,ts,tsx,json,md}\" \"*.{json,md}\"",
         "format:check": "prettier --check \"src/**/*.{js,jsx,ts,tsx,json,md}\" \"*.{json,md}\"",
         "typecheck": "tsc --noEmit",
         "lint": "eslint .",
         "test": "bun test",
-        "test:confidence": "bun test src/__tests__/backendAuth.test.ts src/__tests__/config.test.ts src/__tests__/http.test.ts src/__tests__/runtimePersistence.test.ts src/__tests__/socketProtocol.test.ts src/__tests__/codexRuntime.test.ts src/__tests__/websocketSession.test.ts",
+        "test:confidence": "bun test src/__tests__/backendAuth.test.ts src/__tests__/config.test.ts src/__tests__/configDiagnostics.test.ts src/__tests__/http.test.ts src/__tests__/runtimePersistence.test.ts src/__tests__/socketProtocol.test.ts src/__tests__/codexRuntime.test.ts src/__tests__/websocketSession.test.ts",
         "health": "bun run format && bun run typecheck && bun run lint && bun test"
     },
     "dependencies": {
