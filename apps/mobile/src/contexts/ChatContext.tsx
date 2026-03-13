@@ -4,12 +4,15 @@ import React, {
     useState,
     useCallback,
     useEffect,
+    useMemo,
     type ReactNode,
 } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
+import type { FunctionReference } from "convex/server";
 import { useStorageAdapter, useSync } from "@/contexts/SyncContext";
 import type { ChatSession, Message, ThinkingLevel } from "@shared/core/types";
+import type { ChatRunSummary, ConversationRuntimeState } from "@/lib/types";
 import {
     mapConvexChatToLocal,
     mapConvexMessageToLocal,
@@ -22,12 +25,16 @@ import {
 } from "@/lib/storage";
 import { APP_DEFAULT_MODEL } from "@shared/core/models";
 import { useModelContext } from "@/contexts/ModelContext";
+import { deriveConversationRuntimeState } from "@/contexts/runtime-helpers";
 
 interface ChatContextValue {
     chats: ChatSession[];
     currentChat: ChatSession | null;
     messages: Record<string, Message[]>;
+    runSummaries: ChatRunSummary[];
+    runtimeState: ConversationRuntimeState;
     isLoading: boolean;
+    isMessagesLoading: boolean;
     error: string | null;
     defaultModel: string;
     defaultThinking: ThinkingLevel;
@@ -49,6 +56,13 @@ interface ChatContextValue {
 const ChatContext = createContext<ChatContextValue | null>(null);
 
 const DEFAULT_THINKING: ThinkingLevel = "none";
+
+const convexApi = api as typeof api & {
+    runs: {
+        listByChat: FunctionReference<"query">;
+    };
+};
+
 export function useChatContext(): ChatContextValue {
     const context = useContext(ChatContext);
     if (!context) {
@@ -68,6 +82,7 @@ export function ChatProvider({
     const [currentChat, setCurrentChat] = useState<ChatSession | null>(null);
     const [messages, setMessages] = useState<Record<string, Message[]>>({});
     const [isLoading, setIsLoading] = useState(false);
+    const [isMessagesLoading, setIsMessagesLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [defaultThinking, setDefaultThinkingState] =
         useState<ThinkingLevel>(DEFAULT_THINKING);
@@ -112,6 +127,31 @@ export function ChatProvider({
         isCloudSyncActive && cloudCurrentChat?._id
             ? { chatId: cloudCurrentChat._id }
             : "skip",
+    );
+    const cloudRunSummaries = useQuery(
+        convexApi.runs.listByChat,
+        isCloudSyncActive && cloudCurrentChat?._id
+            ? { chatId: cloudCurrentChat._id }
+            : "skip",
+    );
+    const runSummaries = useMemo(
+        () => cloudRunSummaries ?? [],
+        [cloudRunSummaries],
+    );
+    const currentMessages = useMemo(() => {
+        if (!currentChatId) {
+            return [];
+        }
+
+        return messages[currentChatId] ?? [];
+    }, [currentChatId, messages]);
+    const runtimeState = useMemo(
+        () =>
+            deriveConversationRuntimeState({
+                messages: currentMessages,
+                runSummaries,
+            }),
+        [currentMessages, runSummaries],
     );
 
     const loadChats = useCallback(async () => {
@@ -173,7 +213,14 @@ export function ChatProvider({
                 (a, b) => a.createdAt - b.createdAt,
             ),
         }));
+        setIsMessagesLoading(false);
     }, [cloudCurrentChat, cloudMessages, isCloudSyncActive]);
+
+    useEffect(() => {
+        if (!isCloudSyncActive || !currentChatId) return;
+        if (cloudCurrentChat && cloudMessages) return;
+        setIsMessagesLoading(true);
+    }, [cloudCurrentChat, cloudMessages, currentChatId, isCloudSyncActive]);
 
     const createChat = useCallback(
         async (title?: string, modelId?: string): Promise<ChatSession> => {
@@ -213,11 +260,14 @@ export function ChatProvider({
 
     const loadMessages = useCallback(
         async (chatId: string) => {
+            setIsMessagesLoading(true);
             try {
                 const loadedMessages = await adapter.getMessagesByChat(chatId);
                 setMessages((prev) => ({ ...prev, [chatId]: loadedMessages }));
             } catch {
                 console.error("Failed to load messages");
+            } finally {
+                setIsMessagesLoading(false);
             }
         },
         [adapter],
@@ -344,6 +394,7 @@ export function ChatProvider({
     useEffect(() => {
         setCurrentChat(null);
         setMessages({});
+        setIsMessagesLoading(false);
         loadChats();
     }, [adapter, loadChats]);
 
@@ -367,7 +418,10 @@ export function ChatProvider({
                 chats,
                 currentChat,
                 messages,
+                runSummaries,
+                runtimeState,
                 isLoading,
+                isMessagesLoading,
                 error,
                 defaultModel: defaultModelId,
                 defaultThinking,

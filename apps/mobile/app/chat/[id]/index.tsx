@@ -46,6 +46,7 @@ import {
 } from "@shared/core/defaults";
 import {
     applyStreamingMessageOverlay,
+    createRecoveredActiveRunFromRuntimeState,
     resolveConversationSocketEvent,
     type ActiveRunState,
     type RetryChatState,
@@ -63,7 +64,6 @@ import {
     interruptMobileConversationRun,
     runMobileConversationSend,
 } from "@/components/chat/conversation-runtime-controller";
-import { recoverActiveRunFromMessages } from "@/components/chat/conversation-runtime-recovery";
 
 const EMPTY_MESSAGES: Message[] = [];
 
@@ -75,6 +75,7 @@ export default function ChatScreen(): ReactElement {
         chats,
         currentChat,
         messages,
+        runtimeState,
         defaultModel,
         defaultThinking,
         setDefaultThinking,
@@ -516,9 +517,10 @@ export default function ChatScreen(): ReactElement {
             return;
         }
 
-        const recoveredRun = recoverActiveRunFromMessages({
-            chat: currentChat,
+        const recoveredRun = createRecoveredActiveRunFromRuntimeState({
+            conversationId: currentChat.id,
             messages: chatMessages,
+            runtimeState,
         });
 
         if (!recoveredRun) {
@@ -542,7 +544,7 @@ export default function ChatScreen(): ReactElement {
             setRecoveredRunNotice(true);
             setIsLoading(true);
         });
-    }, [chatMessages, currentChat]);
+    }, [chatMessages, currentChat, runtimeState]);
 
     useEffect(() => {
         if (!currentChat) {

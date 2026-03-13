@@ -10,7 +10,7 @@ This document tracks mobile work that should happen after the web-first migratio
 - Mobile model loading now comes from `apps/server`, and stale OpenRouter/search terminology has been removed from the active mobile code path.
 - Mobile now has the same authenticated backend token and shared socket-client foundation as web.
 - Mobile chat now sends, interrupts, and streams responses through the shared Agentchat websocket runtime path.
-- Mobile can recover an in-flight run from persisted streaming message state after refresh or reconnect, but it does not yet read full Convex `runs` / `runtime_bindings` summaries the way web does.
+- Mobile now derives conversation runtime state from Convex run summaries, with streamed-message fallback while those summaries are loading.
 
 ## Pending Mobile Work
 
@@ -21,7 +21,6 @@ This document tracks mobile work that should happen after the web-first migratio
 - Update conversation lists so they are scoped to the selected agent.
 - Support empty conversation creation per selected agent.
 - Replace current model selection with provider, model, and variant flows driven by the backend.
-- Persist and recover mobile run state from Convex `runs` / `runtime_bindings`.
 - Remove image attachment UX and related local handling from the mobile chat flow.
 - Remove mobile image quota, cloud image clearing, and attachment cache code to match the web/Convex cleanup.
 - Remove any remaining mobile dependency on Convex attachment APIs once the mobile runtime is switched to the new provider architecture.

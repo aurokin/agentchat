@@ -30,6 +30,12 @@ export interface ActiveRunState {
     runId: string | null;
 }
 
+export interface ConversationRuntimeSnapshot {
+    phase: "idle" | "active" | "recovering" | "interrupted" | "failed";
+    runId: string | null;
+    assistantMessageId: string | null;
+}
+
 export interface ConversationMessageDraft {
     id: string;
     role: "user" | "assistant";
@@ -195,6 +201,38 @@ export function createRecoveredActiveRunFromSocket(params: {
         ),
         content: assistantMessage.content,
         runId: params.runId,
+    };
+}
+
+export function createRecoveredActiveRunFromRuntimeState(params: {
+    conversationId: string;
+    messages: Message[];
+    runtimeState: ConversationRuntimeSnapshot;
+}): ActiveRunState | null {
+    if (
+        params.runtimeState.phase !== "active" ||
+        !params.runtimeState.assistantMessageId
+    ) {
+        return null;
+    }
+
+    const assistantMessage =
+        params.messages.find(
+            (message) => message.id === params.runtimeState.assistantMessageId,
+        ) ?? null;
+    if (!assistantMessage) {
+        return null;
+    }
+
+    return {
+        conversationId: params.conversationId,
+        assistantMessageId: assistantMessage.id,
+        userContent: findLatestUserContentBeforeMessage(
+            params.messages,
+            assistantMessage.id,
+        ),
+        content: assistantMessage.content,
+        runId: params.runtimeState.runId ?? assistantMessage.runId ?? null,
     };
 }
 
