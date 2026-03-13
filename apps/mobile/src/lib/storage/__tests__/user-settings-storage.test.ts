@@ -36,10 +36,14 @@ describe("user-settings-storage", () => {
     it("stores agent-scoped model and thinking independently", async () => {
         await storage.setDefaultModel("global-model");
         await storage.setDefaultModelForAgent("agent-model", "agent-1");
+        await storage.setDefaultProviderForAgent("codex-primary", "agent-1");
         await storage.setDefaultThinking("low");
         await storage.setDefaultThinkingForAgent("high", "agent-1");
 
         expect(await storage.getDefaultModel()).toBe("global-model");
+        expect(await storage.getDefaultProviderForAgent("agent-1")).toBe(
+            "codex-primary",
+        );
         expect(await storage.getDefaultModelForAgent("agent-1")).toBe(
             "agent-model",
         );

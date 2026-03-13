@@ -65,3 +65,61 @@ export function selectScopedDefaultModel(params: {
 
     return models[0]?.id ?? null;
 }
+
+export function getProviderIdForModel(model: ProviderModel): string {
+    return model.providerId ?? model.id.split("/")[0] ?? "other";
+}
+
+export function filterModelsForProvider(params: {
+    models: ProviderModel[];
+    providerId: string | null;
+}): ProviderModel[] {
+    const { models, providerId } = params;
+    if (!providerId) {
+        return models;
+    }
+
+    return models.filter(
+        (model) => getProviderIdForModel(model) === providerId,
+    );
+}
+
+export function selectScopedDefaultProvider(params: {
+    models: ProviderModel[];
+    userPreferredProviderId: string | null;
+    selectedModelId: string | null;
+    agentDefaultProviderId: string | null;
+}): string | null {
+    const availableProviderIds = Array.from(
+        new Set(params.models.map(getProviderIdForModel)),
+    );
+
+    if (availableProviderIds.length === 0) {
+        return null;
+    }
+
+    if (params.selectedModelId) {
+        const selectedModel = params.models.find(
+            (model) => model.id === params.selectedModelId,
+        );
+        if (selectedModel) {
+            return getProviderIdForModel(selectedModel);
+        }
+    }
+
+    if (
+        params.userPreferredProviderId &&
+        availableProviderIds.includes(params.userPreferredProviderId)
+    ) {
+        return params.userPreferredProviderId;
+    }
+
+    if (
+        params.agentDefaultProviderId &&
+        availableProviderIds.includes(params.agentDefaultProviderId)
+    ) {
+        return params.agentDefaultProviderId;
+    }
+
+    return availableProviderIds[0] ?? null;
+}

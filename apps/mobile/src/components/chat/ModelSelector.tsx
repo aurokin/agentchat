@@ -12,6 +12,7 @@ import {
     StyleSheet,
     FlatList,
     Modal,
+    ScrollView,
     TextInput,
     type GestureResponderEvent,
 } from "react-native";
@@ -27,6 +28,12 @@ import {
 
 interface ModelSelectorProps {
     models: ProviderModel[];
+    availableProviders: Array<{
+        id: string;
+        label: string;
+    }>;
+    selectedProviderId: string | null;
+    onProviderChange: (providerId: string) => void;
     selectedModelId: string | null;
     onModelChange: (modelId: string) => void;
     favoriteModels: string[];
@@ -36,6 +43,9 @@ interface ModelSelectorProps {
 
 export function ModelSelector({
     models,
+    availableProviders,
+    selectedProviderId,
+    onProviderChange,
     selectedModelId,
     onModelChange,
     favoriteModels,
@@ -174,6 +184,40 @@ export function ModelSelector({
                                 placeholderTextColor={colors.textFaint}
                             />
                         </View>
+                        {availableProviders.length > 0 && (
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={styles.providerFilterRow}
+                            >
+                                {availableProviders.map((provider) => (
+                                    <TouchableOpacity
+                                        key={provider.id}
+                                        style={[
+                                            styles.providerFilterChip,
+                                            selectedProviderId ===
+                                                provider.id &&
+                                                styles.providerFilterChipSelected,
+                                        ]}
+                                        onPress={() =>
+                                            onProviderChange(provider.id)
+                                        }
+                                        activeOpacity={0.7}
+                                    >
+                                        <Text
+                                            style={[
+                                                styles.providerFilterText,
+                                                selectedProviderId ===
+                                                    provider.id &&
+                                                    styles.providerFilterTextSelected,
+                                            ]}
+                                        >
+                                            {provider.label}
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        )}
 
                         {showEmptyState ? (
                             <View style={styles.emptyState}>
@@ -345,6 +389,33 @@ const createStyles = (colors: ThemeColors) =>
             paddingHorizontal: 12,
             paddingVertical: 8,
             fontSize: 14,
+        },
+        providerFilterRow: {
+            gap: 8,
+            paddingHorizontal: 12,
+            paddingVertical: 10,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.borderMuted,
+        },
+        providerFilterChip: {
+            paddingHorizontal: 12,
+            paddingVertical: 7,
+            borderRadius: 999,
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.surface,
+        },
+        providerFilterChipSelected: {
+            borderColor: colors.accent,
+            backgroundColor: colors.accentSoft,
+        },
+        providerFilterText: {
+            fontSize: 13,
+            fontWeight: "500",
+            color: colors.textMuted,
+        },
+        providerFilterTextSelected: {
+            color: colors.accent,
         },
         list: {
             maxHeight: 400,

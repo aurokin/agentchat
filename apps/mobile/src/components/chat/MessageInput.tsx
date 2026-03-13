@@ -33,6 +33,12 @@ interface MessageInputProps {
     disabled?: boolean;
     settingsLocked?: boolean;
     models: ProviderModel[];
+    availableProviders: Array<{
+        id: string;
+        label: string;
+    }>;
+    selectedProviderId: string | null;
+    onProviderChange: (providerId: string) => void;
     selectedModelId: string | null;
     onModelChange: (modelId: string) => void;
     favoriteModels: string[];
@@ -51,6 +57,9 @@ export function MessageInput({
     disabled,
     settingsLocked,
     models,
+    availableProviders,
+    selectedProviderId,
+    onProviderChange,
     selectedModelId,
     onModelChange,
     favoriteModels,
@@ -113,6 +122,9 @@ export function MessageInput({
         <>
             <ModelSelector
                 models={models}
+                availableProviders={availableProviders}
+                selectedProviderId={selectedProviderId}
+                onProviderChange={onProviderChange}
                 selectedModelId={selectedModelId}
                 onModelChange={onModelChange}
                 favoriteModels={favoriteModels}

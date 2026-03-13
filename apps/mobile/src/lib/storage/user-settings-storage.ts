@@ -3,6 +3,7 @@ import type { ThinkingLevel } from "@shared/core/types";
 
 const DEFAULT_THINKING_KEY = "agentchat-default-thinking";
 const DEFAULT_THINKING_BY_AGENT_KEY = "agentchat-default-thinking-by-agent";
+const DEFAULT_PROVIDER_BY_AGENT_KEY = "agentchat-default-provider-by-agent";
 const DEFAULT_MODEL_KEY = "agentchat-selected-model";
 const DEFAULT_MODEL_BY_AGENT_KEY = "agentchat-default-model-by-agent";
 const FAVORITE_MODELS_KEY = "agentchat-favorite-models";
@@ -108,6 +109,42 @@ export async function setDefaultThinkingForAgent(
 
 export async function getDefaultModel(): Promise<string | null> {
     return await getDefaultModelForAgent(null);
+}
+
+export async function getDefaultProviderForAgent(
+    agentId?: string | null,
+): Promise<string | null> {
+    if (!agentId) {
+        return null;
+    }
+
+    try {
+        const scopedProvider = (
+            await getStringMap(DEFAULT_PROVIDER_BY_AGENT_KEY)
+        )[agentId];
+        return scopedProvider ?? null;
+    } catch {
+        return null;
+    }
+}
+
+export async function setDefaultProviderForAgent(
+    value: string,
+    agentId?: string | null,
+): Promise<void> {
+    if (!agentId) {
+        return;
+    }
+
+    try {
+        const scopedProviders = await getStringMap(
+            DEFAULT_PROVIDER_BY_AGENT_KEY,
+        );
+        scopedProviders[agentId] = value;
+        await setStringMap(DEFAULT_PROVIDER_BY_AGENT_KEY, scopedProviders);
+    } catch (error) {
+        console.error("Failed to save default provider:", error);
+    }
 }
 
 export async function getDefaultModelForAgent(

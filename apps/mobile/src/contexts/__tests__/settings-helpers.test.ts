@@ -5,7 +5,9 @@ import type {
 } from "@/lib/agentchat-server";
 import { SupportedParameter, type ProviderModel } from "@shared/core/models";
 import {
+    filterModelsForProvider,
     filterModelsForAgent,
+    selectScopedDefaultProvider,
     selectScopedDefaultModel,
 } from "@/contexts/settings-helpers";
 
@@ -97,5 +99,36 @@ describe("settings helpers", () => {
                 agentDefaultModel: "codex/model-a",
             }),
         ).toBe("codex/model-a");
+    });
+
+    test("prefers the selected model provider for the scoped provider selection", () => {
+        expect(
+            selectScopedDefaultProvider({
+                models,
+                userPreferredProviderId: "codex",
+                selectedModelId: "other/model-b",
+                agentDefaultProviderId: "codex",
+            }),
+        ).toBe("other");
+    });
+
+    test("falls back to the agent default provider when the stored provider is unavailable", () => {
+        expect(
+            selectScopedDefaultProvider({
+                models: [models[0]!],
+                userPreferredProviderId: "other",
+                selectedModelId: null,
+                agentDefaultProviderId: "codex",
+            }),
+        ).toBe("codex");
+    });
+
+    test("filters models to the selected provider", () => {
+        expect(
+            filterModelsForProvider({
+                models,
+                providerId: "codex",
+            }).map((model) => model.id),
+        ).toEqual(["codex/model-a"]);
     });
 });

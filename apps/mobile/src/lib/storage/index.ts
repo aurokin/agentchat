@@ -26,6 +26,8 @@ export {
     setDefaultThinking,
     getDefaultThinkingForAgent,
     setDefaultThinkingForAgent,
+    getDefaultProviderForAgent,
+    setDefaultProviderForAgent,
     getDefaultModel,
     setDefaultModel,
     getDefaultModelForAgent,

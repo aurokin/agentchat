@@ -13,23 +13,36 @@ import {
     type ProviderModel,
 } from "@shared/core/models";
 import {
+    getDefaultProviderForAgent,
     getDefaultModelForAgent,
     getFavoriteModels,
+    setDefaultProviderForAgent,
     setDefaultModelForAgent,
     setFavoriteModels,
 } from "@/lib/storage";
 import { fetchAvailableModels } from "@/lib/agentchat-server";
 import { useAgent } from "@/contexts/AgentContext";
 import {
+    filterModelsForProvider,
     filterModelsForAgent,
+    getProviderIdForModel,
+    selectScopedDefaultProvider,
     selectScopedDefaultModel,
 } from "@/contexts/settings-helpers";
+
+export interface AvailableProviderOption {
+    id: string;
+    label: string;
+}
 
 interface ModelContextValue {
     models: ProviderModel[];
     isLoading: boolean;
     error: string | null;
     defaultAgentId: string | null;
+    availableProviders: AvailableProviderOption[];
+    selectedProviderId: string | null;
+    selectProvider: (providerId: string) => Promise<void>;
     selectedModel: string | null;
     selectModel: (modelId: string) => Promise<void>;
     refreshModels: () => Promise<void>;
@@ -57,12 +70,17 @@ export function ModelProvider({
     const [allModels, setAllModels] = useState<ProviderModel[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [selectedProviderId, setSelectedProviderId] = useState<string | null>(
+        null,
+    );
     const [selectedModel, setSelectedModel] = useState<string | null>(null);
     const [favoriteModels, setFavoriteModelsState] = useState<string[]>([]);
+    const [hasLoadedSelectedProvider, setHasLoadedSelectedProvider] =
+        useState(false);
     const [hasLoadedSelectedModel, setHasLoadedSelectedModel] = useState(false);
     const { selectedAgentId, selectedAgent, selectedAgentOptions } = useAgent();
 
-    const models = useMemo(
+    const agentModels = useMemo(
         () =>
             filterModelsForAgent({
                 models: allModels,
@@ -71,6 +89,52 @@ export function ModelProvider({
             }),
         [allModels, selectedAgent, selectedAgentOptions],
     );
+
+    const availableProviders = useMemo<AvailableProviderOption[]>(() => {
+        const allowedProviders = selectedAgentOptions?.allowedProviders ?? [];
+        if (allowedProviders.length > 0) {
+            return allowedProviders.filter((provider) =>
+                agentModels.some(
+                    (model) => getProviderIdForModel(model) === provider.id,
+                ),
+            );
+        }
+
+        return Array.from(
+            new Map(
+                agentModels.map((model) => [
+                    getProviderIdForModel(model),
+                    {
+                        id: getProviderIdForModel(model),
+                        label: model.provider ?? getProviderIdForModel(model),
+                    },
+                ]),
+            ).values(),
+        );
+    }, [agentModels, selectedAgentOptions?.allowedProviders]);
+
+    const models = useMemo(
+        () =>
+            filterModelsForProvider({
+                models: agentModels,
+                providerId: selectedProviderId,
+            }),
+        [agentModels, selectedProviderId],
+    );
+
+    const loadSelectedProvider = useCallback(async () => {
+        try {
+            const providerId =
+                await getDefaultProviderForAgent(selectedAgentId);
+            if (providerId) {
+                setSelectedProviderId(providerId);
+            }
+        } catch {
+            console.error("Failed to load selected provider");
+        } finally {
+            setHasLoadedSelectedProvider(true);
+        }
+    }, [selectedAgentId]);
 
     const loadSelectedModel = useCallback(async () => {
         try {
@@ -110,16 +174,73 @@ export function ModelProvider({
         }
     }, []);
 
+    const selectProvider = useCallback(
+        async (providerId: string) => {
+            const providerModels = filterModelsForProvider({
+                models: agentModels,
+                providerId,
+            });
+            if (providerModels.length === 0) {
+                return;
+            }
+
+            try {
+                await setDefaultProviderForAgent(providerId, selectedAgentId);
+                setSelectedProviderId(providerId);
+
+                if (
+                    !providerModels.some((model) => model.id === selectedModel)
+                ) {
+                    const nextModel = selectScopedDefaultModel({
+                        models: providerModels,
+                        userPreferredModel: null,
+                        agentDefaultModel:
+                            selectedAgentOptions?.defaultModel ??
+                            selectedAgent?.defaultModel ??
+                            null,
+                    });
+
+                    if (nextModel) {
+                        await setDefaultModelForAgent(
+                            nextModel,
+                            selectedAgentId,
+                        );
+                        setSelectedModel(nextModel);
+                    }
+                }
+            } catch {
+                console.error("Failed to save selected provider");
+            }
+        },
+        [
+            agentModels,
+            selectedAgent?.defaultModel,
+            selectedAgentId,
+            selectedAgentOptions?.defaultModel,
+            selectedModel,
+        ],
+    );
+
     const selectModel = useCallback(
         async (modelId: string) => {
             try {
                 await setDefaultModelForAgent(modelId, selectedAgentId);
                 setSelectedModel(modelId);
+
+                const model = agentModels.find((entry) => entry.id === modelId);
+                const providerId = model ? getProviderIdForModel(model) : null;
+                if (providerId) {
+                    await setDefaultProviderForAgent(
+                        providerId,
+                        selectedAgentId,
+                    );
+                    setSelectedProviderId(providerId);
+                }
             } catch {
                 console.error("Failed to save selected model");
             }
         },
-        [selectedAgentId],
+        [agentModels, selectedAgentId],
     );
 
     const toggleFavoriteModel = useCallback((modelId: string) => {
@@ -134,18 +255,41 @@ export function ModelProvider({
     }, []);
 
     useEffect(() => {
+        loadSelectedProvider();
         loadSelectedModel();
         loadFavoriteModels();
-    }, [loadSelectedModel, loadFavoriteModels]);
+    }, [loadSelectedProvider, loadSelectedModel, loadFavoriteModels]);
 
     useEffect(() => {
-        if (hasLoadedSelectedModel) {
+        if (hasLoadedSelectedModel && hasLoadedSelectedProvider) {
             refreshModels();
         }
-    }, [hasLoadedSelectedModel, refreshModels]);
+    }, [hasLoadedSelectedModel, hasLoadedSelectedProvider, refreshModels]);
 
     useEffect(() => {
-        if (!hasLoadedSelectedModel) {
+        if (!hasLoadedSelectedModel || !hasLoadedSelectedProvider) {
+            return;
+        }
+
+        const nextSelectedProvider = selectScopedDefaultProvider({
+            models: agentModels,
+            userPreferredProviderId: selectedProviderId,
+            selectedModelId: selectedModel,
+            agentDefaultProviderId:
+                selectedAgentOptions?.defaultProviderId ??
+                selectedAgent?.defaultProviderId ??
+                null,
+        });
+
+        if (
+            nextSelectedProvider &&
+            nextSelectedProvider !== selectedProviderId
+        ) {
+            setSelectedProviderId(nextSelectedProvider);
+            void setDefaultProviderForAgent(
+                nextSelectedProvider,
+                selectedAgentId,
+            );
             return;
         }
 
@@ -165,11 +309,16 @@ export function ModelProvider({
         setSelectedModel(nextSelectedModel);
         void setDefaultModelForAgent(nextSelectedModel, selectedAgentId);
     }, [
+        agentModels,
+        hasLoadedSelectedProvider,
         hasLoadedSelectedModel,
         models,
+        selectedAgent?.defaultProviderId,
         selectedAgent?.defaultModel,
         selectedAgentId,
+        selectedAgentOptions?.defaultProviderId,
         selectedAgentOptions?.defaultModel,
+        selectedProviderId,
         selectedModel,
     ]);
 
@@ -180,6 +329,9 @@ export function ModelProvider({
                 isLoading,
                 error,
                 defaultAgentId: selectedAgentId,
+                availableProviders,
+                selectedProviderId,
+                selectProvider,
                 selectedModel,
                 selectModel,
                 refreshModels,

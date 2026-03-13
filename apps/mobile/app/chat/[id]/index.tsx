@@ -81,6 +81,9 @@ export default function ChatScreen(): ReactElement {
     } = useChatContext();
     const {
         models,
+        availableProviders,
+        selectedProviderId,
+        selectProvider,
         selectModel: setSelectedModel,
         favoriteModels,
         toggleFavoriteModel,
@@ -1118,6 +1121,9 @@ export default function ChatScreen(): ReactElement {
                     isLoading={isLoading}
                     settingsLocked={Boolean(currentChat.settingsLockedAt)}
                     models={models}
+                    availableProviders={availableProviders}
+                    selectedProviderId={selectedProviderId}
+                    onProviderChange={selectProvider}
                     selectedModelId={currentChat.modelId}
                     onModelChange={handleModelChange}
                     favoriteModels={favoriteModels}
