@@ -513,4 +513,66 @@ describe("CodexRuntimeManager", () => {
         });
         await sendPromise;
     });
+
+    test("interrupt is a no-op when no active run exists", async () => {
+        const manager = new CodexRuntimeManager({
+            getConfig: () => createConfig(),
+            persistence: createPersistence(
+                null,
+            ) as unknown as RuntimePersistenceClient,
+            createClient: () => new FakeCodexClient(),
+        });
+
+        await expect(
+            manager.interrupt({
+                userSub: "sub-1",
+                conversationId: "chat-1",
+            }),
+        ).resolves.toBeUndefined();
+    });
+
+    test("recycles the runtime when the agent rootPath changes in config", async () => {
+        const config = createConfig();
+        const persistence = createPersistence(null);
+        const clients: FakeCodexClient[] = [];
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: () => {
+                const client = new FakeCodexClient();
+                clients.push(client);
+                return client;
+            },
+        });
+
+        await manager.sendMessage({
+            userSub: "sub-1",
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        const currentAgent = config.agents[0];
+        if (!currentAgent) {
+            throw new Error("Expected agent config");
+        }
+
+        config.agents[0] = {
+            ...currentAgent,
+            rootPath: "/tmp/agent-1-next",
+        };
+
+        await manager.sendMessage({
+            userSub: "sub-1",
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        expect(clients).toHaveLength(2);
+        expect(clients[0]?.stopped).toBe(true);
+        expect(clients[1]?.stopped).toBe(false);
+    });
 });

@@ -91,4 +91,37 @@ describe("socket protocol parsing", () => {
             },
         });
     });
+
+    test("rejects send commands with invalid history entries", () => {
+        expect(() =>
+            parseClientCommand(
+                JSON.stringify({
+                    id: "cmd-4",
+                    type: "conversation.send",
+                    payload: {
+                        conversationId: "chat-1",
+                        agentId: "agent-1",
+                        modelId: "gpt-5.3-codex",
+                        thinking: "medium",
+                        content: "Hello",
+                        userMessageId: "user-1",
+                        assistantMessageId: "assistant-1",
+                        history: [{ role: "tool", content: "bad" }],
+                    },
+                }),
+            ),
+        ).toThrow("Invalid send payload");
+    });
+
+    test("rejects unsupported command types", () => {
+        expect(() =>
+            parseClientCommand(
+                JSON.stringify({
+                    id: "cmd-5",
+                    type: "conversation.retry",
+                    payload: {},
+                }),
+            ),
+        ).toThrow("Unsupported command type: conversation.retry");
+    });
 });

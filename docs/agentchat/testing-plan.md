@@ -110,6 +110,10 @@ Coverage targets:
 
 These should also be manually invoked, not run automatically on push.
 
+## Manual QA Checklist
+
+Use [manual-qa-checklist.md](./manual-qa-checklist.md) for the explicit Codex confidence pass tied to these fixtures.
+
 ## Invocation Rule
 
 - Do not wire these tests into automatic GitHub CI.
