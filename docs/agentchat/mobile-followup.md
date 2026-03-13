@@ -12,13 +12,14 @@ This document tracks mobile work that should happen after the web-first migratio
 - Mobile chat now sends, interrupts, and streams responses through the shared Agentchat websocket runtime path.
 - Mobile now derives conversation runtime state from Convex run summaries, with streamed-message fallback while those summaries are loading.
 - Mobile now has an agent context, agent switcher, agent-scoped conversation lists, and agent-scoped model defaults.
+- Active mobile chat/settings UI no longer exposes image attachments or cloud image management.
+- Mobile share intent is now text-only, matching the current no-attachments product surface.
 
 ## Pending Mobile Work
 
 - Replace the current chat and settings flows with the new agent-centric model.
 - Replace current model selection with provider, model, and variant flows driven by the backend.
-- Remove image attachment UX and related local handling from the mobile chat flow.
-- Remove mobile image quota, cloud image clearing, and attachment cache code to match the web/Convex cleanup.
+- Remove remaining mobile attachment cache and local image-quota code to match the web/Convex cleanup.
 - Remove any remaining mobile dependency on Convex attachment APIs once the mobile runtime is switched to the new provider architecture.
 - Replace any remaining provider-specific client assumptions with backend-driven provider options.
 - Update mobile auth/session handling to work with backend-minted tokens from Convex.

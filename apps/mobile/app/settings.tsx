@@ -15,20 +15,14 @@ import {
 import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import { useSync } from "@/contexts/SyncContext";
-import { formatBytes, type UserTheme } from "@/lib/storage";
+import { type UserTheme } from "@/lib/storage";
 import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { useAuthContext } from "@/lib/convex/AuthContext";
 
 export default function SettingsScreen(): ReactElement {
     const router = useRouter();
-    const {
-        syncState,
-        clearCloudImages,
-        refreshQuotaStatus,
-        cloudQuotaStatus,
-        cloudStorageUsage,
-    } = useSync();
+    const { syncState } = useSync();
     const {
         user,
         isAuthenticated,
@@ -44,10 +38,6 @@ export default function SettingsScreen(): ReactElement {
     const [isSigningIn, setIsSigningIn] = useState(false);
 
     const convexUnavailableMessage = "Convex isn't configured for this build.";
-
-    useEffect(() => {
-        void refreshQuotaStatus();
-    }, [refreshQuotaStatus]);
 
     const handleSignOut = async () => {
         Alert.alert(
@@ -104,34 +94,6 @@ export default function SettingsScreen(): ReactElement {
         }
 
         await performSignIn();
-    };
-
-    const handleClearCloudImages = async () => {
-        Alert.alert(
-            "Clear Workspace Images",
-            "This will delete all synced attachments from your Convex workspace. Your chats will remain.",
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Clear",
-                    style: "destructive",
-                    onPress: async () => {
-                        try {
-                            await clearCloudImages();
-                            Alert.alert(
-                                "Workspace Images Cleared",
-                                "Your synced attachments have been removed.",
-                            );
-                        } catch {
-                            Alert.alert(
-                                "Clear Failed",
-                                "Could not clear cloud images. Please try again.",
-                            );
-                        }
-                    },
-                },
-            ],
-        );
     };
 
     const handleThemeChange = async (theme: UserTheme) => {
@@ -492,135 +454,27 @@ export default function SettingsScreen(): ReactElement {
 
                                 <View style={styles.section}>
                                     <Text style={styles.sectionTitle}>
-                                        Storage
+                                        Workspace
                                     </Text>
 
                                     <View style={styles.storageContainer}>
-                                        {isAuthenticated &&
-                                        syncState === "cloud-enabled" &&
-                                        cloudQuotaStatus &&
-                                        cloudStorageUsage ? (
-                                            <>
-                                                <View style={styles.storageRow}>
-                                                    <Text
-                                                        style={
-                                                            styles.storageLabel
-                                                        }
-                                                    >
-                                                        Workspace attachments
-                                                    </Text>
-                                                    <Text
-                                                        style={
-                                                            styles.storageValue
-                                                        }
-                                                    >
-                                                        {formatBytes(
-                                                            cloudQuotaStatus.used,
-                                                        )}{" "}
-                                                        /{" "}
-                                                        {formatBytes(
-                                                            cloudQuotaStatus.limit,
-                                                        )}
-                                                    </Text>
-                                                </View>
-                                                <View style={styles.storageBar}>
-                                                    <View
-                                                        style={[
-                                                            styles.storageBarFill,
-                                                            {
-                                                                width: `${Math.min(cloudQuotaStatus.percentage * 100, 100)}%`,
-                                                                backgroundColor:
-                                                                    cloudQuotaStatus.isExceeded
-                                                                        ? colors.danger
-                                                                        : cloudQuotaStatus.isWarning80
-                                                                          ? colors.warning
-                                                                          : colors.success,
-                                                            },
-                                                        ]}
-                                                    />
-                                                </View>
-                                                <View style={styles.statsRow}>
-                                                    <View
-                                                        style={styles.statCard}
-                                                    >
-                                                        <Text
-                                                            style={
-                                                                styles.statValue
-                                                            }
-                                                        >
-                                                            {
-                                                                cloudStorageUsage.sessionCount
-                                                            }
-                                                        </Text>
-                                                        <Text
-                                                            style={
-                                                                styles.statLabel
-                                                            }
-                                                        >
-                                                            Chats
-                                                        </Text>
-                                                    </View>
-                                                    <View
-                                                        style={styles.statCard}
-                                                    >
-                                                        <Text
-                                                            style={
-                                                                styles.statValue
-                                                            }
-                                                        >
-                                                            {
-                                                                cloudStorageUsage.messageCount
-                                                            }
-                                                        </Text>
-                                                        <Text
-                                                            style={
-                                                                styles.statLabel
-                                                            }
-                                                        >
-                                                            Messages
-                                                        </Text>
-                                                    </View>
-                                                </View>
-                                            </>
-                                        ) : null}
-
                                         {syncState === "cloud-enabled" && (
                                             <Text
                                                 style={styles.storageInfoText}
                                             >
-                                                Your attachments are stored in
-                                                Convex and available on every
-                                                signed-in device.
+                                                Chat history, settings, and
+                                                runtime state are stored in
+                                                Convex for this deployment.
                                             </Text>
-                                        )}
-
-                                        {syncState === "cloud-enabled" && (
-                                            <View style={styles.buttonRow}>
-                                                <TouchableOpacity
-                                                    style={styles.clearButton}
-                                                    onPress={
-                                                        handleClearCloudImages
-                                                    }
-                                                    disabled={false}
-                                                >
-                                                    <Text
-                                                        style={
-                                                            styles.clearButtonText
-                                                        }
-                                                    >
-                                                        Clear Workspace Images
-                                                    </Text>
-                                                </TouchableOpacity>
-                                            </View>
                                         )}
 
                                         {syncState !== "cloud-enabled" && (
                                             <Text
                                                 style={styles.storageInfoText}
                                             >
-                                                Sign in to inspect workspace
-                                                storage usage for this
-                                                deployment.
+                                                Sign in to access this
+                                                deployment&apos;s Convex-backed
+                                                workspace.
                                             </Text>
                                         )}
                                     </View>

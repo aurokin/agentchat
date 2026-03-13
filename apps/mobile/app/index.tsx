@@ -127,7 +127,7 @@ export default function HomeScreen(): React.ReactElement {
                 "Delete Chats",
                 `Delete ${chatIds.length} ${
                     chatIds.length === 1 ? "chat" : "chats"
-                } and all attachments?`,
+                }?`,
                 [
                     { text: "Cancel", style: "cancel" },
                     {

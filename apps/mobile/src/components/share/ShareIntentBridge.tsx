@@ -3,14 +3,10 @@ import { useRouter } from "expo-router";
 import { parse, useURL } from "expo-linking";
 import { useAppContext } from "@/contexts/AppContext";
 import { useChatContext } from "@/contexts/ChatContext";
-import {
-    setPendingSharePayload,
-    type PendingSharedFile,
-} from "@/lib/share-intent/pending-share";
+import { setPendingSharePayload } from "@/lib/share-intent/pending-share";
 
 interface ParsedSharePayload {
     text: string;
-    files: PendingSharedFile[];
     fingerprint: string;
 }
 
@@ -23,33 +19,6 @@ function getStringParam(value: unknown): string {
     return "";
 }
 
-function parseSharedFiles(value: string): PendingSharedFile[] {
-    if (!value) return [];
-    try {
-        const parsed = JSON.parse(value);
-        if (!Array.isArray(parsed)) return [];
-        return parsed
-            .map((item) => {
-                if (typeof item !== "object" || item === null) {
-                    return null;
-                }
-                const uri =
-                    "uri" in item && typeof item.uri === "string"
-                        ? item.uri
-                        : null;
-                if (!uri) return null;
-                const mimeType =
-                    "mimeType" in item && typeof item.mimeType === "string"
-                        ? item.mimeType
-                        : null;
-                return { uri, mimeType };
-            })
-            .filter((item): item is PendingSharedFile => Boolean(item));
-    } catch {
-        return [];
-    }
-}
-
 function parseSharePayload(url: string | null): ParsedSharePayload | null {
     if (!url) return null;
     const parsedUrl = parse(url);
@@ -57,14 +26,10 @@ function parseSharePayload(url: string | null): ParsedSharePayload | null {
     if (!sharedAt) return null;
 
     const text = getStringParam(parsedUrl.queryParams?.sharedText).trim();
-    const files = parseSharedFiles(
-        getStringParam(parsedUrl.queryParams?.sharedFiles),
-    );
-    if (!text && files.length === 0) return null;
+    if (!text) return null;
 
     return {
         text,
-        files,
         fingerprint: `${sharedAt}:${url}`,
     };
 }
@@ -90,10 +55,7 @@ export function ShareIntentBridge(): ReactElement | null {
 
         void (async () => {
             const chat = await createChat();
-            setPendingSharePayload(chat.id, {
-                text: payload.text,
-                files: payload.files,
-            });
+            setPendingSharePayload(chat.id, { text: payload.text });
             router.replace(`/chat/${chat.id}`);
         })()
             .catch((shareError) => {

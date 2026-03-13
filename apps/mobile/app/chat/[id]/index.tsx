@@ -14,7 +14,6 @@ import {
     TouchableOpacity,
     StyleSheet,
     ActivityIndicator,
-    Image,
     Alert,
     KeyboardAvoidingView,
     Platform,
@@ -26,20 +25,13 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useChatContext } from "@/contexts/ChatContext";
 import { useModelContext } from "@/contexts/ModelContext";
 import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
-import { useStorageAdapter } from "@/contexts/SyncContext";
 import { useAgentchatSocket } from "@/contexts/AgentchatSocketContext";
 import { useAgent } from "@/contexts/AgentContext";
 import {
     modelSupportsReasoning,
     type ProviderModel,
 } from "@shared/core/models";
-import type {
-    ChatSession,
-    Message,
-    ThinkingLevel,
-    Attachment,
-    PendingAttachment,
-} from "@shared/core/types";
+import type { ChatSession, Message, ThinkingLevel } from "@shared/core/types";
 import {
     applyModelCapabilities,
     getLastUserSettings,
@@ -58,10 +50,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { MessageInput } from "@/components/chat/MessageInput";
 import { AgentSwitcher } from "@/components/chat/AgentSwitcher";
-import { AttachmentGallery } from "@/components/chat/AttachmentGallery";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { consumePendingSharePayload } from "@/lib/share-intent/pending-share";
-import { importSharedImageFiles } from "@/lib/share-intent/attachments";
 import {
     interruptMobileConversationRun,
     runMobileConversationSend,
@@ -102,11 +92,6 @@ export default function ChatScreen(): ReactElement {
         useAgentchatSocket();
 
     const [inputText, setInputText] = useState("");
-    const storageAdapter = useStorageAdapter();
-    const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
-    const [attachmentsById, setAttachmentsById] = useState<
-        Record<string, Attachment>
-    >({});
     const [error, setError] = useState<RuntimeErrorState | null>(null);
     const [retryPayload, setRetryPayload] = useState<RetryChatState | null>(
         null,
@@ -125,11 +110,6 @@ export default function ChatScreen(): ReactElement {
     const [expandedThinking, setExpandedThinking] = useState<
         Record<string, boolean>
     >({});
-    const [galleryVisible, setGalleryVisible] = useState(false);
-    const [galleryAttachments, setGalleryAttachments] = useState<Attachment[]>(
-        [],
-    );
-    const [galleryInitialIndex, setGalleryInitialIndex] = useState(0);
     const { width: windowWidth, height: windowHeight } = useWindowDimensions();
     const screenWidth = windowWidth;
     const smallestSide = Math.min(windowWidth, windowHeight);
@@ -137,7 +117,6 @@ export default function ChatScreen(): ReactElement {
     const sidebarWidth = Math.max(280, Math.min(360, windowWidth * 0.32));
     const lastInitializedChatIdRef = useRef<string | null>(null);
     const suppressInputRef = useRef(false);
-    const sharePayloadAppliedRef = useRef<string | null>(null);
     const currentChatRef = useRef<ChatSession | null>(currentChat);
     const chatMessagesRef = useRef<Message[]>(EMPTY_MESSAGES);
     const activeRunRef = useRef<ActiveRunState | null>(null);
@@ -147,6 +126,25 @@ export default function ChatScreen(): ReactElement {
             selectChat(chatId);
         }
     }, [chatId, selectChat]);
+
+    useEffect(() => {
+        if (!chatId) {
+            return;
+        }
+
+        const pendingShare = consumePendingSharePayload(chatId);
+        if (!pendingShare?.text) {
+            return;
+        }
+
+        const timeoutId = setTimeout(() => {
+            setInputText((current) => current || pendingShare.text);
+        }, 0);
+
+        return () => {
+            clearTimeout(timeoutId);
+        };
+    }, [chatId]);
 
     useEffect(() => {
         if (chats.length > 0) return;
@@ -206,92 +204,6 @@ export default function ChatScreen(): ReactElement {
     useEffect(() => {
         activeRunRef.current = activeRun;
     }, [activeRun]);
-
-    useEffect(() => {
-        let isMounted = true;
-        const loadAttachments = async () => {
-            const nextById: Record<string, Attachment> = {};
-
-            for (const message of chatMessages) {
-                if (
-                    !message.attachmentIds ||
-                    message.attachmentIds.length === 0
-                ) {
-                    continue;
-                }
-                const attachmentsForMessage =
-                    await storageAdapter.getAttachmentsByMessage(message.id);
-                for (const attachment of attachmentsForMessage) {
-                    nextById[attachment.id] = attachment;
-                }
-            }
-
-            if (isMounted) {
-                setAttachmentsById(nextById);
-            }
-        };
-
-        void loadAttachments();
-
-        return () => {
-            isMounted = false;
-        };
-    }, [chatMessages, storageAdapter]);
-
-    useEffect(() => {
-        if (!chatId || !currentChat || currentChat.id !== chatId) return;
-        if (sharePayloadAppliedRef.current === chatId) return;
-
-        const payload = consumePendingSharePayload(chatId);
-        if (!payload) return;
-        sharePayloadAppliedRef.current = chatId;
-
-        if (payload.text.trim()) {
-            startTransition(() => {
-                setInputText(payload.text);
-            });
-        }
-
-        if (payload.files.length === 0) {
-            return;
-        }
-
-        void (async () => {
-            try {
-                const {
-                    attachments: imported,
-                    unsupportedFiles,
-                    blockedByQuota,
-                } = await importSharedImageFiles(payload.files, chatId);
-
-                if (imported.length > 0) {
-                    setAttachments((prev) => [...prev, ...imported]);
-                }
-
-                const notes: string[] = [];
-                if (unsupportedFiles > 0) {
-                    notes.push(
-                        `${unsupportedFiles} unsupported file${
-                            unsupportedFiles > 1 ? "s were" : " was"
-                        } skipped (only images are supported right now).`,
-                    );
-                }
-                if (blockedByQuota) {
-                    notes.push(
-                        "Some images were skipped because the current storage limits were reached.",
-                    );
-                }
-                if (notes.length > 0) {
-                    Alert.alert("Shared Content", notes.join("\n\n"));
-                }
-            } catch {
-                Alert.alert(
-                    "Shared Content",
-                    "Unable to import one or more shared files.",
-                );
-            }
-        })();
-    }, [chatId, currentChat]);
 
     useEffect(() => {
         if (!currentChat || !hasLoadedMessages) return;
@@ -369,14 +281,6 @@ export default function ChatScreen(): ReactElement {
         setDefaultThinking(thinking);
         const updatedChat = { ...currentChat, thinking };
         await updateChat(updatedChat);
-    };
-
-    const handleAttachmentsSelected = (newAttachments: PendingAttachment[]) => {
-        setAttachments((prev) => [...prev, ...newAttachments]);
-    };
-
-    const handleRemoveAttachment = (attachmentId: string) => {
-        setAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
     };
 
     const persistAssistantMessage = useCallback(
@@ -570,22 +474,9 @@ export default function ChatScreen(): ReactElement {
         return unsubscribe;
     }, [currentChat, ensureConnected, socketClient]);
 
-    const handleSendMessage = async (
-        content: string,
-        pendingAttachments?: PendingAttachment[],
-    ): Promise<boolean> => {
+    const handleSendMessage = async (content: string): Promise<boolean> => {
         if (!currentChat) {
             setError({ message: "No chat selected", isRetryable: false });
-            return false;
-        }
-
-        if (pendingAttachments && pendingAttachments.length > 0) {
-            setError({
-                message:
-                    "Mobile attachments are being rebuilt for the Agentchat architecture. Use text-only messages for now.",
-                isRetryable: false,
-            });
-            setRetryPayload(null);
             return false;
         }
 
@@ -624,16 +515,10 @@ export default function ChatScreen(): ReactElement {
     };
 
     const handleSend = async () => {
-        if (
-            (!inputText.trim() && attachments.length === 0) ||
-            isLoading ||
-            !currentChat
-        )
-            return;
+        if (!inputText.trim() || isLoading || !currentChat) return;
 
         const content = inputText.trim();
-        const pending = attachments;
-        const didSend = await handleSendMessage(content, pending);
+        const didSend = await handleSendMessage(content);
         if (!didSend) {
             return;
         }
@@ -643,7 +528,6 @@ export default function ChatScreen(): ReactElement {
         }
         suppressInputRef.current = true;
         setInputText("");
-        setAttachments([]);
         inputSuppressionTimeoutRef.current = setTimeout(() => {
             suppressInputRef.current = false;
             inputSuppressionTimeoutRef.current = null;
@@ -686,32 +570,24 @@ export default function ChatScreen(): ReactElement {
         };
 
         if (chatMessages.length > 0) {
-            Alert.alert(
-                "Delete Chat",
-                "This chat has messages. Delete it and all attachments?",
-                [
-                    { text: "Cancel", style: "cancel" },
-                    {
-                        text: "Delete",
-                        style: "destructive",
-                        onPress: () => {
-                            void (async () => {
-                                await deleteChat(chatId);
-                                navigateAfterDelete();
-                            })();
-                        },
+            Alert.alert("Delete Chat", "This chat has messages. Delete it?", [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Delete",
+                    style: "destructive",
+                    onPress: () => {
+                        void (async () => {
+                            await deleteChat(chatId);
+                            navigateAfterDelete();
+                        })();
                     },
-                ],
-            );
+                },
+            ]);
             return;
         }
 
         await deleteChat(chatId);
         navigateAfterDelete();
-    };
-
-    const handleManageStorage = () => {
-        router.replace("/");
     };
 
     const handleStartNewChat = async () => {
@@ -838,97 +714,6 @@ export default function ChatScreen(): ReactElement {
         }));
     };
 
-    const openGallery = (attachmentId: string, attachments: Attachment[]) => {
-        const index = attachments.findIndex((a) => a.id === attachmentId);
-        if (index >= 0) {
-            setGalleryAttachments(attachments);
-            setGalleryInitialIndex(index);
-            setGalleryVisible(true);
-        }
-    };
-
-    const getChatAttachments = (): Attachment[] => {
-        const allAttachments: Attachment[] = [];
-        const seenIds = new Set<string>();
-
-        chatMessages.forEach((message) => {
-            if (message.attachmentIds) {
-                message.attachmentIds.forEach((id) => {
-                    if (!seenIds.has(id)) {
-                        seenIds.add(id);
-                        const attachment = attachmentsById[id];
-                        if (attachment) {
-                            allAttachments.push(attachment);
-                        }
-                    }
-                });
-            }
-        });
-
-        return allAttachments;
-    };
-
-    const formatFileSize = (bytes: number): string => {
-        if (bytes < 1024) return `${bytes} B`;
-        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-    };
-
-    const renderAttachmentThumbnail = (attachment: Attachment) => {
-        const aspectRatio =
-            attachment.width && attachment.height
-                ? attachment.width / attachment.height
-                : 1;
-        const thumbnailSize = 80;
-        const thumbnailWidth = thumbnailSize;
-        const thumbnailHeight = thumbnailSize / aspectRatio;
-
-        return (
-            <TouchableOpacity
-                key={attachment.id}
-                style={styles.attachmentThumbnailContainer}
-                onPress={() => openGallery(attachment.id, getChatAttachments())}
-                activeOpacity={0.7}
-            >
-                <Image
-                    source={{ uri: attachment.data }}
-                    style={[
-                        styles.attachmentThumbnail,
-                        { width: thumbnailWidth, height: thumbnailHeight },
-                    ]}
-                    resizeMode="cover"
-                />
-                <View style={styles.attachmentMetadata}>
-                    <Text style={styles.attachmentDimension}>
-                        {attachment.width} × {attachment.height}
-                    </Text>
-                    <Text style={styles.attachmentSize}>
-                        {formatFileSize(attachment.size)}
-                    </Text>
-                </View>
-            </TouchableOpacity>
-        );
-    };
-
-    const renderAttachments = (
-        attachmentIds: string[],
-        containerStyle?: object,
-    ) => {
-        if (!attachmentIds || attachmentIds.length === 0) return null;
-
-        const attachments = attachmentIds
-            .map((id) => attachmentsById[id])
-            .filter((a): a is Attachment => Boolean(a && a.data));
-
-        if (attachments.length === 0) return null;
-
-        return (
-            <View style={[styles.attachmentsContainer, containerStyle]}>
-                {attachments.map(renderAttachmentThumbnail)}
-            </View>
-        );
-    };
-
     const formatMessageTime = (timestamp: number): string => {
         return new Date(timestamp).toLocaleTimeString([], {
             hour: "numeric",
@@ -964,8 +749,6 @@ export default function ChatScreen(): ReactElement {
         const hasModelBadge = Boolean(item.modelId);
         const showDivider = hasThinkingBadge || hasModelBadge;
         const modelDisplayName = getModelDisplayName(item.modelId, models);
-        const hasAttachments =
-            item.attachmentIds !== undefined && item.attachmentIds.length > 0;
 
         return (
             <View
@@ -976,12 +759,6 @@ export default function ChatScreen(): ReactElement {
                         : styles.messageGroupAssistant,
                 ]}
             >
-                {isUser && hasAttachments
-                    ? renderAttachments(
-                          item.attachmentIds as string[],
-                          styles.attachmentsBeforeContent,
-                      )
-                    : null}
                 {displayThinking && (
                     <View
                         style={[
@@ -1055,9 +832,6 @@ export default function ChatScreen(): ReactElement {
                         ) : !isUser ? (
                             <Text style={styles.emptyMessageText}>...</Text>
                         ) : null}
-                        {!isUser &&
-                            hasAttachments &&
-                            renderAttachments(item.attachmentIds as string[])}
                     </View>
                 )}
                 <View
@@ -1343,7 +1117,6 @@ export default function ChatScreen(): ReactElement {
                     onCancel={handleCancel}
                     isLoading={isLoading}
                     settingsLocked={Boolean(currentChat.settingsLockedAt)}
-                    attachmentsEnabled={false}
                     models={models}
                     selectedModelId={currentChat.modelId}
                     onModelChange={handleModelChange}
@@ -1352,12 +1125,6 @@ export default function ChatScreen(): ReactElement {
                     reasoningSupported={reasoningSupported}
                     thinkingLevel={currentChat.thinking}
                     onThinkingChange={handleThinkingChange}
-                    attachments={attachments}
-                    onAttachmentsChange={handleAttachmentsSelected}
-                    onRemoveAttachment={handleRemoveAttachment}
-                    sessionId={chatId}
-                    onManageStorage={handleManageStorage}
-                    onStartNewChat={handleStartNewChat}
                 />
             </KeyboardAvoidingView>
         </>
@@ -1373,14 +1140,6 @@ export default function ChatScreen(): ReactElement {
             ) : (
                 threadContent
             )}
-
-            <AttachmentGallery
-                key={`${galleryVisible}-${galleryInitialIndex}-${galleryAttachments.length}`}
-                visible={galleryVisible}
-                attachments={galleryAttachments}
-                initialIndex={galleryInitialIndex}
-                onClose={() => setGalleryVisible(false)}
-            />
         </SafeAreaView>
     );
 }
@@ -1875,39 +1634,5 @@ const createStyles = (colors: ThemeColors) =>
             lineHeight: 18,
             color: colors.text,
             fontFamily: "monospace",
-        },
-        attachmentsContainer: {
-            marginTop: 8,
-            flexDirection: "row",
-            flexWrap: "wrap",
-            gap: 8,
-        },
-        attachmentsBeforeContent: {
-            marginTop: 0,
-            marginBottom: 8,
-        },
-        attachmentThumbnailContainer: {
-            alignItems: "flex-start",
-            gap: 4,
-        },
-        attachmentThumbnail: {
-            borderRadius: 8,
-            backgroundColor: colors.surfaceSubtle,
-        },
-        attachmentMetadata: {
-            paddingHorizontal: 4,
-            paddingVertical: 2,
-        },
-        attachmentDimension: {
-            fontSize: 10,
-            color: colors.textMuted,
-        },
-        attachmentSize: {
-            fontSize: 10,
-            color: colors.textSubtle,
-        },
-        attachmentImage: {
-            borderRadius: 8,
-            backgroundColor: colors.surfaceSubtle,
         },
     });

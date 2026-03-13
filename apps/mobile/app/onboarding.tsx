@@ -51,7 +51,7 @@ export default function OnboardingScreen({
             title: "Self-Hosted Design",
             subtitle: "Connect the app to your own backend",
             content: [
-                "• Chats and attachments live in your Convex deployment",
+                "• Chats and runtime state live in your Convex deployment",
                 "• Bring your own infrastructure and agent stack",
                 "• Keep full control of storage and auth",
                 "• The instance owner configures model provider access",

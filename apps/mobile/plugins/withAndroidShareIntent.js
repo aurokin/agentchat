@@ -5,7 +5,6 @@ const {
 } = require("@expo/config-plugins");
 
 const ACTION_SEND = "android.intent.action.SEND";
-const ACTION_SEND_MULTIPLE = "android.intent.action.SEND_MULTIPLE";
 
 function getMainActivity(manifest) {
     const application = manifest.manifest.application?.[0];
@@ -50,14 +49,7 @@ function withShareIntentManifest(config) {
         if (!hasIntentFilter(mainActivity, ACTION_SEND)) {
             mainActivity["intent-filter"] = [
                 ...(mainActivity["intent-filter"] ?? []),
-                makeSendIntentFilter(ACTION_SEND, ["text/*", "image/*"]),
-            ];
-        }
-
-        if (!hasIntentFilter(mainActivity, ACTION_SEND_MULTIPLE)) {
-            mainActivity["intent-filter"] = [
-                ...(mainActivity["intent-filter"] ?? []),
-                makeSendIntentFilter(ACTION_SEND_MULTIPLE, ["image/*"]),
+                makeSendIntentFilter(ACTION_SEND, ["text/*"]),
             ];
         }
 
@@ -92,8 +84,6 @@ function withShareIntentMainActivity(config) {
         if (!contents.includes("mapShareIntentToDeepLink")) {
             contents = ensureImport(contents, "import android.content.Intent");
             contents = ensureImport(contents, "import android.net.Uri");
-            contents = ensureImport(contents, "import org.json.JSONArray");
-            contents = ensureImport(contents, "import org.json.JSONObject");
 
             if (!contents.includes("setIntent(mapShareIntentToDeepLink(intent))")) {
                 contents = contents.replace(
@@ -115,37 +105,20 @@ function withShareIntentMainActivity(config) {
 
   private fun mapShareIntentToDeepLink(intent: Intent): Intent {
     val action = intent.action
-    if (action != Intent.ACTION_SEND && action != Intent.ACTION_SEND_MULTIPLE) {
+    if (action != Intent.ACTION_SEND) {
       return intent
     }
 
     val sharedText = intent.getStringExtra(Intent.EXTRA_TEXT)?.trim().orEmpty()
-    val streamUris = getSharedStreamUris(intent)
-
-    if (sharedText.isEmpty() && streamUris.isEmpty()) {
+    if (sharedText.isEmpty()) {
       return intent
-    }
-
-    val filesJson = JSONArray()
-    streamUris.forEach { uri ->
-      val fileJson = JSONObject()
-      fileJson.put("uri", uri.toString())
-      fileJson.put("mimeType", contentResolver.getType(uri) ?: intent.type ?: "")
-      filesJson.put(fileJson)
     }
 
     val deepLink = Uri.Builder()
       .scheme("${scheme}")
       .path("/")
       .appendQueryParameter("sharedAt", System.currentTimeMillis().toString())
-      .apply {
-        if (sharedText.isNotEmpty()) {
-          appendQueryParameter("sharedText", sharedText)
-        }
-        if (filesJson.length() > 0) {
-          appendQueryParameter("sharedFiles", filesJson.toString())
-        }
-      }
+      .appendQueryParameter("sharedText", sharedText)
       .build()
 
     return Intent(Intent.ACTION_VIEW, deepLink).apply {
@@ -153,34 +126,6 @@ function withShareIntentMainActivity(config) {
       addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
       addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
     }
-  }
-
-  private fun getSharedStreamUris(intent: Intent): List<Uri> {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-      val singleUri = intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
-      val multipleUris = intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java)
-      return buildList {
-        if (singleUri != null) {
-          add(singleUri)
-        }
-        if (multipleUris != null) {
-          addAll(multipleUris)
-        }
-      }.distinct()
-    }
-
-    @Suppress("DEPRECATION")
-    val singleUri = intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
-    @Suppress("DEPRECATION")
-    val multipleUris = intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)
-    return buildList {
-      if (singleUri != null) {
-        add(singleUri)
-      }
-      if (multipleUris != null) {
-        addAll(multipleUris)
-      }
-    }.distinct()
   }
 `;
 

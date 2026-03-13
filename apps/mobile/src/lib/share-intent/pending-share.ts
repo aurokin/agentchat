@@ -1,11 +1,5 @@
-export interface PendingSharedFile {
-    uri: string;
-    mimeType: string | null;
-}
-
 export interface PendingSharePayload {
     text: string;
-    files: PendingSharedFile[];
 }
 
 const payloadByChatId = new Map<string, PendingSharePayload>();

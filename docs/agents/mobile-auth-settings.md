@@ -177,7 +177,7 @@ await setTheme("dark");
 ```typescript
 <View style={styles.storageContainer}>
     <Text style={styles.storageInfoText}>
-        Workspace attachments live in Convex and follow the signed-in account.
+        Chat history, settings, and runtime state live in Convex for this deployment.
     </Text>
 </View>
 ```
