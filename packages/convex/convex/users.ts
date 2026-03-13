@@ -88,7 +88,7 @@ export const create = internalMutation({
     },
 });
 
-export const resetCloudData = mutation({
+export const resetWorkspaceData = mutation({
     args: {},
     handler: async (ctx) => {
         const userId = await getAuthUserId(ctx);
@@ -164,7 +164,7 @@ export const resetCloudData = mutation({
     },
 });
 
-export const ensureUsageCounters = mutation({
+export const ensureWorkspaceUsage = mutation({
     args: {},
     handler: async (ctx) => {
         const userId = await requireWorkspaceUser(ctx);
