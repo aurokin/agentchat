@@ -16,6 +16,7 @@ export interface Message {
     thinking?: string;
     runId?: string | null;
     modelId?: string;
+    variantId?: string | null;
     thinkingLevel?: ThinkingLevel;
     attachmentIds?: string[];
     createdAt: number;
@@ -28,6 +29,7 @@ export interface ChatSession {
     agentId: string;
     title: string;
     modelId: string;
+    variantId?: string | null;
     thinking: ThinkingLevel;
     settingsLockedAt?: number | null;
     createdAt: number;

@@ -37,6 +37,7 @@ describe("user-settings-storage", () => {
         await storage.setDefaultModel("global-model");
         await storage.setDefaultModelForAgent("agent-model", "agent-1");
         await storage.setDefaultProviderForAgent("codex-primary", "agent-1");
+        await storage.setDefaultVariantForAgent("balanced", "agent-1");
         await storage.setDefaultThinking("low");
         await storage.setDefaultThinkingForAgent("high", "agent-1");
 
@@ -46,6 +47,9 @@ describe("user-settings-storage", () => {
         );
         expect(await storage.getDefaultModelForAgent("agent-1")).toBe(
             "agent-model",
+        );
+        expect(await storage.getDefaultVariantForAgent("agent-1")).toBe(
+            "balanced",
         );
         expect(await storage.getDefaultThinking()).toBe("low");
         expect(await storage.getDefaultThinkingForAgent("agent-1")).toBe(

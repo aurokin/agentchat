@@ -15,9 +15,11 @@ import {
 import {
     getDefaultProviderForAgent,
     getDefaultModelForAgent,
+    getDefaultVariantForAgent,
     getFavoriteModels,
     setDefaultProviderForAgent,
     setDefaultModelForAgent,
+    setDefaultVariantForAgent,
     setFavoriteModels,
 } from "@/lib/storage";
 import { fetchAvailableModels } from "@/lib/agentchat-server";
@@ -25,9 +27,11 @@ import { useAgent } from "@/contexts/AgentContext";
 import {
     filterModelsForProvider,
     filterModelsForAgent,
+    getVariantsForModel,
     getProviderIdForModel,
     selectScopedDefaultProvider,
     selectScopedDefaultModel,
+    selectScopedDefaultVariant,
 } from "@/contexts/settings-helpers";
 
 export interface AvailableProviderOption {
@@ -45,6 +49,12 @@ interface ModelContextValue {
     selectProvider: (providerId: string) => Promise<void>;
     selectedModel: string | null;
     selectModel: (modelId: string) => Promise<void>;
+    availableVariants: Array<{
+        id: string;
+        label: string;
+    }>;
+    selectedVariantId: string | null;
+    selectVariant: (variantId: string) => Promise<void>;
     refreshModels: () => Promise<void>;
     favoriteModels: string[];
     toggleFavoriteModel: (modelId: string) => void;
@@ -74,10 +84,15 @@ export function ModelProvider({
         null,
     );
     const [selectedModel, setSelectedModel] = useState<string | null>(null);
+    const [selectedVariantId, setSelectedVariantId] = useState<string | null>(
+        null,
+    );
     const [favoriteModels, setFavoriteModelsState] = useState<string[]>([]);
     const [hasLoadedSelectedProvider, setHasLoadedSelectedProvider] =
         useState(false);
     const [hasLoadedSelectedModel, setHasLoadedSelectedModel] = useState(false);
+    const [hasLoadedSelectedVariant, setHasLoadedSelectedVariant] =
+        useState(false);
     const { selectedAgentId, selectedAgent, selectedAgentOptions } = useAgent();
 
     const agentModels = useMemo(
@@ -121,6 +136,14 @@ export function ModelProvider({
             }),
         [agentModels, selectedProviderId],
     );
+    const selectedModelEntry = useMemo(
+        () => agentModels.find((model) => model.id === selectedModel) ?? null,
+        [agentModels, selectedModel],
+    );
+    const availableVariants = useMemo(
+        () => getVariantsForModel(selectedModelEntry),
+        [selectedModelEntry],
+    );
 
     const loadSelectedProvider = useCallback(async () => {
         try {
@@ -146,6 +169,21 @@ export function ModelProvider({
             console.error("Failed to load selected model");
         } finally {
             setHasLoadedSelectedModel(true);
+        }
+    }, [selectedAgentId]);
+
+    const loadSelectedVariant = useCallback(async () => {
+        try {
+            const variantId = await getDefaultVariantForAgent(selectedAgentId);
+            if (variantId) {
+                setSelectedVariantId(variantId);
+            } else {
+                setSelectedVariantId(null);
+            }
+        } catch {
+            console.error("Failed to load selected variant");
+        } finally {
+            setHasLoadedSelectedVariant(true);
         }
     }, [selectedAgentId]);
 
@@ -206,6 +244,26 @@ export function ModelProvider({
                             selectedAgentId,
                         );
                         setSelectedModel(nextModel);
+
+                        const nextModelEntry =
+                            providerModels.find(
+                                (model) => model.id === nextModel,
+                            ) ?? null;
+                        const nextVariantId = selectScopedDefaultVariant({
+                            model: nextModelEntry,
+                            userPreferredVariantId: null,
+                            agentDefaultVariantId:
+                                selectedAgentOptions?.defaultVariant ??
+                                selectedAgent?.defaultVariant ??
+                                null,
+                        });
+                        if (nextVariantId) {
+                            await setDefaultVariantForAgent(
+                                nextVariantId,
+                                selectedAgentId,
+                            );
+                        }
+                        setSelectedVariantId(nextVariantId);
                     }
                 }
             } catch {
@@ -214,8 +272,10 @@ export function ModelProvider({
         },
         [
             agentModels,
+            selectedAgent?.defaultVariant,
             selectedAgent?.defaultModel,
             selectedAgentId,
+            selectedAgentOptions?.defaultVariant,
             selectedAgentOptions?.defaultModel,
             selectedModel,
         ],
@@ -227,8 +287,11 @@ export function ModelProvider({
                 await setDefaultModelForAgent(modelId, selectedAgentId);
                 setSelectedModel(modelId);
 
-                const model = agentModels.find((entry) => entry.id === modelId);
-                const providerId = model ? getProviderIdForModel(model) : null;
+                const nextModelEntry =
+                    agentModels.find((entry) => entry.id === modelId) ?? null;
+                const providerId = nextModelEntry
+                    ? getProviderIdForModel(nextModelEntry)
+                    : null;
                 if (providerId) {
                     await setDefaultProviderForAgent(
                         providerId,
@@ -236,11 +299,53 @@ export function ModelProvider({
                     );
                     setSelectedProviderId(providerId);
                 }
+
+                const nextVariantId = selectScopedDefaultVariant({
+                    model: nextModelEntry,
+                    userPreferredVariantId: selectedVariantId,
+                    agentDefaultVariantId:
+                        selectedAgentOptions?.defaultVariant ??
+                        selectedAgent?.defaultVariant ??
+                        null,
+                });
+
+                if (nextVariantId) {
+                    await setDefaultVariantForAgent(
+                        nextVariantId,
+                        selectedAgentId,
+                    );
+                }
+                setSelectedVariantId(nextVariantId);
             } catch {
                 console.error("Failed to save selected model");
             }
         },
-        [agentModels, selectedAgentId],
+        [
+            agentModels,
+            selectedAgent?.defaultVariant,
+            selectedAgentId,
+            selectedAgentOptions?.defaultVariant,
+            selectedVariantId,
+        ],
+    );
+
+    const selectVariant = useCallback(
+        async (variantId: string) => {
+            const availableVariantIds = availableVariants.map(
+                (variant) => variant.id,
+            );
+            if (!availableVariantIds.includes(variantId)) {
+                return;
+            }
+
+            try {
+                await setDefaultVariantForAgent(variantId, selectedAgentId);
+                setSelectedVariantId(variantId);
+            } catch {
+                console.error("Failed to save selected variant");
+            }
+        },
+        [availableVariants, selectedAgentId],
     );
 
     const toggleFavoriteModel = useCallback((modelId: string) => {
@@ -257,17 +362,36 @@ export function ModelProvider({
     useEffect(() => {
         loadSelectedProvider();
         loadSelectedModel();
+        loadSelectedVariant();
         loadFavoriteModels();
-    }, [loadSelectedProvider, loadSelectedModel, loadFavoriteModels]);
+    }, [
+        loadFavoriteModels,
+        loadSelectedModel,
+        loadSelectedProvider,
+        loadSelectedVariant,
+    ]);
 
     useEffect(() => {
-        if (hasLoadedSelectedModel && hasLoadedSelectedProvider) {
+        if (
+            hasLoadedSelectedModel &&
+            hasLoadedSelectedProvider &&
+            hasLoadedSelectedVariant
+        ) {
             refreshModels();
         }
-    }, [hasLoadedSelectedModel, hasLoadedSelectedProvider, refreshModels]);
+    }, [
+        hasLoadedSelectedModel,
+        hasLoadedSelectedProvider,
+        hasLoadedSelectedVariant,
+        refreshModels,
+    ]);
 
     useEffect(() => {
-        if (!hasLoadedSelectedModel || !hasLoadedSelectedProvider) {
+        if (
+            !hasLoadedSelectedModel ||
+            !hasLoadedSelectedProvider ||
+            !hasLoadedSelectedVariant
+        ) {
             return;
         }
 
@@ -293,6 +417,26 @@ export function ModelProvider({
             return;
         }
 
+        const nextSelectedVariant = selectScopedDefaultVariant({
+            model: selectedModelEntry,
+            userPreferredVariantId: selectedVariantId,
+            agentDefaultVariantId:
+                selectedAgentOptions?.defaultVariant ??
+                selectedAgent?.defaultVariant ??
+                null,
+        });
+
+        if (nextSelectedVariant !== selectedVariantId) {
+            setSelectedVariantId(nextSelectedVariant);
+            if (nextSelectedVariant) {
+                void setDefaultVariantForAgent(
+                    nextSelectedVariant,
+                    selectedAgentId,
+                );
+            }
+            return;
+        }
+
         const nextSelectedModel = selectScopedDefaultModel({
             models,
             userPreferredModel: selectedModel,
@@ -312,14 +456,19 @@ export function ModelProvider({
         agentModels,
         hasLoadedSelectedProvider,
         hasLoadedSelectedModel,
+        hasLoadedSelectedVariant,
         models,
+        selectedAgent?.defaultVariant,
         selectedAgent?.defaultProviderId,
         selectedAgent?.defaultModel,
         selectedAgentId,
+        selectedAgentOptions?.defaultVariant,
         selectedAgentOptions?.defaultProviderId,
         selectedAgentOptions?.defaultModel,
         selectedProviderId,
         selectedModel,
+        selectedModelEntry,
+        selectedVariantId,
     ]);
 
     return (
@@ -334,6 +483,9 @@ export function ModelProvider({
                 selectProvider,
                 selectedModel,
                 selectModel,
+                availableVariants,
+                selectedVariantId,
+                selectVariant,
                 refreshModels,
                 favoriteModels,
                 toggleFavoriteModel,

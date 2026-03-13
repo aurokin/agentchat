@@ -2,7 +2,7 @@ import type {
     AgentOptionsResponse,
     BootstrapAgent,
 } from "@/lib/agentchat-server";
-import type { ProviderModel } from "@shared/core/models";
+import type { ProviderModel, ProviderVariant } from "@shared/core/models";
 import { APP_DEFAULT_MODEL } from "@shared/core/models";
 
 export function filterModelsForAgent(params: {
@@ -82,6 +82,41 @@ export function filterModelsForProvider(params: {
     return models.filter(
         (model) => getProviderIdForModel(model) === providerId,
     );
+}
+
+export function selectScopedDefaultVariant(params: {
+    model: ProviderModel | null | undefined;
+    userPreferredVariantId: string | null;
+    agentDefaultVariantId: string | null;
+}): string | null {
+    const variants = params.model?.variants ?? [];
+    const variantIds = variants.map((variant) => variant.id);
+
+    if (variantIds.length === 0) {
+        return null;
+    }
+
+    if (
+        params.userPreferredVariantId &&
+        variantIds.includes(params.userPreferredVariantId)
+    ) {
+        return params.userPreferredVariantId;
+    }
+
+    if (
+        params.agentDefaultVariantId &&
+        variantIds.includes(params.agentDefaultVariantId)
+    ) {
+        return params.agentDefaultVariantId;
+    }
+
+    return variants[0]?.id ?? null;
+}
+
+export function getVariantsForModel(
+    model: ProviderModel | null | undefined,
+): ProviderVariant[] {
+    return model?.variants ?? [];
 }
 
 export function selectScopedDefaultProvider(params: {

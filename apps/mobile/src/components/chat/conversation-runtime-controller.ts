@@ -67,6 +67,7 @@ export async function runMobileConversationSend(params: {
             status: "completed",
             runId: null,
             modelId: sendPlan.userMessage.modelId,
+            variantId: sendPlan.userMessage.variantId ?? null,
             thinkingLevel: sendPlan.userMessage.thinkingLevel,
             completedAt: Date.now(),
         });
@@ -96,6 +97,7 @@ export async function runMobileConversationSend(params: {
             status: "draft",
             runId: null,
             modelId: sendPlan.assistantMessage.modelId,
+            variantId: sendPlan.assistantMessage.variantId ?? null,
             thinkingLevel: sendPlan.assistantMessage.thinkingLevel,
             thinking: undefined,
             completedAt: null,

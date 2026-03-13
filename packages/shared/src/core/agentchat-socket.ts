@@ -12,6 +12,7 @@ export interface ConversationSendCommand {
         conversationId: string;
         agentId: string;
         modelId: string;
+        variantId?: string | null;
         thinking: ThinkingLevel;
         content: string;
         userMessageId: string;

@@ -108,6 +108,7 @@ describe("conversation runtime controller", () => {
                 conversationId: "chat-1",
                 agentId: "agent-1",
                 modelId: "gpt-5.3-codex",
+                variantId: null,
                 thinking: "high",
                 content: "New prompt",
                 userMessageId: "user-1",

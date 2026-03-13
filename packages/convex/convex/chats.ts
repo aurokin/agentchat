@@ -148,6 +148,7 @@ export const create = mutation({
         agentId: v.string(),
         title: v.string(),
         modelId: v.string(),
+        variantId: v.union(v.string(), v.null()),
         thinking: v.string(),
         createdAt: v.optional(v.number()),
         updatedAt: v.optional(v.number()),
@@ -172,6 +173,7 @@ export const create = mutation({
             agentId: args.agentId,
             title: args.title,
             modelId: args.modelId,
+            variantId: args.variantId,
             thinking: args.thinking,
             settingsLockedAt: null,
             createdAt: args.createdAt ?? now,
@@ -189,6 +191,7 @@ export const update = mutation({
         id: v.id("chats"),
         title: v.optional(v.string()),
         modelId: v.optional(v.string()),
+        variantId: v.optional(v.union(v.string(), v.null())),
         thinking: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
@@ -202,11 +205,13 @@ export const update = mutation({
 
         const modelChanged =
             args.modelId !== undefined && args.modelId !== chat.modelId;
+        const variantChanged =
+            args.variantId !== undefined && args.variantId !== chat.variantId;
         const thinkingChanged =
             args.thinking !== undefined && args.thinking !== chat.thinking;
         if (
             chat.settingsLockedAt !== null &&
-            (modelChanged || thinkingChanged)
+            (modelChanged || variantChanged || thinkingChanged)
         ) {
             throw new Error(
                 "Conversation settings are locked after the first message.",

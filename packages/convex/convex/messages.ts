@@ -129,6 +129,7 @@ export const create = mutation({
         contextContent: v.string(),
         thinking: v.optional(v.string()),
         modelId: v.optional(v.string()),
+        variantId: v.union(v.string(), v.null()),
         thinkingLevel: v.optional(v.string()),
         createdAt: v.optional(v.number()),
     },
@@ -172,6 +173,7 @@ export const create = mutation({
             runId: null,
             thinking: args.thinking,
             modelId: args.modelId,
+            variantId: args.variantId,
             thinkingLevel: args.thinkingLevel,
             createdAt: args.createdAt ?? now,
             updatedAt: args.createdAt ?? now,
@@ -201,6 +203,7 @@ export const update = mutation({
         content: v.optional(v.string()),
         contextContent: v.optional(v.string()),
         thinking: v.optional(v.string()),
+        variantId: v.optional(v.union(v.string(), v.null())),
     },
     handler: async (ctx, args) => {
         const authenticatedUserId = await requireCloudSync(ctx);

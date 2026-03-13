@@ -3,6 +3,7 @@ import {
     modelSupportsSearch,
     modelSupportsReasoning,
     modelSupportsVision,
+    resolveThinkingLevelForVariant,
     SupportedParameter,
     type ProviderModel,
 } from "../models";
@@ -32,5 +33,13 @@ describe("model capabilities", () => {
     it("detects vision support", () => {
         expect(modelSupportsVision(model)).toBe(true);
         expect(modelSupportsVision(undefined)).toBe(false);
+    });
+
+    it("maps provider variants to thinking levels", () => {
+        expect(resolveThinkingLevelForVariant("fast")).toBe("low");
+        expect(resolveThinkingLevelForVariant("balanced")).toBe("medium");
+        expect(resolveThinkingLevelForVariant("deep")).toBe("high");
+        expect(resolveThinkingLevelForVariant("minimal")).toBe("minimal");
+        expect(resolveThinkingLevelForVariant("unknown", "none")).toBe("none");
     });
 });

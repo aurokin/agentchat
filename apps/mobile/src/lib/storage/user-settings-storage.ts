@@ -6,6 +6,7 @@ const DEFAULT_THINKING_BY_AGENT_KEY = "agentchat-default-thinking-by-agent";
 const DEFAULT_PROVIDER_BY_AGENT_KEY = "agentchat-default-provider-by-agent";
 const DEFAULT_MODEL_KEY = "agentchat-selected-model";
 const DEFAULT_MODEL_BY_AGENT_KEY = "agentchat-default-model-by-agent";
+const DEFAULT_VARIANT_BY_AGENT_KEY = "agentchat-default-variant-by-agent";
 const FAVORITE_MODELS_KEY = "agentchat-favorite-models";
 const SELECTED_AGENT_KEY = "agentchat-selected-agent";
 const SELECTED_CHAT_BY_AGENT_KEY = "agentchat-selected-chat-by-agent";
@@ -109,6 +110,40 @@ export async function setDefaultThinkingForAgent(
 
 export async function getDefaultModel(): Promise<string | null> {
     return await getDefaultModelForAgent(null);
+}
+
+export async function getDefaultVariantForAgent(
+    agentId?: string | null,
+): Promise<string | null> {
+    if (!agentId) {
+        return null;
+    }
+
+    try {
+        const scopedVariant = (
+            await getStringMap(DEFAULT_VARIANT_BY_AGENT_KEY)
+        )[agentId];
+        return scopedVariant ?? null;
+    } catch {
+        return null;
+    }
+}
+
+export async function setDefaultVariantForAgent(
+    value: string,
+    agentId?: string | null,
+): Promise<void> {
+    if (!agentId) {
+        return;
+    }
+
+    try {
+        const scopedVariants = await getStringMap(DEFAULT_VARIANT_BY_AGENT_KEY);
+        scopedVariants[agentId] = value;
+        await setStringMap(DEFAULT_VARIANT_BY_AGENT_KEY, scopedVariants);
+    } catch (error) {
+        console.error("Failed to save default variant:", error);
+    }
 }
 
 export async function getDefaultProviderForAgent(

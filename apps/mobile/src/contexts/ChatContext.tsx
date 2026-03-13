@@ -15,6 +15,10 @@ import { useStorageAdapter, useSync } from "@/contexts/SyncContext";
 import type { ChatSession, Message, ThinkingLevel } from "@shared/core/types";
 import type { ChatRunSummary, ConversationRuntimeState } from "@/lib/types";
 import {
+    APP_DEFAULT_MODEL,
+    resolveThinkingLevelForVariant,
+} from "@shared/core/models";
+import {
     mapConvexChatToLocal,
     mapConvexMessageToLocal,
     mergeByIdWithPending,
@@ -27,7 +31,6 @@ import {
     clearSelectedChatId,
     setDefaultThinking as persistDefaultThinking,
 } from "@/lib/storage";
-import { APP_DEFAULT_MODEL } from "@shared/core/models";
 import { useModelContext } from "@/contexts/ModelContext";
 import { deriveConversationRuntimeState } from "@/contexts/runtime-helpers";
 import { useAgent } from "@/contexts/AgentContext";
@@ -91,8 +94,13 @@ export function ChatProvider({
     const [error, setError] = useState<string | null>(null);
     const [defaultThinking, setDefaultThinkingState] =
         useState<ThinkingLevel>(DEFAULT_THINKING);
-    const { defaultAgentId, selectedModel, selectModel, models } =
-        useModelContext();
+    const {
+        defaultAgentId,
+        selectedModel,
+        selectedVariantId,
+        selectModel,
+        models,
+    } = useModelContext();
     const { selectedAgentId } = useAgent();
     const validatedSelectedModel =
         selectedModel && models.some((model) => model.id === selectedModel)
@@ -258,7 +266,11 @@ export function ChatProvider({
                     selectedAgentId ?? defaultAgentId ?? "mobile-default-agent",
                 title: title || "New Chat",
                 modelId: modelId || defaultModelId,
-                thinking: defaultThinking,
+                variantId: selectedVariantId,
+                thinking: resolveThinkingLevelForVariant(
+                    selectedVariantId,
+                    defaultThinking,
+                ),
                 settingsLockedAt: null,
                 createdAt: now,
                 updatedAt: now,
@@ -284,6 +296,7 @@ export function ChatProvider({
             defaultThinking,
             isCloudSyncActive,
             defaultAgentId,
+            selectedVariantId,
             selectedAgentId,
         ],
     );

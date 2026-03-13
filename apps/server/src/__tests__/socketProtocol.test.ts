@@ -13,6 +13,7 @@ describe("socket protocol parsing", () => {
                         conversationId: "chat-1",
                         agentId: "agent-1",
                         modelId: "gpt-5.3-codex",
+                        variantId: "balanced",
                         thinking: "medium",
                         content: "Hello",
                         userMessageId: "user-1",
@@ -24,6 +25,9 @@ describe("socket protocol parsing", () => {
         ).toMatchObject({
             id: "cmd-1",
             type: "conversation.send",
+            payload: {
+                variantId: "balanced",
+            },
         });
     });
 

@@ -158,6 +158,26 @@ export function buildInitialTurnText(
     ].join("\n\n");
 }
 
+function resolveCodexEffort(command: ConversationSendCommand): string {
+    switch (command.payload.variantId) {
+        case "fast":
+            return "low";
+        case "balanced":
+            return "medium";
+        case "deep":
+            return "high";
+        case "xhigh":
+        case "high":
+        case "medium":
+        case "low":
+        case "minimal":
+        case "none":
+            return command.payload.variantId;
+        default:
+            return command.payload.thinking;
+    }
+}
+
 class CodexAppServerClient {
     private readonly child: ChildProcessWithoutNullStreams;
     private readonly pending = new Map<
@@ -410,7 +430,7 @@ export class CodexRuntimeManager {
                         type: "dangerFullAccess",
                     },
                     model: params.command.payload.modelId,
-                    effort: params.command.payload.thinking,
+                    effort: resolveCodexEffort(params.command),
                     personality: "pragmatic",
                 });
 

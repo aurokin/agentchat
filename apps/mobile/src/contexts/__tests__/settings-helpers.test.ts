@@ -7,8 +7,10 @@ import { SupportedParameter, type ProviderModel } from "@shared/core/models";
 import {
     filterModelsForProvider,
     filterModelsForAgent,
+    getVariantsForModel,
     selectScopedDefaultProvider,
     selectScopedDefaultModel,
+    selectScopedDefaultVariant,
 } from "@/contexts/settings-helpers";
 
 const models: ProviderModel[] = [
@@ -130,5 +132,32 @@ describe("settings helpers", () => {
                 providerId: "codex",
             }).map((model) => model.id),
         ).toEqual(["codex/model-a"]);
+    });
+
+    test("prefers a stored variant when it is still available", () => {
+        expect(
+            selectScopedDefaultVariant({
+                model: models[0],
+                userPreferredVariantId: "low",
+                agentDefaultVariantId: "high",
+            }),
+        ).toBe("low");
+    });
+
+    test("falls back to the agent default variant when needed", () => {
+        expect(
+            selectScopedDefaultVariant({
+                model: models[0],
+                userPreferredVariantId: "missing",
+                agentDefaultVariantId: "high",
+            }),
+        ).toBe("high");
+    });
+
+    test("returns model variants or an empty list", () => {
+        expect(
+            getVariantsForModel(models[0]).map((variant) => variant.id),
+        ).toEqual(["high", "low"]);
+        expect(getVariantsForModel(null)).toEqual([]);
     });
 });

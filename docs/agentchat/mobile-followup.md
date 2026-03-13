@@ -13,17 +13,16 @@ This document tracks mobile work that should happen after the web-first migratio
 - Mobile now derives conversation runtime state from Convex run summaries, with streamed-message fallback while those summaries are loading.
 - Mobile now has an agent context, agent switcher, agent-scoped conversation lists, and agent-scoped model defaults.
 - Mobile model selection now persists provider-first choices per agent and narrows the model list to the selected provider.
+- Mobile composer now exposes provider and variant selection, and conversation sends persist `variantId` through the shared runtime and Convex sync model.
 - Active mobile chat/settings UI no longer exposes image attachments or cloud image management.
 - Mobile share intent is now text-only, matching the current no-attachments product surface.
 
 ## Pending Mobile Work
 
 - Replace the current chat and settings flows with the new agent-centric model.
-- Add explicit variant selection to the mobile composer and persist it alongside provider/model choices.
 - Remove remaining mobile attachment cache and local image-quota code to match the web/Convex cleanup.
 - Remove any remaining mobile dependency on Convex attachment APIs once the mobile runtime is switched to the new provider architecture.
-- Replace any remaining provider-specific client assumptions with backend-driven provider options.
-- Update mobile auth/session handling to work with backend-minted tokens from Convex.
+- Replace any remaining provider-specific client assumptions with backend-driven provider capability and settings options.
 - Revisit local database tables and sync helpers once the Convex schema migration is defined.
 - Remove or quarantine legacy storage and sync code that no longer matches the product direction.
 

@@ -211,6 +211,7 @@ function createCommand() {
             conversationId: "chat-1",
             agentId: "agent-1",
             modelId: "gpt-5.3-codex",
+            variantId: null,
             thinking: "medium" as const,
             content: "Continue the migration",
             userMessageId: "user-1",
@@ -326,6 +327,42 @@ describe("CodexRuntimeManager", () => {
             "message.completed",
             "run.completed",
         ]);
+    });
+
+    test("maps the selected variant onto Codex effort", async () => {
+        const config = createConfig();
+        const persistence = createPersistence(null);
+        const fakeClient = new FakeCodexClient();
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: () => fakeClient,
+        });
+
+        await manager.sendMessage({
+            userSub: "sub-1",
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: {
+                ...createCommand(),
+                payload: {
+                    ...createCommand().payload,
+                    variantId: "deep",
+                    thinking: "low",
+                },
+            },
+            sendEvent: () => {},
+        });
+
+        expect(
+            (
+                fakeClient.requests.find(
+                    (request) => request.method === "turn/start",
+                )?.params as {
+                    effort?: string;
+                }
+            ).effort,
+        ).toBe("high");
     });
 
     test("falls back to thread/start when resume hits a recoverable error", async () => {

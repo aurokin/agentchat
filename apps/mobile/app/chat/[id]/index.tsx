@@ -29,9 +29,10 @@ import { useAgentchatSocket } from "@/contexts/AgentchatSocketContext";
 import { useAgent } from "@/contexts/AgentContext";
 import {
     modelSupportsReasoning,
+    resolveThinkingLevelForVariant,
     type ProviderModel,
 } from "@shared/core/models";
-import type { ChatSession, Message, ThinkingLevel } from "@shared/core/types";
+import type { ChatSession, Message } from "@shared/core/types";
 import {
     applyModelCapabilities,
     getLastUserSettings,
@@ -83,8 +84,11 @@ export default function ChatScreen(): ReactElement {
         models,
         availableProviders,
         selectedProviderId,
+        availableVariants,
+        selectedVariantId,
         selectProvider,
         selectModel: setSelectedModel,
+        selectVariant: setSelectedVariant,
         favoriteModels,
         toggleFavoriteModel,
     } = useModelContext();
@@ -213,7 +217,11 @@ export default function ChatScreen(): ReactElement {
         if (lastInitializedChatIdRef.current === currentChat.id) return;
         const defaults = {
             modelId: defaultModel,
-            thinking: defaultThinking,
+            variantId: selectedVariantId,
+            thinking: resolveThinkingLevelForVariant(
+                selectedVariantId,
+                defaultThinking,
+            ),
         };
         const lastUserSettings = getLastUserSettings(chatMessages);
         const resolvedSettings = resolveInitialChatSettings({
@@ -232,11 +240,14 @@ export default function ChatScreen(): ReactElement {
 
         if (
             constrainedSettings.modelId !== currentChat.modelId ||
+            (constrainedSettings.variantId ?? null) !==
+                (currentChat.variantId ?? null) ||
             constrainedSettings.thinking !== currentChat.thinking
         ) {
             void updateChat({
                 ...currentChat,
                 modelId: constrainedSettings.modelId,
+                variantId: constrainedSettings.variantId ?? null,
                 thinking: constrainedSettings.thinking,
             });
         }
@@ -248,15 +259,34 @@ export default function ChatScreen(): ReactElement {
         defaultThinking,
         hasLoadedMessages,
         models,
+        selectedVariantId,
         updateChat,
     ]);
 
     useEffect(() => {
         if (!currentChat || !currentModel) return;
-        const nextThinking = reasoningSupported ? currentChat.thinking : "none";
-        if (nextThinking !== currentChat.thinking) {
+        const currentVariantIsValid =
+            !currentChat.variantId ||
+            (currentModel.variants?.some(
+                (variant) => variant.id === currentChat.variantId,
+            ) ??
+                false);
+        const nextVariantId = currentVariantIsValid
+            ? (currentChat.variantId ?? currentModel.variants?.[0]?.id ?? null)
+            : (currentModel.variants?.[0]?.id ?? null);
+        const nextThinking = reasoningSupported
+            ? resolveThinkingLevelForVariant(
+                  nextVariantId,
+                  currentChat.thinking,
+              )
+            : "none";
+        if (
+            nextThinking !== currentChat.thinking ||
+            nextVariantId !== (currentChat.variantId ?? null)
+        ) {
             void updateChat({
                 ...currentChat,
+                variantId: nextVariantId,
                 thinking: nextThinking,
             });
         }
@@ -268,21 +298,37 @@ export default function ChatScreen(): ReactElement {
         const nextModel = models.find((model) => model.id === modelId);
         const nextThinking = nextModel
             ? modelSupportsReasoning(nextModel)
-                ? currentChat.thinking
+                ? resolveThinkingLevelForVariant(
+                      selectedVariantId,
+                      currentChat.thinking,
+                  )
                 : "none"
             : currentChat.thinking;
+        const nextVariantId = nextModel?.variants?.some(
+            (variant) => variant.id === selectedVariantId,
+        )
+            ? selectedVariantId
+            : (nextModel?.variants?.[0]?.id ?? null);
         const updatedChat = {
             ...currentChat,
             modelId,
+            variantId: nextVariantId,
             thinking: nextThinking,
         };
         await updateChat(updatedChat);
     };
 
-    const handleThinkingChange = async (thinking: ThinkingLevel) => {
+    const handleVariantChange = async (variantId: string) => {
         if (!currentChat) return;
-        setDefaultThinking(thinking);
-        const updatedChat = { ...currentChat, thinking };
+        await setSelectedVariant(variantId);
+        const updatedChat = {
+            ...currentChat,
+            variantId,
+            thinking: resolveThinkingLevelForVariant(
+                variantId,
+                currentChat.thinking,
+            ),
+        };
         await updateChat(updatedChat);
     };
 
@@ -1126,11 +1172,14 @@ export default function ChatScreen(): ReactElement {
                     onProviderChange={selectProvider}
                     selectedModelId={currentChat.modelId}
                     onModelChange={handleModelChange}
+                    availableVariants={availableVariants}
+                    selectedVariantId={
+                        currentChat.variantId ?? selectedVariantId
+                    }
+                    onVariantChange={handleVariantChange}
                     favoriteModels={favoriteModels}
                     onToggleFavoriteModel={toggleFavoriteModel}
                     reasoningSupported={reasoningSupported}
-                    thinkingLevel={currentChat.thinking}
-                    onThinkingChange={handleThinkingChange}
                 />
             </KeyboardAvoidingView>
         </>

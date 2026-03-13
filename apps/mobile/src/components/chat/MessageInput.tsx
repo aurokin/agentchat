@@ -7,7 +7,6 @@ import React, {
 } from "react";
 import {
     View,
-    Text,
     TextInput,
     TouchableOpacity,
     StyleSheet,
@@ -16,10 +15,9 @@ import {
     ScrollView,
     useWindowDimensions,
 } from "react-native";
-import type { ProviderModel } from "@shared/core/models";
-import type { ThinkingLevel } from "@shared/core/types";
+import type { ProviderModel, ProviderVariant } from "@shared/core/models";
 import { ModelSelector } from "@/components/chat/ModelSelector";
-import { ThinkingToggle } from "@/components/chat/ThinkingToggle";
+import { VariantSelector } from "@/components/chat/VariantSelector";
 import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
 import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -41,11 +39,12 @@ interface MessageInputProps {
     onProviderChange: (providerId: string) => void;
     selectedModelId: string | null;
     onModelChange: (modelId: string) => void;
+    availableVariants: ProviderVariant[];
+    selectedVariantId: string | null;
+    onVariantChange: (variantId: string) => void;
     favoriteModels: string[];
     onToggleFavoriteModel: (modelId: string) => void;
     reasoningSupported: boolean;
-    thinkingLevel: ThinkingLevel;
-    onThinkingChange: (value: ThinkingLevel) => void;
 }
 
 export function MessageInput({
@@ -62,11 +61,12 @@ export function MessageInput({
     onProviderChange,
     selectedModelId,
     onModelChange,
+    availableVariants,
+    selectedVariantId,
+    onVariantChange,
     favoriteModels,
     onToggleFavoriteModel,
     reasoningSupported,
-    thinkingLevel,
-    onThinkingChange,
 }: MessageInputProps): ReactElement {
     const { colors } = useTheme();
     const insets = useSafeAreaInsets();
@@ -131,10 +131,11 @@ export function MessageInput({
                 onToggleFavoriteModel={onToggleFavoriteModel}
                 disabled={isLoading || settingsLocked}
             />
-            {reasoningSupported && (
-                <ThinkingToggle
-                    value={thinkingLevel}
-                    onChange={onThinkingChange}
+            {reasoningSupported && availableVariants.length > 0 && (
+                <VariantSelector
+                    variants={availableVariants}
+                    selectedVariantId={selectedVariantId}
+                    onVariantChange={onVariantChange}
                     disabled={isLoading || settingsLocked}
                 />
             )}

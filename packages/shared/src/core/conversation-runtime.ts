@@ -3,7 +3,11 @@ import {
     type ConversationInterruptCommand,
     type ConversationSendCommand,
 } from "./agentchat-socket";
-import { modelSupportsReasoning, type ProviderModel } from "./models";
+import {
+    modelSupportsReasoning,
+    resolveThinkingLevelForVariant,
+    type ProviderModel,
+} from "./models";
 import type { ChatSession, Message } from "./types";
 
 export interface RuntimeErrorState {
@@ -42,6 +46,7 @@ export interface ConversationMessageDraft {
     content: string;
     contextContent: string;
     modelId: string;
+    variantId?: string | null;
     thinkingLevel: ChatSession["thinking"];
     chatId: string;
 }
@@ -109,7 +114,12 @@ export function prepareConversationSend(params: {
         (model) => model.id === params.chat.modelId,
     );
     const supportsReasoning = modelSupportsReasoning(currentModel);
-    const effectiveThinking = supportsReasoning ? params.chat.thinking : "none";
+    const effectiveThinking = supportsReasoning
+        ? resolveThinkingLevelForVariant(
+              params.chat.variantId,
+              params.chat.thinking,
+          )
+        : "none";
     const userMessageId = createId();
     const assistantMessageId = createId();
 
@@ -120,6 +130,7 @@ export function prepareConversationSend(params: {
             content: params.content,
             contextContent: params.content,
             modelId: params.chat.modelId,
+            variantId: params.chat.variantId ?? null,
             thinkingLevel: effectiveThinking,
             chatId: params.chat.id,
         },
@@ -129,6 +140,7 @@ export function prepareConversationSend(params: {
             content: "",
             contextContent: "",
             modelId: params.chat.modelId,
+            variantId: params.chat.variantId ?? null,
             thinkingLevel: effectiveThinking,
             chatId: params.chat.id,
         },
@@ -139,6 +151,7 @@ export function prepareConversationSend(params: {
                 conversationId: params.chat.id,
                 agentId: params.chat.agentId,
                 modelId: params.chat.modelId,
+                variantId: params.chat.variantId ?? null,
                 thinking: effectiveThinking,
                 content: params.content,
                 userMessageId,

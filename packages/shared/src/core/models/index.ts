@@ -1,4 +1,11 @@
+import type { ThinkingLevel } from "../types";
+
 export const APP_DEFAULT_MODEL = "moonshotai/kimi-k2.5";
+
+export interface ProviderVariant {
+    id: string;
+    label: string;
+}
 
 export interface ProviderModel {
     id: string;
@@ -6,10 +13,7 @@ export interface ProviderModel {
     providerId?: string;
     provider: string;
     supportedParameters?: SupportedParameter[];
-    variants?: Array<{
-        id: string;
-        label: string;
-    }>;
+    variants?: ProviderVariant[];
 }
 
 export enum SupportedParameter {
@@ -37,4 +41,34 @@ export function modelSupportsVision(model: ProviderModel | undefined): boolean {
     return (
         model?.supportedParameters?.includes(SupportedParameter.Vision) ?? false
     );
+}
+
+const THINKING_LEVEL_VARIANTS = new Set<ThinkingLevel>([
+    "xhigh",
+    "high",
+    "medium",
+    "low",
+    "minimal",
+    "none",
+]);
+
+const CODEX_VARIANT_TO_THINKING: Record<string, ThinkingLevel> = {
+    fast: "low",
+    balanced: "medium",
+    deep: "high",
+};
+
+export function resolveThinkingLevelForVariant(
+    variantId: string | null | undefined,
+    fallback: ThinkingLevel = "none",
+): ThinkingLevel {
+    if (!variantId) {
+        return fallback;
+    }
+
+    if (THINKING_LEVEL_VARIANTS.has(variantId as ThinkingLevel)) {
+        return variantId as ThinkingLevel;
+    }
+
+    return CODEX_VARIANT_TO_THINKING[variantId] ?? fallback;
 }

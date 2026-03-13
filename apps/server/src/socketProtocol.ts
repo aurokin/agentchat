@@ -10,6 +10,7 @@ export interface ConversationSendCommand {
         conversationId: string;
         agentId: string;
         modelId: string;
+        variantId?: string | null;
         thinking: "xhigh" | "high" | "medium" | "low" | "minimal" | "none";
         content: string;
         userMessageId: string;
@@ -124,6 +125,9 @@ export function parseClientCommand(raw: string): ClientCommand {
             typeof payload.conversationId !== "string" ||
             typeof payload.agentId !== "string" ||
             typeof payload.modelId !== "string" ||
+            (payload.variantId !== undefined &&
+                payload.variantId !== null &&
+                typeof payload.variantId !== "string") ||
             typeof payload.content !== "string" ||
             typeof payload.userMessageId !== "string" ||
             typeof payload.assistantMessageId !== "string" ||

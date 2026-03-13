@@ -32,6 +32,8 @@ export {
     setDefaultModel,
     getDefaultModelForAgent,
     setDefaultModelForAgent,
+    getDefaultVariantForAgent,
+    setDefaultVariantForAgent,
     getFavoriteModels,
     setFavoriteModels,
     getSelectedAgentId,

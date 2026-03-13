@@ -13,6 +13,7 @@ function createChat(overrides: Partial<ChatSession> = {}): ChatSession {
         agentId: "agent-1",
         title: "New Chat",
         modelId: "provider/model-1",
+        variantId: "deep",
         thinking: "high",
         settingsLockedAt: null,
         createdAt: 1,
@@ -75,9 +76,11 @@ describe("mobile conversation runtime controller", () => {
 
         expect(result.status).toBe("sent");
         expect(added).toHaveLength(2);
+        expect(added[0]?.variantId).toBe("deep");
         expect(updatedChats).toHaveLength(1);
         expect(updatedChats[0]?.settingsLockedAt).not.toBeNull();
         expect(sentCommands).toHaveLength(1);
+        expect(sentCommands[0]?.payload.variantId).toBe("deep");
     });
 
     test("returns retry metadata when connection setup fails", async () => {
