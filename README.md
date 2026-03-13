@@ -18,6 +18,7 @@ The canonical product and architecture docs live in `docs/agentchat/`:
 - `docs/agentchat/product-rules.md`
 - `docs/agentchat/architecture-v1.md`
 - `docs/agentchat/roadmap.md`
+- `docs/agentchat/operator-guide.md`
 
 ## Features
 
