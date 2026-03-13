@@ -21,8 +21,6 @@ This document tracks mobile work that should happen after the web-first migratio
 ## Pending Mobile Work
 
 - Continue refining the mobile chat flow around the new agent-centric model.
-- Continue trimming stale storage compatibility fields that remain in shared message and sync types during later cleanup passes.
-- Remove any remaining mobile dependency on deprecated legacy storage APIs once the shared storage interface is narrowed.
 - Replace any remaining provider-specific client assumptions with backend-driven provider capability and settings options.
 - Keep aligning mobile state helpers with the web runtime model as the rewrite settles.
 

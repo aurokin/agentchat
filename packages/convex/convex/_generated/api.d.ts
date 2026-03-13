@@ -8,7 +8,6 @@
  * @module
  */
 
-import type * as attachments from "../attachments.js";
 import type * as auth from "../auth.js";
 import type * as chats from "../chats.js";
 import type * as http from "../http.js";
@@ -19,7 +18,6 @@ import type * as lib_limits from "../lib/limits.js";
 import type * as lib_pagination from "../lib/pagination.js";
 import type * as lib_subscription from "../lib/subscription.js";
 import type * as messages from "../messages.js";
-import type * as openrouter from "../openrouter.js";
 import type * as users from "../users.js";
 
 import type {
@@ -29,7 +27,6 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
-  attachments: typeof attachments;
   auth: typeof auth;
   chats: typeof chats;
   http: typeof http;
@@ -40,7 +37,6 @@ declare const fullApi: ApiFromModules<{
   "lib/pagination": typeof lib_pagination;
   "lib/subscription": typeof lib_subscription;
   messages: typeof messages;
-  openrouter: typeof openrouter;
   users: typeof users;
 }>;
 
