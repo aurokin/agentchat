@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useMemo, type ReactElement } from "react";
+import React, { useState, useMemo, type ReactElement } from "react";
 import {
     View,
     Text,
-    TextInput,
     TouchableOpacity,
     StyleSheet,
     ActivityIndicator,
@@ -14,15 +13,17 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Feather } from "@expo/vector-icons";
-import { useSync } from "@/contexts/SyncContext";
 import { type UserTheme } from "@/lib/storage";
 import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { useAuthContext } from "@/lib/convex/AuthContext";
+import { useAgent } from "@/contexts/AgentContext";
+import { useModelContext } from "@/contexts/ModelContext";
+import { AgentSwitcher } from "@/components/chat/AgentSwitcher";
+import { buildAgentSettingsSummary } from "@/lib/settings-summary";
 
 export default function SettingsScreen(): ReactElement {
     const router = useRouter();
-    const { syncState } = useSync();
     const {
         user,
         isAuthenticated,
@@ -31,6 +32,9 @@ export default function SettingsScreen(): ReactElement {
         signOut,
         isConvexAvailable,
     } = useAuthContext();
+    const { selectedAgent } = useAgent();
+    const { models, selectedProviderId, selectedModel, selectedVariantId } =
+        useModelContext();
     const { colors, userTheme, setUserTheme, isMaterialYouActive } = useTheme();
     const { width: windowWidth, height: windowHeight } = useWindowDimensions();
     const styles = useMemo(() => createStyles(colors), [colors]);
@@ -99,6 +103,23 @@ export default function SettingsScreen(): ReactElement {
     const handleThemeChange = async (theme: UserTheme) => {
         await setUserTheme(theme);
     };
+    const agentSummary = useMemo(
+        () =>
+            buildAgentSettingsSummary({
+                selectedAgent,
+                selectedProviderId,
+                selectedModelId: selectedModel,
+                selectedVariantId,
+                models,
+            }),
+        [
+            models,
+            selectedAgent,
+            selectedModel,
+            selectedProviderId,
+            selectedVariantId,
+        ],
+    );
     const isGoogleButtonBusy = isAuthLoading || isSigningIn;
     const isTwoPaneLayout = Math.min(windowWidth, windowHeight) >= 700;
     const settingsRailWidth = Math.max(256, Math.min(320, windowWidth * 0.28));
@@ -166,12 +187,16 @@ export default function SettingsScreen(): ReactElement {
                                         : "Signed out"}
                                 </Text>
                                 <Text style={styles.tabletRailSummaryLabel}>
-                                    Workspace
+                                    Agent
                                 </Text>
                                 <Text style={styles.tabletRailSummaryValue}>
-                                    {syncState === "cloud-enabled"
-                                        ? "Connected"
-                                        : "Signed out"}
+                                    {agentSummary.agentName}
+                                </Text>
+                                <Text style={styles.tabletRailSummaryLabel}>
+                                    Model
+                                </Text>
+                                <Text style={styles.tabletRailSummaryValue}>
+                                    {agentSummary.modelLabel}
                                 </Text>
                             </View>
                         </View>
@@ -311,18 +336,60 @@ export default function SettingsScreen(): ReactElement {
 
                                 <View style={styles.section}>
                                     <Text style={styles.sectionTitle}>
-                                        Model Provider
+                                        Agent
                                     </Text>
                                     <Text style={styles.sectionDescription}>
-                                        This deployment uses a server-managed
-                                        provider backend. End users do not
-                                        configure provider credentials in the
-                                        app.
+                                        Switch the active agent for this device.
+                                        Conversations, defaults, and runtime
+                                        state are scoped to the selected agent.
                                     </Text>
                                     <View style={styles.storageContainer}>
+                                        <AgentSwitcher />
                                         <Text style={styles.storageInfoText}>
-                                            Sign-in controls who can access the
-                                            agents exposed by this deployment.
+                                            {agentSummary.agentDescription ??
+                                                "This deployment exposes agents from the server configuration."}
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                <View style={styles.section}>
+                                    <Text style={styles.sectionTitle}>
+                                        Conversation Defaults
+                                    </Text>
+                                    <Text style={styles.sectionDescription}>
+                                        Provider, model, and variant options are
+                                        managed by the deployment and narrowed
+                                        by the selected agent.
+                                    </Text>
+                                    <View style={styles.storageContainer}>
+                                        <View style={styles.summaryRow}>
+                                            <Text style={styles.summaryLabel}>
+                                                Provider
+                                            </Text>
+                                            <Text style={styles.summaryValue}>
+                                                {agentSummary.providerLabel}
+                                            </Text>
+                                        </View>
+                                        <View style={styles.summaryRow}>
+                                            <Text style={styles.summaryLabel}>
+                                                Model
+                                            </Text>
+                                            <Text style={styles.summaryValue}>
+                                                {agentSummary.modelLabel}
+                                            </Text>
+                                        </View>
+                                        <View style={styles.summaryRow}>
+                                            <Text style={styles.summaryLabel}>
+                                                Variant
+                                            </Text>
+                                            <Text style={styles.summaryValue}>
+                                                {agentSummary.variantLabel}
+                                            </Text>
+                                        </View>
+                                        <Text style={styles.storageInfoText}>
+                                            Update these defaults from the chat
+                                            composer before the first message in
+                                            a conversation.
                                         </Text>
                                     </View>
                                 </View>
@@ -456,27 +523,12 @@ export default function SettingsScreen(): ReactElement {
                                     <Text style={styles.sectionTitle}>
                                         Workspace
                                     </Text>
-
                                     <View style={styles.storageContainer}>
-                                        {syncState === "cloud-enabled" && (
-                                            <Text
-                                                style={styles.storageInfoText}
-                                            >
-                                                Chat history, settings, and
-                                                runtime state are stored in
-                                                Convex for this deployment.
-                                            </Text>
-                                        )}
-
-                                        {syncState !== "cloud-enabled" && (
-                                            <Text
-                                                style={styles.storageInfoText}
-                                            >
-                                                Sign in to access this
-                                                deployment&apos;s Convex-backed
-                                                workspace.
-                                            </Text>
-                                        )}
+                                        <Text style={styles.storageInfoText}>
+                                            {isAuthenticated
+                                                ? "Chat history, settings, and runtime state are stored in Convex for this deployment."
+                                                : "Sign in to access this deployment's Convex-backed workspace."}
+                                        </Text>
                                     </View>
                                 </View>
 
@@ -882,6 +934,26 @@ const createStyles = (colors: ThemeColors) =>
         },
         storageContainer: {
             marginTop: 8,
+            gap: 10,
+        },
+        summaryRow: {
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 12,
+        },
+        summaryLabel: {
+            fontSize: 13,
+            color: colors.textSubtle,
+            textTransform: "uppercase",
+            letterSpacing: 0.6,
+        },
+        summaryValue: {
+            flex: 1,
+            textAlign: "right",
+            fontSize: 14,
+            fontWeight: "600",
+            color: colors.text,
         },
         errorText: {
             fontSize: 14,
@@ -890,7 +962,6 @@ const createStyles = (colors: ThemeColors) =>
         storageInfoText: {
             fontSize: 14,
             color: colors.text,
-            marginBottom: 8,
         },
         storageInfoSpacing: {
             marginTop: 12,
