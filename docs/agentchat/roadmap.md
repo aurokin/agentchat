@@ -117,6 +117,8 @@ Planned work:
 ## Later, Not V1
 
 - OpenCode support through the provider layer
+- Pi Coding Agent support through the provider layer
+- Pi Agent Core support through the provider layer
 - Admin UI for agent and provider management
 - Attachments
 - Approval controls beyond auto-approve
