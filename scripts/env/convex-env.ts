@@ -88,7 +88,7 @@ const main = (): void => {
 
     if (!allowProcessEnv && !fs.existsSync(absSecretsFile)) {
         throw new Error(
-            `Missing ${absSecretsFile}. Create it and re-run (see docs/cloud_dashboard_setup.md).`,
+            `Missing ${absSecretsFile}. Create it and re-run (see docs/convex_dashboard_setup.md).`,
         );
     }
 

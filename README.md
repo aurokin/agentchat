@@ -110,7 +110,7 @@ Primary runbooks:
 References:
 
 - `docs/preview_environment_setup_checklist.md` and `docs/prod_environment_setup_checklist.md` for environment-specific deployment setup.
-- `docs/cloud_dashboard_setup.md` for the Convex dashboard checklist.
+- `docs/convex_dashboard_setup.md` for the Convex dashboard checklist.
 - `docs/mobile_dev_setup.md` for mobile dev builds.
 
 #### Environment variables

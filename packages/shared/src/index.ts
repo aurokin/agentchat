@@ -6,7 +6,7 @@ export {
     WorkspaceStatus,
     PersistenceAdapter,
     PersistenceAdapterFactory,
-} from "./core/sync";
+} from "./core/persistence";
 export * from "./core/defaults";
 export * from "./core/errors";
 export {

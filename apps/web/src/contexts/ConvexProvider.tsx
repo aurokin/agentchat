@@ -4,7 +4,7 @@ import { ConvexReactClient } from "convex/react";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { createContext, useContext, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { isConvexConfigured, getConvexUrl } from "@/lib/sync/config";
+import { isConvexConfigured, getConvexUrl } from "@/lib/workspace/config";
 
 interface ConvexAvailabilityContextType {
     isAvailable: boolean;

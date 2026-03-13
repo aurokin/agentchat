@@ -3,12 +3,15 @@
 import React, { createContext, useContext, useMemo } from "react";
 import { useConvex, useConvexAuth, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
-import type { WorkspaceStatus } from "@/lib/sync/types";
-import type { PersistenceAdapter } from "@/lib/sync/persistence-adapter";
-import { ConvexPersistenceAdapter } from "@/lib/sync/convex-adapter";
-import type { ConvexClientInterface, ConvexId } from "@/lib/sync/convex-types";
+import type { WorkspaceStatus } from "@/lib/workspace/types";
+import type { PersistenceAdapter } from "@/lib/workspace/persistence-adapter";
+import { ConvexPersistenceAdapter } from "@/lib/workspace/convex-adapter";
+import type {
+    ConvexClientInterface,
+    ConvexId,
+} from "@/lib/workspace/convex-types";
 import { useIsConvexAvailable } from "@/contexts/ConvexProvider";
-import { unavailablePersistenceAdapter } from "@/lib/sync/unavailable-adapter";
+import { unavailablePersistenceAdapter } from "@/lib/workspace/unavailable-adapter";
 
 interface WorkspaceContextType {
     workspaceStatus: WorkspaceStatus;

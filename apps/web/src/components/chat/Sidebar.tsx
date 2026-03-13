@@ -17,7 +17,7 @@ import { usePersistenceAdapter } from "@/contexts/WorkspaceContext";
 import { cn } from "@/lib/utils";
 
 import { ChatListSkeleton } from "./ChatListSkeleton";
-import { WorkspaceStatusBadge } from "@/components/sync/WorkspaceStatusBadge";
+import { WorkspaceStatusBadge } from "@/components/workspace/WorkspaceStatusBadge";
 import {
     useIsMobile,
     useIsTablet,

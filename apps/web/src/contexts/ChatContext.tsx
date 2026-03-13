@@ -24,7 +24,7 @@ import {
     mapConvexChatToSession,
     mapConvexMessageToMessage,
     mergeByIdWithPending,
-} from "@shared/core/sync";
+} from "@shared/core/persistence";
 import {
     usePersistenceAdapter,
     useWorkspace,

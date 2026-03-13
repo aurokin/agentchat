@@ -25,7 +25,7 @@ import {
     mapConvexChatToSession,
     mapConvexMessageToMessage,
     mergeByIdWithPending,
-} from "@shared/core/sync";
+} from "@shared/core/persistence";
 import { v4 as uuidv4 } from "uuid";
 import {
     getSelectedChatId,

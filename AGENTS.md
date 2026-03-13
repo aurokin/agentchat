@@ -15,7 +15,7 @@ Read this file before making any changes in this repository.
 - [Product Direction And Roadmap](docs/agentchat/README.md)
 - [Tooling And Tests](docs/agents/tooling.md)
 - [Imports And Aliases](docs/agents/imports.md)
-- [Sync And Cloud Rules](docs/agents/sync.md)
+- [Workspace Rules](docs/agents/workspace.md)
 - [Web App Notes](docs/agents/web.md)
 - [Mobile Storage And Database](docs/agents/mobile-storage.md)
 - [Mobile Features And UI Patterns](docs/agents/mobile-features.md)

@@ -6,7 +6,7 @@ The mobile app is now Convex-first. Do not add new SQLite, file-system, or other
 
 - `expo-secure-store` stores auth tokens, onboarding state, theme, selected agent, selected chat, and per-agent default provider/model/variant preferences.
 - Convex is the authoritative backend for chats, messages, runs, and runtime recovery state.
-- Mobile runtime code reads and writes through the Convex-backed storage adapter in `apps/mobile/src/lib/sync/convex-adapter.ts`.
+- Mobile runtime code reads and writes through the Convex-backed persistence adapter in `apps/mobile/src/lib/workspace/convex-adapter.ts`.
 
 ## What To Use
 
@@ -30,7 +30,7 @@ The mobile app is now Convex-first. Do not add new SQLite, file-system, or other
 ## Related Files
 
 - `apps/mobile/src/contexts/WorkspaceContext.tsx`
-- `apps/mobile/src/lib/sync/convex-adapter.ts`
+- `apps/mobile/src/lib/workspace/convex-adapter.ts`
 - `apps/mobile/src/lib/storage/credential-storage.ts`
 - `apps/mobile/src/lib/storage/sync-storage.ts`
 - `apps/mobile/src/lib/storage/user-settings-storage.ts`

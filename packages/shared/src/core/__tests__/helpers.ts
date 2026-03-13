@@ -1,4 +1,4 @@
-import type { PersistenceAdapter } from "../sync";
+import type { PersistenceAdapter } from "../persistence";
 import type { ChatSession, Message } from "../types";
 
 export type MemoryAdapterSeed = {
