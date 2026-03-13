@@ -24,11 +24,13 @@ import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
 import { useAgent } from "@/contexts/AgentContext";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AgentSwitcher } from "@/components/chat/AgentSwitcher";
+import { getPreferredHomeChatId } from "@/lib/home-chat-route";
 
 export default function HomeScreen(): React.ReactElement {
     const router = useRouter();
     const {
         chats,
+        currentChat,
         isLoading,
         error,
         loadChats,
@@ -58,8 +60,20 @@ export default function HomeScreen(): React.ReactElement {
     useEffect(() => {
         if (!isInitialized || !isTwoPaneLayout) return;
         if (isLoading || chats.length === 0) return;
-        router.replace(`/chat/${chats[0].id}`);
-    }, [chats, isInitialized, isLoading, isTwoPaneLayout, router]);
+        const preferredChatId = getPreferredHomeChatId({
+            currentChatId: currentChat?.id ?? null,
+            chats,
+        });
+        if (!preferredChatId) return;
+        router.replace(`/chat/${preferredChatId}`);
+    }, [
+        chats,
+        currentChat?.id,
+        isInitialized,
+        isLoading,
+        isTwoPaneLayout,
+        router,
+    ]);
 
     const handleCreateChat = async () => {
         const chat = await createChat();
