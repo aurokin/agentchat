@@ -127,6 +127,7 @@ Current manual confidence command:
 - `bun run test:manual:codex-confidence`
 
 This runs the server doctor plus the targeted server and web confidence suites without turning them into always-on checks.
+It also runs the targeted mobile confidence suite for agent selection, provider/model/variant state, and runtime recovery helpers.
 
 ## Priority Order
 

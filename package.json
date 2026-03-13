@@ -42,7 +42,7 @@
         "test:shared": "bun run --cwd packages/shared test",
         "test:convex": "bun run --cwd packages/convex test",
         "doctor:server": "bun run --cwd apps/server doctor",
-        "test:manual:codex-confidence": "bun run env:check && bun run doctor:server && bun run --cwd apps/server test:confidence && bun run --cwd apps/web test:confidence",
+        "test:manual:codex-confidence": "bun run env:check && bun run doctor:server && bun run --cwd apps/server test:confidence && bun run --cwd apps/web test:confidence && bun run --cwd apps/mobile test:confidence",
         "typecheck": "bun run --cwd apps/web typecheck && bun run --cwd apps/server typecheck && bun run --cwd apps/mobile typecheck && bun run --cwd packages/shared typecheck && bun run --cwd packages/convex typecheck",
         "typecheck:web": "bun run --cwd apps/web typecheck",
         "typecheck:server": "bun run --cwd apps/server typecheck",

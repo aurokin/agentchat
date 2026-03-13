@@ -2,6 +2,12 @@
 
 Use this checklist for deliberate Codex confidence passes. These checks are manual on purpose and should not run automatically on push.
 
+Before the interactive checklist, run:
+
+```bash
+bun run test:manual:codex-confidence
+```
+
 ## Fixtures
 
 - smoke: `/home/auro/agents/agentchat_test/smoke`
