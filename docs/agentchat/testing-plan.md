@@ -120,6 +120,12 @@ Use [manual-qa-checklist.md](./manual-qa-checklist.md) for the explicit Codex co
 - Prefer explicit scripts or checklists that an operator runs intentionally.
 - Keep smoke and manual functional checks cheap enough for frequent local use.
 
+Current manual confidence command:
+
+- `bun run test:manual:codex-confidence`
+
+This runs the targeted server and web confidence suites without turning them into always-on checks.
+
 ## Priority Order
 
 1. Web manual smoke and functional checks using the smoke and primary fixtures
