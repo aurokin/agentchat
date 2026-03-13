@@ -21,7 +21,7 @@ This document tracks mobile work that should happen after the web-first migratio
 ## Pending Mobile Work
 
 - Replace the current chat and settings flows with the new agent-centric model.
-- Remove the remaining attachment table and quota-oriented helpers from the mobile local DB once we are ready for a schema reset.
+- Continue trimming any attachment-related compatibility fields that remain in shared message/storage types during later schema cleanup passes.
 - Remove any remaining mobile dependency on Convex attachment APIs once the mobile runtime is switched to the new provider architecture.
 - Replace any remaining provider-specific client assumptions with backend-driven provider capability and settings options.
 - Revisit local database tables and sync helpers once the Convex schema migration is defined.
