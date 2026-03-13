@@ -8,26 +8,26 @@ import {
 } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { isOwner, requireUserMatches } from "./lib/authz";
-import { requireCloudSync } from "./lib/subscription";
+import { requireWorkspaceUser } from "./lib/subscription";
 import { assertMaxLen, LIMITS } from "./lib/limits";
 import { clampPaginationOpts } from "./lib/pagination";
 import { drainBatches } from "./lib/batch";
 import {
-    applyCloudUsageDelta,
-    ensureCloudUsageCounters,
-} from "./lib/cloud_usage";
+    applyWorkspaceUsageDelta,
+    ensureWorkspaceUsageCounters,
+} from "./lib/workspace_usage";
 
 /**
  * Chat Operations
  *
- * CRUD operations for chat sessions (conversations) in the cloud.
+ * CRUD operations for chat sessions (conversations) in the workspace.
  */
 
 // Get all chats for a user, sorted by updatedAt descending
 export const listByUser = query({
     args: { userId: v.id("users") },
     handler: async (ctx, args) => {
-        const authenticatedUserId = await requireCloudSync(ctx);
+        const authenticatedUserId = await requireWorkspaceUser(ctx);
         requireUserMatches(authenticatedUserId, args.userId);
 
         const chats = await ctx.db
@@ -48,7 +48,7 @@ export const listByUserPaginated = query({
         paginationOpts: paginationOptsValidator,
     },
     handler: async (ctx, args) => {
-        const authenticatedUserId = await requireCloudSync(ctx);
+        const authenticatedUserId = await requireWorkspaceUser(ctx);
         requireUserMatches(authenticatedUserId, args.userId);
 
         const paginationOpts = clampPaginationOpts(
@@ -73,7 +73,7 @@ export const listByUserAndAgentPaginated = query({
         paginationOpts: paginationOptsValidator,
     },
     handler: async (ctx, args) => {
-        const authenticatedUserId = await requireCloudSync(ctx);
+        const authenticatedUserId = await requireWorkspaceUser(ctx);
         requireUserMatches(authenticatedUserId, args.userId);
         assertMaxLen(args.agentId, LIMITS.maxLocalIdChars, "agentId");
 
@@ -96,7 +96,7 @@ export const listByUserAndAgentPaginated = query({
 export const get = query({
     args: { id: v.id("chats") },
     handler: async (ctx, args) => {
-        const authenticatedUserId = await requireCloudSync(ctx);
+        const authenticatedUserId = await requireWorkspaceUser(ctx);
         const chat = await ctx.db.get(args.id);
         if (!isOwner(chat, authenticatedUserId)) return null;
         return chat;
@@ -110,7 +110,7 @@ export const getByLocalId = query({
         localId: v.string(),
     },
     handler: async (ctx, args) => {
-        const authenticatedUserId = await requireCloudSync(ctx);
+        const authenticatedUserId = await requireWorkspaceUser(ctx);
         requireUserMatches(authenticatedUserId, args.userId);
         assertMaxLen(args.localId, LIMITS.maxLocalIdChars, "localId");
 
@@ -154,14 +154,17 @@ export const create = mutation({
         updatedAt: v.optional(v.number()),
     },
     handler: async (ctx, args) => {
-        const authenticatedUserId = await requireCloudSync(ctx);
+        const authenticatedUserId = await requireWorkspaceUser(ctx);
         requireUserMatches(authenticatedUserId, args.userId);
 
         assertMaxLen(args.localId, LIMITS.maxLocalIdChars, "localId");
         assertMaxLen(args.agentId, LIMITS.maxLocalIdChars, "agentId");
         assertMaxLen(args.title, LIMITS.maxChatTitleChars, "title");
 
-        const usage = await ensureCloudUsageCounters(ctx, authenticatedUserId);
+        const usage = await ensureWorkspaceUsageCounters(
+            ctx,
+            authenticatedUserId,
+        );
         if (usage.chatCount >= LIMITS.maxChatsPerUser) {
             throw new Error("Chat limit reached");
         }
@@ -180,7 +183,9 @@ export const create = mutation({
             updatedAt: args.updatedAt ?? now,
         });
 
-        await applyCloudUsageDelta(ctx, authenticatedUserId, { chatCount: 1 });
+        await applyWorkspaceUsageDelta(ctx, authenticatedUserId, {
+            chatCount: 1,
+        });
         return chatId;
     },
 });
@@ -195,7 +200,7 @@ export const update = mutation({
         thinking: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
-        const authenticatedUserId = await requireCloudSync(ctx);
+        const authenticatedUserId = await requireWorkspaceUser(ctx);
         const chat = await ctx.db.get(args.id);
         if (!chat || !isOwner(chat, authenticatedUserId)) {
             throw new Error("Not found");
@@ -267,7 +272,7 @@ export const lockSettingsIfNeeded = internalMutation({
 export const remove = mutation({
     args: { id: v.id("chats") },
     handler: async (ctx, args) => {
-        const authenticatedUserId = await requireCloudSync(ctx);
+        const authenticatedUserId = await requireWorkspaceUser(ctx);
         const chat = await ctx.db.get(args.id);
         if (!isOwner(chat, authenticatedUserId)) {
             throw new Error("Not found");
@@ -327,7 +332,7 @@ export const remove = mutation({
         // Delete the chat
         await ctx.db.delete(args.id);
 
-        await applyCloudUsageDelta(ctx, authenticatedUserId, {
+        await applyWorkspaceUsageDelta(ctx, authenticatedUserId, {
             chatCount: -1,
             messageCount: -deletedMessages,
         });
@@ -338,7 +343,7 @@ export const remove = mutation({
 export const getOldestByUser = query({
     args: { userId: v.id("users") },
     handler: async (ctx, args) => {
-        const authenticatedUserId = await requireCloudSync(ctx);
+        const authenticatedUserId = await requireWorkspaceUser(ctx);
         requireUserMatches(authenticatedUserId, args.userId);
 
         const chat = await ctx.db

@@ -358,6 +358,6 @@ Use bounded batch processing and scheduling if the transaction size grows too la
 
 ## Explicitly Out Of Scope
 
-- local-first storage adapters
+- alternate local persistence adapters
 - provider process state inside Convex
 - soft deletion

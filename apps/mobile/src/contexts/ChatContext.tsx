@@ -19,8 +19,8 @@ import {
     resolveThinkingLevelForVariant,
 } from "@shared/core/models";
 import {
-    mapConvexChatToLocal,
-    mapConvexMessageToLocal,
+    mapConvexChatToSession,
+    mapConvexMessageToMessage,
     mergeByIdWithPending,
 } from "@shared/core/sync";
 import { v4 as uuidv4 } from "uuid";
@@ -113,37 +113,39 @@ export function ChatProvider({
     const pendingMessageIdsRef = React.useRef<Set<string>>(new Set());
     const currentChatIdRef = useRef<string | null>(null);
 
-    const isCloudSyncActive = isConvexAvailable && isWorkspaceReady;
+    const isWorkspaceActive = isConvexAvailable && isWorkspaceReady;
     const currentChatId = currentChat?.id ?? null;
-    const cloudUserId = useQuery(
+    const workspaceUserId = useQuery(
         api.users.getCurrentUserId,
-        isCloudSyncActive ? {} : "skip",
+        isWorkspaceActive ? {} : "skip",
     );
-    const cloudChats = useQuery(
+    const workspaceChats = useQuery(
         api.chats.listByUser,
-        isCloudSyncActive && cloudUserId ? { userId: cloudUserId } : "skip",
+        isWorkspaceActive && workspaceUserId
+            ? { userId: workspaceUserId }
+            : "skip",
     );
-    const cloudCurrentChat = useQuery(
+    const workspaceCurrentChat = useQuery(
         api.chats.getByLocalId,
-        isCloudSyncActive && cloudUserId && currentChatId
-            ? { userId: cloudUserId, localId: currentChatId }
+        isWorkspaceActive && workspaceUserId && currentChatId
+            ? { userId: workspaceUserId, localId: currentChatId }
             : "skip",
     );
-    const cloudMessages = useQuery(
+    const workspaceMessages = useQuery(
         api.messages.listByChat,
-        isCloudSyncActive && cloudCurrentChat?._id
-            ? { chatId: cloudCurrentChat._id }
+        isWorkspaceActive && workspaceCurrentChat?._id
+            ? { chatId: workspaceCurrentChat._id }
             : "skip",
     );
-    const cloudRunSummaries = useQuery(
+    const workspaceRunSummaries = useQuery(
         convexApi.runs.listByChat,
-        isCloudSyncActive && cloudCurrentChat?._id
-            ? { chatId: cloudCurrentChat._id }
+        isWorkspaceActive && workspaceCurrentChat?._id
+            ? { chatId: workspaceCurrentChat._id }
             : "skip",
     );
     const runSummaries = useMemo(
-        () => cloudRunSummaries ?? [],
-        [cloudRunSummaries],
+        () => workspaceRunSummaries ?? [],
+        [workspaceRunSummaries],
     );
     const currentMessages = useMemo(() => {
         if (!currentChatId) {
@@ -195,10 +197,10 @@ export function ChatProvider({
             setCurrentChat(null);
             return;
         }
-        if (!isCloudSyncActive || !cloudChats) return;
+        if (!isWorkspaceActive || !workspaceChats) return;
 
-        const mapped = cloudChats
-            .map(mapConvexChatToLocal)
+        const mapped = workspaceChats
+            .map(mapConvexChatToSession)
             .filter((chat) => chat.agentId === selectedAgentId);
         const pending = pendingChatIdsRef.current;
         for (const chat of mapped) {
@@ -213,16 +215,17 @@ export function ChatProvider({
                 (a, b) => b.updatedAt - a.updatedAt,
             ),
         );
-    }, [cloudChats, isCloudSyncActive, selectedAgentId]);
+    }, [isWorkspaceActive, selectedAgentId, workspaceChats]);
 
     useEffect(() => {
-        if (!isCloudSyncActive || !cloudCurrentChat || !cloudMessages) {
+        if (!isWorkspaceActive || !workspaceCurrentChat || !workspaceMessages) {
             return;
         }
 
-        const chatLocalId = cloudCurrentChat.localId ?? cloudCurrentChat._id;
-        const mapped = cloudMessages.map((msg) =>
-            mapConvexMessageToLocal(msg, chatLocalId),
+        const chatLocalId =
+            workspaceCurrentChat.localId ?? workspaceCurrentChat._id;
+        const mapped = workspaceMessages.map((msg) =>
+            mapConvexMessageToMessage(msg, chatLocalId),
         );
         const pending = pendingMessageIdsRef.current;
         for (const message of mapped) {
@@ -239,13 +242,18 @@ export function ChatProvider({
             ),
         }));
         setIsMessagesLoading(false);
-    }, [cloudCurrentChat, cloudMessages, isCloudSyncActive]);
+    }, [isWorkspaceActive, workspaceCurrentChat, workspaceMessages]);
 
     useEffect(() => {
-        if (!isCloudSyncActive || !currentChatId) return;
-        if (cloudCurrentChat && cloudMessages) return;
+        if (!isWorkspaceActive || !currentChatId) return;
+        if (workspaceCurrentChat && workspaceMessages) return;
         setIsMessagesLoading(true);
-    }, [cloudCurrentChat, cloudMessages, currentChatId, isCloudSyncActive]);
+    }, [
+        currentChatId,
+        isWorkspaceActive,
+        workspaceCurrentChat,
+        workspaceMessages,
+    ]);
 
     const createChat = useCallback(
         async (title?: string, modelId?: string): Promise<ChatSession> => {
@@ -266,7 +274,7 @@ export function ChatProvider({
             };
 
             await adapter.createChat(chat);
-            if (isCloudSyncActive) {
+            if (isWorkspaceActive) {
                 pendingChatIdsRef.current.add(chat.id);
             }
 
@@ -282,7 +290,7 @@ export function ChatProvider({
         [
             adapter,
             defaultModelId,
-            isCloudSyncActive,
+            isWorkspaceActive,
             defaultAgentId,
             selectedVariantId,
             selectedAgentId,
@@ -429,7 +437,7 @@ export function ChatProvider({
             };
 
             await adapter.createMessage(message);
-            if (isCloudSyncActive) {
+            if (isWorkspaceActive) {
                 pendingMessageIdsRef.current.add(message.id);
             }
 
@@ -443,7 +451,7 @@ export function ChatProvider({
 
             return message;
         },
-        [adapter, currentChat, isCloudSyncActive],
+        [adapter, currentChat, isWorkspaceActive],
     );
 
     const hasMessagesInChats = useCallback(

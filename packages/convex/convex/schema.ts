@@ -19,9 +19,9 @@ export default defineSchema({
         phoneVerificationTime: v.optional(v.number()),
         isAnonymous: v.optional(v.boolean()),
         initialSync: v.optional(v.boolean()),
-        // Cloud usage counters (anti-abuse + cheap usage queries)
-        cloudChatCount: v.optional(v.number()),
-        cloudMessageCount: v.optional(v.number()),
+        // Workspace usage counters (anti-abuse + cheap usage queries)
+        workspaceChatCount: v.optional(v.number()),
+        workspaceMessageCount: v.optional(v.number()),
         createdAt: v.optional(v.number()),
         updatedAt: v.optional(v.number()),
     })

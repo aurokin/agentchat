@@ -21,8 +21,8 @@ import type {
 } from "@/lib/types";
 import { APP_DEFAULT_MODEL } from "@shared/core/models";
 import {
-    mapConvexChatToLocal,
-    mapConvexMessageToLocal,
+    mapConvexChatToSession,
+    mapConvexMessageToMessage,
     mergeByIdWithPending,
 } from "@shared/core/sync";
 import { useStorageAdapter, useSync } from "@/contexts/SyncContext";
@@ -93,44 +93,44 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     const pendingChatIdsRef = useRef<Set<string>>(new Set());
     const pendingMessageIdsRef = useRef<Set<string>>(new Set());
 
-    const isCloudSyncActive = isConvexAvailable && isWorkspaceReady;
+    const isWorkspaceActive = isConvexAvailable && isWorkspaceReady;
     const currentChatId = currentChat?.id ?? null;
-    const cloudUserId = useQuery(
+    const workspaceUserId = useQuery(
         api.users.getCurrentUserId,
-        isCloudSyncActive ? {} : "skip",
+        isWorkspaceActive ? {} : "skip",
     );
-    const cloudChatsPagination = usePaginatedQuery(
+    const workspaceChatsPagination = usePaginatedQuery(
         api.chats.listByUserAndAgentPaginated,
-        isCloudSyncActive && cloudUserId && selectedAgentId
+        isWorkspaceActive && workspaceUserId && selectedAgentId
             ? {
-                  userId: cloudUserId,
+                  userId: workspaceUserId,
                   agentId: selectedAgentId,
               }
             : "skip",
         { initialNumItems: CLOUD_CHAT_PAGE_SIZE },
     );
-    const cloudChats = cloudChatsPagination.results;
-    const cloudCurrentChat = useQuery(
+    const workspaceChats = workspaceChatsPagination.results;
+    const workspaceCurrentChat = useQuery(
         api.chats.getByLocalId,
-        isCloudSyncActive && cloudUserId && currentChatId
-            ? { userId: cloudUserId, localId: currentChatId }
+        isWorkspaceActive && workspaceUserId && currentChatId
+            ? { userId: workspaceUserId, localId: currentChatId }
             : "skip",
     );
-    const cloudMessages = useQuery(
+    const workspaceMessages = useQuery(
         api.messages.listByChat,
-        isCloudSyncActive && cloudCurrentChat?._id
-            ? { chatId: cloudCurrentChat._id }
+        isWorkspaceActive && workspaceCurrentChat?._id
+            ? { chatId: workspaceCurrentChat._id }
             : "skip",
     );
-    const cloudRunSummaries = useQuery(
+    const workspaceRunSummaries = useQuery(
         convexApi.runs.listByChat,
-        isCloudSyncActive && cloudCurrentChat?._id
-            ? { chatId: cloudCurrentChat._id }
+        isWorkspaceActive && workspaceCurrentChat?._id
+            ? { chatId: workspaceCurrentChat._id }
             : "skip",
     );
     const runSummaries = useMemo(
-        () => cloudRunSummaries ?? [],
-        [cloudRunSummaries],
+        () => workspaceRunSummaries ?? [],
+        [workspaceRunSummaries],
     );
     const runtimeState = useMemo(
         () =>
@@ -146,9 +146,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     }, [currentChat?.id]);
 
     useEffect(() => {
-        if (!isCloudSyncActive) return;
+        if (!isWorkspaceActive) return;
 
-        const mapped = cloudChats.map(mapConvexChatToLocal);
+        const mapped = workspaceChats.map(mapConvexChatToSession);
         const pending = pendingChatIdsRef.current;
         for (const chat of mapped) {
             pending.delete(chat.id);
@@ -171,16 +171,17 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                     : null,
             }),
         );
-    }, [cloudChats, isCloudSyncActive, selectedAgentId]);
+    }, [isWorkspaceActive, selectedAgentId, workspaceChats]);
 
     useEffect(() => {
-        if (!isCloudSyncActive || !cloudCurrentChat || !cloudMessages) {
+        if (!isWorkspaceActive || !workspaceCurrentChat || !workspaceMessages) {
             return;
         }
 
-        const chatLocalId = cloudCurrentChat.localId ?? cloudCurrentChat._id;
-        const mapped = cloudMessages.map((msg) =>
-            mapConvexMessageToLocal(msg, chatLocalId),
+        const chatLocalId =
+            workspaceCurrentChat.localId ?? workspaceCurrentChat._id;
+        const mapped = workspaceMessages.map((msg) =>
+            mapConvexMessageToMessage(msg, chatLocalId),
         );
         const pending = pendingMessageIdsRef.current;
         for (const message of mapped) {
@@ -196,18 +197,23 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             ),
         );
         setIsMessagesLoading(false);
-    }, [cloudCurrentChat, cloudMessages, isCloudSyncActive]);
+    }, [isWorkspaceActive, workspaceCurrentChat, workspaceMessages]);
 
     useEffect(() => {
-        if (!isCloudSyncActive) return;
-        setLoading(cloudChatsPagination.status === "LoadingFirstPage");
-    }, [cloudChatsPagination.status, isCloudSyncActive]);
+        if (!isWorkspaceActive) return;
+        setLoading(workspaceChatsPagination.status === "LoadingFirstPage");
+    }, [isWorkspaceActive, workspaceChatsPagination.status]);
 
     useEffect(() => {
-        if (!isCloudSyncActive || !currentChatId) return;
-        if (cloudCurrentChat && cloudMessages) return;
+        if (!isWorkspaceActive || !currentChatId) return;
+        if (workspaceCurrentChat && workspaceMessages) return;
         setIsMessagesLoading(true);
-    }, [cloudCurrentChat, cloudMessages, currentChatId, isCloudSyncActive]);
+    }, [
+        currentChatId,
+        isWorkspaceActive,
+        workspaceCurrentChat,
+        workspaceMessages,
+    ]);
 
     const loadChats = useCallback(async () => {
         if (!selectedAgentId) {
@@ -296,23 +302,23 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             setLoading(false);
             return;
         }
-        if (isCloudSyncActive) {
+        if (isWorkspaceActive) {
             return;
         }
 
         setLoading(true);
         void loadChats();
-    }, [isCloudSyncActive, loadChats, loadingAgents, selectedAgentId]);
+    }, [isWorkspaceActive, loadChats, loadingAgents, selectedAgentId]);
 
     const canLoadMoreChats =
-        isCloudSyncActive && cloudChatsPagination.status === "CanLoadMore";
+        isWorkspaceActive && workspaceChatsPagination.status === "CanLoadMore";
     const isChatsLoadingMore =
-        isCloudSyncActive && cloudChatsPagination.status === "LoadingMore";
+        isWorkspaceActive && workspaceChatsPagination.status === "LoadingMore";
     const loadMoreChats = useCallback(() => {
-        if (!isCloudSyncActive) return;
-        if (cloudChatsPagination.status !== "CanLoadMore") return;
-        cloudChatsPagination.loadMore(CLOUD_CHAT_PAGE_SIZE);
-    }, [cloudChatsPagination, isCloudSyncActive]);
+        if (!isWorkspaceActive) return;
+        if (workspaceChatsPagination.status !== "CanLoadMore") return;
+        workspaceChatsPagination.loadMore(CLOUD_CHAT_PAGE_SIZE);
+    }, [isWorkspaceActive, workspaceChatsPagination]);
 
     const createChat = useCallback(
         async (title?: string, modelId?: string): Promise<ChatSession> => {
@@ -339,7 +345,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             };
 
             await storageAdapter.createChat(chat);
-            if (isCloudSyncActive) {
+            if (isWorkspaceActive) {
                 pendingChatIdsRef.current.add(chat.id);
             }
             setChats((prev) => [chat, ...prev]);
@@ -350,17 +356,17 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
             return chat;
         },
-        [isCloudSyncActive, selectedAgent, selectedAgentId, storageAdapter],
+        [isWorkspaceActive, selectedAgent, selectedAgentId, storageAdapter],
     );
 
     const selectChat = useCallback(
         async (chatId: string) => {
-            if (isCloudSyncActive) {
+            if (isWorkspaceActive) {
                 const chat = chats.find((candidate) => candidate.id === chatId);
                 if (!chat) return;
                 setCurrentChat(chat);
                 storage.setSelectedChatId(chat.agentId, chat.id);
-                // `cloudMessages` will populate `messages` reactively.
+                // `workspaceMessages` will populate `messages` reactively.
                 setIsMessagesLoading(true);
                 return;
             }
@@ -378,7 +384,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             }
             setIsMessagesLoading(false);
         },
-        [chats, isCloudSyncActive, selectedAgentId, storageAdapter],
+        [chats, isWorkspaceActive, selectedAgentId, storageAdapter],
     );
 
     const deleteChat = useCallback(
@@ -447,7 +453,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             };
 
             await storageAdapter.createMessage(newMessage);
-            if (isCloudSyncActive) {
+            if (isWorkspaceActive) {
                 pendingMessageIdsRef.current.add(newMessage.id);
             }
             if (currentChat?.id === targetChatId) {
@@ -474,7 +480,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
             return newMessage;
         },
-        [currentChat, isCloudSyncActive, storageAdapter],
+        [currentChat, isWorkspaceActive, storageAdapter],
     );
 
     const updateMessage = useCallback(

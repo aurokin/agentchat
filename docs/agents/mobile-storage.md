@@ -19,7 +19,7 @@ The mobile app is now Convex-first. Do not add new SQLite, file-system, or other
 
 - Do not add new imports from `src/lib/db/*`.
 - Do not reintroduce `expo-sqlite`, file-based media storage, or migration helpers as part of normal feature work.
-- Do not treat mobile as local-first. Signed-in users operate against the Convex-backed workspace.
+- Do not treat mobile as an offline-first or alternate local product mode. Signed-in users operate against the Convex-backed workspace.
 
 ## Current Model
 

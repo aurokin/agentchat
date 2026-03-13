@@ -131,8 +131,8 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
 
             const userId = await ctx.db.insert("users", {
                 ...profileUpdates,
-                cloudChatCount: 0,
-                cloudMessageCount: 0,
+                workspaceChatCount: 0,
+                workspaceMessageCount: 0,
                 createdAt: now,
                 updatedAt: now,
                 initialSync: false,

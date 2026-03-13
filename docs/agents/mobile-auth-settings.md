@@ -195,7 +195,7 @@ if (isInitialized && !hasCompletedOnboarding) {
 ### Onboarding Screen
 
 - File: `app/onboarding.tsx`
-- Steps: Welcome, Local-first design, Optional cloud sync
+- Steps: Welcome, Self-hosted workspace overview, Google sign-in guidance
 
 ### Onboarding Wrapper Component
 

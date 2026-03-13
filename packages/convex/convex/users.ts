@@ -7,17 +7,17 @@ import {
 } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { requireAuthUserId, requireUserMatches } from "./lib/authz";
-import { requireCloudSync } from "./lib/subscription";
+import { requireWorkspaceUser } from "./lib/subscription";
 import { drainBatches } from "./lib/batch";
 import {
-    cloudUsageCountersToPatch,
-    computeCloudChatCount,
-    computeCloudMessageCount,
-    computeCloudUsageCounters,
-    ensureCloudUsageCounters,
-    readCloudUsageCountersFromUser,
-    zeroCloudUsageCounters,
-} from "./lib/cloud_usage";
+    computeWorkspaceChatCount,
+    computeWorkspaceMessageCount,
+    computeWorkspaceUsageCounters,
+    ensureWorkspaceUsageCounters,
+    readWorkspaceUsageCountersFromUser,
+    workspaceUsageCountersToPatch,
+    zeroWorkspaceUsageCounters,
+} from "./lib/workspace_usage";
 
 export const get = query({
     args: { id: v.id("users") },
@@ -45,11 +45,11 @@ export const getCurrentUserId = query({
 export const getStorageUsage = query({
     args: { userId: v.id("users") },
     handler: async (ctx, args) => {
-        const authenticatedUserId = await requireCloudSync(ctx);
+        const authenticatedUserId = await requireWorkspaceUser(ctx);
         requireUserMatches(authenticatedUserId, args.userId);
 
         const user = await ctx.db.get(authenticatedUserId);
-        const cached = readCloudUsageCountersFromUser(user);
+        const cached = readWorkspaceUsageCountersFromUser(user);
         if (cached) {
             return {
                 bytes: 0,
@@ -59,8 +59,8 @@ export const getStorageUsage = query({
         }
 
         const [sessionCount, messageCount] = await Promise.all([
-            computeCloudChatCount(ctx, authenticatedUserId),
-            computeCloudMessageCount(ctx, authenticatedUserId),
+            computeWorkspaceChatCount(ctx, authenticatedUserId),
+            computeWorkspaceMessageCount(ctx, authenticatedUserId),
         ]);
 
         return {
@@ -80,8 +80,8 @@ export const create = internalMutation({
         return await ctx.db.insert("users", {
             email: args.email ?? undefined,
             initialSync: false,
-            cloudChatCount: 0,
-            cloudMessageCount: 0,
+            workspaceChatCount: 0,
+            workspaceMessageCount: 0,
             createdAt: now,
             updatedAt: now,
         });
@@ -159,7 +159,7 @@ export const resetCloudData = mutation({
 
         await ctx.db.patch(
             userId,
-            cloudUsageCountersToPatch(zeroCloudUsageCounters()) as any,
+            workspaceUsageCountersToPatch(zeroWorkspaceUsageCounters()) as any,
         );
     },
 });
@@ -167,8 +167,8 @@ export const resetCloudData = mutation({
 export const ensureUsageCounters = mutation({
     args: {},
     handler: async (ctx) => {
-        const userId = await requireCloudSync(ctx);
-        return await ensureCloudUsageCounters(ctx, userId);
+        const userId = await requireWorkspaceUser(ctx);
+        return await ensureWorkspaceUsageCounters(ctx, userId);
     },
 });
 
@@ -176,9 +176,9 @@ async function rebuildUsageCounters(
     ctx: { db: { patch: (...args: any[]) => Promise<void> } },
     userId: any,
 ) {
-    const computed = await computeCloudUsageCounters(ctx as any, userId);
+    const computed = await computeWorkspaceUsageCounters(ctx as any, userId);
     await ctx.db.patch(userId, {
-        ...cloudUsageCountersToPatch(computed),
+        ...workspaceUsageCountersToPatch(computed),
         updatedAt: Date.now(),
     } as any);
     return computed;

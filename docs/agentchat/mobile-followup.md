@@ -12,11 +12,11 @@ This document tracks mobile work that should happen after the web-first migratio
 - Mobile chat now sends, interrupts, and streams responses through the shared Agentchat websocket runtime path.
 - Mobile now derives conversation runtime state from Convex run summaries, with streamed-message fallback while those summaries are loading.
 - Mobile now has an agent context, agent switcher, agent-scoped conversation lists, and agent-scoped model defaults.
-- Mobile settings now surface the selected agent and deployment-managed provider/model/variant defaults instead of old sync-centric copy.
+- Mobile settings now surface the selected agent and deployment-managed provider/model/variant defaults instead of the older mixed sync/settings wording.
 - Mobile model selection now persists provider-first choices per agent and narrows the model list to the selected provider.
 - Mobile composer now exposes provider and variant selection, and conversation sends persist `variantId` through the shared runtime and Convex sync model.
 - Mobile share intent is now text-only, matching the current product surface.
-- Removed mobile media-storage helpers and the old local database path no longer shape the active app model.
+- Removed mobile media-storage helpers and the retired local database path no longer shapes the active app model.
 
 ## Pending Mobile Work
 

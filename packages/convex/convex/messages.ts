@@ -2,14 +2,14 @@ import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
 import { internalQuery, mutation, query } from "./_generated/server";
 import { isOwner, requireUserMatches } from "./lib/authz";
-import { requireCloudSync } from "./lib/subscription";
+import { requireWorkspaceUser } from "./lib/subscription";
 import { drainBatches } from "./lib/batch";
 import { assertMaxLen, LIMITS } from "./lib/limits";
 import { clampPaginationOpts } from "./lib/pagination";
 import {
-    applyCloudUsageDelta,
-    ensureCloudUsageCounters,
-} from "./lib/cloud_usage";
+    applyWorkspaceUsageDelta,
+    ensureWorkspaceUsageCounters,
+} from "./lib/workspace_usage";
 
 /**
  * Message Operations
@@ -21,7 +21,7 @@ import {
 export const listByChat = query({
     args: { chatId: v.id("chats") },
     handler: async (ctx, args) => {
-        const authenticatedUserId = await requireCloudSync(ctx);
+        const authenticatedUserId = await requireWorkspaceUser(ctx);
         const chat = await ctx.db.get(args.chatId);
         if (!isOwner(chat, authenticatedUserId)) {
             return [];
@@ -43,7 +43,7 @@ export const listByChatPaginated = query({
         paginationOpts: paginationOptsValidator,
     },
     handler: async (ctx, args) => {
-        const authenticatedUserId = await requireCloudSync(ctx);
+        const authenticatedUserId = await requireWorkspaceUser(ctx);
         const chat = await ctx.db.get(args.chatId);
         if (!isOwner(chat, authenticatedUserId)) {
             return {
@@ -70,7 +70,7 @@ export const listByChatPaginated = query({
 export const get = query({
     args: { id: v.id("messages") },
     handler: async (ctx, args) => {
-        const authenticatedUserId = await requireCloudSync(ctx);
+        const authenticatedUserId = await requireWorkspaceUser(ctx);
         const message = await ctx.db.get(args.id);
         if (!isOwner(message, authenticatedUserId)) return null;
         return message;
@@ -84,7 +84,7 @@ export const getByLocalId = query({
         localId: v.string(),
     },
     handler: async (ctx, args) => {
-        const authenticatedUserId = await requireCloudSync(ctx);
+        const authenticatedUserId = await requireWorkspaceUser(ctx);
         requireUserMatches(authenticatedUserId, args.userId);
         assertMaxLen(args.localId, LIMITS.maxLocalIdChars, "localId");
 
@@ -134,7 +134,7 @@ export const create = mutation({
         createdAt: v.optional(v.number()),
     },
     handler: async (ctx, args) => {
-        const authenticatedUserId = await requireCloudSync(ctx);
+        const authenticatedUserId = await requireWorkspaceUser(ctx);
         requireUserMatches(authenticatedUserId, args.userId);
 
         assertMaxLen(args.localId, LIMITS.maxLocalIdChars, "localId");
@@ -151,7 +151,10 @@ export const create = mutation({
             throw new Error("Chat not found");
         }
 
-        const usage = await ensureCloudUsageCounters(ctx, authenticatedUserId);
+        const usage = await ensureWorkspaceUsageCounters(
+            ctx,
+            authenticatedUserId,
+        );
         if (usage.messageCount >= LIMITS.maxMessagesPerUser) {
             throw new Error("Message limit reached");
         }
@@ -188,7 +191,7 @@ export const create = mutation({
             updatedAt: args.createdAt ?? now,
         });
 
-        await applyCloudUsageDelta(ctx, authenticatedUserId, {
+        await applyWorkspaceUsageDelta(ctx, authenticatedUserId, {
             messageCount: 1,
         });
 
@@ -206,7 +209,7 @@ export const update = mutation({
         variantId: v.optional(v.union(v.string(), v.null())),
     },
     handler: async (ctx, args) => {
-        const authenticatedUserId = await requireCloudSync(ctx);
+        const authenticatedUserId = await requireWorkspaceUser(ctx);
         const message = await ctx.db.get(args.id);
         if (!isOwner(message, authenticatedUserId)) {
             throw new Error("Not found");
@@ -232,7 +235,7 @@ export const update = mutation({
 export const remove = mutation({
     args: { id: v.id("messages") },
     handler: async (ctx, args) => {
-        const authenticatedUserId = await requireCloudSync(ctx);
+        const authenticatedUserId = await requireWorkspaceUser(ctx);
         const message = await ctx.db.get(args.id);
         if (!isOwner(message, authenticatedUserId)) {
             throw new Error("Not found");
@@ -240,7 +243,7 @@ export const remove = mutation({
 
         await ctx.db.delete(args.id);
 
-        await applyCloudUsageDelta(ctx, authenticatedUserId, {
+        await applyWorkspaceUsageDelta(ctx, authenticatedUserId, {
             messageCount: -1,
         });
     },
@@ -250,7 +253,7 @@ export const remove = mutation({
 export const deleteByChat = mutation({
     args: { chatId: v.id("chats") },
     handler: async (ctx, args) => {
-        const authenticatedUserId = await requireCloudSync(ctx);
+        const authenticatedUserId = await requireWorkspaceUser(ctx);
         const chat = await ctx.db.get(args.chatId);
         if (!isOwner(chat, authenticatedUserId)) {
             throw new Error("Chat not found");
@@ -269,7 +272,7 @@ export const deleteByChat = mutation({
             },
         );
 
-        await applyCloudUsageDelta(ctx, authenticatedUserId, {
+        await applyWorkspaceUsageDelta(ctx, authenticatedUserId, {
             messageCount: -deletedMessages,
         });
     },

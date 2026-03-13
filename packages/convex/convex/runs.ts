@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { query } from "./_generated/server";
 import { isOwner } from "./lib/authz";
-import { requireCloudSync } from "./lib/subscription";
+import { requireWorkspaceUser } from "./lib/subscription";
 
 const MAX_RUNS_PER_CHAT = 10;
 
@@ -40,7 +40,7 @@ export const listByChat = query({
         chatId: v.id("chats"),
     },
     handler: async (ctx, args) => {
-        const authenticatedUserId = await requireCloudSync(ctx);
+        const authenticatedUserId = await requireWorkspaceUser(ctx);
         const chat = await ctx.db.get(args.chatId);
         if (!isOwner(chat, authenticatedUserId)) {
             return [];

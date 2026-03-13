@@ -136,9 +136,8 @@ function SettingsPageContent() {
                                 </div>
                                 <p className="text-sm text-muted-foreground leading-relaxed">
                                     The web client is being migrated away from
-                                    legacy provider-specific and image-upload
-                                    assumptions toward the new Agentchat server
-                                    architecture.
+                                    older direct-provider assumptions toward the
+                                    new Agentchat server architecture.
                                 </p>
                             </div>
                             <div className="flex items-center gap-2 text-muted-foreground text-sm p-3 bg-muted/30 border border-border">

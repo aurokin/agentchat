@@ -17,7 +17,7 @@ import { useStorageAdapter } from "@/contexts/SyncContext";
 import { cn } from "@/lib/utils";
 
 import { ChatListSkeleton } from "./ChatListSkeleton";
-import { CloudStatusBadge } from "@/components/sync/CloudStatusBadge";
+import { WorkspaceStatusBadge } from "@/components/sync/WorkspaceStatusBadge";
 import {
     useIsMobile,
     useIsTablet,
@@ -311,7 +311,7 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                             <h1 className="font-semibold text-lg tracking-tight text-foreground">
                                 Agentchat
                             </h1>
-                            <CloudStatusBadge />
+                            <WorkspaceStatusBadge />
                         </div>
                     </div>
                     <button
