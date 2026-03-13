@@ -1,4 +1,5 @@
 import type { AgentchatConfig, AgentConfig, ProviderConfig } from "./config.ts";
+import type { CodexModelCatalog } from "./codexModelCatalog.ts";
 import {
     getConfigDiagnostics,
     getVisibleAgents,
@@ -7,6 +8,7 @@ import {
 
 type HandlerDependencies = {
     getConfig(): AgentchatConfig;
+    modelCatalog?: Pick<CodexModelCatalog, "getProviderModels">;
 };
 
 function jsonResponse(body: unknown, init?: ResponseInit): Response {
@@ -98,8 +100,10 @@ function getAgentOptions(config: AgentchatConfig, agentId: string) {
     };
 }
 
-// TODO: replace placeholder model metadata with live Codex-backed fetch + in-memory cache.
-function getProviderModels(config: AgentchatConfig, providerId: string) {
+function getProviderModelsFallback(
+    config: AgentchatConfig,
+    providerId: string,
+) {
     const provider = resolveProvider(config, providerId);
     if (!provider) return null;
 
@@ -172,10 +176,10 @@ export function createFetchHandler(deps: HandlerDependencies) {
             /^\/api\/providers\/([^/]+)\/models$/,
         );
         if (request.method === "GET" && providerModelsMatch) {
-            const result = getProviderModels(
-                config,
-                decodeURIComponent(providerModelsMatch[1] ?? ""),
-            );
+            const providerId = decodeURIComponent(providerModelsMatch[1] ?? "");
+            const result =
+                (await deps.modelCatalog?.getProviderModels(providerId)) ??
+                getProviderModelsFallback(config, providerId);
             if (!result) {
                 return jsonResponse(
                     { error: "Provider not found" },

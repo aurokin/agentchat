@@ -24,6 +24,7 @@ The canonical product and architecture docs live in `docs/agentchat/`:
 - **Agent-Scoped Conversations** - Switch agents and work inside separate conversation spaces for each one
 - **Chat Interface** - Clean, responsive chat UI with persistent message history
 - **Provider-Driven Model Selection** - Choose from the provider, model, and variant options exposed by your server
+- **Live Codex Model Catalog** - Provider model and variant options are fetched from Codex and cached in the backend server
 - **Realtime Streaming** - Stream assistant output through the Agentchat backend server
 - **Markdown Support** - Rich text rendering for code blocks, lists, and formatting
 - **Copy Messages** - One-click copy for any message

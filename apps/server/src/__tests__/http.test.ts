@@ -221,6 +221,21 @@ describe("createFetchHandler", () => {
     test("returns model metadata for enabled providers only", async () => {
         const fetchHandler = createFetchHandler({
             getConfig: () => createConfig(),
+            modelCatalog: {
+                getProviderModels: async (providerId) => ({
+                    providerId,
+                    fetchedAt: "2026-03-13T12:00:00.000Z",
+                    expiresAt: "2026-03-13T12:05:00.000Z",
+                    models: [
+                        {
+                            id: "gpt-5.3-codex-live",
+                            label: "GPT-5.3 Codex Live",
+                            supportsReasoning: true,
+                            variants: [{ id: "balanced", label: "Balanced" }],
+                        },
+                    ],
+                }),
+            },
         });
 
         const response = await fetchHandler(
@@ -237,7 +252,7 @@ describe("createFetchHandler", () => {
         expect(body.providerId).toBe("codex-main");
         expect(body.models).toMatchObject([
             {
-                id: "gpt-5.3-codex",
+                id: "gpt-5.3-codex-live",
                 variants: [{ id: "balanced" }],
             },
         ]);

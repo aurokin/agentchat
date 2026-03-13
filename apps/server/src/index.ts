@@ -3,6 +3,7 @@ import {
     toConnectionReadyEvent,
 } from "./backendAuth.ts";
 import { ConfigStore } from "./config.ts";
+import { CodexModelCatalog } from "./codexModelCatalog.ts";
 import { CodexRuntimeManager } from "./codexRuntime.ts";
 import { createFetchHandler } from "./http.ts";
 import { RuntimePersistenceClient } from "./runtimePersistence.ts";
@@ -15,6 +16,9 @@ import {
 const configStore = new ConfigStore();
 configStore.watch();
 const runtimePersistence = new RuntimePersistenceClient();
+const modelCatalog = new CodexModelCatalog({
+    getConfig: () => configStore.snapshot,
+});
 const runtimeManager = new CodexRuntimeManager({
     getConfig: () => configStore.snapshot,
     persistence: runtimePersistence,
@@ -27,6 +31,7 @@ type WebSocketData = {
 
 const httpFetch = createFetchHandler({
     getConfig: () => configStore.snapshot,
+    modelCatalog,
 });
 
 const server = Bun.serve<WebSocketData>({

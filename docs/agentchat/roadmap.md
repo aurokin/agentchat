@@ -16,7 +16,7 @@ This roadmap describes the current implementation state and the next major steps
 
 - Tighten end-to-end reliability across web, server, Convex, and Codex
 - Close the remaining mobile parity gaps
-- Replace placeholder provider model metadata with live provider-backed fetching and cache behavior
+- Keep Codex-backed model and variant discovery well-tested and operator-friendly
 - Improve operator-facing diagnostics and health reporting
 - Build a practical testing stack around the dedicated local fixtures in `/home/auro/agents/agentchat_test`
 - Keep the active roadmap narrowly focused on Codex confidence rather than adding more providers
