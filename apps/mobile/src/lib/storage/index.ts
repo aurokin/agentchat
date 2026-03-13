@@ -8,12 +8,6 @@ export {
     clearAllCredentials,
 } from "@/lib/storage/credential-storage";
 export {
-    getSyncState,
-    setSyncState,
-    clearSyncState,
-    getSyncMetadata,
-    setSyncMetadata,
-    updateSyncMetadata,
     getTheme,
     setTheme,
     getHasCompletedOnboarding,

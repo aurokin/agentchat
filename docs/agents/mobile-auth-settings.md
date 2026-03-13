@@ -86,43 +86,7 @@ const { user, isAuthenticated, isLoading, signIn, signOut, isConvexAvailable } =
 4. Credentials are cleared via `clearAllCredentials()`.
 5. The app returns to a signed-out, Convex-only state.
 
-## Sync State Management
-
-The shared sync types still expose older sync-state names during the transition, but the intended product model is simpler:
-
-- Convex is the active persistence backend.
-- Signed-in users operate against the Convex-backed workspace.
-- Signed-out users should be treated as disconnected, not local-first.
-
-### Sync State Storage
-
-Sync state is stored in SecureStore under `agentchat-sync-state`.
-
-Use `lib/storage/sync-storage.ts` for sync state operations:
-
-```typescript
-import { getSyncState, setSyncState, clearSyncState } from "@/lib/storage";
-
-const state = await getSyncState();
-
-await setSyncState("cloud-enabled");
-
-await clearSyncState();
-```
-
-### Sync State Context
-
-Use `useAppContext()` to access sync state:
-
-```typescript
-import { useAppContext } from "../src/contexts/AppContext";
-
-const { syncState, isConvexAvailable, setSyncState } = useAppContext();
-
-const canUseCloud = isConvexAvailable && syncState === "cloud-enabled";
-```
-
-### Convex Availability Check
+## Convex Availability Check
 
 Convex availability is checked at runtime using the configured URL:
 
@@ -134,7 +98,7 @@ const available = isConvexConfigured();
 
 ### State Transitions
 
-- Initial launch restores the last known Convex configuration state.
+- Initial launch resolves whether Convex is configured and whether the user is authenticated.
 - After successful sign-in, the Convex-backed workspace becomes available.
 - After sign-out, the user returns to a signed-out/disconnected state.
 

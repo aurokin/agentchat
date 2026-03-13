@@ -53,6 +53,7 @@ interface ChatContextValue {
     deleteChats: (chatIds: string[]) => Promise<void>;
     updateChat: (chat: ChatSession) => Promise<void>;
     loadMessages: (chatId: string) => Promise<void>;
+    hasMessagesInChats: (chatIds: string[]) => Promise<boolean>;
     addMessage: (
         message: Omit<Message, "createdAt" | "id"> & { id?: string },
     ) => Promise<Message>;
@@ -458,6 +459,29 @@ export function ChatProvider({
         [adapter, currentChat, isCloudSyncActive],
     );
 
+    const hasMessagesInChats = useCallback(
+        async (chatIds: string[]): Promise<boolean> => {
+            for (const chatId of chatIds) {
+                const cachedMessages = messages[chatId];
+                if (cachedMessages && cachedMessages.length > 0) {
+                    return true;
+                }
+
+                if (cachedMessages) {
+                    continue;
+                }
+
+                const storedMessages = await adapter.getMessagesByChat(chatId);
+                if (storedMessages.length > 0) {
+                    return true;
+                }
+            }
+
+            return false;
+        },
+        [adapter, messages],
+    );
+
     const updateMessage = useCallback(
         async (message: Message) => {
             await adapter.updateMessage(message);
@@ -527,6 +551,7 @@ export function ChatProvider({
                 deleteChats,
                 updateChat,
                 loadMessages,
+                hasMessagesInChats,
                 addMessage,
                 updateMessage,
                 setDefaultModel,

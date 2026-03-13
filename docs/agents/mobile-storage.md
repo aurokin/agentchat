@@ -1,130 +1,36 @@
-# Mobile Storage And Database
+# Mobile Storage
 
-## SQLite Schema
+The mobile app is now Convex-first. Do not add new SQLite, file-system, or local attachment storage paths for product data.
 
-The mobile app uses `expo-sqlite` with `better-sqlite3` for offline-first storage. The schema mirrors the web's IndexedDB schema in `apps/web/src/lib/db.ts`.
+## Active Storage
 
-### Tables
+- `expo-secure-store` stores auth tokens, onboarding state, theme, selected agent, selected chat, and per-agent default provider/model/variant preferences.
+- Convex is the authoritative backend for chats, messages, runs, and runtime recovery state.
+- Mobile runtime code reads and writes through the Convex-backed storage adapter in `apps/mobile/src/lib/sync/convex-adapter.ts`.
 
-| Table | Purpose | Indexes |
-| --- | --- | --- |
-| `chats` | Chat sessions | `idx_chats_updated` (updated_at DESC) |
-| `messages` | Chat messages | `idx_messages_session` (session_id), `idx_messages_created` (created_at ASC) |
-| `attachments` | Legacy attachment records kept only for migration compatibility | `idx_attachments_message` (message_id), `idx_attachments_created` (created_at ASC) |
-| `sync_state` | Sync state metadata | None |
-| `user_settings` | User preferences | None |
-| `schema_version` | Migration tracking | None |
+## What To Use
 
-### Schema Conventions
+- Use `src/lib/storage/credential-storage.ts` for auth credentials.
+- Use `src/lib/storage/user-settings-storage.ts` for selected agent/chat and per-agent defaults.
+- Use `src/lib/storage/sync-storage.ts` only for theme and onboarding persistence.
+- Use `src/contexts/SyncContext.tsx` and the shared `StorageAdapter` interface for chat/message persistence.
 
-- Use snake_case for column names (example: `model_id`, `created_at`).
-- Store JSON arrays as TEXT with `JSON.stringify` and `JSON.parse`.
-- Use `INTEGER` for timestamps (Unix epoch milliseconds).
-- Use `FOREIGN KEY ... ON DELETE CASCADE` for message and attachment cleanup.
+## What To Avoid
 
-## Database Location
+- Do not add new imports from `src/lib/db/*`.
+- Do not reintroduce `expo-sqlite`, file-based attachment storage, or migration helpers as part of normal feature work.
+- Do not treat mobile as local-first. Signed-in users operate against the Convex-backed workspace.
 
-- File: `agentchat.db` in the app's document directory.
-- Access via `getDatabase()` from `lib/db/database.ts`.
-- Database initializes automatically on first access.
+## Current Model
 
-## Migration Pattern
-
-1. Increment `SCHEMA_VERSION` in `lib/db/schema.ts`.
-2. Add migration logic in `migrateDatabase()`.
-3. Migrations run automatically on app start based on stored version.
-4. Initial schema creation uses `CREATE TABLE IF NOT EXISTS` for idempotency.
-
-## Row Conversion
-
-Use `*ToRow()` and `rowTo*()` functions in `lib/db/schema.ts` for type-safe conversions:
-
-- `chatSessionToRow()` and `rowToChatSession()`
-- `messageToRow()` and `rowToMessage()`
-- `attachmentToRow()` and `rowToAttachment()`
-
-## Legacy Attachment Storage
-
-Attachment storage still exists in the mobile codebase for compatibility with older local data paths, but attachments are not part of the active Agentchat product surface.
-
-### File Storage Location
-
-- Directory: `${FileSystem.documentDirectory}attachments/`
-- File naming: `{attachmentId}.{mimeTypeExtension}` (example: `abc123.png`)
-- Files are stored with their file URIs referenced in SQLite
-
-### Legacy Storage Architecture
-
-1. SQLite metadata: attachments table stores file URI, dimensions, size, and metadata
-2. File system: actual image blobs stored in `attachments/` directory
-3. Pending attachments: temporary base64 data during image selection before save
-
-### Legacy Modules
-
-- `src/lib/storage/attachment-storage.ts` contains the legacy attachment file helpers.
-- `src/lib/storage/file-storage.ts` contains low-level file operations shared by that legacy path.
-- Do not expose these helpers in new feature work unless the attachment system is being intentionally rebuilt.
-
-### File Storage API
-
-Use `lib/storage/file-storage.ts` for low-level file operations:
-
-```typescript
-import * as fileStorage from "@/lib/storage";
-
-const uri = await fileStorage.saveFile(base64Data, {
-    id: attachmentId,
-    mimeType: "image/png",
-    width: 1024,
-    height: 768,
-});
-
-const data = await fileStorage.readFile(uri);
-
-await fileStorage.deleteFile(uri);
-
-const size = await fileStorage.calculateAttachmentsDirSize();
-
-const freedBytes = await fileStorage.cleanupOrphanedFiles(validUris);
-```
-
-### Important Notes
-
-- Always use `expo-file-system/legacy` imports for the legacy API.
-- The legacy API exports: `documentDirectory`, `cacheDirectory`, `EncodingType`, `getInfoAsync`, `makeDirectoryAsync`, `readAsStringAsync`, `writeAsStringAsync`, `deleteAsync`, `readDirectoryAsync`.
-- File URIs are stored in the `data` field of the Attachment type (which now contains file:// URIs).
-- If you touch the legacy attachment layer, delete both the database record and the file.
-
-## Storage Adapter
-
-The mobile app uses `SqliteStorageAdapter` to implement the shared `StorageAdapter` interface from `@shared/core/sync`.
-
-- Adapter: `src/lib/sync/sqlite-adapter.ts`
-- Database ops: `src/lib/db/operations.ts`
-- Schema: `src/lib/db/schema.ts`
-- Shared interface: `packages/shared/src/core/sync/index.ts`
-
-### Adapter Pattern
-
-- Wrap synchronous SQLite operations in async methods.
-- Use a singleton adapter instance.
-- All methods return Promises to match the `StorageAdapter` interface.
-
-## Dependencies
-
-Required packages in `package.json`:
-
-- `expo-sqlite`
-- `better-sqlite3`
-- `expo-file-system`
-- `uuid`
+- Conversations are scoped to the selected agent.
+- Provider, model, and variant defaults can be stored per agent in SecureStore.
+- Active run state is recovered from Convex-backed run summaries plus websocket state.
 
 ## Related Files
 
-- `src/lib/db/schema.ts`
-- `src/lib/db/database.ts`
-- `src/lib/db/operations.ts`
-- `src/lib/storage/file-storage.ts`
-- `src/lib/storage/attachment-storage.ts`
-- `src/lib/storage/credential-storage.ts`
-- `src/lib/storage/index.ts`
+- `apps/mobile/src/contexts/SyncContext.tsx`
+- `apps/mobile/src/lib/sync/convex-adapter.ts`
+- `apps/mobile/src/lib/storage/credential-storage.ts`
+- `apps/mobile/src/lib/storage/sync-storage.ts`
+- `apps/mobile/src/lib/storage/user-settings-storage.ts`

@@ -22,10 +22,9 @@ This document tracks mobile work that should happen after the web-first migratio
 
 - Replace the current chat and settings flows with the new agent-centric model.
 - Continue trimming any attachment-related compatibility fields that remain in shared message/storage types during later schema cleanup passes.
-- Remove any remaining mobile dependency on Convex attachment APIs once the mobile runtime is switched to the new provider architecture.
+- Remove any remaining mobile dependency on Convex attachment APIs once the shared storage interface is narrowed.
 - Replace any remaining provider-specific client assumptions with backend-driven provider capability and settings options.
-- Revisit local database tables and sync helpers once the Convex schema migration is defined.
-- Remove or quarantine legacy storage and sync code that no longer matches the product direction.
+- Keep aligning mobile state helpers with the web runtime model as the rewrite settles.
 
 ## Documentation Rule
 

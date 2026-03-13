@@ -1,85 +1,9 @@
 import * as SecureStore from "expo-secure-store";
-import type { SyncState } from "@shared/core/sync";
-import type { SyncMetadata } from "@/lib/sync/types";
-import { DEFAULT_SYNC_METADATA } from "@/lib/sync/types";
 
 export type UserTheme = "light" | "dark" | "system";
 
-const SYNC_STATE_KEY = "agentchat-sync-state";
-const SYNC_METADATA_KEY = "agentchat-sync-metadata";
 const THEME_KEY = "agentchat-theme";
 const ONBOARDING_KEY = "agentchat-has-completed-onboarding";
-
-export async function getSyncState(): Promise<SyncState | null> {
-    try {
-        const state = await SecureStore.getItemAsync(SYNC_STATE_KEY);
-        if (!state) return null;
-
-        const parsed = JSON.parse(state);
-        if (
-            parsed === "local-only" ||
-            parsed === "cloud-enabled" ||
-            parsed === "cloud-disabled"
-        ) {
-            return parsed;
-        }
-        return null;
-    } catch {
-        return null;
-    }
-}
-
-export async function setSyncState(state: SyncState): Promise<void> {
-    try {
-        await SecureStore.setItemAsync(SYNC_STATE_KEY, JSON.stringify(state));
-    } catch (error) {
-        console.error("Failed to save sync state:", error);
-    }
-}
-
-export async function clearSyncState(): Promise<void> {
-    try {
-        await SecureStore.deleteItemAsync(SYNC_STATE_KEY);
-    } catch (error) {
-        console.error("Failed to clear sync state:", error);
-    }
-}
-
-export async function getSyncMetadata(): Promise<SyncMetadata> {
-    try {
-        const stored = await SecureStore.getItemAsync(SYNC_METADATA_KEY);
-        if (stored) {
-            const parsed = JSON.parse(stored) as Partial<SyncMetadata>;
-            return {
-                ...DEFAULT_SYNC_METADATA,
-                ...parsed,
-            };
-        }
-        return DEFAULT_SYNC_METADATA;
-    } catch {
-        return DEFAULT_SYNC_METADATA;
-    }
-}
-
-export async function setSyncMetadata(metadata: SyncMetadata): Promise<void> {
-    try {
-        await SecureStore.setItemAsync(
-            SYNC_METADATA_KEY,
-            JSON.stringify(metadata),
-        );
-    } catch (error) {
-        console.error("Failed to save sync metadata:", error);
-    }
-}
-
-export async function updateSyncMetadata(
-    updates: Partial<SyncMetadata>,
-): Promise<SyncMetadata> {
-    const current = await getSyncMetadata();
-    const updated = { ...current, ...updates };
-    await setSyncMetadata(updated);
-    return updated;
-}
 
 export async function getTheme(): Promise<UserTheme> {
     try {

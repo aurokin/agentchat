@@ -23,13 +23,19 @@ import { useAppContext } from "@/contexts/AppContext";
 import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
 import { useAgent } from "@/contexts/AgentContext";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { getMessageCountByChat } from "@/lib/db/operations";
 import { AgentSwitcher } from "@/components/chat/AgentSwitcher";
 
 export default function HomeScreen(): React.ReactElement {
     const router = useRouter();
-    const { chats, isLoading, error, loadChats, createChat, deleteChats } =
-        useChatContext();
+    const {
+        chats,
+        isLoading,
+        error,
+        loadChats,
+        createChat,
+        deleteChats,
+        hasMessagesInChats,
+    } = useChatContext();
     const { isInitialized } = useAppContext();
     const { selectedAgent } = useAgent();
     const { colors } = useTheme();
@@ -113,9 +119,7 @@ export default function HomeScreen(): React.ReactElement {
         if (selectedChatIds.size === 0) return;
 
         const chatIds = Array.from(selectedChatIds);
-        const hasMessages = chatIds.some(
-            (chatId) => getMessageCountByChat(chatId) > 0,
-        );
+        const hasMessages = await hasMessagesInChats(chatIds);
 
         const performDelete = async () => {
             await deleteChats(chatIds);
@@ -143,7 +147,7 @@ export default function HomeScreen(): React.ReactElement {
         }
 
         await performDelete();
-    }, [selectedChatIds, deleteChats, clearSelection]);
+    }, [selectedChatIds, deleteChats, clearSelection, hasMessagesInChats]);
 
     const handleHeaderLayout = useCallback(
         (event: LayoutChangeEvent) => {

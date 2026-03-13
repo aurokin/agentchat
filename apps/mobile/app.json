@@ -42,7 +42,6 @@
         "plugins": [
             "expo-router",
             "expo-secure-store",
-            "expo-sqlite",
             "./plugins/withAndroidShareIntent"
         ]
     }
