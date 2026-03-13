@@ -18,25 +18,33 @@ This roadmap describes the current implementation state and the next major steps
 - Close the remaining mobile parity gaps
 - Replace placeholder provider model metadata with live provider-backed fetching and cache behavior
 - Improve operator-facing diagnostics and health reporting
+- Build a practical testing stack around the dedicated local fixtures in `/home/auro/agents/agentchat_test`
 
 ## Next Milestones
 
 ### 1. Testing And Validation
 
+- Standardize on the dedicated local test fixtures in `/home/auro/agents/agentchat_test`
+  - `/home/auro/agents/agentchat_test/smoke` for ultra-cheap liveness checks
+  - `/home/auro/agents/agentchat_test` for deterministic read-only functional checks
+  - `/home/auro/agents/agentchat_test/workspace` for edit, interruption, and resume checks
 - Add integration coverage across `apps/server`, Convex ingress, and websocket runtime flow
 - Add browser-level end-to-end coverage for agent selection, chat send, interruption, refresh, and recovery
 - Build a manual QA checklist for real Codex-backed instances
+- Keep these tests manually invoked, not automatic on push
 
 ### 2. Operator Hardening
 
 - Better error reporting for disabled agents, disabled providers, and bad server config
 - Clear operator docs for custom agent setup
 - Stronger runtime and recovery observability
+- Low-token operator smoke checks using the dedicated test fixtures
 
 ### 3. Mobile Parity
 
 - Continue aligning mobile UX and runtime behavior with web
 - Reduce remaining mobile-specific assumptions and polish the agent-centric flow
+- Validate mobile manually against the same dedicated test-agent fixtures used for web
 
 ### 4. Provider Expansion
 
