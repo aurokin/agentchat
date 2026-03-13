@@ -218,7 +218,7 @@ Agent instructions live in `AGENTS.md` and the linked docs under `docs/agents/`.
 - **Backend transport**: `apps/server` exposes authenticated HTTP and WebSocket endpoints using short-lived backend tokens minted by Convex
 - **Provider runtime**: `apps/server` owns live provider sessions and currently targets Codex first behind a provider abstraction
 - **Convex source of truth**: Auth, conversations, runs, and runtime bindings are persisted in Convex
-- **Storage adapter pattern**: The local adapter remains in the codebase, but active runtime paths currently use Convex
+- **Browser storage**: Web local storage is limited to UI preferences like selected agent, theme, and per-agent defaults
 - **Monorepo**: Designed for web-first migration now, with mobile follow-up tracked in `docs/agentchat/mobile-followup.md`
 
 ## License

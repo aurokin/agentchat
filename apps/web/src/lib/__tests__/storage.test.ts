@@ -1,12 +1,17 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import {
+    clearSelectedChatId,
+    clearSelectedAgentId,
     getDefaultModel,
     getDefaultThinking,
+    getSelectedAgentId,
+    getSelectedChatId,
     setDefaultModel,
     setDefaultThinking,
+    setSelectedAgentId,
+    setSelectedChatId,
     setTheme,
-    setSyncState,
 } from "@/lib/storage";
 
 class MockLocalStorage implements Storage {
@@ -103,15 +108,38 @@ describe("storage scoped defaults", () => {
         setTheme("dark");
         setDefaultModel("global-model");
         setDefaultThinking("high");
-        setSyncState("cloud-enabled");
+        setSelectedAgentId("agent-a");
+        setSelectedChatId("agent-a", "chat-1");
 
         expect(localStorage.getItem("agentchat-theme")).toBe("dark");
         expect(localStorage.getItem("agentchat-default-model")).toBe(
             "global-model",
         );
         expect(localStorage.getItem("agentchat-default-thinking")).toBe("high");
-        expect(localStorage.getItem("agentchat-sync-state")).toBe(
-            "cloud-enabled",
+        expect(localStorage.getItem("agentchat-selected-agent")).toBe(
+            "agent-a",
         );
+        expect(localStorage.getItem("agentchat-selected-chat-by-agent")).toBe(
+            JSON.stringify({ "agent-a": "chat-1" }),
+        );
+    });
+
+    test("stores selected chat independently for each agent", () => {
+        setSelectedChatId("agent-a", "chat-1");
+        setSelectedChatId("agent-b", "chat-2");
+
+        expect(getSelectedChatId("agent-a")).toBe("chat-1");
+        expect(getSelectedChatId("agent-b")).toBe("chat-2");
+    });
+
+    test("can clear selected agent and selected chat state", () => {
+        setSelectedAgentId("agent-a");
+        setSelectedChatId("agent-a", "chat-1");
+
+        clearSelectedAgentId();
+        clearSelectedChatId("agent-a");
+
+        expect(getSelectedAgentId()).toBeNull();
+        expect(getSelectedChatId("agent-a")).toBeNull();
     });
 });
