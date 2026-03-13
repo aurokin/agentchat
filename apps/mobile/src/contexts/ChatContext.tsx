@@ -12,7 +12,7 @@ import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { FunctionReference } from "convex/server";
 import { useStorageAdapter, useSync } from "@/contexts/SyncContext";
-import type { ChatSession, Message, ThinkingLevel } from "@shared/core/types";
+import type { ChatSession, Message } from "@shared/core/types";
 import type { ChatRunSummary, ConversationRuntimeState } from "@/lib/types";
 import {
     APP_DEFAULT_MODEL,
@@ -25,11 +25,9 @@ import {
 } from "@shared/core/sync";
 import { v4 as uuidv4 } from "uuid";
 import {
-    getDefaultThinking,
     getSelectedChatId,
     setSelectedChatId,
     clearSelectedChatId,
-    setDefaultThinking as persistDefaultThinking,
 } from "@/lib/storage";
 import { useModelContext } from "@/contexts/ModelContext";
 import { deriveConversationRuntimeState } from "@/contexts/runtime-helpers";
@@ -45,7 +43,6 @@ interface ChatContextValue {
     isMessagesLoading: boolean;
     error: string | null;
     defaultModel: string;
-    defaultThinking: ThinkingLevel;
     loadChats: () => Promise<void>;
     createChat: (title?: string, modelId?: string) => Promise<ChatSession>;
     selectChat: (chatId: string) => Promise<void>;
@@ -59,12 +56,9 @@ interface ChatContextValue {
     ) => Promise<Message>;
     updateMessage: (message: Message) => Promise<void>;
     setDefaultModel: (modelId: string) => void;
-    setDefaultThinking: (thinking: ThinkingLevel) => void;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
-
-const DEFAULT_THINKING: ThinkingLevel = "none";
 
 const convexApi = api as typeof api & {
     runs: {
@@ -93,8 +87,6 @@ export function ChatProvider({
     const [isLoading, setIsLoading] = useState(false);
     const [isMessagesLoading, setIsMessagesLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [defaultThinking, setDefaultThinkingState] =
-        useState<ThinkingLevel>(DEFAULT_THINKING);
     const {
         defaultAgentId,
         selectedModel,
@@ -268,10 +260,7 @@ export function ChatProvider({
                 title: title || "New Chat",
                 modelId: modelId || defaultModelId,
                 variantId: selectedVariantId,
-                thinking: resolveThinkingLevelForVariant(
-                    selectedVariantId,
-                    defaultThinking,
-                ),
+                thinking: resolveThinkingLevelForVariant(selectedVariantId),
                 settingsLockedAt: null,
                 createdAt: now,
                 updatedAt: now,
@@ -294,7 +283,6 @@ export function ChatProvider({
         [
             adapter,
             defaultModelId,
-            defaultThinking,
             isCloudSyncActive,
             defaultAgentId,
             selectedVariantId,
@@ -505,31 +493,12 @@ export function ChatProvider({
         [selectModel],
     );
 
-    const setDefaultThinking = useCallback((thinking: ThinkingLevel) => {
-        setDefaultThinkingState(thinking);
-        void persistDefaultThinking(thinking);
-    }, []);
-
     useEffect(() => {
         setCurrentChat(null);
         setMessages({});
         setIsMessagesLoading(false);
         loadChats();
     }, [adapter, loadChats]);
-
-    useEffect(() => {
-        let isMounted = true;
-        const loadDefaults = async () => {
-            const thinking = await getDefaultThinking();
-            if (isMounted) {
-                setDefaultThinkingState(thinking);
-            }
-        };
-        void loadDefaults();
-        return () => {
-            isMounted = false;
-        };
-    }, []);
 
     return (
         <ChatContext.Provider
@@ -543,7 +512,6 @@ export function ChatProvider({
                 isMessagesLoading,
                 error,
                 defaultModel: defaultModelId,
-                defaultThinking,
                 loadChats,
                 createChat,
                 selectChat,
@@ -555,7 +523,6 @@ export function ChatProvider({
                 addMessage,
                 updateMessage,
                 setDefaultModel,
-                setDefaultThinking,
             }}
         >
             {children}

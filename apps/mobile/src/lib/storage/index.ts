@@ -15,10 +15,6 @@ export {
     type UserTheme,
 } from "@/lib/storage/sync-storage";
 export {
-    getDefaultThinking,
-    setDefaultThinking,
-    getDefaultThinkingForAgent,
-    setDefaultThinkingForAgent,
     getDefaultProviderForAgent,
     setDefaultProviderForAgent,
     getDefaultModel,

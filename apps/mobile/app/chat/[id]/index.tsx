@@ -70,8 +70,6 @@ export default function ChatScreen(): ReactElement {
         messages,
         runtimeState,
         defaultModel,
-        defaultThinking,
-        setDefaultThinking,
         selectChat,
         addMessage,
         updateMessage,
@@ -218,10 +216,7 @@ export default function ChatScreen(): ReactElement {
         const defaults = {
             modelId: defaultModel,
             variantId: selectedVariantId,
-            thinking: resolveThinkingLevelForVariant(
-                selectedVariantId,
-                defaultThinking,
-            ),
+            thinking: resolveThinkingLevelForVariant(selectedVariantId),
         };
         const lastUserSettings = getLastUserSettings(chatMessages);
         const resolvedSettings = resolveInitialChatSettings({
@@ -256,7 +251,6 @@ export default function ChatScreen(): ReactElement {
         chatMessages,
         currentChat,
         defaultModel,
-        defaultThinking,
         hasLoadedMessages,
         models,
         selectedVariantId,
@@ -539,7 +533,6 @@ export default function ChatScreen(): ReactElement {
                 updateMessage,
                 updateChat,
                 setDefaultModel: setSelectedModel,
-                setDefaultThinking,
                 queueStreamingMessageUpdate: setStreamingMessage,
                 ensureConnected,
                 sendCommand: (command) => {

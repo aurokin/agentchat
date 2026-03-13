@@ -20,7 +20,6 @@ export type MobileConversationSendDependencies = {
     updateMessage: (message: Message) => Promise<void>;
     updateChat: (chat: ChatSession) => Promise<void>;
     setDefaultModel: (modelId: string) => void;
-    setDefaultThinking: (thinking: ChatSession["thinking"]) => void;
     queueStreamingMessageUpdate: (
         update: StreamingMessageState | null,
     ) => void | Promise<void>;
@@ -73,9 +72,6 @@ export async function runMobileConversationSend(params: {
         });
 
         params.dependencies.setDefaultModel(params.chat.modelId);
-        if (sendPlan.shouldPersistDefaultThinking) {
-            params.dependencies.setDefaultThinking(sendPlan.effectiveThinking);
-        }
 
         if (
             sendPlan.titleUpdate ||

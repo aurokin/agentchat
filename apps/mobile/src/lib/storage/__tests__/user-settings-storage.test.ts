@@ -29,17 +29,14 @@ describe("user-settings-storage", () => {
     });
 
     it("returns defaults when nothing stored", async () => {
-        expect(await storage.getDefaultThinking()).toBe("none");
         expect(await storage.getDefaultModel()).toBeNull();
     });
 
-    it("stores agent-scoped model and thinking independently", async () => {
+    it("stores agent-scoped provider, model, and variant independently", async () => {
         await storage.setDefaultModel("global-model");
         await storage.setDefaultModelForAgent("agent-model", "agent-1");
         await storage.setDefaultProviderForAgent("codex-primary", "agent-1");
         await storage.setDefaultVariantForAgent("balanced", "agent-1");
-        await storage.setDefaultThinking("low");
-        await storage.setDefaultThinkingForAgent("high", "agent-1");
 
         expect(await storage.getDefaultModel()).toBe("global-model");
         expect(await storage.getDefaultProviderForAgent("agent-1")).toBe(
@@ -50,10 +47,6 @@ describe("user-settings-storage", () => {
         );
         expect(await storage.getDefaultVariantForAgent("agent-1")).toBe(
             "balanced",
-        );
-        expect(await storage.getDefaultThinking()).toBe("low");
-        expect(await storage.getDefaultThinkingForAgent("agent-1")).toBe(
-            "high",
         );
     });
 

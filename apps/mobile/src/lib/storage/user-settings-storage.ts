@@ -1,8 +1,5 @@
 import * as SecureStore from "expo-secure-store";
-import type { ThinkingLevel } from "@shared/core/types";
 
-const DEFAULT_THINKING_KEY = "agentchat-default-thinking";
-const DEFAULT_THINKING_BY_AGENT_KEY = "agentchat-default-thinking-by-agent";
 const DEFAULT_PROVIDER_BY_AGENT_KEY = "agentchat-default-provider-by-agent";
 const DEFAULT_MODEL_KEY = "agentchat-selected-model";
 const DEFAULT_MODEL_BY_AGENT_KEY = "agentchat-default-model-by-agent";
@@ -10,19 +7,6 @@ const DEFAULT_VARIANT_BY_AGENT_KEY = "agentchat-default-variant-by-agent";
 const FAVORITE_MODELS_KEY = "agentchat-favorite-models";
 const SELECTED_AGENT_KEY = "agentchat-selected-agent";
 const SELECTED_CHAT_BY_AGENT_KEY = "agentchat-selected-chat-by-agent";
-
-const THINKING_LEVELS: ThinkingLevel[] = [
-    "xhigh",
-    "high",
-    "medium",
-    "low",
-    "minimal",
-    "none",
-];
-
-export async function getDefaultThinking(): Promise<ThinkingLevel> {
-    return await getDefaultThinkingForAgent(null);
-}
 
 async function getStringMap(key: string): Promise<Record<string, string>> {
     try {
@@ -55,56 +39,6 @@ async function setStringMap(
         await SecureStore.setItemAsync(key, JSON.stringify(value));
     } catch (error) {
         console.error(`Failed to save ${key}:`, error);
-    }
-}
-
-export async function getDefaultThinkingForAgent(
-    agentId?: string | null,
-): Promise<ThinkingLevel> {
-    try {
-        if (agentId) {
-            const scopedThinking = (
-                await getStringMap(DEFAULT_THINKING_BY_AGENT_KEY)
-            )[agentId];
-            if (
-                scopedThinking &&
-                THINKING_LEVELS.includes(scopedThinking as ThinkingLevel)
-            ) {
-                return scopedThinking as ThinkingLevel;
-            }
-        }
-
-        const stored = await SecureStore.getItemAsync(DEFAULT_THINKING_KEY);
-        if (stored && THINKING_LEVELS.includes(stored as ThinkingLevel)) {
-            return stored as ThinkingLevel;
-        }
-        return "none";
-    } catch {
-        return "none";
-    }
-}
-
-export async function setDefaultThinking(value: ThinkingLevel): Promise<void> {
-    await setDefaultThinkingForAgent(value, null);
-}
-
-export async function setDefaultThinkingForAgent(
-    value: ThinkingLevel,
-    agentId?: string | null,
-): Promise<void> {
-    try {
-        if (agentId) {
-            const scopedThinking = await getStringMap(
-                DEFAULT_THINKING_BY_AGENT_KEY,
-            );
-            scopedThinking[agentId] = value;
-            await setStringMap(DEFAULT_THINKING_BY_AGENT_KEY, scopedThinking);
-            return;
-        }
-
-        await SecureStore.setItemAsync(DEFAULT_THINKING_KEY, value);
-    } catch (error) {
-        console.error("Failed to save default thinking:", error);
     }
 }
 
