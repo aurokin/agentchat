@@ -142,7 +142,6 @@ export function createFetchHandler(deps: HandlerDependencies) {
                 capabilities: {
                     transport: "http+websocket",
                     providers: ["codex"],
-                    attachments: false,
                     autoApprove: true,
                 },
             });

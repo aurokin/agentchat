@@ -3,10 +3,10 @@ import { v } from "convex/values";
 import { authTables } from "@convex-dev/auth/server";
 
 /**
- * Convex Database Schema for Cloud Sync
+ * Convex Database Schema for Agentchat
  *
- * Mirrors the local IndexedDB structure with additional fields
- * for cloud-specific features (user association, storage references).
+ * Convex is the durable source of truth for auth, conversations,
+ * messages, runs, and runtime bindings.
  */
 export default defineSchema({
     ...authTables,
