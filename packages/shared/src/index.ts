@@ -4,8 +4,8 @@ export * from "./core/agentchat-socket";
 export * from "./core/conversation-runtime";
 export {
     WorkspaceStatus,
-    StorageAdapter,
-    StorageAdapterFactory,
+    PersistenceAdapter,
+    PersistenceAdapterFactory,
 } from "./core/sync";
 export * from "./core/defaults";
 export * from "./core/errors";

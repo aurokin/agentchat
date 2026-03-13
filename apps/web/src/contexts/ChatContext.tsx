@@ -25,7 +25,7 @@ import {
     mapConvexMessageToMessage,
     mergeByIdWithPending,
 } from "@shared/core/sync";
-import { useStorageAdapter, useSync } from "@/contexts/SyncContext";
+import { usePersistenceAdapter, useSync } from "@/contexts/SyncContext";
 import { useAgent } from "@/contexts/AgentContext";
 import { getDefaultModelForAgent } from "@/contexts/agent-helpers";
 import {
@@ -81,7 +81,7 @@ const convexApi = api as typeof api & {
 };
 
 export function ChatProvider({ children }: { children: React.ReactNode }) {
-    const storageAdapter = useStorageAdapter();
+    const persistenceAdapter = usePersistenceAdapter();
     const { isWorkspaceReady, isConvexAvailable } = useSync();
     const { selectedAgentId, selectedAgent, loadingAgents } = useAgent();
     const [chats, setChats] = useState<ChatSession[]>([]);
@@ -226,7 +226,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         }
 
         try {
-            const allChats = await storageAdapter.getAllChats();
+            const allChats = await persistenceAdapter.getAllChats();
             const migratedChats = await Promise.all(
                 allChats.map(async (chat) => {
                     const needsAgentId = !chat.agentId;
@@ -242,7 +242,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                         agentId: chat.agentId || selectedAgentId,
                         settingsLockedAt: chat.settingsLockedAt ?? null,
                     };
-                    await storageAdapter.updateChat(migratedChat);
+                    await persistenceAdapter.updateChat(migratedChat);
                     return migratedChat;
                 }),
             );
@@ -262,7 +262,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             }
 
             setIsMessagesLoading(true);
-            const refreshedChat = await storageAdapter.getChat(activeChatId);
+            const refreshedChat =
+                await persistenceAdapter.getChat(activeChatId);
 
             if (!refreshedChat || refreshedChat.agentId !== selectedAgentId) {
                 if (storedChatId === activeChatId) {
@@ -276,7 +277,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             } else {
                 storage.setSelectedChatId(selectedAgentId, refreshedChat.id);
                 setCurrentChat(refreshedChat);
-                const chatMessages = await storageAdapter.getMessagesByChat(
+                const chatMessages = await persistenceAdapter.getMessagesByChat(
                     refreshedChat.id,
                 );
                 if (
@@ -290,7 +291,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         } finally {
             setLoading(false);
         }
-    }, [selectedAgentId, storageAdapter]);
+    }, [persistenceAdapter, selectedAgentId]);
 
     useEffect(() => {
         if (loadingAgents) return;
@@ -344,7 +345,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 updatedAt: Date.now(),
             };
 
-            await storageAdapter.createChat(chat);
+            await persistenceAdapter.createChat(chat);
             if (isWorkspaceActive) {
                 pendingChatIdsRef.current.add(chat.id);
             }
@@ -356,7 +357,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
             return chat;
         },
-        [isWorkspaceActive, selectedAgent, selectedAgentId, storageAdapter],
+        [isWorkspaceActive, persistenceAdapter, selectedAgent, selectedAgentId],
     );
 
     const selectChat = useCallback(
@@ -371,25 +372,25 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 return;
             }
 
-            const chat = await storageAdapter.getChat(chatId);
+            const chat = await persistenceAdapter.getChat(chatId);
             if (chat && chat.agentId === selectedAgentId) {
                 setCurrentChat(chat);
                 storage.setSelectedChatId(chat.agentId, chat.id);
                 setIsMessagesLoading(true);
                 const chatMessages =
-                    await storageAdapter.getMessagesByChat(chatId);
+                    await persistenceAdapter.getMessagesByChat(chatId);
                 setMessages(chatMessages);
                 setIsMessagesLoading(false);
                 return;
             }
             setIsMessagesLoading(false);
         },
-        [chats, isWorkspaceActive, selectedAgentId, storageAdapter],
+        [chats, isWorkspaceActive, persistenceAdapter, selectedAgentId],
     );
 
     const deleteChat = useCallback(
         async (chatId: string) => {
-            await storageAdapter.deleteChat(chatId);
+            await persistenceAdapter.deleteChat(chatId);
             setChats((prev) => prev.filter((c) => c.id !== chatId));
 
             const deletedChat =
@@ -407,13 +408,13 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 setIsMessagesLoading(false);
             }
         },
-        [chats, currentChat, storageAdapter],
+        [chats, currentChat, persistenceAdapter],
     );
 
     const updateChat = useCallback(
         async (chat: ChatSession) => {
             const updated = { ...chat, updatedAt: Date.now() };
-            await storageAdapter.updateChat(updated);
+            await persistenceAdapter.updateChat(updated);
             setChats((prev) =>
                 prev.map((c) => (c.id === chat.id ? updated : c)),
             );
@@ -421,7 +422,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 setCurrentChat(updated);
             }
         },
-        [currentChat, storageAdapter],
+        [currentChat, persistenceAdapter],
     );
 
     const addMessage = useCallback(
@@ -452,7 +453,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 createdAt: Date.now(),
             };
 
-            await storageAdapter.createMessage(newMessage);
+            await persistenceAdapter.createMessage(newMessage);
             if (isWorkspaceActive) {
                 pendingMessageIdsRef.current.add(newMessage.id);
             }
@@ -460,13 +461,13 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 setMessages((prev) => [...prev, newMessage]);
             }
 
-            const baseChat = await storageAdapter.getChat(targetChatId);
+            const baseChat = await persistenceAdapter.getChat(targetChatId);
             if (baseChat ?? (currentChat?.id === targetChatId && currentChat)) {
                 const updated = {
                     ...(baseChat ?? currentChat!),
                     updatedAt: Date.now(),
                 };
-                await storageAdapter.updateChat(updated);
+                await persistenceAdapter.updateChat(updated);
                 setChats((prev) => {
                     if (!prev.some((c) => c.id === updated.id)) {
                         return prev;
@@ -480,7 +481,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
             return newMessage;
         },
-        [currentChat, isWorkspaceActive, storageAdapter],
+        [currentChat, isWorkspaceActive, persistenceAdapter],
     );
 
     const updateMessage = useCallback(
@@ -503,24 +504,24 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             });
 
             if (updatedMessage) {
-                await storageAdapter.updateMessage(updatedMessage);
+                await persistenceAdapter.updateMessage(updatedMessage);
                 return;
             }
 
             if (currentChat) {
-                const chatMessages = await storageAdapter.getMessagesByChat(
+                const chatMessages = await persistenceAdapter.getMessagesByChat(
                     currentChat.id,
                 );
                 const message = chatMessages.find((m) => m.id === id);
                 if (message) {
-                    await storageAdapter.updateMessage({
+                    await persistenceAdapter.updateMessage({
                         ...message,
                         ...updates,
                     });
                 }
             }
         },
-        [currentChat, storageAdapter],
+        [currentChat, persistenceAdapter],
     );
 
     const clearCurrentChat = useCallback(() => {

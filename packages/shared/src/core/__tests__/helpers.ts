@@ -1,4 +1,4 @@
-import type { StorageAdapter } from "../sync";
+import type { PersistenceAdapter } from "../sync";
 import type { ChatSession, Message } from "../types";
 
 export type MemoryAdapterSeed = {
@@ -11,7 +11,7 @@ const findIndexById = <T extends { id: string }>(items: T[], id: string) =>
 
 export function createMemoryAdapter(
     seed: MemoryAdapterSeed = {},
-): StorageAdapter {
+): PersistenceAdapter {
     const chats = [...(seed.chats ?? [])];
     const messages = [...(seed.messages ?? [])];
 

@@ -13,7 +13,7 @@ The mobile app is now Convex-first. Do not add new SQLite, file-system, or other
 - Use `src/lib/storage/credential-storage.ts` for auth credentials.
 - Use `src/lib/storage/user-settings-storage.ts` for selected agent/chat and per-agent defaults.
 - Use `src/lib/storage/sync-storage.ts` only for theme and onboarding persistence.
-- Use `src/contexts/SyncContext.tsx` and the shared `StorageAdapter` interface for chat/message persistence.
+- Use `src/contexts/SyncContext.tsx` and the shared `PersistenceAdapter` interface for chat/message persistence.
 
 ## What To Avoid
 

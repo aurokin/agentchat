@@ -13,7 +13,7 @@ import { formatDistanceToNow } from "date-fns";
 import { Hexagon, Plus, Settings, Trash2 } from "lucide-react";
 import { useChat } from "@/contexts/ChatContext";
 import { useAgent } from "@/contexts/AgentContext";
-import { useStorageAdapter } from "@/contexts/SyncContext";
+import { usePersistenceAdapter } from "@/contexts/SyncContext";
 import { cn } from "@/lib/utils";
 
 import { ChatListSkeleton } from "./ChatListSkeleton";
@@ -50,7 +50,7 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
     const isTablet = useIsTablet();
     const isTouchDevice = useTouchDevice();
 
-    const storageAdapter = useStorageAdapter();
+    const persistenceAdapter = usePersistenceAdapter();
     const [isMac, setIsMac] = useState(false);
     const [pendingDeleteChatId, setPendingDeleteChatId] = useState<
         string | null
@@ -148,8 +148,8 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
             const hasMessages =
                 currentChat?.id === chatId
                     ? messages.length > 0
-                    : (await storageAdapter.getMessagesByChat(chatId)).length >
-                      0;
+                    : (await persistenceAdapter.getMessagesByChat(chatId))
+                          .length > 0;
 
             if (!hasMessages) {
                 await deleteChatAndSelectNext(chatId);
@@ -162,7 +162,7 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
             currentChat?.id,
             deleteChatAndSelectNext,
             messages.length,
-            storageAdapter,
+            persistenceAdapter,
         ],
     );
 
