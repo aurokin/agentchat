@@ -18,7 +18,6 @@ import {
     Alert,
     KeyboardAvoidingView,
     Platform,
-    ScrollView,
     useWindowDimensions,
     type NativeScrollEvent,
     type NativeSyntheticEvent,
@@ -27,8 +26,8 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useChatContext } from "@/contexts/ChatContext";
 import { useModelContext } from "@/contexts/ModelContext";
 import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
-import { saveFile } from "@/lib/storage";
 import { useStorageAdapter } from "@/contexts/SyncContext";
+import { useAgentchatSocket } from "@/contexts/AgentchatSocketContext";
 import {
     modelSupportsReasoning,
     type ProviderModel,
@@ -45,6 +44,14 @@ import {
     getLastUserSettings,
     resolveInitialChatSettings,
 } from "@shared/core/defaults";
+import {
+    applyStreamingMessageOverlay,
+    resolveConversationSocketEvent,
+    type ActiveRunState,
+    type RetryChatState,
+    type RuntimeErrorState,
+    type StreamingMessageState,
+} from "@shared/core/conversation-runtime";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { MessageInput } from "@/components/chat/MessageInput";
@@ -52,34 +59,13 @@ import { AttachmentGallery } from "@/components/chat/AttachmentGallery";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { consumePendingSharePayload } from "@/lib/share-intent/pending-share";
 import { importSharedImageFiles } from "@/lib/share-intent/attachments";
-
-interface ErrorState {
-    message: string;
-    isRetryable: boolean;
-}
+import {
+    interruptMobileConversationRun,
+    runMobileConversationSend,
+} from "@/components/chat/conversation-runtime-controller";
+import { recoverActiveRunFromMessages } from "@/components/chat/conversation-runtime-recovery";
 
 const EMPTY_MESSAGES: Message[] = [];
-
-interface StreamingDraft {
-    id: string;
-    content: string;
-    thinking: string;
-    hasReceivedChunk: boolean;
-    isThinkingStreaming: boolean;
-}
-
-const getChatTitleUpdate = (
-    chat: ChatSession | null,
-    content: string,
-    messageCount: number,
-): ChatSession | null => {
-    if (!chat || chat.title !== "New Chat" || messageCount !== 0) {
-        return null;
-    }
-
-    const title = content.slice(0, 50) + (content.length > 50 ? "..." : "");
-    return { ...chat, title };
-};
 
 export default function ChatScreen(): ReactElement {
     const params = useLocalSearchParams();
@@ -108,18 +94,24 @@ export default function ChatScreen(): ReactElement {
     } = useModelContext();
     const { colors } = useTheme();
     const styles = useMemo(() => createStyles(colors), [colors]);
+    const { socketClient, ensureConnected, connectionError, isConfigured } =
+        useAgentchatSocket();
 
     const [inputText, setInputText] = useState("");
-    const isLoading = false;
     const storageAdapter = useStorageAdapter();
     const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
     const [attachmentsById, setAttachmentsById] = useState<
         Record<string, Attachment>
     >({});
-    const [error, setError] = useState<ErrorState | null>(null);
-    const [retryPayload, setRetryPayload] = useState<{
-        content: string;
-    } | null>(null);
+    const [error, setError] = useState<RuntimeErrorState | null>(null);
+    const [retryPayload, setRetryPayload] = useState<RetryChatState | null>(
+        null,
+    );
+    const [isLoading, setIsLoading] = useState(false);
+    const [streamingMessage, setStreamingMessage] =
+        useState<StreamingMessageState | null>(null);
+    const [activeRun, setActiveRun] = useState<ActiveRunState | null>(null);
+    const [recoveredRunNotice, setRecoveredRunNotice] = useState(false);
 
     const flatListRef = useRef<FlatList<Message>>(null);
     const isAtBottomRef = useRef(true);
@@ -142,6 +134,9 @@ export default function ChatScreen(): ReactElement {
     const lastInitializedChatIdRef = useRef<string | null>(null);
     const suppressInputRef = useRef(false);
     const sharePayloadAppliedRef = useRef<string | null>(null);
+    const currentChatRef = useRef<ChatSession | null>(currentChat);
+    const chatMessagesRef = useRef<Message[]>(EMPTY_MESSAGES);
+    const activeRunRef = useRef<ActiveRunState | null>(null);
 
     useEffect(() => {
         if (chatId) {
@@ -188,9 +183,25 @@ export default function ChatScreen(): ReactElement {
         if (!chatId) return EMPTY_MESSAGES;
         return messages[chatId] ?? EMPTY_MESSAGES;
     }, [chatId, messages]);
+    const displayedMessages = useMemo(
+        () => applyStreamingMessageOverlay(chatMessages, streamingMessage),
+        [chatMessages, streamingMessage],
+    );
     const hasLoadedMessages = Boolean(chatId && messages[chatId] !== undefined);
     const showSkeletons = !hasLoadedMessages;
-    const showEmptyState = hasLoadedMessages && chatMessages.length === 0;
+    const showEmptyState = hasLoadedMessages && displayedMessages.length === 0;
+
+    useEffect(() => {
+        currentChatRef.current = currentChat;
+    }, [currentChat]);
+
+    useEffect(() => {
+        chatMessagesRef.current = chatMessages;
+    }, [chatMessages]);
+
+    useEffect(() => {
+        activeRunRef.current = activeRun;
+    }, [activeRun]);
 
     useEffect(() => {
         let isMounted = true;
@@ -364,37 +375,195 @@ export default function ChatScreen(): ReactElement {
         setAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
     };
 
-    const savePendingAttachmentsToStorage = useCallback(
-        async (pending: PendingAttachment[], messageId: string) => {
-            const createdAt = Date.now();
-            const saved: Attachment[] = [];
-
-            for (const pendingAttachment of pending) {
-                const fileUri = await saveFile(pendingAttachment.data, {
-                    id: pendingAttachment.id,
-                    mimeType: pendingAttachment.mimeType,
-                    width: pendingAttachment.width,
-                    height: pendingAttachment.height,
-                });
-
-                saved.push({
-                    id: pendingAttachment.id,
-                    messageId,
-                    type: "image",
-                    mimeType: pendingAttachment.mimeType,
-                    data: fileUri,
-                    width: pendingAttachment.width,
-                    height: pendingAttachment.height,
-                    size: pendingAttachment.size,
-                    createdAt,
-                });
+    const persistAssistantMessage = useCallback(
+        async (params: {
+            messageId: string;
+            content: string;
+            status: NonNullable<Message["status"]>;
+            runId: string | null;
+        }) => {
+            const existingMessage =
+                chatMessagesRef.current.find(
+                    (message) => message.id === params.messageId,
+                ) ?? null;
+            if (!existingMessage) {
+                return;
             }
 
-            await storageAdapter.saveAttachments(saved);
-            return saved;
+            await updateMessage({
+                ...existingMessage,
+                content: params.content,
+                contextContent: params.content,
+                status: params.status,
+                runId: params.runId,
+                updatedAt: Date.now(),
+                completedAt: params.status === "streaming" ? null : Date.now(),
+            });
         },
-        [storageAdapter],
+        [updateMessage],
     );
+
+    useEffect(() => {
+        const unsubscribe = socketClient.subscribe((event) => {
+            if (event.type === "connection.error") {
+                const nextActiveRun = activeRunRef.current;
+                if (!nextActiveRun) {
+                    return;
+                }
+
+                setError({
+                    message: event.payload.message,
+                    isRetryable: true,
+                });
+                setRetryPayload({
+                    content: nextActiveRun.userContent,
+                    contextContent: nextActiveRun.userContent,
+                });
+                setActiveRun(null);
+                setStreamingMessage(null);
+                setRecoveredRunNotice(false);
+                setIsLoading(false);
+                return;
+            }
+
+            const resolution = resolveConversationSocketEvent({
+                currentChatId: currentChatRef.current?.id ?? null,
+                event,
+                activeRun: activeRunRef.current,
+                messages: chatMessagesRef.current,
+            });
+
+            if (resolution.type === "ignore") {
+                return;
+            }
+
+            if (resolution.type === "run.started") {
+                setActiveRun(resolution.activeRun);
+                setIsLoading(true);
+                if (resolution.recovered) {
+                    setRecoveredRunNotice(true);
+                    if (resolution.streamingMessage) {
+                        setStreamingMessage(resolution.streamingMessage);
+                    }
+                }
+                return;
+            }
+
+            if (resolution.type === "message.updated") {
+                setActiveRun(resolution.activeRun);
+                setStreamingMessage(resolution.streamingMessage);
+                return;
+            }
+
+            if (resolution.type === "run.completed") {
+                void persistAssistantMessage({
+                    messageId: resolution.activeRun.assistantMessageId,
+                    content: resolution.finalContent,
+                    status: "completed",
+                    runId: resolution.activeRun.runId,
+                }).finally(() => {
+                    setActiveRun(null);
+                    setStreamingMessage(null);
+                    setRecoveredRunNotice(false);
+                    setIsLoading(false);
+                });
+                return;
+            }
+
+            if (resolution.type === "run.interrupted") {
+                void persistAssistantMessage({
+                    messageId: resolution.activeRun.assistantMessageId,
+                    content: resolution.finalContent,
+                    status: "interrupted",
+                    runId: resolution.activeRun.runId,
+                }).finally(() => {
+                    setActiveRun(null);
+                    setStreamingMessage(null);
+                    setRecoveredRunNotice(false);
+                    setIsLoading(false);
+                });
+                return;
+            }
+
+            if (resolution.type === "run.failed") {
+                void persistAssistantMessage({
+                    messageId: resolution.activeRun.assistantMessageId,
+                    content: resolution.finalContent,
+                    status: "errored",
+                    runId: resolution.activeRun.runId,
+                }).finally(() => {
+                    setError(resolution.error);
+                    setRetryPayload(resolution.retryChat);
+                    setActiveRun(null);
+                    setStreamingMessage(null);
+                    setRecoveredRunNotice(false);
+                    setIsLoading(false);
+                });
+            }
+        });
+
+        return unsubscribe;
+    }, [persistAssistantMessage, socketClient]);
+
+    useEffect(() => {
+        if (!currentChat) {
+            startTransition(() => {
+                setActiveRun(null);
+                setStreamingMessage(null);
+                setRecoveredRunNotice(false);
+                setIsLoading(false);
+            });
+            return;
+        }
+
+        const recoveredRun = recoverActiveRunFromMessages({
+            chat: currentChat,
+            messages: chatMessages,
+        });
+
+        if (!recoveredRun) {
+            if (activeRunRef.current?.conversationId !== currentChat.id) {
+                startTransition(() => {
+                    setActiveRun(null);
+                    setStreamingMessage(null);
+                    setRecoveredRunNotice(false);
+                    setIsLoading(false);
+                });
+            }
+            return;
+        }
+
+        startTransition(() => {
+            setActiveRun(recoveredRun);
+            setStreamingMessage({
+                id: recoveredRun.assistantMessageId,
+                content: recoveredRun.content,
+            });
+            setRecoveredRunNotice(true);
+            setIsLoading(true);
+        });
+    }, [chatMessages, currentChat]);
+
+    useEffect(() => {
+        if (!currentChat) {
+            return;
+        }
+
+        const unsubscribe = socketClient.subscribeToConversation(
+            currentChat.id,
+        );
+        void ensureConnected().catch((connectError: unknown) => {
+            setError({
+                message:
+                    connectError instanceof Error
+                        ? connectError.message
+                        : "Failed to connect to the Agentchat server.",
+                isRetryable: true,
+            });
+        });
+
+        return unsubscribe;
+    }, [currentChat, ensureConnected, socketClient]);
 
     const handleSendMessage = async (
         content: string,
@@ -415,13 +584,38 @@ export default function ChatScreen(): ReactElement {
             return false;
         }
 
-        setError({
-            message:
-                "Mobile message execution is still migrating to the Agentchat server. Use the web app for active chats for now.",
-            isRetryable: false,
+        const result = await runMobileConversationSend({
+            chat: currentChat,
+            messages: chatMessages,
+            models,
+            content,
+            dependencies: {
+                addMessage,
+                updateMessage,
+                updateChat,
+                setDefaultModel: setSelectedModel,
+                setDefaultThinking,
+                queueStreamingMessageUpdate: setStreamingMessage,
+                ensureConnected,
+                sendCommand: (command) => {
+                    socketClient.send(command);
+                },
+            },
         });
+
+        if (result.status === "failed") {
+            setError(result.error);
+            setRetryPayload(result.retryChat);
+            setIsLoading(false);
+            return false;
+        }
+
+        setError(null);
         setRetryPayload(null);
-        return false;
+        setRecoveredRunNotice(false);
+        setActiveRun(result.activeRun);
+        setIsLoading(true);
+        return true;
     };
 
     const handleSend = async () => {
@@ -463,6 +657,18 @@ export default function ChatScreen(): ReactElement {
         setError(null);
         await handleSendMessage(content);
     };
+
+    const handleCancel = useCallback(() => {
+        const interruptError = interruptMobileConversationRun({
+            activeRun,
+            sendCommand: (command) => {
+                socketClient.send(command);
+            },
+        });
+        if (interruptError) {
+            setError(interruptError);
+        }
+    }, [activeRun, socketClient]);
 
     const handleDeleteChat = async () => {
         const fallbackChatId = chats.find((chat) => chat.id !== chatId)?.id;
@@ -732,10 +938,14 @@ export default function ChatScreen(): ReactElement {
         const isUser = item.role === "user";
         const displayContent = item.content;
         const displayThinking = item.thinking;
-        const hasReceivedChunk = Boolean(item.content || item.thinking);
+        const isStreamingMessage = activeRun?.assistantMessageId === item.id;
         const showThinkingIndicator = false;
         const hideContentWhileReasoning = false;
-        const showGenerating = false;
+        const showGenerating =
+            isStreamingMessage &&
+            !displayContent &&
+            !displayThinking &&
+            item.role === "assistant";
         const hasThinkingBadge =
             item.thinkingLevel !== undefined && item.thinkingLevel !== "none";
         const hasModelBadge = Boolean(item.modelId);
@@ -1037,6 +1247,37 @@ export default function ChatScreen(): ReactElement {
                     )}
                 </View>
             )}
+            {!error && recoveredRunNotice && (
+                <View style={styles.infoBanner}>
+                    <Feather
+                        name="refresh-cw"
+                        size={16}
+                        color={colors.accent}
+                    />
+                    <Text style={styles.infoBannerText}>
+                        Reconnected to the active run for this conversation.
+                    </Text>
+                </View>
+            )}
+            {!error && !isConfigured && (
+                <View style={styles.errorBanner}>
+                    <Feather
+                        name="alert-circle"
+                        size={16}
+                        color={colors.danger}
+                    />
+                    <Text style={styles.errorBannerText}>
+                        EXPO_PUBLIC_AGENTCHAT_SERVER_URL is not configured for
+                        the mobile app.
+                    </Text>
+                </View>
+            )}
+            {!error && isConfigured && connectionError && (
+                <View style={styles.infoBanner}>
+                    <Feather name="wifi-off" size={16} color={colors.warning} />
+                    <Text style={styles.infoBannerText}>{connectionError}</Text>
+                </View>
+            )}
 
             <KeyboardAvoidingView
                 behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -1044,7 +1285,7 @@ export default function ChatScreen(): ReactElement {
             >
                 <FlatList
                     ref={flatListRef}
-                    data={chatMessages}
+                    data={displayedMessages}
                     keyExtractor={(item) => item.id}
                     renderItem={renderMessage}
                     contentContainerStyle={[
@@ -1069,7 +1310,10 @@ export default function ChatScreen(): ReactElement {
                     inputText={inputText}
                     onInputChange={handleInputChange}
                     onSend={handleSend}
+                    onCancel={handleCancel}
                     isLoading={isLoading}
+                    settingsLocked={Boolean(currentChat.settingsLockedAt)}
+                    attachmentsEnabled={false}
                     models={models}
                     selectedModelId={currentChat.modelId}
                     onModelChange={handleModelChange}
@@ -1244,6 +1488,21 @@ const createStyles = (colors: ThemeColors) =>
             flex: 1,
             fontSize: 13,
             color: colors.danger,
+        },
+        infoBanner: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            paddingHorizontal: 16,
+            paddingVertical: 10,
+            backgroundColor: colors.accentSoft,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.accentBorder,
+        },
+        infoBannerText: {
+            flex: 1,
+            fontSize: 13,
+            color: colors.text,
         },
         retryButton: {
             flexDirection: "row",

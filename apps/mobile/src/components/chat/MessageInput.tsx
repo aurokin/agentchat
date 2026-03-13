@@ -35,8 +35,11 @@ interface MessageInputProps {
     inputText: string;
     onInputChange: (text: string) => void;
     onSend: () => void;
+    onCancel?: () => void;
     isLoading: boolean;
     disabled?: boolean;
+    settingsLocked?: boolean;
+    attachmentsEnabled?: boolean;
     models: ProviderModel[];
     selectedModelId: string | null;
     onModelChange: (modelId: string) => void;
@@ -63,8 +66,11 @@ export function MessageInput({
     inputText,
     onInputChange,
     onSend,
+    onCancel,
     isLoading,
     disabled,
+    settingsLocked,
+    attachmentsEnabled = true,
     models,
     selectedModelId,
     onModelChange,
@@ -195,6 +201,10 @@ export function MessageInput({
     };
 
     const handleSendPress = () => {
+        if (isLoading) {
+            onCancel?.();
+            return;
+        }
         if (!canSend) return;
         inputRef.current?.clear();
         Keyboard.dismiss();
@@ -209,13 +219,13 @@ export function MessageInput({
                 onModelChange={onModelChange}
                 favoriteModels={favoriteModels}
                 onToggleFavoriteModel={onToggleFavoriteModel}
-                disabled={isLoading}
+                disabled={isLoading || settingsLocked}
             />
             {reasoningSupported && (
                 <ThinkingToggle
                     value={thinkingLevel}
                     onChange={onThinkingChange}
-                    disabled={isLoading}
+                    disabled={isLoading || settingsLocked}
                 />
             )}
         </>
@@ -355,7 +365,7 @@ export function MessageInput({
                     maxLength={10000}
                     editable={!isLoading}
                 />
-                {visionSupported && (
+                {attachmentsEnabled && visionSupported && (
                     <AttachmentPicker
                         onAttachmentsSelected={onAttachmentsChange}
                         disabled={
@@ -367,16 +377,17 @@ export function MessageInput({
                 <TouchableOpacity
                     style={[
                         styles.sendButton,
-                        !canSend && styles.sendButtonDisabled,
+                        !canSend && !isLoading && styles.sendButtonDisabled,
                     ]}
                     onPress={handleSendPress}
-                    disabled={!canSend}
+                    disabled={!canSend && !isLoading}
                     activeOpacity={0.7}
                 >
                     {isLoading ? (
-                        <ActivityIndicator
+                        <Feather
+                            name="square"
+                            size={16}
                             color={colors.textOnAccent}
-                            size="small"
                         />
                     ) : (
                         <Feather

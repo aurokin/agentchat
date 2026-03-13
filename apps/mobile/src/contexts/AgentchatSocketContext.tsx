@@ -21,6 +21,7 @@ interface AgentchatSocketContextValue {
     connectionState: SocketConnectionState;
     connectionError: string | null;
     isConfigured: boolean;
+    ensureConnected: () => Promise<void>;
 }
 
 const AgentchatSocketContext =
@@ -37,6 +38,9 @@ export function AgentchatSocketProvider({
         useState<SocketConnectionState>("idle");
     const [connectionError, setConnectionError] = useState<string | null>(null);
     const isConfigured = Boolean(getAgentchatServerUrl());
+    const ensureConnected = React.useCallback(async () => {
+        await socketClient.ensureConnected(getBackendSessionToken);
+    }, [getBackendSessionToken, socketClient]);
 
     useEffect(() => {
         let cancelled = false;
@@ -55,7 +59,7 @@ export function AgentchatSocketProvider({
             setConnectionError(null);
         });
 
-        void socketClient.ensureConnected(getBackendSessionToken).then(
+        void ensureConnected().then(
             () => {
                 if (cancelled) return;
                 setConnectionState("connected");
@@ -74,7 +78,7 @@ export function AgentchatSocketProvider({
         return () => {
             cancelled = true;
         };
-    }, [getBackendSessionToken, isAuthenticated, isConfigured, socketClient]);
+    }, [ensureConnected, isAuthenticated, isConfigured, socketClient]);
 
     return (
         <AgentchatSocketContext.Provider
@@ -83,6 +87,7 @@ export function AgentchatSocketProvider({
                 connectionState,
                 connectionError,
                 isConfigured,
+                ensureConnected,
             }}
         >
             {children}

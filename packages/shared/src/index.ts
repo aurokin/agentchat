@@ -2,6 +2,7 @@ export * from "./core/models";
 export * from "./core/quota";
 export * from "./core/backend-token";
 export * from "./core/agentchat-socket";
+export * from "./core/conversation-runtime";
 export {
     SyncState,
     SyncMetadata,
