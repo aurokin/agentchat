@@ -16,6 +16,10 @@ import {
     type BootstrapAgent,
     type BootstrapResponse,
 } from "@/lib/agentchat-server";
+import {
+    type AgentchatServerIssue,
+    toAgentchatServerIssue,
+} from "@/lib/server-issues";
 import * as storage from "@/lib/storage";
 import { resolveSelectedAgentId } from "@/contexts/agent-helpers";
 
@@ -27,6 +31,8 @@ interface AgentContextType {
     loadingAgents: boolean;
     loadingAgentOptions: boolean;
     bootstrap: BootstrapResponse | null;
+    bootstrapIssue: AgentchatServerIssue | null;
+    agentOptionsIssue: AgentchatServerIssue | null;
     setSelectedAgentId: (agentId: string) => void;
     refreshBootstrap: () => Promise<void>;
 }
@@ -42,11 +48,16 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
     );
     const [loadingAgents, setLoadingAgents] = useState(false);
     const [loadingAgentOptions, setLoadingAgentOptions] = useState(false);
+    const [bootstrapIssue, setBootstrapIssue] =
+        useState<AgentchatServerIssue | null>(null);
+    const [agentOptionsIssue, setAgentOptionsIssue] =
+        useState<AgentchatServerIssue | null>(null);
 
     const refreshBootstrap = useCallback(async () => {
         setLoadingAgents(true);
         try {
             const nextBootstrap = await fetchBootstrap();
+            setBootstrapIssue(null);
             setBootstrap(nextBootstrap);
 
             const nextSelectedAgentId = resolveSelectedAgentId({
@@ -62,6 +73,12 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
             }
         } catch (error) {
             console.error("Failed to load Agentchat bootstrap:", error);
+            setBootstrapIssue(
+                toAgentchatServerIssue({
+                    scope: "bootstrap",
+                    error,
+                }),
+            );
             setBootstrap({ agents: [], providers: [] });
             setSelectedAgentIdState(null);
             storage.clearSelectedAgentId();
@@ -110,11 +127,18 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
         void fetchAgentOptions(selectedAgentId)
             .then((options) => {
                 if (cancelled) return;
+                setAgentOptionsIssue(null);
                 setSelectedAgentOptions(options);
             })
             .catch((error) => {
                 if (cancelled) return;
                 console.error("Failed to load agent options:", error);
+                setAgentOptionsIssue(
+                    toAgentchatServerIssue({
+                        scope: "agentOptions",
+                        error,
+                    }),
+                );
                 setSelectedAgentOptions(null);
             })
             .finally(() => {
@@ -137,6 +161,8 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
                 loadingAgents,
                 loadingAgentOptions,
                 bootstrap,
+                bootstrapIssue,
+                agentOptionsIssue,
                 setSelectedAgentId,
                 refreshBootstrap,
             }}

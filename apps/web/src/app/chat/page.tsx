@@ -8,10 +8,18 @@ import { useAgent } from "@/contexts/AgentContext";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { Loader2 } from "lucide-react";
 import { useIsConvexAvailable } from "@/contexts/ConvexProvider";
+import { useSettings } from "@/contexts/SettingsContext";
+import { OperatorNotice } from "@/components/chat/OperatorNotice";
 
 export default function ChatPage() {
     const { chats, loading, selectChat, currentChat } = useChat();
-    const { loadingAgents } = useAgent();
+    const {
+        loadingAgents,
+        bootstrapIssue,
+        agentOptionsIssue,
+        refreshBootstrap,
+    } = useAgent();
+    const { modelsIssue, refreshModels } = useSettings();
     const isConvexAvailable = useIsConvexAvailable();
     const { isAuthenticated, isLoading: isAuthLoading } = useConvexAuth();
     const { signIn } = useAuthActions() ?? {};
@@ -66,6 +74,25 @@ export default function ChatPage() {
         );
     }
 
+    if (bootstrapIssue) {
+        return (
+            <div className="flex h-dvh items-center justify-center bg-background px-6">
+                <div className="w-full max-w-2xl space-y-4">
+                    <OperatorNotice
+                        issue={bootstrapIssue}
+                        actionLabel="Retry bootstrap"
+                        onAction={() => void refreshBootstrap()}
+                    />
+                    <p className="text-sm text-muted-foreground">
+                        Fix the local Agentchat server configuration first. The
+                        web app cannot discover agents or providers until the
+                        bootstrap request succeeds.
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
     if (!isConvexAvailable || !isAuthenticated) {
         return (
             <div className="flex h-dvh items-center justify-center bg-background px-6">
@@ -90,5 +117,31 @@ export default function ChatPage() {
         );
     }
 
-    return <ChatLayout />;
+    return (
+        <div className="relative h-dvh">
+            {(agentOptionsIssue || modelsIssue) && (
+                <div className="pointer-events-none absolute inset-x-0 top-4 z-20 mx-auto w-full max-w-3xl px-4">
+                    <div className="pointer-events-auto space-y-3">
+                        {agentOptionsIssue ? (
+                            <OperatorNotice
+                                issue={agentOptionsIssue}
+                                actionLabel="Reload agents"
+                                onAction={() => void refreshBootstrap()}
+                                tone="warning"
+                            />
+                        ) : null}
+                        {modelsIssue ? (
+                            <OperatorNotice
+                                issue={modelsIssue}
+                                actionLabel="Reload models"
+                                onAction={() => void refreshModels()}
+                                tone="warning"
+                            />
+                        ) : null}
+                    </div>
+                </div>
+            )}
+            <ChatLayout />
+        </div>
+    );
 }

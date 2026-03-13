@@ -12,7 +12,7 @@
         "typecheck": "tsc --noEmit",
         "lint": "eslint .",
         "test": "bun test",
-        "test:confidence": "bun test src/components/chat/__tests__/conversation-runtime-controller.test.ts src/components/chat/__tests__/conversation-runtime-helpers.test.ts src/components/chat/__tests__/message-list.test.ts src/contexts/__tests__/agent-helpers.test.ts src/contexts/__tests__/chat-helpers.test.ts src/contexts/__tests__/runtime-helpers.test.ts src/contexts/__tests__/settings-helpers.test.ts src/lib/__tests__/agentchat-server.test.ts src/lib/__tests__/agentchat-socket.test.ts src/lib/__tests__/errors.test.ts src/lib/__tests__/storage.test.ts src/lib/workspace/__tests__/config.test.ts",
+        "test:confidence": "bun test src/components/chat/__tests__/conversation-runtime-controller.test.ts src/components/chat/__tests__/conversation-runtime-helpers.test.ts src/components/chat/__tests__/message-list.test.ts src/contexts/__tests__/agent-helpers.test.ts src/contexts/__tests__/chat-helpers.test.ts src/contexts/__tests__/runtime-helpers.test.ts src/contexts/__tests__/settings-helpers.test.ts src/lib/__tests__/agentchat-server.test.ts src/lib/__tests__/agentchat-socket.test.ts src/lib/__tests__/errors.test.ts src/lib/__tests__/server-issues.test.ts src/lib/__tests__/storage.test.ts src/lib/workspace/__tests__/config.test.ts",
         "health": "bun run format && bun run typecheck && bun run lint && bun test"
     },
     "dependencies": {

@@ -12,6 +12,10 @@ import React, {
 import type { UserSettings, ProviderModel, ThinkingLevel } from "@/lib/types";
 import * as storage from "@/lib/storage";
 import { fetchAvailableModels } from "@/lib/agentchat-server";
+import {
+    type AgentchatServerIssue,
+    toAgentchatServerIssue,
+} from "@/lib/server-issues";
 import { useAgent } from "@/contexts/AgentContext";
 import {
     filterModelsForAgent,
@@ -25,6 +29,7 @@ interface SettingsContextType extends UserSettings {
     toggleFavoriteModel: (modelId: string) => void;
     models: ProviderModel[];
     loadingModels: boolean;
+    modelsIssue: AgentchatServerIssue | null;
     refreshModels: () => Promise<void>;
 }
 
@@ -54,6 +59,9 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     const [settings, setSettings] = useState<UserSettings>(defaultSettings);
     const [allModels, setAllModels] = useState<ProviderModel[]>([]);
     const [loadingModels, setLoadingModels] = useState(false);
+    const [modelsIssue, setModelsIssue] = useState<AgentchatServerIssue | null>(
+        null,
+    );
     const [mounted, setMounted] = useState(false);
     const refreshPromiseRef = useRef<Promise<void> | null>(null);
 
@@ -76,12 +84,19 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         setLoadingModels(true);
         try {
             const promise = fetchAvailableModels().then((fetchedModels) => {
+                setModelsIssue(null);
                 setAllModels(fetchedModels);
             });
             refreshPromiseRef.current = promise;
             await promise;
         } catch (err) {
             console.error("Failed to load models:", err);
+            setModelsIssue(
+                toAgentchatServerIssue({
+                    scope: "models",
+                    error: err,
+                }),
+            );
         } finally {
             setLoadingModels(false);
             refreshPromiseRef.current = null;
@@ -203,6 +218,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
                 toggleFavoriteModel,
                 models,
                 loadingModels,
+                modelsIssue,
                 refreshModels,
             }}
         >

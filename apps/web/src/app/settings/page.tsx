@@ -3,9 +3,11 @@
 import { useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Sidebar } from "@/components/chat/Sidebar";
+import { OperatorNotice } from "@/components/chat/OperatorNotice";
 import { KeybindingsContent } from "@/components/keybindings/KeybindingsContent";
 import { useChat } from "@/contexts/ChatContext";
 import { useSettings } from "@/contexts/SettingsContext";
+import { useAgent } from "@/contexts/AgentContext";
 import {
     Settings,
     Key,
@@ -39,7 +41,8 @@ const isTypingTarget = (target: EventTarget | null) => {
 function SettingsPageContent() {
     const router = useRouter();
     const { currentChat, clearCurrentChat } = useChat();
-    const { theme, setTheme } = useSettings();
+    const { theme, setTheme, modelsIssue, refreshModels } = useSettings();
+    const { bootstrapIssue, agentOptionsIssue, refreshBootstrap } = useAgent();
     const searchParams = useSearchParams();
 
     useEffect(() => {
@@ -88,6 +91,34 @@ function SettingsPageContent() {
                 </div>
 
                 <div className="max-w-2xl mx-auto p-8 relative z-10">
+                    {(bootstrapIssue || agentOptionsIssue || modelsIssue) && (
+                        <div className="space-y-3 mb-6">
+                            {bootstrapIssue ? (
+                                <OperatorNotice
+                                    issue={bootstrapIssue}
+                                    actionLabel="Retry bootstrap"
+                                    onAction={() => void refreshBootstrap()}
+                                />
+                            ) : null}
+                            {agentOptionsIssue ? (
+                                <OperatorNotice
+                                    issue={agentOptionsIssue}
+                                    actionLabel="Reload agents"
+                                    onAction={() => void refreshBootstrap()}
+                                    tone="warning"
+                                />
+                            ) : null}
+                            {modelsIssue ? (
+                                <OperatorNotice
+                                    issue={modelsIssue}
+                                    actionLabel="Reload models"
+                                    onAction={() => void refreshModels()}
+                                    tone="warning"
+                                />
+                            ) : null}
+                        </div>
+                    )}
+
                     <div className="mb-10">
                         <div className="flex items-center gap-4 mb-3">
                             <div className="relative">
