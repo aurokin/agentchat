@@ -14,11 +14,11 @@ This document records the manual, integration, and end-to-end testing strategy f
 Agentchat uses a dedicated local test workspace outside the repo:
 
 - `/home/auro/agents/agentchat_test`
-  - primary deterministic read-mostly test agent
+    - primary deterministic read-mostly test agent
 - `/home/auro/agents/agentchat_test/smoke`
-  - ultra-cheap greeting smoke agent
+    - ultra-cheap greeting smoke agent
 - `/home/auro/agents/agentchat_test/workspace`
-  - constrained edit agent for interruption, resume, and mutation tests
+    - constrained edit agent for interruption, resume, and mutation tests
 
 These fixtures should stay small, stable, and cheap to run.
 
@@ -41,7 +41,7 @@ Examples:
 
 - run `bun run --cwd packages/convex codegen`
 - run `bun run doctor:server`
-  - confirm it reports live Codex model access for each enabled provider
+    - confirm it reports live Codex model access for each enabled provider
 - sign in
 - select the smoke agent
 - send a greeting
@@ -100,6 +100,33 @@ Coverage targets:
 
 These tests should be manually invoked from scripts or package test commands when needed.
 
+### 4a. Live Runtime Smoke
+
+Purpose:
+
+- validate the real local `apps/server` plus Convex plus Codex path with seeded data
+
+Invocation:
+
+- `bun run test:manual:live-runtime-smoke`
+- `bun run test:manual:live-runtime-interrupt`
+
+Coverage targets:
+
+- seed a real Convex user, conversation, user message, and assistant draft
+- mint a backend session token
+- connect to the local websocket transport
+- send a live Codex turn
+- persist completed and interrupted run state back into Convex
+- verify assistant message and run status after the socket flow completes
+
+Notes:
+
+- these commands require `apps/server` to be running locally
+- they prefer the real Convex-issued backend token path
+- if the deployment does not yet have `BACKEND_TOKEN_SECRET`, they can fall back to a locally signed token only when the same secret is available to `apps/server`
+- treat that fallback as temporary operator convenience, not full auth-path coverage
+
 ### 5. Browser End-To-End Tests
 
 Purpose:
@@ -130,6 +157,8 @@ Use [manual-qa-checklist.md](./manual-qa-checklist.md) for the explicit Codex co
 Current manual confidence command:
 
 - `bun run test:manual:codex-confidence`
+- `bun run test:manual:live-runtime-smoke`
+- `bun run test:manual:live-runtime-interrupt`
 
 This runs live Convex codegen, the server doctor, and the targeted server and web confidence suites without turning them into always-on checks.
 It also runs the targeted mobile confidence suite for agent selection, provider/model/variant state, and runtime recovery helpers.

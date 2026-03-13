@@ -17,6 +17,17 @@ This guide assumes:
 - Convex is configured for auth and conversation persistence
 - `apps/server` runs locally on the same machine that has access to the agent workspaces
 
+Required shared secrets:
+
+- `BACKEND_TOKEN_SECRET`
+    - must exist in both Convex and `apps/server`
+    - used to mint and verify short-lived backend websocket session tokens
+- `RUNTIME_INGRESS_SECRET`
+    - must exist in both Convex and `apps/server`
+    - used by `apps/server` to persist runs and runtime bindings through Convex HTTP ingress
+
+If `BACKEND_TOKEN_SECRET` is still missing from the Convex deployment, the manual live smoke script can fall back to a locally signed token when `apps/server` has the secret. That is useful for development, but it should be treated as a temporary setup gap rather than the desired end state.
+
 ## 1. Pick Your Agent Workspaces
 
 An Agentchat agent is an operator-approved workspace on disk.
@@ -130,6 +141,13 @@ Then use:
 - [manual-qa-checklist.md](./manual-qa-checklist.md)
 
 for the real interactive smoke, functional, interruption, reconnect, and restart checks.
+
+For direct local runtime verification with a running `apps/server`, also use:
+
+```bash
+bun run test:manual:live-runtime-smoke
+bun run test:manual:live-runtime-interrupt
+```
 
 ## 7. Common Failure Modes
 

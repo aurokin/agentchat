@@ -9,6 +9,13 @@ bun run setup:test-agent-config
 bun run test:manual:codex-confidence
 ```
 
+For live runtime persistence validation with a running local server, also run:
+
+```bash
+bun run test:manual:live-runtime-smoke
+bun run test:manual:live-runtime-interrupt
+```
+
 ## Fixtures
 
 - smoke: `/home/auro/agents/agentchat_test/smoke`
@@ -23,6 +30,13 @@ bun run test:manual:codex-confidence
 - the web app is running
 - the selected Google account is allowlisted
 - `bun run doctor:server` reports the configured Codex provider and target agents as ready, and shows live Codex model access for each enabled provider
+
+For the fullest backend-auth coverage:
+
+- `BACKEND_TOKEN_SECRET` is configured in the Convex deployment
+- the same `BACKEND_TOKEN_SECRET` is configured for `apps/server`
+
+If the Convex deployment is still missing `BACKEND_TOKEN_SECRET`, the live runtime smoke command can fall back to a locally signed token. That still validates websocket runtime behavior and Convex persistence, but it does not validate the Convex-issued backend token path.
 
 ## 1. Smoke
 

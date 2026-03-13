@@ -35,6 +35,31 @@ export const getById = internalQuery({
     },
 });
 
+export const getByEmailInternal = internalQuery({
+    args: { email: v.string() },
+    handler: async (ctx, args) => {
+        const rawEmail = args.email.trim();
+        if (!rawEmail) {
+            throw new Error("Email is required");
+        }
+
+        const candidates = Array.from(
+            new Set([rawEmail, rawEmail.toLowerCase()]),
+        );
+        for (const email of candidates) {
+            const user = await ctx.db
+                .query("users")
+                .withIndex("email", (q) => q.eq("email", email))
+                .unique();
+            if (user) {
+                return user;
+            }
+        }
+
+        return null;
+    },
+});
+
 export const getCurrentUserId = query({
     args: {},
     handler: async (ctx) => {

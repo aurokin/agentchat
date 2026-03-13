@@ -44,17 +44,17 @@ Agentchat is designed to keep you in control of users, agents, and runtime infra
 
 ## Tech Stack
 
-| Category  | Technology                                        |
-| --------- | ------------------------------------------------- |
-| Runtime   | Bun 1.x                                           |
-| Framework | Next.js 16 (App Router)                           |
-| Language  | TypeScript 5.x                                    |
-| UI        | Tailwind CSS 4                                    |
-| State     | React Context + Hooks                             |
-| Storage   | Convex workspace storage                          |
-| API       | Agentchat backend server + provider runtimes      |
-| Linting   | ESLint                                            |
-| Testing   | Bun Test                                          |
+| Category  | Technology                                   |
+| --------- | -------------------------------------------- |
+| Runtime   | Bun 1.x                                      |
+| Framework | Next.js 16 (App Router)                      |
+| Language  | TypeScript 5.x                               |
+| UI        | Tailwind CSS 4                               |
+| State     | React Context + Hooks                        |
+| Storage   | Convex workspace storage                     |
+| API       | Agentchat backend server + provider runtimes |
+| Linting   | ESLint                                       |
+| Testing   | Bun Test                                     |
 
 ## Using the App
 
@@ -146,7 +146,7 @@ These are Convex-managed environment variables. Set them in the Convex dashboard
 - `RUNTIME_INGRESS_SECRET` - Shared secret used by `apps/server` to persist run/runtime state into Convex HTTP ingress.
 - `JWKS` - JSON Web Key Set used by Convex auth.
 - `JWT_PRIVATE_KEY` - Private key used by Convex auth for JWT signing.
-Convex also provides some runtime variables that you can read but do not set:
+  Convex also provides some runtime variables that you can read but do not set:
 
 - `CONVEX_SITE_URL` - Convex-provided base URL for the workspace "site" (used by Convex Auth in `packages/convex/convex/auth.config.ts`).
 
@@ -215,6 +215,12 @@ bun run setup:test-agent-config
 
 # Run live Convex codegen plus the targeted Codex confidence suites
 bun run test:manual:codex-confidence
+
+# Drive a real local websocket turn through Codex + Convex persistence
+bun run test:manual:live-runtime-smoke
+
+# Verify interrupted runs retain partial output and persist interruption state
+bun run test:manual:live-runtime-interrupt
 ```
 
 ## Architecture Notes

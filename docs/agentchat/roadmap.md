@@ -27,11 +27,14 @@ This roadmap describes the current implementation state and the next major steps
 ### 1. Testing And Validation
 
 - Standardize on the dedicated local test fixtures in `/home/auro/agents/agentchat_test`
-  - `/home/auro/agents/agentchat_test/smoke` for ultra-cheap liveness checks
-  - `/home/auro/agents/agentchat_test` for deterministic read-only functional checks
-  - `/home/auro/agents/agentchat_test/workspace` for edit, interruption, and resume checks
+    - `/home/auro/agents/agentchat_test/smoke` for ultra-cheap liveness checks
+    - `/home/auro/agents/agentchat_test` for deterministic read-only functional checks
+    - `/home/auro/agents/agentchat_test/workspace` for edit, interruption, and resume checks
 - Add integration coverage across `apps/server`, Convex ingress, and websocket runtime flow
 - Keep generated Convex bindings in sync with the live deployment before manual confidence passes
+- Run `bun run test:manual:live-runtime-smoke` against a real local `apps/server` instance to verify the full Codex plus Convex persistence path
+- Run `bun run test:manual:live-runtime-interrupt` to verify partial-output retention and interrupted run persistence
+- Prefer Convex-issued backend session tokens for these live passes; allow the local signing fallback only while the deployment is still missing `BACKEND_TOKEN_SECRET`
 - Add browser-level end-to-end coverage for agent selection, chat send, interruption, refresh, and recovery
 - Build a manual QA checklist for real Codex-backed instances
 - Keep these tests manually invoked, not automatic on push
