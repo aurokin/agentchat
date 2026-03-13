@@ -1,10 +1,9 @@
 import type { StorageAdapter } from "../sync";
-import type { ChatSession, Message, Attachment } from "../types";
+import type { ChatSession, Message } from "../types";
 
 export type MemoryAdapterSeed = {
     chats?: ChatSession[];
     messages?: Message[];
-    attachments?: Attachment[];
 };
 
 const findIndexById = <T extends { id: string }>(items: T[], id: string) =>
@@ -15,7 +14,6 @@ export function createMemoryAdapter(
 ): StorageAdapter {
     const chats = [...(seed.chats ?? [])];
     const messages = [...(seed.messages ?? [])];
-    const attachments = [...(seed.attachments ?? [])];
 
     return {
         async createChat(chat) {
@@ -66,52 +64,6 @@ export function createMemoryAdapter(
             if (index >= 0) {
                 messages.splice(index, 1);
             }
-        },
-
-        async saveAttachment(attachment) {
-            attachments.push(attachment);
-            return attachment.id;
-        },
-        async saveAttachments(newAttachments) {
-            attachments.push(...newAttachments);
-            return newAttachments.map((attachment) => attachment.id);
-        },
-        async getAttachment(id) {
-            return attachments.find((attachment) => attachment.id === id);
-        },
-        async getAttachmentsByMessage(messageId) {
-            return attachments.filter(
-                (attachment) => attachment.messageId === messageId,
-            );
-        },
-        async deleteAttachment(id) {
-            const index = findIndexById(attachments, id);
-            if (index >= 0) {
-                attachments.splice(index, 1);
-            }
-        },
-        async deleteAttachmentsByMessage(messageId) {
-            for (let i = attachments.length - 1; i >= 0; i -= 1) {
-                if (attachments[i].messageId === messageId) {
-                    attachments.splice(i, 1);
-                }
-            }
-        },
-
-        async getImageStorageUsage() {
-            return attachments
-                .filter((attachment) => !attachment.purgedAt)
-                .reduce((sum, attachment) => sum + attachment.size, 0);
-        },
-        async getStorageUsage() {
-            const bytes = attachments
-                .filter((attachment) => !attachment.purgedAt)
-                .reduce((sum, attachment) => sum + attachment.size, 0);
-            return {
-                bytes,
-                messageCount: messages.length,
-                sessionCount: chats.length,
-            };
         },
     };
 }

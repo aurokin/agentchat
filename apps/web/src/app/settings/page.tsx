@@ -297,10 +297,10 @@ function SettingsPageContent() {
                                         Current Scope
                                     </div>
                                     <p className="text-sm text-muted-foreground leading-relaxed">
-                                        User-facing attachment uploads and web
-                                        search controls are removed while the
-                                        app migrates toward provider-driven
-                                        agent conversations.
+                                        Legacy upload, search, and browser-side
+                                        storage migration flows are removed
+                                        while the app migrates toward
+                                        provider-driven agent conversations.
                                     </p>
                                 </div>
                             </div>

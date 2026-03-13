@@ -2,8 +2,6 @@ import type {
     Message as SharedMessage,
     ChatSession as SharedChatSession,
     UserSettings as SharedUserSettings,
-    Attachment as SharedAttachment,
-    PendingAttachment as SharedPendingAttachment,
     ThinkingLevel as SharedThinkingLevel,
 } from "@shared/core/types";
 
@@ -64,18 +62,6 @@ export interface ConversationRuntimeState {
     completedAt: number | null;
     lastEventAt: number | null;
 }
-
-export type ImageMimeType =
-    | "image/jpeg"
-    | "image/png"
-    | "image/gif"
-    | "image/webp";
-
-export interface Attachment extends SharedAttachment {
-    mimeType: string;
-}
-
-export interface PendingAttachment extends SharedPendingAttachment {}
 
 export enum SupportedParameter {
     Tools = "tools",

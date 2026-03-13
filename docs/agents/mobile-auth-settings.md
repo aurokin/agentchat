@@ -108,7 +108,7 @@ When Convex is unavailable:
 
 - The signed-in workspace should be treated as unavailable.
 - UI should explain that the backend workspace cannot currently be reached.
-- Do not describe this as a first-class local-only product mode.
+- Do not describe this as a first-class offline or browser-local product mode.
 
 ## Settings Page Patterns
 

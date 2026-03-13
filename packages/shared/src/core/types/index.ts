@@ -18,7 +18,6 @@ export interface Message {
     modelId?: string;
     variantId?: string | null;
     thinkingLevel?: ThinkingLevel;
-    attachmentIds?: string[];
     createdAt: number;
     updatedAt?: number;
     completedAt?: number | null;
@@ -41,28 +40,4 @@ export interface UserSettings {
     defaultThinking: ThinkingLevel;
     theme: "light" | "dark" | "system";
     favoriteModels: string[];
-}
-
-export interface Attachment {
-    id: string;
-    messageId: string;
-    type: "image";
-    mimeType: string;
-    data: string;
-    width: number;
-    height: number;
-    size: number;
-    createdAt: number;
-    purgedAt?: number;
-}
-
-export interface PendingAttachment {
-    id: string;
-    type: "image";
-    mimeType: string;
-    data: string;
-    width: number;
-    height: number;
-    size: number;
-    preview: string;
 }
