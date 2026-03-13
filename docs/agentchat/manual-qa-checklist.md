@@ -5,6 +5,7 @@ Use this checklist for deliberate Codex confidence passes. These checks are manu
 Before the interactive checklist, run:
 
 ```bash
+bun run setup:test-agent-config
 bun run test:manual:codex-confidence
 ```
 

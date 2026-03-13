@@ -101,6 +101,7 @@ Helpful references:
 
 - `docs/local_environment_setup_checklist.md` for local web, server, mobile, and Convex setup
 - `bun run doctor:server` for a manual readiness check against your current `apps/server/agentchat.config.json`
+- `bun run setup:test-agent-config` to generate a local server config for the dedicated `~/agents/agentchat_test` fixtures
 
 #### Environment variables
 
@@ -207,6 +208,9 @@ Use these commands when you want a deliberate Codex confidence pass rather than 
 ```bash
 # Validate configured agent/provider paths, defaults, and live Codex model access
 bun run doctor:server
+
+# Generate a local config for the dedicated Agentchat test fixtures
+bun run setup:test-agent-config
 
 # Run the targeted Codex confidence suites
 bun run test:manual:codex-confidence

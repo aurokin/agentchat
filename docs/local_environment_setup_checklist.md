@@ -78,6 +78,24 @@ bun run convex:env
     - `AGENTCHAT_CONVEX_SITE_URL=https://<your-deployment>.convex.site`
     - `RUNTIME_INGRESS_SECRET=<same value you set in Convex>`
 
+Optional shortcut for the dedicated local test fixtures:
+
+```bash
+bun run setup:test-agent-config
+```
+
+This writes `apps/server/agentchat.config.json` pointing at:
+
+- `~/agents/agentchat_test/smoke`
+- `~/agents/agentchat_test`
+- `~/agents/agentchat_test/workspace`
+
+Re-run with `--force` only if you want to replace an existing local config:
+
+```bash
+bun run setup:test-agent-config -- --force
+```
+
 2H) Start local development (Convex + backend server + web):
 
 ```bash

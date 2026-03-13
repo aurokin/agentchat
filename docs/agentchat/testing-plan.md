@@ -22,6 +22,8 @@ Agentchat uses a dedicated local test workspace outside the repo:
 
 These fixtures should stay small, stable, and cheap to run.
 
+For local setup convenience, `bun run setup:test-agent-config` writes a gitignored `apps/server/agentchat.config.json` that points at these fixtures.
+
 ## Test Layers
 
 ### 1. Manual Smoke Checks
