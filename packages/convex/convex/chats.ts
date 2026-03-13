@@ -103,7 +103,7 @@ export const get = query({
     },
 });
 
-// Get chat by local ID (for migration)
+// Get chat by the client-visible conversation id.
 export const getByLocalId = query({
     args: {
         userId: v.id("users"),

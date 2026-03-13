@@ -18,7 +18,6 @@ export default defineSchema({
         phone: v.optional(v.string()),
         phoneVerificationTime: v.optional(v.number()),
         isAnonymous: v.optional(v.boolean()),
-        initialSync: v.optional(v.boolean()),
         // Workspace usage counters (anti-abuse + cheap usage queries)
         workspaceChatCount: v.optional(v.number()),
         workspaceMessageCount: v.optional(v.number()),

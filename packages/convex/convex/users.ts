@@ -79,7 +79,6 @@ export const create = internalMutation({
         const now = Date.now();
         return await ctx.db.insert("users", {
             email: args.email ?? undefined,
-            initialSync: false,
             workspaceChatCount: 0,
             workspaceMessageCount: 0,
             createdAt: now,
@@ -217,22 +216,5 @@ export const rebuildUsageCountersForEmail = internalMutation({
         }
 
         return await rebuildUsageCounters(ctx as any, user._id);
-    },
-});
-
-export const setInitialSync = mutation({
-    args: {
-        initialSync: v.boolean(),
-    },
-    handler: async (ctx, args) => {
-        const userId = await getAuthUserId(ctx);
-        if (!userId) {
-            throw new Error("Not authenticated");
-        }
-
-        await ctx.db.patch(userId, {
-            initialSync: args.initialSync,
-            updatedAt: Date.now(),
-        });
     },
 });

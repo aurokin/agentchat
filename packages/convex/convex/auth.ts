@@ -36,23 +36,6 @@ const getProfileUpdates = (
     return updates;
 };
 
-const getInitialSync = async (
-    ctx: { db: any },
-    userId: string,
-    existingInitialSync: boolean | undefined,
-) => {
-    if (existingInitialSync !== undefined) {
-        return existingInitialSync;
-    }
-
-    const chat = await ctx.db
-        .query("chats")
-        .filter((q: any) => q.eq(q.field("userId"), userId))
-        .first();
-
-    return Boolean(chat);
-};
-
 const getSiteUrl = () => {
     const siteUrl = process.env.SITE_URL;
     if (!siteUrl) {
@@ -112,17 +95,10 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
             if (args.existingUserId) {
                 const existing = await ctx.db.get(args.existingUserId);
                 if (existing) {
-                    const initialSync = await getInitialSync(
-                        ctx,
-                        args.existingUserId,
-                        existing.initialSync,
-                    );
-
                     await ctx.db.patch(args.existingUserId, {
                         ...profileUpdates,
                         createdAt: existing.createdAt ?? now,
                         updatedAt: now,
-                        initialSync,
                     });
 
                     return args.existingUserId;
@@ -135,7 +111,6 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
                 workspaceMessageCount: 0,
                 createdAt: now,
                 updatedAt: now,
-                initialSync: false,
             });
 
             return userId;

@@ -77,7 +77,7 @@ export const get = query({
     },
 });
 
-// Get message by local ID (for migration)
+// Get message by the client-visible message id.
 export const getByLocalId = query({
     args: {
         userId: v.id("users"),
