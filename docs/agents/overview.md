@@ -19,7 +19,7 @@ The canonical rewrite docs live in `docs/agentchat/`.
 - `apps/server`: instance-local backend server for agent/provider runtime orchestration
 - `apps/mobile`: Expo app (React Native), uses Expo Router
 - `packages/convex`: Convex backend (schema, auth, sync, encryption)
-- `src/lib/sync`: Convex-backed sync helpers and workspace availability state
+- `src/lib/sync`: Convex-backed workspace helpers and availability state
 - `src/lib/storage.ts`: Browser UI preference storage for the web shell
 
 ## Documentation Expectations

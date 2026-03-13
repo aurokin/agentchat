@@ -3,7 +3,7 @@ import { Outfit, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import "highlight.js/styles/github-dark.css";
 import { SafeConvexProvider } from "@/contexts/ConvexProvider";
-import { SyncProvider } from "@/contexts/SyncContext";
+import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
 import { AgentProvider } from "@/contexts/AgentContext";
 import { SettingsProvider } from "@/contexts/SettingsContext";
 import { ChatProvider } from "@/contexts/ChatContext";
@@ -43,13 +43,13 @@ export default function RootLayout({
                 className={`antialiased ${outfit.variable} ${ibmPlexMono.variable}`}
             >
                 <SafeConvexProvider>
-                    <SyncProvider>
+                    <WorkspaceProvider>
                         <AgentProvider>
                             <SettingsProvider>
                                 <ChatProvider>{children}</ChatProvider>
                             </SettingsProvider>
                         </AgentProvider>
-                    </SyncProvider>
+                    </WorkspaceProvider>
                 </SafeConvexProvider>
             </body>
         </html>

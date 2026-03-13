@@ -25,7 +25,10 @@ import {
     mapConvexMessageToMessage,
     mergeByIdWithPending,
 } from "@shared/core/sync";
-import { usePersistenceAdapter, useSync } from "@/contexts/SyncContext";
+import {
+    usePersistenceAdapter,
+    useWorkspace,
+} from "@/contexts/WorkspaceContext";
 import { useAgent } from "@/contexts/AgentContext";
 import { getDefaultModelForAgent } from "@/contexts/agent-helpers";
 import {
@@ -82,7 +85,7 @@ const convexApi = api as typeof api & {
 
 export function ChatProvider({ children }: { children: React.ReactNode }) {
     const persistenceAdapter = usePersistenceAdapter();
-    const { isWorkspaceReady, isConvexAvailable } = useSync();
+    const { isWorkspaceReady, isConvexAvailable } = useWorkspace();
     const { selectedAgentId, selectedAgent, loadingAgents } = useAgent();
     const [chats, setChats] = useState<ChatSession[]>([]);
     const [currentChat, setCurrentChat] = useState<ChatSession | null>(null);

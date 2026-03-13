@@ -8,7 +8,7 @@ import { ChatProvider } from "@/contexts/ChatContext";
 import { AuthProvider } from "@/lib/convex/AuthContext";
 import { ConvexProvider } from "@/lib/convex";
 import { ModelProvider } from "@/contexts/ModelContext";
-import { SyncProvider } from "@/contexts/SyncContext";
+import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
 import { AgentchatSocketProvider } from "@/contexts/AgentchatSocketContext";
 import { ShareIntentBridge } from "@/components/share/ShareIntentBridge";
 import { AgentProvider } from "@/contexts/AgentContext";
@@ -58,7 +58,7 @@ export default function Layout(): ReactElement {
                         <AgentchatSocketProvider>
                             <AgentProvider>
                                 <ModelProvider>
-                                    <SyncProvider>
+                                    <WorkspaceProvider>
                                         <AppProvider>
                                             <ChatProvider>
                                                 <ShareIntentBridge />
@@ -71,7 +71,7 @@ export default function Layout(): ReactElement {
                                                 </OnboardingWrapper>
                                             </ChatProvider>
                                         </AppProvider>
-                                    </SyncProvider>
+                                    </WorkspaceProvider>
                                 </ModelProvider>
                             </AgentProvider>
                         </AgentchatSocketProvider>

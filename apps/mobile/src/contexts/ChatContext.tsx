@@ -11,7 +11,10 @@ import React, {
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { FunctionReference } from "convex/server";
-import { usePersistenceAdapter, useSync } from "@/contexts/SyncContext";
+import {
+    usePersistenceAdapter,
+    useWorkspace,
+} from "@/contexts/WorkspaceContext";
 import type { ChatSession, Message } from "@shared/core/types";
 import type { ChatRunSummary, ConversationRuntimeState } from "@/lib/types";
 import {
@@ -108,7 +111,7 @@ export function ChatProvider({
         APP_DEFAULT_MODEL;
 
     const adapter = usePersistenceAdapter();
-    const { isWorkspaceReady, isConvexAvailable } = useSync();
+    const { isWorkspaceReady, isConvexAvailable } = useWorkspace();
     const pendingChatIdsRef = React.useRef<Set<string>>(new Set());
     const pendingMessageIdsRef = React.useRef<Set<string>>(new Set());
     const currentChatIdRef = useRef<string | null>(null);

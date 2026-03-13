@@ -13,7 +13,7 @@ import { formatDistanceToNow } from "date-fns";
 import { Hexagon, Plus, Settings, Trash2 } from "lucide-react";
 import { useChat } from "@/contexts/ChatContext";
 import { useAgent } from "@/contexts/AgentContext";
-import { usePersistenceAdapter } from "@/contexts/SyncContext";
+import { usePersistenceAdapter } from "@/contexts/WorkspaceContext";
 import { cn } from "@/lib/utils";
 
 import { ChatListSkeleton } from "./ChatListSkeleton";
