@@ -39,6 +39,7 @@ Primary fixture:
 
 Examples:
 
+- run `bun run --cwd packages/convex codegen`
 - run `bun run doctor:server`
   - confirm it reports live Codex model access for each enabled provider
 - sign in
@@ -92,6 +93,7 @@ Coverage targets:
 - backend auth token verification
 - websocket send/subscribe/interrupt protocol
 - runtime persistence ingress into Convex
+- generated Convex bindings validated against the live deployment
 - Codex thread start/resume fallback behavior
 - disabled provider / disabled agent handling
 - operator diagnostics for invalid paths and fallback defaults
@@ -129,7 +131,7 @@ Current manual confidence command:
 
 - `bun run test:manual:codex-confidence`
 
-This runs the server doctor plus the targeted server and web confidence suites without turning them into always-on checks.
+This runs live Convex codegen, the server doctor, and the targeted server and web confidence suites without turning them into always-on checks.
 It also runs the targeted mobile confidence suite for agent selection, provider/model/variant state, and runtime recovery helpers.
 
 ## Priority Order

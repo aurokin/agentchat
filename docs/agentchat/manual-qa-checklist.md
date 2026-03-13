@@ -18,6 +18,7 @@ bun run test:manual:codex-confidence
 ## Preconditions
 
 - Convex is configured and reachable
+- `bun run --cwd packages/convex codegen` succeeds against the selected deployment
 - `apps/server` is running
 - the web app is running
 - the selected Google account is allowlisted

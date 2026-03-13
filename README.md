@@ -212,7 +212,7 @@ bun run doctor:server
 # Generate a local config for the dedicated Agentchat test fixtures
 bun run setup:test-agent-config
 
-# Run the targeted Codex confidence suites
+# Run live Convex codegen plus the targeted Codex confidence suites
 bun run test:manual:codex-confidence
 ```
 

@@ -105,6 +105,7 @@ bun run dev:web
 2I) Validate the configured agents, provider runtime paths, and live Codex model access before a manual confidence pass:
 
 ```bash
+bun run --cwd packages/convex codegen
 bun run doctor:server
 ```
 
