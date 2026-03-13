@@ -2,7 +2,7 @@
 
 Goal: get Agentchat running locally for development.
 
-Agentchat runs against Convex. If you need the hosted preview environment, use `docs/preview_environment_setup_checklist.md`.
+Agentchat runs against Convex plus a local Agentchat backend server.
 
 ## 1) Local-Only (Fast Path)
 
@@ -22,11 +22,11 @@ cd apps/web && bun dev
 
 - `http://localhost:4040`
 
-1D) Sign in with an allowed Google account if the local deployment has auth enabled.
+1D) Sign in with an allowed Google account if the local workspace has auth enabled.
 
-## 2) Optional: Local Dev With Cloud Sync (Convex)
+## 2) Optional: Local Dev With Convex
 
-Only do this if you need to develop against a real Convex deployment. Otherwise, stick to Step 1.
+Only do this if you need to develop against a real Convex workspace. Otherwise, stick to Step 1.
 
 2A) Manual step: create or choose a Convex dev deployment for local development.
 
@@ -38,7 +38,7 @@ Notes:
 
 2B) Create a gitignored Convex runtime env file in the repo root:
 
-- Copy `./.env.convex.dev.local.example` to `./.env.convex.dev.local`
+- Copy `./.env.convex.local.example` to `./.env.convex.local`
 - Fill in:
     - `CONVEX_DEPLOYMENT=dev:<your-deployment>`
     - `AUTH_GOOGLE_ID=...` and `AUTH_GOOGLE_SECRET=...`
@@ -46,7 +46,7 @@ Notes:
     - `BACKEND_TOKEN_SECRET=...`
     - `RUNTIME_INGRESS_SECRET=...`
 
-2C) Generate Convex Auth secrets and paste them into `./.env.convex.dev.local`:
+2C) Generate Convex Auth secrets and paste them into `./.env.convex.local`:
 
 ```bash
 bun run convex:gen-secrets
@@ -55,7 +55,7 @@ bun run convex:gen-secrets
 2D) Apply the Convex runtime env vars to that dev deployment (safe to run repeatedly):
 
 ```bash
-bun run convex:env -- --env dev
+bun run convex:env
 ```
 
 2E) Configure the Convex CLI target for local `convex dev` + codegen:
@@ -64,7 +64,7 @@ bun run convex:env -- --env dev
 - Set:
     - `CONVEX_DEPLOYMENT=dev:<your-deployment>`
 
-2F) Configure the local web app runtime to point at your Convex deployment:
+2F) Configure the local web app runtime to point at your Convex workspace:
 
 - Copy `apps/web/.env.example` to `apps/web/.env.local`
 - Set:

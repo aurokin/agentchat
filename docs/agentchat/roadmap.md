@@ -108,7 +108,6 @@ Goals:
 
 Planned work:
 
-- Better deployment runbooks
 - Clear operator configuration docs
 - Better health and failure reporting
 - Rate limits and abuse controls where needed

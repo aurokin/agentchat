@@ -1,23 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-export type AppEnvName = "dev" | "preview" | "prod";
-
 export type DotEnv = Record<string, string | undefined>;
-
-export const parseEnvArg = (argv: string[]): AppEnvName => {
-    const idx = argv.indexOf("--env");
-    if (idx === -1 || !argv[idx + 1]) {
-        throw new Error("Missing required arg: --env dev|preview|prod");
-    }
-    const value = argv[idx + 1];
-    if (value !== "dev" && value !== "preview" && value !== "prod") {
-        throw new Error(
-            `Invalid --env: ${value} (expected dev|preview|prod)`,
-        );
-    }
-    return value;
-};
 
 export const repoRootPath = (...parts: string[]): string =>
     path.join(process.cwd(), ...parts);

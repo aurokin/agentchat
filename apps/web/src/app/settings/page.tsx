@@ -277,7 +277,7 @@ function SettingsPageContent() {
                                     </div>
                                     <p className="text-sm text-muted-foreground leading-relaxed">
                                         Agentchat is designed to run against
-                                        your own Convex deployment and your own
+                                        your own Convex workspace and your own
                                         operator-managed agent stack.
                                     </p>
                                 </div>

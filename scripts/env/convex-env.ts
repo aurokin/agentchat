@@ -1,22 +1,17 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import {
-    type AppEnvName,
     isMissingSecret,
     loadDotEnvIfExists,
     mergeEnv,
-    parseEnvArg,
     readArgValue,
     repoRootPath,
 } from "./lib";
 
-const toConvexDeploymentId = (
-    envName: AppEnvName,
-    value: string,
-): string => {
+const toConvexDeploymentId = (value: string): string => {
     const trimmed = value.trim();
     if (!trimmed) {
-        throw new Error("Convex deployment is empty");
+        throw new Error("Convex target is empty");
     }
 
     // If caller provided a fully-qualified value, keep it.
@@ -25,15 +20,7 @@ const toConvexDeploymentId = (
         return trimmed;
     }
 
-    // For dev/preview we default to a dev deployment.
-    if (envName === "dev" || envName === "preview") {
-        return `dev:${trimmed}`;
-    }
-
-    // For prod, require the caller to be explicit because Convex prefixes vary.
-    throw new Error(
-        `For --env prod, pass a full CONVEX_DEPLOYMENT value (example: dev:${trimmed} or prod:${trimmed}) via --deployment`,
-    );
+    return `dev:${trimmed}`;
 };
 
 const runConvexEnvSet = (args: {
@@ -43,9 +30,8 @@ const runConvexEnvSet = (args: {
 }): void => {
     // Use stdin so secrets don't end up in shell history or process args.
     const targetDeployment = args.convexDeployment;
-    const forceProd = process.argv.includes("--prod");
     const cliArgs: string[] = ["convex", "env", "set"];
-    if (forceProd || targetDeployment.startsWith("prod:")) {
+    if (targetDeployment.startsWith("prod:")) {
         cliArgs.push("--prod");
     } else if (targetDeployment.startsWith("dev:")) {
         cliArgs.push(
@@ -80,24 +66,20 @@ const runConvexEnvSet = (args: {
 };
 
 const main = (): void => {
-    const envName = parseEnvArg(process.argv);
-
     const allowProcessEnv = process.argv.includes("--allow-process-env");
-    const absSecretsFile = repoRootPath(`.env.convex.${envName}.local`);
+    const absSecretsFile = repoRootPath(".env.convex.local");
     const secretsFileEnv = loadDotEnvIfExists(absSecretsFile);
 
     if (!allowProcessEnv && !fs.existsSync(absSecretsFile)) {
         throw new Error(
-            `Missing ${absSecretsFile}. Create it and re-run (see docs/convex_dashboard_setup.md).`,
+            `Missing ${absSecretsFile}. Create it and re-run (see docs/local_environment_setup_checklist.md).`,
         );
     }
 
     const env = allowProcessEnv ? mergeEnv(process.env, secretsFileEnv) : secretsFileEnv;
 
     if (!env.SITE_URL?.trim()) {
-        if (envName === "dev") {
-            env.SITE_URL = "http://localhost:4040";
-        }
+        env.SITE_URL = "http://localhost:4040";
     }
 
     const deploymentArg = readArgValue(process.argv, "--deployment");
@@ -109,20 +91,20 @@ const main = (): void => {
     if (!deploymentInput) {
         throw new Error(
             [
-                "Missing Convex deployment.",
-                "Pass --deployment <CONVEX_DEPLOYMENT> (recommended) or set CONVEX_DEPLOYMENT=... in .env.convex.<env>.local.",
-                `Example: bun run convex:env -- --env ${envName} --deployment dev:blessed-cuttlefish-350`,
+                "Missing Convex target.",
+                "Pass --deployment <CONVEX_DEPLOYMENT> (recommended) or set CONVEX_DEPLOYMENT=... in .env.convex.local.",
+                "Example: bun run convex:env -- --deployment dev:blessed-cuttlefish-350",
             ].join("\n"),
         );
     }
 
-    const convexDeployment = toConvexDeploymentId(envName, deploymentInput);
+    const convexDeployment = toConvexDeploymentId(deploymentInput);
 
     const hasGoogleId = Boolean(env.AUTH_GOOGLE_ID?.trim());
     const hasGoogleSecret = Boolean(env.AUTH_GOOGLE_SECRET?.trim());
     if (hasGoogleId !== hasGoogleSecret) {
         throw new Error(
-            `AUTH_GOOGLE_ID and AUTH_GOOGLE_SECRET must both be set (or both omitted) in .env.convex.${envName}.local.`,
+            "AUTH_GOOGLE_ID and AUTH_GOOGLE_SECRET must both be set (or both omitted) in .env.convex.local.",
         );
     }
 
@@ -149,7 +131,7 @@ const main = (): void => {
     }
 
     console.log(
-        `Setting Convex env vars from ${absSecretsFile} on "${convexDeployment}" (${envName})...`,
+        `Setting Convex env vars from ${absSecretsFile} on "${convexDeployment}"...`,
     );
 
     for (const [name, value] of entriesToSet) {

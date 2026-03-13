@@ -200,7 +200,7 @@ The implementation should support:
 
 ## Logging
 
-Each run should log enough information to debug production issues:
+Each run should log enough information to debug runtime issues:
 
 - conversation id
 - user subject or email

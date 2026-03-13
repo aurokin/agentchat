@@ -22,7 +22,6 @@
     "scripts": {
         "dev": "bunx convex dev",
         "codegen": "bunx convex codegen",
-        "deploy": "bunx convex deploy",
         "format": "prettier --write \"convex/**/*.{js,jsx,ts,tsx,json,css,md}\" \"*.{js,jsx,ts,tsx,json,css,md}\"",
         "format:check": "prettier --check \"convex/**/*.{js,jsx,ts,tsx,json,css,md}\" \"*.{js,jsx,ts,tsx,json,css,md}\"",
         "typecheck": "tsc --noEmit",

@@ -5,7 +5,7 @@
 - Uses Expo Router with file-based routing in the `app/` directory.
 - Entry point: `index.tsx` imports `expo-router/entry`.
 - TypeScript config extends `expo/tsconfig.base`.
-- EAS config for dev builds is in `eas.json`.
+- Local EAS dev-client config is in `eas.json`.
 - Bundle ID: `com.agentchat.app` (configured in `app.json`).
 - Monorepo paths: use `@shared/*` for `packages/shared/src/*` and ensure `metro.config.js` includes `watchFolders` pointing to the workspace root.
 
@@ -141,7 +141,7 @@ await setTheme("dark");
 ```typescript
 <View style={styles.storageContainer}>
     <Text style={styles.storageInfoText}>
-        Chat history, settings, and runtime state live in Convex for this deployment.
+        Chat history, settings, and runtime state live in Convex for this instance.
     </Text>
 </View>
 ```

@@ -30,7 +30,7 @@ export const issue = action({
         const secret = process.env.BACKEND_TOKEN_SECRET?.trim();
         if (!secret) {
             throw new Error(
-                "BACKEND_TOKEN_SECRET is not configured for this deployment.",
+                "BACKEND_TOKEN_SECRET is not configured for this instance.",
             );
         }
 

@@ -194,7 +194,7 @@ Payload:
 Notes:
 
 - useful for operator debugging
-- may be disabled in production UI but still useful in the protocol
+- may be hidden in the default UI but still useful in the protocol
 
 ## WebSocket Event Envelope
 

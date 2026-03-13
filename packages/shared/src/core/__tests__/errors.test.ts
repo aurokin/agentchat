@@ -13,7 +13,7 @@ describe("errors", () => {
             "Invalid request. Please check your input.",
         );
         expect(getUserMessage(401)).toBe(
-            "This deployment's provider credential is invalid.",
+            "This instance's provider credential is invalid.",
         );
         expect(getUserMessage(429)).toBe(
             "Too many requests. Please wait before trying again.",

@@ -16,13 +16,13 @@ describe("getUserMessage", () => {
 
     test("returns_invalid_provider_credential_for_401", () => {
         expect(getUserMessage(401)).toBe(
-            "This deployment's provider credential is invalid.",
+            "This instance's provider credential is invalid.",
         );
     });
 
     test("returns_instance_credit_error_for_402", () => {
         expect(getUserMessage(402)).toBe(
-            "This deployment does not have enough provider quota.",
+            "This instance does not have enough provider quota.",
         );
     });
 
@@ -125,7 +125,7 @@ describe("parseProviderError", () => {
         expect(error.code).toBe(401);
         expect(error.message).toBe("Invalid API key");
         expect(error.userMessage).toBe(
-            "This deployment's provider credential is invalid.",
+            "This instance's provider credential is invalid.",
         );
         expect(error.isRetryable).toBe(false);
     });
@@ -143,7 +143,7 @@ describe("parseProviderError", () => {
 
         expect(error.code).toBe(402);
         expect(error.userMessage).toBe(
-            "This deployment does not have enough provider quota.",
+            "This instance does not have enough provider quota.",
         );
         expect(error.isRetryable).toBe(false);
     });

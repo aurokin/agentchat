@@ -74,7 +74,7 @@ export default function ChatPage() {
                     <p className="mt-3 text-sm text-muted-foreground">
                         Agentchat runs against your Convex workspace only. Sign
                         in to access chats and the agents exposed by this
-                        deployment.
+                        instance.
                     </p>
                     <button
                         type="button"

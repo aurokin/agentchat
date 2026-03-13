@@ -347,7 +347,7 @@ export default function SettingsScreen(): ReactElement {
                                         <AgentSwitcher />
                                         <Text style={styles.storageInfoText}>
                                             {agentSummary.agentDescription ??
-                                                "This deployment exposes agents from the server configuration."}
+                                                "This instance exposes agents from the server configuration."}
                                         </Text>
                                     </View>
                                 </View>
@@ -358,8 +358,8 @@ export default function SettingsScreen(): ReactElement {
                                     </Text>
                                     <Text style={styles.sectionDescription}>
                                         Provider, model, and variant options are
-                                        managed by the deployment and narrowed
-                                        by the selected agent.
+                                        managed by the instance and narrowed by
+                                        the selected agent.
                                     </Text>
                                     <View style={styles.storageContainer}>
                                         <View style={styles.summaryRow}>
@@ -526,8 +526,8 @@ export default function SettingsScreen(): ReactElement {
                                     <View style={styles.storageContainer}>
                                         <Text style={styles.storageInfoText}>
                                             {isAuthenticated
-                                                ? "Chat history, settings, and runtime state are stored in Convex for this deployment."
-                                                : "Sign in to access this deployment's Convex-backed workspace."}
+                                                ? "Chat history, settings, and runtime state are stored in Convex for this instance."
+                                                : "Sign in to access this instance's Convex-backed workspace."}
                                         </Text>
                                     </View>
                                 </View>

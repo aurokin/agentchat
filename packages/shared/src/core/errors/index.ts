@@ -19,9 +19,9 @@ export function getUserMessage(
         case 400:
             return "Invalid request. Please check your input.";
         case 401:
-            return "This deployment's provider credential is invalid.";
+            return "This instance's provider credential is invalid.";
         case 402:
-            return "This deployment does not have enough provider quota.";
+            return "This instance does not have enough provider quota.";
         case 403:
             const reasons = metadata?.reasons as string[] | undefined;
             if (reasons && reasons.length > 0) {
