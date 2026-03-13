@@ -1,116 +1,47 @@
 # Agentchat Roadmap
 
-This roadmap describes the rewrite from the current app into the new Agentchat architecture.
+This roadmap describes the current implementation state and the next major steps for Agentchat.
 
-## Phase 0: Direction And Guardrails
+## Completed Foundations
 
-Goals:
+- Product direction, rules, and implementation specs under `docs/agentchat/`
+- Agent-centric UX in both web and mobile
+- Server-config-driven providers and agents
+- Convex-backed conversations, messages, runs, run events, and runtime bindings
+- Backend token auth, websocket transport, streaming, interruption, and recovery
+- Codex as the first working provider
+- Removal of billing, analytics, attachments, browser-local product modes, and hosted deployment assumptions
 
-- Record the product rules
-- Record the architecture direction
-- Establish the rewrite as the canonical project direction
+## Active Work
 
-Deliverables:
+- Tighten end-to-end reliability across web, server, Convex, and Codex
+- Close the remaining mobile parity gaps
+- Replace placeholder provider model metadata with live provider-backed fetching and cache behavior
+- Improve operator-facing diagnostics and health reporting
 
-- Documentation under `docs/agentchat/`
-- Links from top-level docs so humans and agents can find the new direction quickly
+## Next Milestones
 
-## Phase 1: Product Simplification
+### 1. Testing And Validation
 
-Goals:
+- Add integration coverage across `apps/server`, Convex ingress, and websocket runtime flow
+- Add browser-level end-to-end coverage for agent selection, chat send, interruption, refresh, and recovery
+- Build a manual QA checklist for real Codex-backed instances
 
-- Remove hosted-product assumptions that do not fit the self-hosted direction
-- Keep the UI and data model focused on agent-centric conversations
+### 2. Operator Hardening
 
-Planned work:
+- Better error reporting for disabled agents, disabled providers, and bad server config
+- Clear operator docs for custom agent setup
+- Stronger runtime and recovery observability
 
-- Remove remaining provider-specific user-facing flows
-- Remove web search toggles
-- Reduce settings to provider, model, and variant where needed
+### 3. Mobile Parity
 
-## Phase 2: Server Config And Convex Model
+- Continue aligning mobile UX and runtime behavior with web
+- Reduce remaining mobile-specific assumptions and polish the agent-centric flow
 
-Goals:
+### 4. Provider Expansion
 
-- Define the top-level server config file
-- Define the Convex schema for the new runtime model
-
-Planned work:
-
-- Provider config schema
-- Agent config schema
-- Auth and allowlist config
-- Convex tables for conversations, messages, runs, run events, runtime bindings, and user defaults
-
-## Phase 3: Backend Server Foundation
-
-Goals:
-
-- Introduce the instance-local TypeScript backend
-- Add backend auth based on short-lived tokens from Convex identity
-
-Planned work:
-
-- Backend project setup
-- WebSocket transport
-- Backend token mint and validation flow
-- Provider interface definition
-
-## Phase 4: Codex Provider Adapter
-
-Goals:
-
-- Implement the first provider through the generic provider layer
-- Support runtime creation, resume, streaming, and interruption
-
-Planned work:
-
-- Codex adapter
-- Runtime binding recovery
-- Run interruption
-- Event normalization from Codex protocol to Agentchat events
-
-## Phase 5: Agent-Centric UX
-
-Goals:
-
-- Make agent selection the primary organizing concept in the app
-- Bind conversation views to the selected agent
-
-Planned work:
-
-- Agent switcher near the user profile area
-- Agent-filtered conversation lists
-- Empty conversation creation per selected agent
-- Provider, model, and variant selection before first message
-- Lock provider, model, and variant after first message
-
-## Phase 6: Persistence And Reliability
-
-Goals:
-
-- Persist enough runtime data for recovery
-- Make reconnect and restart behavior predictable
-
-Planned work:
-
-- Runs and run events in Convex
-- Runtime bindings in Convex
-- Backend recovery from persisted runtime metadata
-- Error handling for disabled providers or changed agent config
-
-## Phase 7: Hardening For Public Self-Hosted Use
-
-Goals:
-
-- Make instance operation understandable and stable
-- Prepare for broader external use
-
-Planned work:
-
-- Clear operator configuration docs
-- Better health and failure reporting
-- Rate limits and abuse controls where needed
+- Keep the provider interface stable enough for additional implementations
+- Add the next providers without changing the product model
 
 ## Later, Not V1
 
@@ -128,3 +59,4 @@ Planned work:
 - Conversations persist in Convex and reconnect cleanly
 - The backend owns provider runtime communication
 - Codex works through a provider abstraction rather than a special-case architecture
+- Web and mobile both feel like first-class clients of the same runtime model

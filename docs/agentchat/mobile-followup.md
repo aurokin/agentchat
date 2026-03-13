@@ -22,7 +22,7 @@ This document tracks the remaining mobile work needed to match the current Agent
 
 - Continue refining the mobile chat flow around the new agent-centric model.
 - Replace any remaining provider-specific client assumptions with backend-driven provider capability and settings options.
-- Keep aligning mobile state helpers with the web runtime model as the rewrite settles.
+- Keep aligning mobile state helpers with the web runtime model as the architecture settles.
 
 ## Documentation Rule
 

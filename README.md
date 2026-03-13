@@ -98,8 +98,7 @@ cd apps/web && bun dev
 
 Helpful references:
 
-- `docs/local_environment_setup_checklist.md` for local web/server/Convex setup
-- `docs/mobile_dev_setup.md` for local mobile development
+- `docs/local_environment_setup_checklist.md` for local web, server, mobile, and Convex setup
 
 #### Environment variables
 

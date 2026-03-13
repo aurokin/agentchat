@@ -1,10 +1,10 @@
 # Mobile Features And UI Patterns
 
-This document should reflect the current Agentchat product direction, not the old hosted mobile feature set.
+This document should reflect the current Agentchat product direction, not older hosted or transitional mobile behavior.
 
 ## Current Direction
 
-- Mobile is temporarily behind web during the rewrite.
+- Mobile is still behind web in some polish and parity areas.
 - The target architecture matches web:
   - agent selection first
   - conversations scoped to the selected agent

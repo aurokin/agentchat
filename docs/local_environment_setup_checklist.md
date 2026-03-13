@@ -88,3 +88,44 @@ bun run dev:web
 
 - If sign-in fails with `Error 400: redirect_uri_mismatch`, add this Authorized redirect URI to the OAuth client matching `AUTH_GOOGLE_ID`:
     - `https://<your-deployment>.convex.site/api/auth/callback/google`
+
+## 3) Optional: Local Mobile Development
+
+Only do this if you want to exercise the current mobile app alongside the web/server stack.
+
+3A) Prerequisites:
+
+- Expo tooling
+- Android Studio or a physical Android device
+- Xcode for iOS simulator builds on macOS
+
+3B) Create `apps/mobile/.env` from `apps/mobile/.env.example`.
+
+Set:
+
+- `EXPO_PUBLIC_CONVEX_URL=https://<your-deployment>.convex.cloud`
+- `EXPO_PUBLIC_AGENTCHAT_SERVER_URL=http://<your-local-server-host>:8787`
+
+3C) Start a mobile build:
+
+```bash
+cd apps/mobile && bun run android
+```
+
+or
+
+```bash
+cd apps/mobile && bun run ios
+```
+
+3D) For development client workflows:
+
+```bash
+cd apps/mobile && bun run dev-client
+```
+
+3E) Current expectation:
+
+- Mobile follows the same backend-driven runtime model as web.
+- Mobile is still catching up to web in a few UX and parity areas.
+- Use `docs/agentchat/mobile-followup.md` for the remaining mobile work list.

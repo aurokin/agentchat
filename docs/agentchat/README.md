@@ -1,11 +1,11 @@
-# Agentchat Direction
+# Agentchat Architecture And Direction
 
-This directory is the canonical reference for the Agentchat rewrite.
+This directory is the canonical reference for the current Agentchat product and architecture.
 
 It exists for both humans and agents:
 
 - Humans should use it to understand the product direction, architecture, and delivery plan.
-- Agents should use it to avoid rebuilding old hosted-product assumptions into the new system.
+- Agents should use it to avoid rebuilding old hosted-product assumptions into the current system.
 
 ## Read First
 
@@ -24,12 +24,12 @@ It exists for both humans and agents:
 
 ## Scope
 
-These docs describe the new Agentchat direction:
+These docs describe the active Agentchat direction:
 
 - Self-hosted and open source
 - Google-authenticated, instance-allowlisted access
 - Conversations stored in Convex
-- A new instance-local backend server
+- An instance-local backend server
 - A provider abstraction with Codex first and OpenCode later
 - Agent-centric UX where conversations are bound to the selected agent
 

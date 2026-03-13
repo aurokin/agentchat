@@ -11,7 +11,7 @@ Agentchat is a monorepo with the primary product surfaces in `apps/web`, `apps/s
 - Primary persistence: Convex
 - Runtime direction: agent-centric provider architecture with Codex first
 
-The canonical rewrite docs live in `docs/agentchat/`.
+The canonical architecture and product docs live in `docs/agentchat/`.
 
 ## Key Directories
 
@@ -27,5 +27,5 @@ The canonical rewrite docs live in `docs/agentchat/`.
 - Major feature additions must be documented in `README.md`.
 - Environment variable requirements must be listed in `README.md`.
 - Use the product name `Agentchat` consistently.
-- Product direction, rules, and roadmap for the rewrite belong under `docs/agentchat/`.
+- Product direction, rules, and roadmap belong under `docs/agentchat/`.
 - If another doc conflicts with `docs/agentchat/`, treat `docs/agentchat/` as authoritative.
