@@ -10,9 +10,7 @@ The mobile app uses `expo-sqlite` with `better-sqlite3` for offline-first storag
 | --- | --- | --- |
 | `chats` | Chat sessions | `idx_chats_updated` (updated_at DESC) |
 | `messages` | Chat messages | `idx_messages_session` (session_id), `idx_messages_created` (created_at ASC) |
-| `attachments` | Image attachments | `idx_attachments_message` (message_id), `idx_attachments_created` (created_at ASC) |
-| `skills` | User-defined skills | None |
-| `skill_settings` | Skill preferences | None |
+| `attachments` | Legacy attachment records kept only for migration compatibility | `idx_attachments_message` (message_id), `idx_attachments_created` (created_at ASC) |
 | `sync_state` | Sync state metadata | None |
 | `user_settings` | User preferences | None |
 | `schema_version` | Migration tracking | None |
@@ -21,7 +19,6 @@ The mobile app uses `expo-sqlite` with `better-sqlite3` for offline-first storag
 
 - Use snake_case for column names (example: `model_id`, `created_at`).
 - Store JSON arrays as TEXT with `JSON.stringify` and `JSON.parse`.
-- Store skill objects denormalized in messages (skill_id, skill_name, skill_description, skill_prompt).
 - Use `INTEGER` for timestamps (Unix epoch milliseconds).
 - Use `FOREIGN KEY ... ON DELETE CASCADE` for message and attachment cleanup.
 
@@ -45,11 +42,10 @@ Use `*ToRow()` and `rowTo*()` functions in `lib/db/schema.ts` for type-safe conv
 - `chatSessionToRow()` and `rowToChatSession()`
 - `messageToRow()` and `rowToMessage()`
 - `attachmentToRow()` and `rowToAttachment()`
-- `skillToRow()` and `rowToSkill()`
 
-## File Storage (Attachments)
+## Legacy Attachment Storage
 
-Image attachments are stored as files in the app's document directory using `expo-file-system`.
+Attachment storage still exists in the mobile codebase for compatibility with older local data paths, but attachments are not part of the active Agentchat product surface.
 
 ### File Storage Location
 
@@ -57,42 +53,17 @@ Image attachments are stored as files in the app's document directory using `exp
 - File naming: `{attachmentId}.{mimeTypeExtension}` (example: `abc123.png`)
 - Files are stored with their file URIs referenced in SQLite
 
-### Storage Architecture
+### Legacy Storage Architecture
 
 1. SQLite metadata: attachments table stores file URI, dimensions, size, and metadata
 2. File system: actual image blobs stored in `attachments/` directory
 3. Pending attachments: temporary base64 data during image selection before save
 
-### Attachment Storage Module
+### Legacy Modules
 
-Use `lib/storage/attachment-storage.ts` for attachment operations:
-
-```typescript
-import {
-    createPendingAttachment,
-    savePendingAttachment,
-    saveAttachments,
-    getAttachmentDataUri,
-    deleteAttachmentWithFile,
-    cleanupAttachmentOrphanedFiles,
-} from "@/lib/storage";
-
-const pending = createPendingAttachment({
-    messageId,
-    base64Data,
-    mimeType: "image/png",
-    width: 1024,
-    height: 768,
-});
-
-const attachment = await savePendingAttachment(pending, messageId);
-
-const dataUri = await getAttachmentDataUri(attachment);
-
-await deleteAttachmentWithFile(attachmentId);
-
-await cleanupAttachmentOrphanedFiles();
-```
+- `src/lib/storage/attachment-storage.ts` contains the legacy attachment file helpers.
+- `src/lib/storage/file-storage.ts` contains low-level file operations shared by that legacy path.
+- Do not expose these helpers in new feature work unless the attachment system is being intentionally rebuilt.
 
 ### File Storage API
 
@@ -122,7 +93,7 @@ const freedBytes = await fileStorage.cleanupOrphanedFiles(validUris);
 - Always use `expo-file-system/legacy` imports for the legacy API.
 - The legacy API exports: `documentDirectory`, `cacheDirectory`, `EncodingType`, `getInfoAsync`, `makeDirectoryAsync`, `readAsStringAsync`, `writeAsStringAsync`, `deleteAsync`, `readDirectoryAsync`.
 - File URIs are stored in the `data` field of the Attachment type (which now contains file:// URIs).
-- When deleting attachments, delete both the database record and the file.
+- If you touch the legacy attachment layer, delete both the database record and the file.
 
 ## Storage Adapter
 

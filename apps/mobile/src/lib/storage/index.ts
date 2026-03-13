@@ -1,19 +1,5 @@
 export * from "@/lib/storage/file-storage";
 export {
-    createPendingAttachment,
-    savePendingAttachment,
-    saveAttachments,
-    loadAttachmentData,
-    getAttachmentDataUri,
-    deleteAttachmentWithFile,
-    deleteAttachmentsByMessage,
-    cleanupOrphanedFiles as cleanupAttachmentOrphanedFiles,
-    getImageStorageUsage,
-    getAttachment,
-    getAttachmentsByMessage,
-    type PendingAttachment,
-} from "@/lib/storage/attachment-storage";
-export {
     getAuthToken,
     setAuthToken,
     clearAuthToken,
