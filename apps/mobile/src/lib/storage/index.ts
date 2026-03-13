@@ -1,4 +1,3 @@
-export * from "@/lib/storage/file-storage";
 export {
     getAuthToken,
     setAuthToken,
