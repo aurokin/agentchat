@@ -53,18 +53,3 @@ export {
     setSelectedChatId,
     clearSelectedChatId,
 } from "@/lib/storage/user-settings-storage";
-export {
-    processImage,
-    isValidImageMimeType,
-    getMimeTypeFromUri,
-    type ImageProcessingResult,
-} from "@/lib/storage/image-processing";
-export {
-    getLocalQuotaStatus,
-    getLocalQuotaUsageString,
-    checkQuotaBeforeUpload,
-    getStorageUsage,
-    formatBytes,
-    LOCAL_IMAGE_QUOTA,
-    type QuotaStatus,
-} from "@/lib/quota";
