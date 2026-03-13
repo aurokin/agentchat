@@ -258,6 +258,70 @@ describe("createFetchHandler", () => {
         ]);
     });
 
+    test("includes runtime env diagnostics", async () => {
+        const originalBackendSecret = process.env.BACKEND_TOKEN_SECRET;
+        const originalConvexSiteUrl = process.env.AGENTCHAT_CONVEX_SITE_URL;
+        const originalRuntimeSecret = process.env.RUNTIME_INGRESS_SECRET;
+
+        process.env.BACKEND_TOKEN_SECRET = "backend-secret";
+        delete process.env.AGENTCHAT_CONVEX_SITE_URL;
+        process.env.RUNTIME_INGRESS_SECRET = "runtime-secret";
+
+        try {
+            const fetchHandler = createFetchHandler({
+                getConfig: () => createConfig(),
+            });
+
+            const response = await fetchHandler(
+                new Request("http://localhost:3030/api/diagnostics"),
+            );
+            const body = (await response.json()) as {
+                runtimeEnv: {
+                    ok: boolean;
+                    diagnostics: Array<{
+                        key: string;
+                        configured: boolean;
+                    }>;
+                };
+            };
+
+            expect(response.status).toBe(200);
+            expect(body.runtimeEnv.ok).toBe(false);
+            expect(body.runtimeEnv.diagnostics).toEqual([
+                expect.objectContaining({
+                    key: "BACKEND_TOKEN_SECRET",
+                    configured: true,
+                }),
+                expect.objectContaining({
+                    key: "AGENTCHAT_CONVEX_SITE_URL",
+                    configured: false,
+                }),
+                expect.objectContaining({
+                    key: "RUNTIME_INGRESS_SECRET",
+                    configured: true,
+                }),
+            ]);
+        } finally {
+            if (originalBackendSecret === undefined) {
+                delete process.env.BACKEND_TOKEN_SECRET;
+            } else {
+                process.env.BACKEND_TOKEN_SECRET = originalBackendSecret;
+            }
+
+            if (originalConvexSiteUrl === undefined) {
+                delete process.env.AGENTCHAT_CONVEX_SITE_URL;
+            } else {
+                process.env.AGENTCHAT_CONVEX_SITE_URL = originalConvexSiteUrl;
+            }
+
+            if (originalRuntimeSecret === undefined) {
+                delete process.env.RUNTIME_INGRESS_SECRET;
+            } else {
+                process.env.RUNTIME_INGRESS_SECRET = originalRuntimeSecret;
+            }
+        }
+    });
+
     test("returns 404 for disabled providers", async () => {
         const fetchHandler = createFetchHandler({
             getConfig: () => createConfig(),

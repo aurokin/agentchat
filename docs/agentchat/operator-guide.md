@@ -92,6 +92,7 @@ bun run doctor:server
 
 This checks:
 
+- required local runtime env readiness for `apps/server`
 - configured provider and agent readiness
 - missing directories
 - disabled default fallback situations

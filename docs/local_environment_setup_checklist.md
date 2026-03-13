@@ -109,6 +109,8 @@ bun run --cwd packages/convex codegen
 bun run doctor:server
 ```
 
+`bun run doctor:server` now also reports whether the local `apps/server` runtime has the required env values for backend token verification and Convex runtime persistence.
+
 2J) Manual step (only if needed): fix Google OAuth redirect URI.
 
 - If sign-in fails with `Error 400: redirect_uri_mismatch`, add this Authorized redirect URI to the OAuth client matching `AUTH_GOOGLE_ID`:

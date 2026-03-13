@@ -1,6 +1,7 @@
 import { ConfigStore } from "./config.ts";
 import { CodexModelCatalog } from "./codexModelCatalog.ts";
 import { getConfigDiagnostics } from "./configDiagnostics.ts";
+import { getRuntimeEnvDiagnostics } from "./envDiagnostics.ts";
 
 function formatIssues(issues: string[]): string {
     if (issues.length === 0) {
@@ -12,11 +13,20 @@ function formatIssues(issues: string[]): string {
 
 const configStore = new ConfigStore();
 const diagnostics = getConfigDiagnostics(configStore.snapshot);
+const runtimeEnv = getRuntimeEnvDiagnostics();
 const modelCatalog = new CodexModelCatalog({
     getConfig: () => configStore.snapshot,
 });
 
 console.log(`[agentchat-server] config: ${configStore.path}`);
+console.log(
+    `[agentchat-server] runtime env: ${runtimeEnv.ok ? "ready" : "missing required values"}`,
+);
+for (const diagnostic of runtimeEnv.diagnostics) {
+    console.log(
+        `[env:${diagnostic.key}] ${diagnostic.configured ? "configured" : "missing"} - ${diagnostic.description}`,
+    );
+}
 console.log(
     `[agentchat-server] providers ready: ${diagnostics.summary.readyProviderCount}/${diagnostics.summary.enabledProviderCount}`,
 );
@@ -56,5 +66,9 @@ for (const agent of diagnostics.agents) {
 }
 
 if (!diagnostics.ok) {
+    process.exitCode = 1;
+}
+
+if (!runtimeEnv.ok) {
     process.exitCode = 1;
 }

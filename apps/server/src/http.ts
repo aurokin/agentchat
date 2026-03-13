@@ -5,6 +5,7 @@ import {
     getVisibleAgents,
     resolveAgentDefaults,
 } from "./configDiagnostics.ts";
+import { getRuntimeEnvDiagnostics } from "./envDiagnostics.ts";
 
 type HandlerDependencies = {
     getConfig(): AgentchatConfig;
@@ -143,7 +144,10 @@ export function createFetchHandler(deps: HandlerDependencies) {
         }
 
         if (request.method === "GET" && pathname === "/api/diagnostics") {
-            return jsonResponse(getConfigDiagnostics(config));
+            return jsonResponse({
+                ...getConfigDiagnostics(config),
+                runtimeEnv: getRuntimeEnvDiagnostics(),
+            });
         }
 
         if (request.method === "GET" && pathname === "/api/bootstrap") {

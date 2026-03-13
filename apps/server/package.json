@@ -12,7 +12,7 @@
         "typecheck": "tsc --noEmit",
         "lint": "eslint .",
         "test": "bun test",
-        "test:confidence": "bun test src/__tests__/backendAuth.test.ts src/__tests__/config.test.ts src/__tests__/configDiagnostics.test.ts src/__tests__/codexModelCatalog.test.ts src/__tests__/http.test.ts src/__tests__/runtimePersistence.test.ts src/__tests__/socketProtocol.test.ts src/__tests__/codexRuntime.test.ts src/__tests__/websocketSession.test.ts",
+        "test:confidence": "bun test src/__tests__/backendAuth.test.ts src/__tests__/config.test.ts src/__tests__/configDiagnostics.test.ts src/__tests__/envDiagnostics.test.ts src/__tests__/codexModelCatalog.test.ts src/__tests__/http.test.ts src/__tests__/runtimePersistence.test.ts src/__tests__/socketProtocol.test.ts src/__tests__/codexRuntime.test.ts src/__tests__/websocketSession.test.ts",
         "health": "bun run format && bun run typecheck && bun run lint && bun test"
     },
     "dependencies": {
