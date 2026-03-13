@@ -33,4 +33,4 @@ These docs describe the new Agentchat direction:
 - A provider abstraction with Codex first and OpenCode later
 - Agent-centric UX where conversations are bound to the selected agent
 
-If an older document elsewhere in the repo conflicts with these docs, treat this directory as the source of truth for the rewrite.
+If another document elsewhere in the repo conflicts with these docs, treat this directory as the source of truth.
