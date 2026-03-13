@@ -32,7 +32,7 @@ These docs describe the active Agentchat direction:
 - Google-authenticated, instance-allowlisted access
 - Conversations stored in Convex
 - An instance-local backend server
-- A provider abstraction with Codex first and OpenCode later
+- A provider abstraction that is intentionally being hardened around Codex first
 - Agent-centric UX where conversations are bound to the selected agent
 
 If another document elsewhere in the repo conflicts with these docs, treat this directory as the source of truth.

@@ -28,4 +28,4 @@ Read this file before making any changes in this repository.
 - Build for the self-hosted, agent-centric architecture that is already in progress.
 - Do not reintroduce hosted-product assumptions, billing, analytics, attachments, or browser-local data modes.
 - Treat Convex as the current source of truth for auth, conversations, runs, and runtime bindings.
-- Treat `apps/server` as the provider/runtime layer, with Codex first and other providers added behind that abstraction later.
+- Treat `apps/server` as the provider/runtime layer, with Codex as the only active provider target in this phase. Do not spend implementation effort on additional providers until Codex is highly confident end to end.

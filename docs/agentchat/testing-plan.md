@@ -132,4 +132,4 @@ This runs the targeted server and web confidence suites without turning them int
 2. Server integration coverage around websocket, persistence, and resume
 3. Web browser end-to-end coverage
 4. Mobile manual parity checks against the same fixtures
-5. Additional provider fixtures when non-Codex providers are added
+5. Revisit provider-specific fixtures only after Codex is highly confident end to end

@@ -19,6 +19,7 @@ This roadmap describes the current implementation state and the next major steps
 - Replace placeholder provider model metadata with live provider-backed fetching and cache behavior
 - Improve operator-facing diagnostics and health reporting
 - Build a practical testing stack around the dedicated local fixtures in `/home/auro/agents/agentchat_test`
+- Keep the active roadmap narrowly focused on Codex confidence rather than adding more providers
 
 ## Next Milestones
 
@@ -46,13 +47,9 @@ This roadmap describes the current implementation state and the next major steps
 - Reduce remaining mobile-specific assumptions and polish the agent-centric flow
 - Validate mobile manually against the same dedicated test-agent fixtures used for web
 
-### 4. Provider Expansion
-
-- Keep the provider interface stable enough for additional implementations
-- Add the next providers without changing the product model
-
 ## Later, Not V1
 
+- Broaden the provider surface once Codex is highly confident end to end
 - OpenCode support through the provider layer
 - Pi Coding Agent support through the provider layer
 - Pi Agent Core support through the provider layer
