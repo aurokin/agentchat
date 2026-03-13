@@ -26,7 +26,6 @@ Planned work:
 
 - Remove remaining provider-specific user-facing flows
 - Remove web search toggles
-- Remove attachment assumptions from the primary chat flow
 - Reduce settings to provider, model, and variant where needed
 
 ## Phase 2: Server Config And Convex Model
@@ -120,7 +119,6 @@ Planned work:
 - Pi Coding Agent support through the provider layer
 - Pi Agent Core support through the provider layer
 - Admin UI for agent and provider management
-- Attachments
 - Approval controls beyond auto-approve
 - Conversation branching and forking
 

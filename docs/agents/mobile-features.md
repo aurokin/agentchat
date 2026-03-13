@@ -10,7 +10,6 @@ This document should reflect the current Agentchat product direction, not the ol
   - conversations scoped to the selected agent
   - provider, model, and variant options supplied by `apps/server`
   - realtime streaming over a single authenticated WebSocket connection
-- Image attachments are out of scope for the current rewrite phase and should not be treated as an active mobile feature.
 - Search is no longer part of the product surface.
 
 ## UI Guidance

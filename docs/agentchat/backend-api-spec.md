@@ -291,6 +291,5 @@ Normalized failures should include:
 
 ## Out Of Scope For V1
 
-- attachments
 - multiple simultaneous active runs in one conversation
 - raw provider event passthrough

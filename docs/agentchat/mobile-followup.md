@@ -15,15 +15,14 @@ This document tracks mobile work that should happen after the web-first migratio
 - Mobile settings now surface the selected agent and deployment-managed provider/model/variant defaults instead of old sync-centric copy.
 - Mobile model selection now persists provider-first choices per agent and narrows the model list to the selected provider.
 - Mobile composer now exposes provider and variant selection, and conversation sends persist `variantId` through the shared runtime and Convex sync model.
-- Active mobile chat/settings UI no longer exposes image attachments or cloud image management.
-- Mobile share intent is now text-only, matching the current no-attachments product surface.
-- The old mobile file-based attachment helpers have been removed, and mobile adapters now treat attachments as explicitly unsupported.
+- Mobile share intent is now text-only, matching the current product surface.
+- Removed mobile media-storage helpers and the old local database path no longer shape the active app model.
 
 ## Pending Mobile Work
 
 - Continue refining the mobile chat flow around the new agent-centric model.
-- Continue trimming any attachment-related compatibility fields that remain in shared message/storage types during later schema cleanup passes.
-- Remove any remaining mobile dependency on Convex attachment APIs once the shared storage interface is narrowed.
+- Continue trimming stale storage compatibility fields that remain in shared message and sync types during later cleanup passes.
+- Remove any remaining mobile dependency on deprecated legacy storage APIs once the shared storage interface is narrowed.
 - Replace any remaining provider-specific client assumptions with backend-driven provider capability and settings options.
 - Keep aligning mobile state helpers with the web runtime model as the rewrite settles.
 
