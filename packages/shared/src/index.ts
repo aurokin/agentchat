@@ -3,9 +3,7 @@ export * from "./core/backend-token";
 export * from "./core/agentchat-socket";
 export * from "./core/conversation-runtime";
 export {
-    SyncState,
-    SyncMetadata,
-    DEFAULT_SYNC_METADATA,
+    WorkspaceStatus,
     StorageAdapter,
     StorageAdapterFactory,
 } from "./core/sync";

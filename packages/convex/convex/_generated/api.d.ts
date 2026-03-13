@@ -9,6 +9,7 @@
  */
 
 import type * as auth from "../auth.js";
+import type * as backendTokens from "../backendTokens.js";
 import type * as chats from "../chats.js";
 import type * as http from "../http.js";
 import type * as lib_authz from "../lib/authz.js";
@@ -18,6 +19,8 @@ import type * as lib_limits from "../lib/limits.js";
 import type * as lib_pagination from "../lib/pagination.js";
 import type * as lib_subscription from "../lib/subscription.js";
 import type * as messages from "../messages.js";
+import type * as runs from "../runs.js";
+import type * as runtimeIngress from "../runtimeIngress.js";
 import type * as users from "../users.js";
 
 import type {
@@ -28,6 +31,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
+  backendTokens: typeof backendTokens;
   chats: typeof chats;
   http: typeof http;
   "lib/authz": typeof lib_authz;
@@ -37,6 +41,8 @@ declare const fullApi: ApiFromModules<{
   "lib/pagination": typeof lib_pagination;
   "lib/subscription": typeof lib_subscription;
   messages: typeof messages;
+  runs: typeof runs;
+  runtimeIngress: typeof runtimeIngress;
   users: typeof users;
 }>;
 

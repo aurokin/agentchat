@@ -82,7 +82,7 @@ const convexApi = api as typeof api & {
 
 export function ChatProvider({ children }: { children: React.ReactNode }) {
     const storageAdapter = useStorageAdapter();
-    const { syncState, isConvexAvailable } = useSync();
+    const { isWorkspaceReady, isConvexAvailable } = useSync();
     const { selectedAgentId, selectedAgent, loadingAgents } = useAgent();
     const [chats, setChats] = useState<ChatSession[]>([]);
     const [currentChat, setCurrentChat] = useState<ChatSession | null>(null);
@@ -93,8 +93,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     const pendingChatIdsRef = useRef<Set<string>>(new Set());
     const pendingMessageIdsRef = useRef<Set<string>>(new Set());
 
-    const isCloudSyncActive =
-        isConvexAvailable && syncState === "cloud-enabled";
+    const isCloudSyncActive = isConvexAvailable && isWorkspaceReady;
     const currentChatId = currentChat?.id ?? null;
     const cloudUserId = useQuery(
         api.users.getCurrentUserId,
