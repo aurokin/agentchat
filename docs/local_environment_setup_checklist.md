@@ -84,7 +84,7 @@ bun run convex:env
 bun run dev:web
 ```
 
-2I) Validate the configured agents and provider runtime paths before a manual confidence pass:
+2I) Validate the configured agents, provider runtime paths, and live Codex model access before a manual confidence pass:
 
 ```bash
 bun run doctor:server

@@ -35,6 +35,13 @@ type ProviderModelsPayload = {
     models: ProviderModelCatalogEntry[];
 };
 
+export type ProviderModelsProbe = {
+    providerId: string;
+    ok: boolean;
+    modelCount: number;
+    error: string | null;
+};
+
 type CachedProviderModels = ProviderModelsPayload & {
     expiresAtEpochMs: number;
 };
@@ -210,6 +217,43 @@ export class CodexModelCatalog {
                 error,
             );
             return buildFallbackModels(provider);
+        }
+    }
+
+    async probeProviderModels(
+        providerId: string,
+    ): Promise<ProviderModelsProbe> {
+        const provider =
+            this.getConfig().providers.find(
+                (candidate) => candidate.id === providerId && candidate.enabled,
+            ) ?? null;
+        if (!provider) {
+            return {
+                providerId,
+                ok: false,
+                modelCount: 0,
+                error: "Provider not found or not enabled.",
+            };
+        }
+
+        try {
+            const models = await this.fetchLiveModels(provider);
+            return {
+                providerId: provider.id,
+                ok: true,
+                modelCount: models.length,
+                error: null,
+            };
+        } catch (error) {
+            return {
+                providerId: provider.id,
+                ok: false,
+                modelCount: 0,
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Failed to reach Codex provider.",
+            };
         }
     }
 

@@ -1,4 +1,5 @@
 import { ConfigStore } from "./config.ts";
+import { CodexModelCatalog } from "./codexModelCatalog.ts";
 import { getConfigDiagnostics } from "./configDiagnostics.ts";
 
 function formatIssues(issues: string[]): string {
@@ -11,6 +12,9 @@ function formatIssues(issues: string[]): string {
 
 const configStore = new ConfigStore();
 const diagnostics = getConfigDiagnostics(configStore.snapshot);
+const modelCatalog = new CodexModelCatalog({
+    getConfig: () => configStore.snapshot,
+});
 
 console.log(`[agentchat-server] config: ${configStore.path}`);
 console.log(
@@ -25,9 +29,20 @@ for (const provider of diagnostics.providers) {
         continue;
     }
 
+    const liveProbe = await modelCatalog.probeProviderModels(provider.id);
     console.log(
         `[provider:${provider.id}] ${provider.ready ? "ready" : "not ready"} - ${formatIssues(provider.issues)}`,
     );
+    console.log(
+        `[provider:${provider.id}] live ${
+            liveProbe.ok
+                ? `ok (${liveProbe.modelCount} models)`
+                : `failed - ${liveProbe.error}`
+        }`,
+    );
+    if (!liveProbe.ok) {
+        process.exitCode = 1;
+    }
 }
 
 for (const agent of diagnostics.agents) {

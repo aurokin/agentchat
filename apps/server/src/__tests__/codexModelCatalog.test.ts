@@ -182,4 +182,60 @@ describe("CodexModelCatalog", () => {
             console.error = originalConsoleError;
         }
     });
+
+    test("reports provider probe success with live model count", async () => {
+        const catalog = new CodexModelCatalog({
+            getConfig: () => createConfig(),
+            createClient: () => ({
+                initialize: async () => undefined,
+                request: async () => ({
+                    data: [
+                        {
+                            id: "gpt-5.3-codex",
+                            displayName: "GPT-5.3 Codex",
+                            hidden: false,
+                            supportedReasoningEfforts: [],
+                        },
+                    ],
+                    nextCursor: null,
+                }),
+                onNotification: () => undefined,
+                onExit: () => undefined,
+                stop: () => undefined,
+            }),
+        });
+
+        await expect(
+            catalog.probeProviderModels("codex-main"),
+        ).resolves.toEqual({
+            providerId: "codex-main",
+            ok: true,
+            modelCount: 1,
+            error: null,
+        });
+    });
+
+    test("reports provider probe failure when live Codex is unreachable", async () => {
+        const catalog = new CodexModelCatalog({
+            getConfig: () => createConfig(),
+            createClient: () => ({
+                initialize: async () => undefined,
+                request: async () => {
+                    throw new Error("connection refused");
+                },
+                onNotification: () => undefined,
+                onExit: () => undefined,
+                stop: () => undefined,
+            }),
+        });
+
+        await expect(
+            catalog.probeProviderModels("codex-main"),
+        ).resolves.toEqual({
+            providerId: "codex-main",
+            ok: false,
+            modelCount: 0,
+            error: "connection refused",
+        });
+    });
 });

@@ -20,7 +20,7 @@ bun run test:manual:codex-confidence
 - `apps/server` is running
 - the web app is running
 - the selected Google account is allowlisted
-- `bun run doctor:server` reports the configured Codex provider and target agents as ready
+- `bun run doctor:server` reports the configured Codex provider and target agents as ready, and shows live Codex model access for each enabled provider
 
 ## 1. Smoke
 

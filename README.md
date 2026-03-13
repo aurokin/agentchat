@@ -205,7 +205,7 @@ Agent instructions live in `AGENTS.md` and the linked docs under `docs/agents/`.
 Use these commands when you want a deliberate Codex confidence pass rather than always-on automation:
 
 ```bash
-# Validate configured agent/provider paths and defaults
+# Validate configured agent/provider paths, defaults, and live Codex model access
 bun run doctor:server
 
 # Run the targeted Codex confidence suites

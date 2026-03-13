@@ -38,6 +38,7 @@ Primary fixture:
 Examples:
 
 - run `bun run doctor:server`
+  - confirm it reports live Codex model access for each enabled provider
 - sign in
 - select the smoke agent
 - send a greeting
