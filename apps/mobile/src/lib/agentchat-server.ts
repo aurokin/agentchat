@@ -30,6 +30,20 @@ export type BootstrapResponse = {
     agents: BootstrapAgent[];
 };
 
+export type AgentOptionsResponse = {
+    agentId: string;
+    allowedProviders: Array<{
+        id: string;
+        kind: string;
+        label: string;
+    }>;
+    defaultProviderId: string;
+    defaultModel: string | null;
+    defaultVariant: string | null;
+    modelAllowlist: string[];
+    variantAllowlist: string[];
+};
+
 type ProviderModelsResponse = {
     providerId: string;
     models: Array<{
@@ -89,6 +103,14 @@ export async function fetchProviderModels(
     );
 }
 
+export async function fetchAgentOptions(
+    agentId: string,
+): Promise<AgentOptionsResponse> {
+    return await fetchJson<AgentOptionsResponse>(
+        `/api/agents/${encodeURIComponent(agentId)}/options`,
+    );
+}
+
 export async function fetchAvailableModels(): Promise<ProviderModel[]> {
     const bootstrap = await fetchBootstrap();
     const visibleProviders = bootstrap.providers.filter(
@@ -101,10 +123,12 @@ export async function fetchAvailableModels(): Promise<ProviderModel[]> {
             return payload.models.map<ProviderModel>((model) => ({
                 id: model.id,
                 name: model.label,
+                providerId: provider.id,
                 provider: provider.label,
                 supportedParameters: model.supportsReasoning
                     ? [SupportedParameter.Reasoning]
                     : [],
+                variants: model.variants,
             }));
         }),
     );

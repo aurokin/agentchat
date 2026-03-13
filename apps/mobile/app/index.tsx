@@ -21,14 +21,17 @@ import { useRouter } from "expo-router";
 import { useChatContext } from "@/contexts/ChatContext";
 import { useAppContext } from "@/contexts/AppContext";
 import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
+import { useAgent } from "@/contexts/AgentContext";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getMessageCountByChat } from "@/lib/db/operations";
+import { AgentSwitcher } from "@/components/chat/AgentSwitcher";
 
 export default function HomeScreen(): React.ReactElement {
     const router = useRouter();
     const { chats, isLoading, error, loadChats, createChat, deleteChats } =
         useChatContext();
     const { isInitialized } = useAppContext();
+    const { selectedAgent } = useAgent();
     const { colors } = useTheme();
     const styles = useMemo(() => createStyles(colors), [colors]);
     const [isSelecting, setIsSelecting] = useState(false);
@@ -206,7 +209,7 @@ export default function HomeScreen(): React.ReactElement {
                 >
                     {isSelecting
                         ? `${selectedChatIds.size} selected`
-                        : "Agentchat"}
+                        : (selectedAgent?.name ?? "Agentchat")}
                 </Text>
                 {isSelecting ? (
                     <View style={styles.selectionActions}>
@@ -251,18 +254,21 @@ export default function HomeScreen(): React.ReactElement {
                         </TouchableOpacity>
                     </View>
                 ) : (
-                    <TouchableOpacity
-                        accessibilityRole="button"
-                        accessibilityLabel="Settings"
-                        style={styles.settingsButton}
-                        onPress={() => router.push("/settings")}
-                    >
-                        <Feather
-                            name="settings"
-                            size={22}
-                            color={colors.accent}
-                        />
-                    </TouchableOpacity>
+                    <View style={styles.headerActions}>
+                        <AgentSwitcher compact />
+                        <TouchableOpacity
+                            accessibilityRole="button"
+                            accessibilityLabel="Settings"
+                            style={styles.settingsButton}
+                            onPress={() => router.push("/settings")}
+                        >
+                            <Feather
+                                name="settings"
+                                size={22}
+                                color={colors.accent}
+                            />
+                        </TouchableOpacity>
+                    </View>
                 )}
             </View>
 
@@ -384,6 +390,11 @@ const createStyles = (colors: ThemeColors) =>
         },
         settingsButton: {
             padding: 8,
+        },
+        headerActions: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
         },
         selectionActions: {
             flexDirection: "row",

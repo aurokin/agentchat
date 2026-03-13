@@ -5,6 +5,7 @@ import React, {
     useCallback,
     useEffect,
     useMemo,
+    useRef,
     type ReactNode,
 } from "react";
 import { useQuery } from "convex/react";
@@ -21,11 +22,15 @@ import {
 import { v4 as uuidv4 } from "uuid";
 import {
     getDefaultThinking,
+    getSelectedChatId,
+    setSelectedChatId,
+    clearSelectedChatId,
     setDefaultThinking as persistDefaultThinking,
 } from "@/lib/storage";
 import { APP_DEFAULT_MODEL } from "@shared/core/models";
 import { useModelContext } from "@/contexts/ModelContext";
 import { deriveConversationRuntimeState } from "@/contexts/runtime-helpers";
+import { useAgent } from "@/contexts/AgentContext";
 
 interface ChatContextValue {
     chats: ChatSession[];
@@ -88,6 +93,7 @@ export function ChatProvider({
         useState<ThinkingLevel>(DEFAULT_THINKING);
     const { defaultAgentId, selectedModel, selectModel, models } =
         useModelContext();
+    const { selectedAgentId } = useAgent();
     const validatedSelectedModel =
         selectedModel && models.some((model) => model.id === selectedModel)
             ? selectedModel
@@ -104,6 +110,7 @@ export function ChatProvider({
     const { syncState, isConvexAvailable } = useSync();
     const pendingChatIdsRef = React.useRef<Set<string>>(new Set());
     const pendingMessageIdsRef = React.useRef<Set<string>>(new Set());
+    const currentChatIdRef = useRef<string | null>(null);
 
     const isCloudSyncActive =
         isConvexAvailable && syncState === "cloud-enabled";
@@ -154,23 +161,45 @@ export function ChatProvider({
         [currentMessages, runSummaries],
     );
 
+    useEffect(() => {
+        currentChatIdRef.current = currentChat?.id ?? null;
+    }, [currentChat?.id]);
+
     const loadChats = useCallback(async () => {
+        if (!selectedAgentId) {
+            setChats([]);
+            setCurrentChat(null);
+            setMessages({});
+            setIsMessagesLoading(false);
+            return;
+        }
+
         setIsLoading(true);
         setError(null);
         try {
             const loadedChats = await adapter.getAllChats();
-            setChats(loadedChats.sort((a, b) => b.updatedAt - a.updatedAt));
+            const scopedChats = loadedChats
+                .filter((chat) => chat.agentId === selectedAgentId)
+                .sort((a, b) => b.updatedAt - a.updatedAt);
+            setChats(scopedChats);
         } catch {
             setError("Failed to load chats");
         } finally {
             setIsLoading(false);
         }
-    }, [adapter]);
+    }, [adapter, selectedAgentId]);
 
     useEffect(() => {
+        if (!selectedAgentId) {
+            setChats([]);
+            setCurrentChat(null);
+            return;
+        }
         if (!isCloudSyncActive || !cloudChats) return;
 
-        const mapped = cloudChats.map(mapConvexChatToLocal);
+        const mapped = cloudChats
+            .map(mapConvexChatToLocal)
+            .filter((chat) => chat.agentId === selectedAgentId);
         const pending = pendingChatIdsRef.current;
         for (const chat of mapped) {
             pending.delete(chat.id);
@@ -179,16 +208,12 @@ export function ChatProvider({
         setChats((prev) =>
             mergeByIdWithPending(
                 mapped,
-                prev,
+                prev.filter((chat) => chat.agentId === selectedAgentId),
                 pending,
                 (a, b) => b.updatedAt - a.updatedAt,
             ),
         );
-        setCurrentChat((prev) => {
-            if (!prev) return prev;
-            return mapped.find((chat) => chat.id === prev.id) ?? prev;
-        });
-    }, [cloudChats, isCloudSyncActive]);
+    }, [cloudChats, isCloudSyncActive, selectedAgentId]);
 
     useEffect(() => {
         if (!isCloudSyncActive || !cloudCurrentChat || !cloudMessages) {
@@ -229,7 +254,8 @@ export function ChatProvider({
 
             const chat: ChatSession = {
                 id: chatId,
-                agentId: defaultAgentId ?? "mobile-default-agent",
+                agentId:
+                    selectedAgentId ?? defaultAgentId ?? "mobile-default-agent",
                 title: title || "New Chat",
                 modelId: modelId || defaultModelId,
                 thinking: defaultThinking,
@@ -246,6 +272,9 @@ export function ChatProvider({
             setChats((prev) => [chat, ...prev]);
             setCurrentChat(chat);
             setMessages((prev) => ({ ...prev, [chatId]: [] }));
+            if (chat.agentId) {
+                await setSelectedChatId(chat.agentId, chat.id);
+            }
 
             return chat;
         },
@@ -255,6 +284,7 @@ export function ChatProvider({
             defaultThinking,
             isCloudSyncActive,
             defaultAgentId,
+            selectedAgentId,
         ],
     );
 
@@ -273,15 +303,57 @@ export function ChatProvider({
         [adapter],
     );
 
+    useEffect(() => {
+        let cancelled = false;
+
+        if (!selectedAgentId) {
+            setCurrentChat(null);
+            setIsMessagesLoading(false);
+            return;
+        }
+
+        const currentChatStillInScope =
+            currentChatIdRef.current &&
+            chats.some((chat) => chat.id === currentChatIdRef.current);
+        if (currentChatStillInScope) {
+            return;
+        }
+
+        void (async () => {
+            const storedChatId = await getSelectedChatId(selectedAgentId);
+            const nextChat =
+                chats.find((chat) => chat.id === storedChatId) ??
+                chats[0] ??
+                null;
+            if (cancelled) {
+                return;
+            }
+
+            setCurrentChat(nextChat);
+            if (nextChat) {
+                await loadMessages(nextChat.id);
+            } else {
+                setIsMessagesLoading(false);
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [chats, loadMessages, selectedAgentId]);
+
     const selectChat = useCallback(
         async (chatId: string) => {
             const chat = chats.find((c) => c.id === chatId);
             if (chat) {
                 setCurrentChat(chat);
+                if (selectedAgentId) {
+                    await setSelectedChatId(selectedAgentId, chat.id);
+                }
                 await loadMessages(chatId);
             }
         },
-        [chats, loadMessages],
+        [chats, loadMessages, selectedAgentId],
     );
 
     const deleteChat = useCallback(
@@ -295,8 +367,11 @@ export function ChatProvider({
                 delete next[chatId];
                 return next;
             });
+            if (selectedAgentId && currentChatIdRef.current === chatId) {
+                await clearSelectedChatId(selectedAgentId);
+            }
         },
-        [adapter],
+        [adapter, selectedAgentId],
     );
 
     const deleteChats = useCallback(
@@ -319,8 +394,15 @@ export function ChatProvider({
                 }
                 return next;
             });
+            if (
+                selectedAgentId &&
+                currentChatIdRef.current &&
+                chatIdSet.has(currentChatIdRef.current)
+            ) {
+                await clearSelectedChatId(selectedAgentId);
+            }
         },
-        [adapter],
+        [adapter, selectedAgentId],
     );
 
     const updateChat = useCallback(

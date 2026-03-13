@@ -4,21 +4,26 @@ import React, {
     useState,
     useCallback,
     useEffect,
+    useMemo,
     type ReactNode,
 } from "react";
 import {
-    APP_DEFAULT_MODEL,
     modelSupportsReasoning as providerSupportsReasoning,
     modelSupportsVision as providerSupportsVision,
     type ProviderModel,
 } from "@shared/core/models";
-import { fetchAvailableModels, fetchBootstrap } from "@/lib/agentchat-server";
 import {
-    getDefaultModel,
-    setDefaultModel,
+    getDefaultModelForAgent,
     getFavoriteModels,
+    setDefaultModelForAgent,
     setFavoriteModels,
 } from "@/lib/storage";
+import { fetchAvailableModels } from "@/lib/agentchat-server";
+import { useAgent } from "@/contexts/AgentContext";
+import {
+    filterModelsForAgent,
+    selectScopedDefaultModel,
+} from "@/contexts/settings-helpers";
 
 interface ModelContextValue {
     models: ProviderModel[];
@@ -49,17 +54,27 @@ interface ModelProviderProps {
 export function ModelProvider({
     children,
 }: ModelProviderProps): React.ReactElement {
-    const [models, setModels] = useState<ProviderModel[]>([]);
+    const [allModels, setAllModels] = useState<ProviderModel[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [defaultAgentId, setDefaultAgentId] = useState<string | null>(null);
     const [selectedModel, setSelectedModel] = useState<string | null>(null);
     const [favoriteModels, setFavoriteModelsState] = useState<string[]>([]);
     const [hasLoadedSelectedModel, setHasLoadedSelectedModel] = useState(false);
+    const { selectedAgentId, selectedAgent, selectedAgentOptions } = useAgent();
+
+    const models = useMemo(
+        () =>
+            filterModelsForAgent({
+                models: allModels,
+                selectedAgent,
+                selectedAgentOptions,
+            }),
+        [allModels, selectedAgent, selectedAgentOptions],
+    );
 
     const loadSelectedModel = useCallback(async () => {
         try {
-            const modelId = await getDefaultModel();
+            const modelId = await getDefaultModelForAgent(selectedAgentId);
             if (modelId) {
                 setSelectedModel(modelId);
             }
@@ -68,7 +83,7 @@ export function ModelProvider({
         } finally {
             setHasLoadedSelectedModel(true);
         }
-    }, []);
+    }, [selectedAgentId]);
 
     const loadFavoriteModels = useCallback(async () => {
         try {
@@ -84,33 +99,8 @@ export function ModelProvider({
         setError(null);
 
         try {
-            const [bootstrap, fetchedModels] = await Promise.all([
-                fetchBootstrap(),
-                fetchAvailableModels(),
-            ]);
-            const primaryAgent =
-                bootstrap.agents
-                    .filter((agent) => agent.enabled)
-                    .sort((a, b) => a.sortOrder - b.sortOrder)[0] ?? null;
-
-            setDefaultAgentId(primaryAgent?.id ?? null);
-            setModels(fetchedModels);
-
-            const modelIds = fetchedModels.map((model) => model.id);
-            let nextSelectedModel: string | null = null;
-
-            if (selectedModel && modelIds.includes(selectedModel)) {
-                nextSelectedModel = selectedModel;
-            } else if (modelIds.includes(APP_DEFAULT_MODEL)) {
-                nextSelectedModel = APP_DEFAULT_MODEL;
-            } else if (fetchedModels.length > 0) {
-                nextSelectedModel = fetchedModels[0].id;
-            }
-
-            if (nextSelectedModel && nextSelectedModel !== selectedModel) {
-                await setDefaultModel(nextSelectedModel);
-                setSelectedModel(nextSelectedModel);
-            }
+            const fetchedModels = await fetchAvailableModels();
+            setAllModels(fetchedModels);
         } catch (err) {
             const message =
                 err instanceof Error ? err.message : "Failed to fetch models";
@@ -118,16 +108,19 @@ export function ModelProvider({
         } finally {
             setIsLoading(false);
         }
-    }, [selectedModel]);
-
-    const selectModel = useCallback(async (modelId: string) => {
-        try {
-            await setDefaultModel(modelId);
-            setSelectedModel(modelId);
-        } catch {
-            console.error("Failed to save selected model");
-        }
     }, []);
+
+    const selectModel = useCallback(
+        async (modelId: string) => {
+            try {
+                await setDefaultModelForAgent(modelId, selectedAgentId);
+                setSelectedModel(modelId);
+            } catch {
+                console.error("Failed to save selected model");
+            }
+        },
+        [selectedAgentId],
+    );
 
     const toggleFavoriteModel = useCallback((modelId: string) => {
         setFavoriteModelsState((prev) => {
@@ -151,13 +144,42 @@ export function ModelProvider({
         }
     }, [hasLoadedSelectedModel, refreshModels]);
 
+    useEffect(() => {
+        if (!hasLoadedSelectedModel) {
+            return;
+        }
+
+        const nextSelectedModel = selectScopedDefaultModel({
+            models,
+            userPreferredModel: selectedModel,
+            agentDefaultModel:
+                selectedAgentOptions?.defaultModel ??
+                selectedAgent?.defaultModel ??
+                null,
+        });
+
+        if (!nextSelectedModel || nextSelectedModel === selectedModel) {
+            return;
+        }
+
+        setSelectedModel(nextSelectedModel);
+        void setDefaultModelForAgent(nextSelectedModel, selectedAgentId);
+    }, [
+        hasLoadedSelectedModel,
+        models,
+        selectedAgent?.defaultModel,
+        selectedAgentId,
+        selectedAgentOptions?.defaultModel,
+        selectedModel,
+    ]);
+
     return (
         <ModelContext.Provider
             value={{
                 models,
                 isLoading,
                 error,
-                defaultAgentId,
+                defaultAgentId: selectedAgentId,
                 selectedModel,
                 selectModel,
                 refreshModels,

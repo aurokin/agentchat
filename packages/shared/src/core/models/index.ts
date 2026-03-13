@@ -3,8 +3,13 @@ export const APP_DEFAULT_MODEL = "moonshotai/kimi-k2.5";
 export interface ProviderModel {
     id: string;
     name: string;
+    providerId?: string;
     provider: string;
     supportedParameters?: SupportedParameter[];
+    variants?: Array<{
+        id: string;
+        label: string;
+    }>;
 }
 
 export enum SupportedParameter {

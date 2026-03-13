@@ -38,10 +38,20 @@ export {
 export {
     getDefaultThinking,
     setDefaultThinking,
+    getDefaultThinkingForAgent,
+    setDefaultThinkingForAgent,
     getDefaultModel,
     setDefaultModel,
+    getDefaultModelForAgent,
+    setDefaultModelForAgent,
     getFavoriteModels,
     setFavoriteModels,
+    getSelectedAgentId,
+    setSelectedAgentId,
+    clearSelectedAgentId,
+    getSelectedChatId,
+    setSelectedChatId,
+    clearSelectedChatId,
 } from "@/lib/storage/user-settings-storage";
 export {
     processImage,

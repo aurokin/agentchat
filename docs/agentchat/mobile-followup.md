@@ -11,15 +11,11 @@ This document tracks mobile work that should happen after the web-first migratio
 - Mobile now has the same authenticated backend token and shared socket-client foundation as web.
 - Mobile chat now sends, interrupts, and streams responses through the shared Agentchat websocket runtime path.
 - Mobile now derives conversation runtime state from Convex run summaries, with streamed-message fallback while those summaries are loading.
+- Mobile now has an agent context, agent switcher, agent-scoped conversation lists, and agent-scoped model defaults.
 
 ## Pending Mobile Work
 
-- Mirror the new web agent bootstrap and selected-agent persistence flow.
-- Scope the mobile model catalog to the selected agent's allowed providers and allowlists.
 - Replace the current chat and settings flows with the new agent-centric model.
-- Add agent selection UI and keep it aligned with the web information architecture.
-- Update conversation lists so they are scoped to the selected agent.
-- Support empty conversation creation per selected agent.
 - Replace current model selection with provider, model, and variant flows driven by the backend.
 - Remove image attachment UX and related local handling from the mobile chat flow.
 - Remove mobile image quota, cloud image clearing, and attachment cache code to match the web/Convex cleanup.

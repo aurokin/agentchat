@@ -33,6 +33,38 @@ describe("user-settings-storage", () => {
         expect(await storage.getDefaultModel()).toBeNull();
     });
 
+    it("stores agent-scoped model and thinking independently", async () => {
+        await storage.setDefaultModel("global-model");
+        await storage.setDefaultModelForAgent("agent-model", "agent-1");
+        await storage.setDefaultThinking("low");
+        await storage.setDefaultThinkingForAgent("high", "agent-1");
+
+        expect(await storage.getDefaultModel()).toBe("global-model");
+        expect(await storage.getDefaultModelForAgent("agent-1")).toBe(
+            "agent-model",
+        );
+        expect(await storage.getDefaultThinking()).toBe("low");
+        expect(await storage.getDefaultThinkingForAgent("agent-1")).toBe(
+            "high",
+        );
+    });
+
+    it("stores selected agent and selected chat by agent", async () => {
+        await storage.setSelectedAgentId("agent-1");
+        await storage.setSelectedChatId("agent-1", "chat-1");
+        await storage.setSelectedChatId("agent-2", "chat-2");
+
+        expect(await storage.getSelectedAgentId()).toBe("agent-1");
+        expect(await storage.getSelectedChatId("agent-1")).toBe("chat-1");
+        expect(await storage.getSelectedChatId("agent-2")).toBe("chat-2");
+
+        await storage.clearSelectedChatId("agent-1");
+        await storage.clearSelectedAgentId();
+
+        expect(await storage.getSelectedChatId("agent-1")).toBeNull();
+        expect(await storage.getSelectedAgentId()).toBeNull();
+    });
+
     it("filters favorite model list entries", async () => {
         store.set(
             "agentchat-favorite-models",

@@ -11,6 +11,7 @@ import { ModelProvider } from "@/contexts/ModelContext";
 import { SyncProvider } from "@/contexts/SyncContext";
 import { AgentchatSocketProvider } from "@/contexts/AgentchatSocketContext";
 import { ShareIntentBridge } from "@/components/share/ShareIntentBridge";
+import { AgentProvider } from "@/contexts/AgentContext";
 import OnboardingScreen from "./onboarding";
 
 function OnboardingWrapper({
@@ -55,22 +56,24 @@ export default function Layout(): ReactElement {
                 <ConvexProvider>
                     <AuthProvider>
                         <AgentchatSocketProvider>
-                            <ModelProvider>
-                                <SyncProvider>
-                                    <AppProvider>
-                                        <ChatProvider>
-                                            <ShareIntentBridge />
-                                            <OnboardingWrapper>
-                                                <Stack
-                                                    screenOptions={{
-                                                        headerShown: false,
-                                                    }}
-                                                />
-                                            </OnboardingWrapper>
-                                        </ChatProvider>
-                                    </AppProvider>
-                                </SyncProvider>
-                            </ModelProvider>
+                            <AgentProvider>
+                                <ModelProvider>
+                                    <SyncProvider>
+                                        <AppProvider>
+                                            <ChatProvider>
+                                                <ShareIntentBridge />
+                                                <OnboardingWrapper>
+                                                    <Stack
+                                                        screenOptions={{
+                                                            headerShown: false,
+                                                        }}
+                                                    />
+                                                </OnboardingWrapper>
+                                            </ChatProvider>
+                                        </AppProvider>
+                                    </SyncProvider>
+                                </ModelProvider>
+                            </AgentProvider>
                         </AgentchatSocketProvider>
                     </AuthProvider>
                 </ConvexProvider>

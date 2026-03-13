@@ -28,6 +28,7 @@ import { useModelContext } from "@/contexts/ModelContext";
 import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
 import { useStorageAdapter } from "@/contexts/SyncContext";
 import { useAgentchatSocket } from "@/contexts/AgentchatSocketContext";
+import { useAgent } from "@/contexts/AgentContext";
 import {
     modelSupportsReasoning,
     type ProviderModel,
@@ -56,6 +57,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { MessageInput } from "@/components/chat/MessageInput";
+import { AgentSwitcher } from "@/components/chat/AgentSwitcher";
 import { AttachmentGallery } from "@/components/chat/AttachmentGallery";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { consumePendingSharePayload } from "@/lib/share-intent/pending-share";
@@ -93,6 +95,7 @@ export default function ChatScreen(): ReactElement {
         favoriteModels,
         toggleFavoriteModel,
     } = useModelContext();
+    const { selectedAgent } = useAgent();
     const { colors } = useTheme();
     const styles = useMemo(() => createStyles(colors), [colors]);
     const { socketClient, ensureConnected, connectionError, isConfigured } =
@@ -750,7 +753,15 @@ export default function ChatScreen(): ReactElement {
         return (
             <View style={[styles.tabletSidebar, { width: sidebarWidth }]}>
                 <View style={styles.tabletSidebarHeader}>
-                    <Text style={styles.tabletSidebarTitle}>Agentchat</Text>
+                    <View style={styles.tabletSidebarHeaderText}>
+                        <Text style={styles.tabletSidebarTitle}>
+                            {selectedAgent?.name ?? "Agentchat"}
+                        </Text>
+                        <AgentSwitcher
+                            compact
+                            onAgentChange={() => router.replace("/")}
+                        />
+                    </View>
                     <View style={styles.tabletSidebarHeaderActions}>
                         <TouchableOpacity
                             style={styles.tabletSidebarHeaderButton}
@@ -1194,34 +1205,51 @@ export default function ChatScreen(): ReactElement {
     const threadContent = (
         <>
             <View style={styles.header}>
-                {isTwoPaneLayout ? (
-                    <View
-                        style={[
-                            styles.iconButton,
-                            styles.backButtonPlaceholder,
-                        ]}
+                <View style={styles.headerLeft}>
+                    {isTwoPaneLayout ? (
+                        <View
+                            style={[
+                                styles.iconButton,
+                                styles.backButtonPlaceholder,
+                            ]}
+                        />
+                    ) : (
+                        <TouchableOpacity
+                            onPress={() => router.replace("/")}
+                            style={[styles.iconButton, styles.backButton]}
+                        >
+                            <Feather
+                                name="arrow-left"
+                                size={20}
+                                color={colors.accent}
+                            />
+                        </TouchableOpacity>
+                    )}
+                </View>
+                <View style={styles.headerCenter}>
+                    <Text style={styles.headerTitle} numberOfLines={1}>
+                        {currentChat.title}
+                    </Text>
+                    <Text style={styles.headerSubtitle} numberOfLines={1}>
+                        {selectedAgent?.name ?? "Agentchat"}
+                    </Text>
+                </View>
+                <View style={styles.headerRight}>
+                    <AgentSwitcher
+                        compact
+                        onAgentChange={() => router.replace("/")}
                     />
-                ) : (
                     <TouchableOpacity
-                        onPress={() => router.replace("/")}
-                        style={[styles.iconButton, styles.backButton]}
+                        onPress={handleDeleteChat}
+                        style={[styles.iconButton, styles.deleteButton]}
                     >
                         <Feather
-                            name="arrow-left"
+                            name="trash-2"
                             size={20}
-                            color={colors.accent}
+                            color={colors.danger}
                         />
                     </TouchableOpacity>
-                )}
-                <Text style={styles.headerTitle} numberOfLines={1}>
-                    {currentChat.title}
-                </Text>
-                <TouchableOpacity
-                    onPress={handleDeleteChat}
-                    style={[styles.iconButton, styles.deleteButton]}
-                >
-                    <Feather name="trash-2" size={20} color={colors.danger} />
-                </TouchableOpacity>
+                </View>
             </View>
 
             {error && (
@@ -1381,6 +1409,11 @@ const createStyles = (colors: ThemeColors) =>
             borderBottomWidth: 1,
             borderBottomColor: colors.border,
         },
+        tabletSidebarHeaderText: {
+            flex: 1,
+            gap: 8,
+            marginRight: 12,
+        },
         tabletSidebarTitle: {
             fontSize: 20,
             fontWeight: "700",
@@ -1457,6 +1490,20 @@ const createStyles = (colors: ThemeColors) =>
             borderBottomColor: colors.border,
             backgroundColor: colors.surface,
         },
+        headerLeft: {
+            marginRight: 8,
+        },
+        headerCenter: {
+            flex: 1,
+            minWidth: 0,
+            gap: 2,
+        },
+        headerRight: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            marginLeft: 8,
+        },
         iconButton: {
             padding: 4,
         },
@@ -1468,13 +1515,16 @@ const createStyles = (colors: ThemeColors) =>
             marginRight: 8,
         },
         headerTitle: {
-            flex: 1,
             fontSize: 17,
             fontWeight: "600",
             color: colors.text,
         },
+        headerSubtitle: {
+            fontSize: 12,
+            color: colors.textMuted,
+        },
         deleteButton: {
-            marginLeft: 8,
+            marginLeft: 0,
         },
         errorBanner: {
             flexDirection: "row",
