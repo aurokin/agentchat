@@ -7,7 +7,7 @@ import React, {
 } from "react";
 import * as WebBrowser from "expo-web-browser";
 import { makeRedirectUri } from "expo-auth-session";
-import { useConvexAuth, useQuery } from "convex/react";
+import { useAction, useConvexAuth, useQuery } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { api } from "@convex/_generated/api";
 import {
@@ -32,6 +32,7 @@ interface AuthContextValue {
     isConvexAvailable: boolean;
     signIn: () => Promise<void>;
     signOut: () => Promise<void>;
+    getBackendSessionToken: () => Promise<string>;
     configureConvex: (url: string) => Promise<void>;
     clearConvexOverride: () => Promise<void>;
 }
@@ -56,6 +57,7 @@ export function AuthProvider({
     const isConvexAvailable = useIsConvexAvailable();
     const { isAuthenticated, isLoading: isAuthLoading } = useConvexAuth();
     const authActions = useAuthActions();
+    const issueBackendSessionToken = useAction(api.backendTokens.issue);
     const userId = useQuery(
         api.users.getCurrentUserId,
         isAuthenticated ? {} : "skip",
@@ -165,6 +167,21 @@ export function AuthProvider({
         }
     }, [authActions]);
 
+    const getBackendSessionToken = useCallback(async () => {
+        if (!isConvexAvailable || !isAuthenticated) {
+            throw new Error("You must be signed in to connect to Agentchat.");
+        }
+
+        const result = await issueBackendSessionToken({});
+        if (!result || typeof result.token !== "string") {
+            throw new Error(
+                "Unable to create an authenticated Agentchat server session.",
+            );
+        }
+
+        return result.token;
+    }, [isAuthenticated, isConvexAvailable, issueBackendSessionToken]);
+
     const configureConvex = useCallback(async (url: string) => {
         await setConvexUrl(url);
     }, []);
@@ -182,6 +199,7 @@ export function AuthProvider({
                 isConvexAvailable,
                 signIn,
                 signOut,
+                getBackendSessionToken,
                 configureConvex,
                 clearConvexOverride,
             }}

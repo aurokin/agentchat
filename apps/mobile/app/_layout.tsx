@@ -9,6 +9,7 @@ import { AuthProvider } from "@/lib/convex/AuthContext";
 import { ConvexProvider } from "@/lib/convex";
 import { ModelProvider } from "@/contexts/ModelContext";
 import { SyncProvider } from "@/contexts/SyncContext";
+import { AgentchatSocketProvider } from "@/contexts/AgentchatSocketContext";
 import { ShareIntentBridge } from "@/components/share/ShareIntentBridge";
 import OnboardingScreen from "./onboarding";
 
@@ -53,22 +54,24 @@ export default function Layout(): ReactElement {
                 <ThemedStatusBar />
                 <ConvexProvider>
                     <AuthProvider>
-                        <ModelProvider>
-                            <SyncProvider>
-                                <AppProvider>
-                                    <ChatProvider>
-                                        <ShareIntentBridge />
-                                        <OnboardingWrapper>
-                                            <Stack
-                                                screenOptions={{
-                                                    headerShown: false,
-                                                }}
-                                            />
-                                        </OnboardingWrapper>
-                                    </ChatProvider>
-                                </AppProvider>
-                            </SyncProvider>
-                        </ModelProvider>
+                        <AgentchatSocketProvider>
+                            <ModelProvider>
+                                <SyncProvider>
+                                    <AppProvider>
+                                        <ChatProvider>
+                                            <ShareIntentBridge />
+                                            <OnboardingWrapper>
+                                                <Stack
+                                                    screenOptions={{
+                                                        headerShown: false,
+                                                    }}
+                                                />
+                                            </OnboardingWrapper>
+                                        </ChatProvider>
+                                    </AppProvider>
+                                </SyncProvider>
+                            </ModelProvider>
+                        </AgentchatSocketProvider>
                     </AuthProvider>
                 </ConvexProvider>
             </ThemeProvider>

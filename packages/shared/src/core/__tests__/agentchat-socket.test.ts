@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { toAgentchatWebSocketUrl } from "@shared/core/agentchat-socket";
+import { toAgentchatWebSocketUrl } from "../agentchat-socket";
 
 describe("agentchat socket helpers", () => {
     test("maps http urls to websocket urls", () => {
