@@ -132,12 +132,12 @@ function SettingsPageContent() {
                         <div className="space-y-4">
                             <div className="border border-border bg-muted/20 p-4 space-y-2">
                                 <div className="text-xs uppercase tracking-wider text-muted-foreground">
-                                    Migration Status
+                                    Architecture Status
                                 </div>
                                 <p className="text-sm text-muted-foreground leading-relaxed">
-                                    The web client is being migrated away from
-                                    older direct-provider assumptions toward the
-                                    new Agentchat server architecture.
+                                    The web client now depends on the Agentchat
+                                    server for provider orchestration instead of
+                                    direct provider calls from the browser.
                                 </p>
                             </div>
                             <div className="flex items-center gap-2 text-muted-foreground text-sm p-3 bg-muted/30 border border-border">

@@ -219,7 +219,7 @@ Agent instructions live in `AGENTS.md` and the linked docs under `docs/agents/`.
 - **Provider runtime**: `apps/server` owns live provider sessions and currently targets Codex first behind a provider abstraction
 - **Convex source of truth**: Auth, conversations, runs, and runtime bindings are persisted in Convex
 - **Browser storage**: Web local storage is limited to UI preferences like selected agent, theme, and per-agent defaults
-- **Monorepo**: Designed for web-first migration now, with mobile follow-up tracked in `docs/agentchat/mobile-followup.md`
+- **Monorepo**: Web and server are the primary implementation surfaces, with remaining mobile cleanup tracked in `docs/agentchat/mobile-followup.md`
 
 ## License
 

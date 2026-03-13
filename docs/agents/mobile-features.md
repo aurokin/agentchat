@@ -22,7 +22,7 @@ This document should reflect the current Agentchat product direction, not the ol
 
 ## Streaming Guidance
 
-- Do not build new mobile runtime flows around the legacy direct-provider streaming transport.
+- Do not build new mobile runtime flows around direct-provider streaming from the client.
 - The target mobile runtime is the same backend-driven model used on web:
   - backend session token minted from Convex auth
   - one authenticated socket connection per signed-in user
