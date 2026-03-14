@@ -11,6 +11,7 @@ This roadmap describes the current implementation state and the next major steps
 - Backend token auth, websocket transport, streaming, interruption, and recovery
 - Codex as the first working provider
 - Manual live runtime smoke and interrupt commands for the real local Codex plus Convex path
+- Manual repeated live runtime smoke for intentionally probing transient runtime flakes
 - Manual browser confidence coverage for the disabled-auth web flow
 - Manual operator browser smoke for config hot-reload and disabled agent/provider handling
 - Manual operator failure smoke for invalid config reloads, missing paths, and env diagnostics
@@ -44,6 +45,7 @@ This roadmap describes the current implementation state and the next major steps
 - Add integration coverage across `apps/server`, Convex ingress, and websocket runtime flow
 - Keep generated Convex bindings in sync with the live deployment before manual confidence passes
 - Run `bun run test:manual:live-runtime-smoke` against a real local `apps/server` instance to verify the full Codex plus Convex persistence path
+- Use `bun run test:manual:live-runtime-repeat` when you need a small manually-invoked flake probe across repeated smoke turns
 - Run `bun run test:manual:live-runtime-interrupt` to verify partial-output retention and interrupted run persistence
 - Keep live runtime smoke assertions on terminal runtime bindings and persisted run-event timelines, not just final transcript rows
 - Run `bun run test:manual:config-reload-smoke` to verify watched config changes disable or fallback safely without restarting the server

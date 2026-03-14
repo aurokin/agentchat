@@ -62,6 +62,14 @@ type LiveSmokeArgs = {
     agentId: string | null;
 };
 
+type FailureSnapshot = {
+    conversation: unknown;
+    assistantMessage: unknown;
+    messages: unknown;
+    runs: unknown;
+    runtimeBinding: unknown;
+};
+
 type LiveOutcome =
     | {
           status: "completed";
@@ -694,6 +702,79 @@ async function postRuntimeIngress<T>(params: {
     return (await response.json()) as T;
 }
 
+async function tryCollectFailureSnapshot(params: {
+    repoRoot: string;
+    userId: string;
+    identity: Identity | null;
+    conversationLocalId: string;
+    assistantMessageLocalId: string;
+}): Promise<FailureSnapshot | null> {
+    try {
+        const conversation = runConvex({
+            repoRoot: params.repoRoot,
+            functionName: "chats:getByLocalId",
+            args: {
+                userId: params.userId,
+                localId: params.conversationLocalId,
+            },
+            identity: params.identity ?? undefined,
+        });
+
+        const assistantMessage = runConvex({
+            repoRoot: params.repoRoot,
+            functionName: "messages:getByLocalId",
+            args: {
+                userId: params.userId,
+                localId: params.assistantMessageLocalId,
+            },
+            identity: params.identity ?? undefined,
+        });
+
+        const messages =
+            conversation && typeof conversation === "object" && "_id" in conversation
+                ? runConvex({
+                      repoRoot: params.repoRoot,
+                      functionName: "messages:listByChat",
+                      args: {
+                          chatId: (conversation as { _id: string })._id,
+                      },
+                      identity: params.identity ?? undefined,
+                  })
+                : null;
+
+        const runs =
+            conversation && typeof conversation === "object" && "_id" in conversation
+                ? runConvex({
+                      repoRoot: params.repoRoot,
+                      functionName: "runs:listByChat",
+                      args: {
+                          chatId: (conversation as { _id: string })._id,
+                      },
+                      identity: params.identity ?? undefined,
+                  })
+                : null;
+
+        const runtimeBinding = await postRuntimeIngress({
+            repoRoot: params.repoRoot,
+            path: "/runtime/runtime-binding/read",
+            payload: {
+                userId: params.userId,
+                conversationLocalId: params.conversationLocalId,
+            },
+        });
+
+        return {
+            conversation,
+            assistantMessage,
+            messages,
+            runs,
+            runtimeBinding: null,
+        };
+    } catch {
+        return null;
+    }
+}
+
 function assertSmokeContent(content: string): void {
     const normalized = content.trim();
     invariant(
@@ -966,19 +1047,42 @@ async function main() {
             },
     });
 
-    const outcome = await runLiveConversation({
-        serverUrl: args.serverUrl,
-        token: token.token,
-        conversationId: ids.conversationId,
-        agentId,
-        modelId,
-        variantId,
-        thinking,
-        content: buildPrompt(args.mode),
-        userMessageId: ids.userMessageId,
-        assistantMessageId: ids.assistantMessageId,
-        mode: args.mode === "interrupt" ? "interrupt" : "smoke",
-    });
+    let outcome: LiveOutcome;
+    try {
+        outcome = await runLiveConversation({
+            serverUrl: args.serverUrl,
+            token: token.token,
+            conversationId: ids.conversationId,
+            agentId,
+            modelId,
+            variantId,
+            thinking,
+            content: buildPrompt(args.mode),
+            userMessageId: ids.userMessageId,
+            assistantMessageId: ids.assistantMessageId,
+            mode: args.mode === "interrupt" ? "interrupt" : "smoke",
+        });
+    } catch (error) {
+        const snapshot = await tryCollectFailureSnapshot({
+            repoRoot,
+            userId,
+            identity,
+            conversationLocalId: ids.conversationId,
+            assistantMessageLocalId: ids.assistantMessageId,
+        });
+        if (snapshot) {
+            console.error(
+                JSON.stringify(
+                    {
+                        failureSnapshot: snapshot,
+                    },
+                    null,
+                    2,
+                ),
+            );
+        }
+        throw error;
+    }
 
     const assistantMessage = runConvex<{
         status: string;

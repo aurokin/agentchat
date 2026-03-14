@@ -113,6 +113,7 @@ Purpose:
 Invocation:
 
 - `bun run test:manual:live-runtime-smoke`
+- `bun run test:manual:live-runtime-repeat`
 - `bun run test:manual:live-runtime-interrupt`
 - `bun run test:manual:stale-runtime-resume`
 - `bun run test:manual:config-reload-smoke`
@@ -131,6 +132,7 @@ Coverage targets:
 - verify terminal runtime bindings settle to the expected persisted idle state
 - verify persisted run-event timelines stay ordered and end with the expected terminal events
 - verify a stale persisted runtime binding falls back to a fresh thread start and is replaced in Convex
+- rerun the cheap smoke path intentionally when you need to probe transient runtime flakes
 
 Current behavior note:
 
@@ -214,6 +216,7 @@ Current manual confidence command:
 
 - `bun run test:manual:codex-confidence`
 - `bun run test:manual:live-runtime-smoke`
+- `bun run test:manual:live-runtime-repeat`
 - `bun run test:manual:live-runtime-interrupt`
 - `bun run test:manual:stale-runtime-resume`
 - `bun run test:manual:config-reload-smoke`
