@@ -39,6 +39,7 @@ This roadmap describes the current implementation state and the next major steps
 - Keep `bun run test:manual:runtime-confidence` as the single manual operator command for the local runtime stack
 - Prefer Convex-issued backend session tokens for these live passes; allow the local signing fallback only while the deployment is still missing `BACKEND_TOKEN_SECRET`
 - Add browser-level end-to-end coverage for agent selection, chat send, interruption, refresh, and recovery
+- Keep browser E2E work honest: do not add fake auth bypasses just to automate the chat flow
 - Build a manual QA checklist for real Codex-backed instances
 - Keep these tests manually invoked, not automatic on push
 

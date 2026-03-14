@@ -152,6 +152,12 @@ Coverage targets:
 
 These should also be manually invoked, not run automatically on push.
 
+Current boundary:
+
+- meaningful full-chat browser E2E still requires an authenticated, allowlisted Google session
+- until the project has an explicit local authenticated test harness, browser automation should focus on unauthenticated and operator-facing states
+- full authenticated chat confidence currently comes from the manual runtime commands plus the interactive checklist rather than unattended browser automation
+
 ## Manual QA Checklist
 
 Use [manual-qa-checklist.md](./manual-qa-checklist.md) for the explicit Codex confidence pass tied to these fixtures.
