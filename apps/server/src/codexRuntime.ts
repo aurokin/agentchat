@@ -268,6 +268,10 @@ export class CodexRuntimeManager {
                     startedAt,
                 });
             } catch (error) {
+                const errorMessage =
+                    error instanceof Error
+                        ? error.message
+                        : "Failed to start Codex turn";
                 if (runtime.activeTurn?.turnId) {
                     try {
                         await runtime.client.request("turn/interrupt", {
@@ -284,24 +288,71 @@ export class CodexRuntimeManager {
                 if (runtime.activeTurn?.pendingDeltaFlush) {
                     clearTimeout(runtime.activeTurn.pendingDeltaFlush);
                 }
+                const failedTurn = runtime.activeTurn;
                 runtime.activeTurn = null;
+                if (failedTurn) {
+                    try {
+                        await this.persistence.runFailed({
+                            userId: failedTurn.userId,
+                            conversationLocalId:
+                                params.command.payload.conversationId,
+                            assistantMessageLocalId:
+                                failedTurn.assistantMessageId,
+                            externalRunId: failedTurn.runId,
+                            sequence: failedTurn.nextSequence,
+                            content: failedTurn.text,
+                            completedAt: Date.now(),
+                            errorMessage,
+                        });
+                    } catch (persistError) {
+                        console.error(
+                            "[agentchat-server] failed to persist send-start failure",
+                            persistError,
+                        );
+                    }
+                }
+                void this.persistence
+                    .runtimeBinding({
+                        userId: params.userId,
+                        conversationLocalId:
+                            params.command.payload.conversationId,
+                        provider: runtime.provider.id,
+                        status: "errored",
+                        providerThreadId: runtime.threadId,
+                        providerResumeToken: null,
+                        activeRunId: null,
+                        lastError: errorMessage,
+                        lastEventAt: Date.now(),
+                        expiresAt: null,
+                        updatedAt: Date.now(),
+                    })
+                    .catch((persistError) => {
+                        if (
+                            isRecoverablePersistenceMissingResource(
+                                persistError,
+                            )
+                        ) {
+                            return;
+                        }
+                        console.error(
+                            "[agentchat-server] failed to persist send-start error binding",
+                            persistError,
+                        );
+                    });
+                runtime.client.stop();
+                this.runtimes.delete(runtime.key);
                 this.emitToSubscribers(
                     runtime,
                     createServerEvent("run.failed", {
                         conversationId: params.command.payload.conversationId,
                         runId,
                         error: {
-                            message:
-                                error instanceof Error
-                                    ? error.message
-                                    : "Failed to start Codex turn",
+                            message: errorMessage,
                         },
                     }),
                 );
                 reject(
-                    error instanceof Error
-                        ? error
-                        : new Error("Failed to start Codex turn"),
+                    error instanceof Error ? error : new Error(errorMessage),
                 );
             }
         }).catch(() => undefined);

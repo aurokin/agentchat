@@ -15,6 +15,7 @@ This roadmap describes the current implementation state and the next major steps
 - Manual operator browser smoke for config hot-reload and disabled agent/provider handling
 - Manual operator failure smoke for invalid config reloads, missing paths, and env diagnostics
 - Manual stale-runtime-resume smoke for recoverable runtime-binding fallback
+- Server coverage for websocket command routing, persistence client endpoints, start-failure persistence, and mid-stream runtime crash handling
 - Removal of billing, analytics, attachments, browser-local product modes, and hosted deployment assumptions
 
 ## Active Work

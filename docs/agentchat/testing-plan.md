@@ -92,9 +92,13 @@ Coverage targets:
 
 - backend auth token verification
 - websocket send/subscribe/interrupt protocol
+- websocket event passthrough from runtime subscriptions back to clients
 - runtime persistence ingress into Convex
+- runtime persistence client coverage for all write endpoints and null binding reads
 - generated Convex bindings validated against the live deployment
 - Codex thread start/resume fallback behavior
+- Codex turn-start failure persistence and errored binding repair
+- Codex mid-stream runtime exit handling with partial-output failure persistence
 - disabled provider / disabled agent handling
 - operator diagnostics for invalid paths and fallback defaults
 

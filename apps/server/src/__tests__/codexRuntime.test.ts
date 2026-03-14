@@ -66,6 +66,7 @@ type FakeClientOptions = {
     startedThreadId?: string;
     turnId?: string;
     autoComplete?: boolean;
+    turnStartError?: Error;
 };
 
 class FakeCodexClient {
@@ -73,6 +74,7 @@ class FakeCodexClient {
     readonly options: FakeClientOptions;
     stopped = false;
     private notificationHandler: ((notification: any) => void) | null = null;
+    private exitHandler: ((error: Error) => void) | null = null;
 
     constructor(options: FakeClientOptions = {}) {
         this.options = options;
@@ -105,6 +107,9 @@ class FakeCodexClient {
         }
 
         if (method === "turn/start") {
+            if (this.options.turnStartError) {
+                throw this.options.turnStartError;
+            }
             if (this.options.autoComplete !== false) {
                 setTimeout(() => {
                     this.notificationHandler?.({
@@ -136,7 +141,7 @@ class FakeCodexClient {
     }
 
     onExit(handler: (error: Error) => void): void {
-        void handler;
+        this.exitHandler = handler;
     }
 
     stop(): void {
@@ -145,6 +150,10 @@ class FakeCodexClient {
 
     emit(notification: unknown): void {
         this.notificationHandler?.(notification);
+    }
+
+    emitExit(error: Error): void {
+        this.exitHandler?.(error);
     }
 }
 
@@ -162,6 +171,8 @@ function createPersistence(
         runtimeBindingCalls: [] as Array<Record<string, unknown>>,
         runStartedCalls: [] as Array<Record<string, unknown>>,
         runCompletedCalls: [] as Array<Record<string, unknown>>,
+        runFailedCalls: [] as Array<Record<string, unknown>>,
+        runInterruptedCalls: [] as Array<Record<string, unknown>>,
         async readRuntimeBinding(payload: {
             userId: string;
             conversationLocalId: string;
@@ -195,11 +206,11 @@ function createPersistence(
         async runCompleted(payload: Record<string, unknown>) {
             this.runCompletedCalls.push(payload);
         },
-        async runInterrupted() {
-            return undefined;
+        async runInterrupted(payload: Record<string, unknown>) {
+            this.runInterruptedCalls.push(payload);
         },
-        async runFailed() {
-            return undefined;
+        async runFailed(payload: Record<string, unknown>) {
+            this.runFailedCalls.push(payload);
         },
     };
 }
@@ -572,6 +583,108 @@ describe("CodexRuntimeManager", () => {
             "run.interrupted",
         ]);
         expect(persistence.runCompletedCalls).toHaveLength(0);
+        expect(persistence.runInterruptedCalls).toHaveLength(1);
+    });
+
+    test("persists a failed run and errored binding when turn/start fails", async () => {
+        const config = createConfig();
+        const persistence = createPersistence(null);
+        const fakeClient = new FakeCodexClient({
+            turnStartError: new Error("turn/start failed: codex unavailable"),
+        });
+        const events: Array<{
+            type: string;
+            payload: Record<string, unknown>;
+        }> = [];
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: () => fakeClient,
+        });
+
+        await manager.sendMessage({
+            userSub: "sub-1",
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: (event) => {
+                events.push(event);
+            },
+        });
+
+        expect(events.map((event) => event.type)).toEqual([
+            "run.started",
+            "run.failed",
+        ]);
+        expect(persistence.runFailedCalls).toHaveLength(1);
+        expect(persistence.runFailedCalls[0]).toMatchObject({
+            conversationLocalId: "chat-1",
+            assistantMessageLocalId: "assistant-1",
+            errorMessage: "turn/start failed: codex unavailable",
+        });
+        expect(persistence.runtimeBindingCalls.at(-1)).toMatchObject({
+            conversationLocalId: "chat-1",
+            status: "errored",
+            lastError: "turn/start failed: codex unavailable",
+            activeRunId: null,
+        });
+        expect(fakeClient.stopped).toBe(true);
+    });
+
+    test("persists crashed runs when the runtime exits mid-stream", async () => {
+        const config = createConfig();
+        const persistence = createPersistence(null);
+        const fakeClient = new FakeCodexClient({
+            startedThreadId: "thread-fresh",
+            autoComplete: false,
+        });
+        const events: Array<{
+            type: string;
+            payload: Record<string, unknown>;
+        }> = [];
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: () => fakeClient,
+        });
+
+        const sendPromise = manager.sendMessage({
+            userSub: "sub-1",
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: (event) => {
+                events.push(event);
+            },
+        });
+
+        await Bun.sleep(0);
+        fakeClient.emit({
+            method: "item/agentMessage/delta",
+            params: {
+                delta: "Partial crash output",
+            },
+        });
+        await Bun.sleep(300);
+        fakeClient.emitExit(new Error("Codex process exited unexpectedly"));
+        await sendPromise;
+
+        expect(events.map((event) => event.type)).toEqual([
+            "run.started",
+            "message.delta",
+            "message.completed",
+            "run.failed",
+        ]);
+        expect(persistence.runFailedCalls).toHaveLength(1);
+        expect(persistence.runFailedCalls[0]).toMatchObject({
+            content: "Partial crash output",
+            errorMessage: "Codex process exited unexpectedly",
+        });
+        expect(persistence.runtimeBindingCalls.at(-1)).toMatchObject({
+            status: "errored",
+            lastError: "Codex process exited unexpectedly",
+            activeRunId: null,
+        });
     });
 
     test("interrupt is a no-op when no active run exists", async () => {
