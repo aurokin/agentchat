@@ -136,7 +136,7 @@ Set:
 - `EXPO_PUBLIC_CONVEX_URL=https://<your-deployment>.convex.cloud`
 - `EXPO_PUBLIC_AGENTCHAT_SERVER_URL=http://<your-local-server-host>:3030`
 
-3C) Fastest iPhone manual path from Linux: Expo Go over LAN.
+3C) Best-effort iPhone path from Linux: Expo Go over LAN.
 
 ```bash
 bun run dev:mobile:expo-go
@@ -145,6 +145,19 @@ bun run dev:mobile:expo-go
 Then scan the QR code in Expo Go on the iPhone.
 
 Use a reachable LAN host for `EXPO_PUBLIC_AGENTCHAT_SERVER_URL`; do not leave it at `localhost` when testing from another device.
+
+If Expo Go reports that the project is incompatible with the installed Expo Go release, switch to an EAS development build instead:
+
+```bash
+cd apps/mobile && bun run ios:eas-register-device
+cd apps/mobile && bun run ios:eas-device
+```
+
+Then start Metro for the installed development build:
+
+```bash
+cd apps/mobile && bun run dev-client
+```
 
 3D) Start a native mobile build:
 

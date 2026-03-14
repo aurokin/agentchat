@@ -131,6 +131,8 @@ Set these in `apps/mobile/.env` for local runs. A template lives at `apps/mobile
 - `EXPO_PUBLIC_AGENTCHAT_SERVER_URL` - Base URL for the self-hosted Agentchat backend server used for provider/model metadata and mobile runtime access. Example: `http://localhost:3030` in local dev. For physical-device testing, use a reachable LAN host instead of `localhost`.
 - `EXPO_PUBLIC_GOOGLE_CLIENT_ID` - Optional. Only needed for the current Google sign-in path when auth mode is `google`.
 
+For iPhone testing from Linux, prefer an EAS development build over Expo Go when Expo Go reports an SDK incompatibility.
+
 **Convex CLI (`packages/convex`)**
 
 Local dev only. Configure the Convex CLI target workspace in `packages/convex/.env.local` (a template lives at `packages/convex/.env.example`):
@@ -202,6 +204,10 @@ bun run dev:mobile
 
 # Convex + server + mobile Expo Go over LAN
 bun run dev:mobile:expo-go
+
+# Remote iPhone development build
+cd apps/mobile && bun run ios:eas-register-device
+cd apps/mobile && bun run ios:eas-device
 
 # Convex + web + mobile dev client
 bun run dev:all

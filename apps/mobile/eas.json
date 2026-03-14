@@ -9,6 +9,7 @@
             "distribution": "internal",
             "env": {
                 "EXPO_PUBLIC_CONVEX_URL": "https://your-development.convex.cloud",
+                "EXPO_PUBLIC_AGENTCHAT_SERVER_URL": "http://your-lan-host:3030",
                 "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "your-google-client-id.apps.googleusercontent.com"
             },
             "android": {
@@ -16,6 +17,18 @@
             },
             "ios": {
                 "simulator": true
+            }
+        },
+        "development-device": {
+            "developmentClient": true,
+            "distribution": "internal",
+            "env": {
+                "EXPO_PUBLIC_CONVEX_URL": "https://your-development.convex.cloud",
+                "EXPO_PUBLIC_AGENTCHAT_SERVER_URL": "http://your-lan-host:3030",
+                "EXPO_PUBLIC_GOOGLE_CLIENT_ID": "your-google-client-id.apps.googleusercontent.com"
+            },
+            "android": {
+                "buildType": "apk"
             }
         }
     }

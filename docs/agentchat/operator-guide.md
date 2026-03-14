@@ -199,7 +199,8 @@ as the source of truth for what this host can and cannot test.
 Short version for this Linux environment:
 
 - Android is the primary native automation target.
-- iPhone testing is currently manual-device testing via Expo Go.
+- iPhone testing is manual-device testing, preferably via EAS development build.
+- Expo Go on iPhone is best-effort only and may be blocked by Expo SDK / App Store release lag.
 - iOS simulator and local native iOS build workflows require macOS.
 
 ## 7. Common Failure Modes
