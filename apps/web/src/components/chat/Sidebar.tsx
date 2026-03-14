@@ -80,6 +80,14 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
         }
         return counts;
     }, [conversationRuntimeBindings]);
+    const activeChats = useMemo(
+        () =>
+            chats.filter(
+                (chat) =>
+                    conversationRuntimeBindings[chat.id]?.status === "active",
+            ),
+        [chats, conversationRuntimeBindings],
+    );
 
     const isMobileActionMode = isMobile || isTablet || isTouchDevice;
 
@@ -355,6 +363,48 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                     ref={scrollContainerRef}
                     className="flex-1 overflow-y-auto"
                 >
+                    {activeChats.length > 0 && (
+                        <div className="border-b border-border px-3 py-3">
+                            <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                                Active Runs
+                            </p>
+                            <ul className="space-y-1 list-none">
+                                {activeChats.map((chat) => (
+                                    <li key={`active-${chat.id}`}>
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                handleSelectChat(chat.id)
+                                            }
+                                            className={cn(
+                                                "flex w-full items-center gap-2 border border-border px-3 py-2 text-left transition-colors hover:border-primary/30 hover:bg-muted/50",
+                                                currentChat?.id === chat.id &&
+                                                    "border-primary/30 bg-primary/10",
+                                            )}
+                                        >
+                                            <LoaderCircle
+                                                size={14}
+                                                className="shrink-0 animate-spin text-primary"
+                                            />
+                                            <div className="min-w-0 flex-1">
+                                                <p className="truncate text-sm font-medium text-foreground">
+                                                    {chat.title}
+                                                </p>
+                                                <p className="text-xs text-muted-foreground">
+                                                    {agents.find(
+                                                        (agent) =>
+                                                            agent.id ===
+                                                            chat.agentId,
+                                                    )?.name ?? "Active agent"}
+                                                </p>
+                                            </div>
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+
                     {loading ? (
                         <ChatListSkeleton />
                     ) : chats.length === 0 ? (
