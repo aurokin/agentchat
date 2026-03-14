@@ -35,13 +35,10 @@ describe("model capabilities", () => {
         expect(modelSupportsVision(undefined)).toBe(false);
     });
 
-    it("uses Codex effort variants directly and tolerates legacy aliases", () => {
+    it("uses provider variants directly without legacy aliases", () => {
         expect(resolveThinkingLevelForVariant("low")).toBe("low");
         expect(resolveThinkingLevelForVariant("medium")).toBe("medium");
         expect(resolveThinkingLevelForVariant("high")).toBe("high");
-        expect(resolveThinkingLevelForVariant("fast")).toBe("low");
-        expect(resolveThinkingLevelForVariant("balanced")).toBe("medium");
-        expect(resolveThinkingLevelForVariant("deep")).toBe("high");
         expect(resolveThinkingLevelForVariant("minimal")).toBe("minimal");
         expect(resolveThinkingLevelForVariant("unknown", "none")).toBe("none");
     });

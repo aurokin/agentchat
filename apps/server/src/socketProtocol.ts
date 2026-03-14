@@ -11,7 +11,6 @@ export interface ConversationSendCommand {
         agentId: string;
         modelId: string;
         variantId?: string | null;
-        thinking: "xhigh" | "high" | "medium" | "low" | "minimal" | "none";
         content: string;
         userMessageId: string;
         assistantMessageId: string;
@@ -136,17 +135,6 @@ export function parseClientCommand(raw: string): ClientCommand {
             !payload.history.every(isHistoryEntry)
         ) {
             throw new Error("Invalid send payload");
-        }
-
-        if (
-            payload.thinking !== "xhigh" &&
-            payload.thinking !== "high" &&
-            payload.thinking !== "medium" &&
-            payload.thinking !== "low" &&
-            payload.thinking !== "minimal" &&
-            payload.thinking !== "none"
-        ) {
-            throw new Error("Invalid thinking level");
         }
 
         return {

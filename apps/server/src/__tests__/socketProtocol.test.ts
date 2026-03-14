@@ -14,7 +14,6 @@ describe("socket protocol parsing", () => {
                         agentId: "agent-1",
                         modelId: "gpt-5.3-codex",
                         variantId: "medium",
-                        thinking: "medium",
                         content: "Hello",
                         userMessageId: "user-1",
                         assistantMessageId: "assistant-1",
@@ -31,7 +30,7 @@ describe("socket protocol parsing", () => {
         });
     });
 
-    test("rejects invalid thinking levels", () => {
+    test("rejects send commands with invalid payloads", () => {
         expect(() =>
             parseClientCommand(
                 JSON.stringify({
@@ -41,15 +40,13 @@ describe("socket protocol parsing", () => {
                         conversationId: "chat-1",
                         agentId: "agent-1",
                         modelId: "gpt-5.3-codex",
-                        thinking: "fast",
                         content: "Hello",
-                        userMessageId: "user-1",
                         assistantMessageId: "assistant-1",
                         history: [],
                     },
                 }),
             ),
-        ).toThrow("Invalid thinking level");
+        ).toThrow("Invalid send payload");
     });
 
     test("parses interrupt commands", () => {
@@ -102,7 +99,6 @@ describe("socket protocol parsing", () => {
                         conversationId: "chat-1",
                         agentId: "agent-1",
                         modelId: "gpt-5.3-codex",
-                        thinking: "medium",
                         content: "Hello",
                         userMessageId: "user-1",
                         assistantMessageId: "assistant-1",

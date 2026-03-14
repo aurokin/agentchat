@@ -52,12 +52,6 @@ const THINKING_LEVEL_VARIANTS = new Set<ThinkingLevel>([
     "none",
 ]);
 
-const LEGACY_CODEX_VARIANT_TO_THINKING: Record<string, ThinkingLevel> = {
-    fast: "low",
-    balanced: "medium",
-    deep: "high",
-};
-
 export function resolveThinkingLevelForVariant(
     variantId: string | null | undefined,
     fallback: ThinkingLevel = "none",
@@ -70,5 +64,5 @@ export function resolveThinkingLevelForVariant(
         return variantId as ThinkingLevel;
     }
 
-    return LEGACY_CODEX_VARIANT_TO_THINKING[variantId] ?? fallback;
+    return fallback;
 }

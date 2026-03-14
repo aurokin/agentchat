@@ -139,20 +139,41 @@ export function buildInitialTurnText(
 }
 
 function resolveCodexEffort(command: ConversationSendCommand): string {
-    switch (command.payload.variantId) {
-        case "fast":
-            return "low";
-        case "balanced":
-            return "medium";
-        case "deep":
-            return "high";
-        default:
-            return command.payload.variantId ?? command.payload.thinking;
-    }
+    return command.payload.variantId ?? "medium";
 }
 
 const REPORT_HEADING_PATTERN =
     /\n{2,}(Report|Assessment|Structure|Summary|Findings?|Recommendations?|Notable details|What [^\n:]+)\n/i;
+
+const STRUCTURED_LIST_PATTERN = /(?:\d+\.\s+|[-*]\s+)/g;
+
+function findStructuredListBoundary(text: string): number | null {
+    for (const match of text.matchAll(STRUCTURED_LIST_PATTERN)) {
+        const index = match.index ?? -1;
+        if (index <= 0) {
+            continue;
+        }
+
+        const prefix = text.slice(0, index);
+        const trimmedPrefix = trimTrailingMessageContent(prefix) ?? "";
+        if (trimmedPrefix.length < 48) {
+            continue;
+        }
+
+        const recentPrefix = prefix.slice(Math.max(0, prefix.length - 4));
+        const hasParagraphBoundary =
+            recentPrefix.includes("\n\n") ||
+            /[.!?]\s*$/.test(prefix) ||
+            /[.!?]$/.test(prefix);
+        if (!hasParagraphBoundary) {
+            continue;
+        }
+
+        return index;
+    }
+
+    return null;
+}
 
 function detectTranscriptSplitBoundary(text: string): number | null {
     if (text.length < 48) {
@@ -161,7 +182,7 @@ function detectTranscriptSplitBoundary(text: string): number | null {
 
     const match = REPORT_HEADING_PATTERN.exec(text);
     if (!match || match.index <= 0) {
-        return null;
+        return findStructuredListBoundary(text);
     }
 
     return match.index + (match[0].startsWith("\n\n") ? 2 : 0);

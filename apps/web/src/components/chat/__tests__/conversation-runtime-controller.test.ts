@@ -110,7 +110,6 @@ describe("conversation runtime controller", () => {
                 agentId: "agent-1",
                 modelId: "gpt-5.3-codex",
                 variantId: "high",
-                thinking: "high",
                 content: "New prompt",
                 userMessageId: "user-1",
                 assistantMessageId: "assistant-1",
@@ -140,7 +139,7 @@ describe("conversation runtime controller", () => {
 
         expect(sendPlan.effectiveThinking).toBe("none");
         expect(sendPlan.userMessage.thinkingLevel).toBe("none");
-        expect(sendPlan.command.payload.thinking).toBe("none");
+        expect(sendPlan.command.payload.variantId).toBe("high");
     });
 
     test("includes prior transcript entries in the send command history", () => {

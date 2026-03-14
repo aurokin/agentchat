@@ -228,7 +228,6 @@ function createCommand() {
             agentId: "agent-1",
             modelId: "gpt-5.3-codex",
             variantId: null,
-            thinking: "medium" as const,
             content: "Continue the migration",
             userMessageId: "user-1",
             assistantMessageId: "assistant-1",
@@ -372,7 +371,6 @@ describe("CodexRuntimeManager", () => {
                 payload: {
                     ...createCommand().payload,
                     variantId: "high",
-                    thinking: "low",
                 },
             },
             sendEvent: () => {},
@@ -581,6 +579,68 @@ describe("CodexRuntimeManager", () => {
             method: "item/agentMessage/delta",
             params: {
                 delta: "I’m surveying the workspace first.\n\nReport\n- Done",
+            },
+        });
+        await Bun.sleep(300);
+        fakeClient.emit({
+            method: "turn/completed",
+            params: {
+                turn: {
+                    status: "completed",
+                },
+            },
+        });
+        await sendPromise;
+
+        expect(events.map((event) => event.type)).toEqual([
+            "run.started",
+            "message.started",
+            "message.completed",
+            "message.started",
+            "message.delta",
+            "message.completed",
+            "run.completed",
+        ]);
+        expect(persistence.messageStartedCalls).toHaveLength(1);
+        expect(persistence.messageStartedCalls[0]).toMatchObject({
+            previousAssistantMessageLocalId: "assistant-1",
+            kind: "assistant_message",
+            runMessageIndex: 1,
+        });
+    });
+
+    test("splits numbered-list output into a second assistant transcript message", async () => {
+        const config = createConfig();
+        const persistence = createPersistence(null);
+        const fakeClient = new FakeCodexClient({
+            startedThreadId: "thread-fresh",
+            autoComplete: false,
+        });
+        const events: Array<{
+            type: string;
+            payload: Record<string, unknown>;
+        }> = [];
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: () => fakeClient,
+        });
+
+        const sendPromise = manager.sendMessage({
+            userSub: "sub-1",
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: (event) => {
+                events.push(event);
+            },
+        });
+
+        await Bun.sleep(0);
+        fakeClient.emit({
+            method: "item/agentMessage/delta",
+            params: {
+                delta: "I’m reading notes.md in the workspace and will return a chat-only 100-item improvement plan without editing files.1. Add a brief purpose sentence under the title.",
             },
         });
         await Bun.sleep(300);

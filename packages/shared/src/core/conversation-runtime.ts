@@ -162,7 +162,6 @@ export function prepareConversationSend(params: {
                 agentId: params.chat.agentId,
                 modelId: params.chat.modelId,
                 variantId: params.chat.variantId ?? null,
-                thinking: effectiveThinking,
                 content: params.content,
                 userMessageId,
                 assistantMessageId,

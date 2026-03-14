@@ -1,5 +1,3 @@
-import type { ThinkingLevel } from "./types";
-
 export interface ConversationHistoryEntry {
     role: "user" | "assistant" | "system";
     content: string;
@@ -13,7 +11,6 @@ export interface ConversationSendCommand {
         agentId: string;
         modelId: string;
         variantId?: string | null;
-        thinking: ThinkingLevel;
         content: string;
         userMessageId: string;
         assistantMessageId: string;
