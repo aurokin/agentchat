@@ -82,6 +82,12 @@ Then seed the standard local smoke users:
 bun run setup:local-smoke-users
 ```
 
+Or do the full local-auth smoke migration in one step:
+
+```bash
+bun run setup:local-auth-smoke
+```
+
 Or switch to Google auth:
 
 ```bash

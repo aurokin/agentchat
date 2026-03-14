@@ -100,6 +100,12 @@ bun run setup:test-agent-config -- --auth-mode=local --force
 bun run setup:local-smoke-users
 ```
 
+Or run the combined helper:
+
+```bash
+bun run setup:local-auth-smoke
+```
+
 Re-run with `--force` only if you want to replace an existing local config:
 
 ```bash
