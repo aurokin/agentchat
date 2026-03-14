@@ -70,6 +70,32 @@ function buildAuthConfig(authMode: AuthMode, allowedEmail: string) {
     };
 }
 
+function buildOptionalAgents(homeDir: string) {
+    const optionalAgents = [];
+    const warcraftRoot = path.join(homeDir, "agents", "warcraft_simple");
+
+    if (existsSync(warcraftRoot)) {
+        optionalAgents.push({
+            id: "warcraft-simple",
+            name: "Warcraft Simple",
+            description: "Warcraft-focused agent workspace.",
+            avatar: null,
+            enabled: true,
+            rootPath: warcraftRoot,
+            providerIds: ["codex-main"],
+            defaultProviderId: "codex-main",
+            defaultModel: "gpt-5.4",
+            defaultVariant: "low",
+            modelAllowlist: [],
+            variantAllowlist: [],
+            tags: ["warcraft"],
+            sortOrder: 40,
+        });
+    }
+
+    return optionalAgents;
+}
+
 function buildConfig(homeDir: string, authMode: AuthMode, allowedEmail: string) {
     const fixturesRoot = path.join(homeDir, "agents", "agentchat_test");
 
@@ -186,6 +212,7 @@ function buildConfig(homeDir: string, authMode: AuthMode, allowedEmail: string) 
                 tags: ["workspace"],
                 sortOrder: 30,
             },
+            ...buildOptionalAgents(homeDir),
         ],
     };
 }
