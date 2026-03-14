@@ -3,8 +3,6 @@ import type { ProviderModel } from "@shared/core/models";
 import {
     filterModels,
     splitFavoriteModels,
-    groupModelsByProvider,
-    getProviderOrder,
 } from "@/components/chat/model-selector-utils";
 
 describe("ModelSelector logic (mobile)", () => {
@@ -99,73 +97,20 @@ describe("ModelSelector logic (mobile)", () => {
         });
     });
 
-    describe("groupModelsByProvider", () => {
-        test("groups by provider from id", () => {
+    describe("otherModels", () => {
+        test("sorts non-favorites alphabetically by name", () => {
             const { otherModels } = splitFavoriteModels(
                 mockModels,
                 favoriteModels,
             );
-            const grouped = groupModelsByProvider(otherModels);
-            expect(Object.keys(grouped)).toEqual([
-                "anthropic",
-                "openai",
-                "google",
-                "meta",
+            expect(otherModels.map((model) => model.name)).toEqual([
+                "claude-3-5-sonnet",
+                "claude-3-haiku",
+                "gemini-pro",
+                "gpt-4o",
+                "gpt-4o-mini",
+                "llama-3-70b",
             ]);
-        });
-
-        test("groups have correct models", () => {
-            const { otherModels } = splitFavoriteModels(
-                mockModels,
-                favoriteModels,
-            );
-            const grouped = groupModelsByProvider(otherModels);
-            expect(grouped.anthropic).toHaveLength(2);
-            expect(grouped.openai).toHaveLength(2);
-            expect(grouped.google).toHaveLength(1);
-            expect(grouped.meta).toHaveLength(1);
-        });
-
-        test("handles model without provider prefix", () => {
-            const modelsWithNoProvider: ProviderModel[] = [
-                {
-                    id: "no-slash-model",
-                    name: "no-slash-model",
-                    provider: "Unknown",
-                },
-            ];
-
-            const grouped = groupModelsByProvider(modelsWithNoProvider);
-            expect(grouped.other).toBeDefined();
-            expect(grouped.other).toHaveLength(1);
-        });
-    });
-
-    describe("getProviderOrder", () => {
-        test("returns providers in first-occurrence order", () => {
-            const { otherModels } = splitFavoriteModels(
-                mockModels,
-                favoriteModels,
-            );
-            const order = getProviderOrder(otherModels);
-            expect(order).toEqual(["anthropic", "openai", "google", "meta"]);
-        });
-
-        test("deduplicates providers", () => {
-            const order = getProviderOrder([
-                { id: "openai/gpt-4o", name: "gpt-4o", provider: "OpenAI" },
-                {
-                    id: "openai/gpt-4o-mini",
-                    name: "gpt-4o-mini",
-                    provider: "OpenAI",
-                },
-                {
-                    id: "anthropic/claude",
-                    name: "claude",
-                    provider: "Anthropic",
-                },
-            ]);
-            expect(order).toEqual(["openai", "anthropic"]);
         });
     });
 });

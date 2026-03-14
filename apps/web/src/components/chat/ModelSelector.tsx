@@ -93,27 +93,12 @@ export function ModelSelector({
             .filter((model) => favoriteModels.includes(model.id))
             .sort((a, b) => a.name.localeCompare(b.name));
 
-        const others = filteredModels.filter(
-            (model) => !favoriteModels.includes(model.id),
-        );
+        const others = filteredModels
+            .filter((model) => !favoriteModels.includes(model.id))
+            .sort((a, b) => a.name.localeCompare(b.name));
 
         return { favoriteModelList: favorites, otherModels: others };
     }, [filteredModels, favoriteModels]);
-
-    // Group non-favorites by provider
-    const groupedModels = useMemo(() => {
-        return otherModels.reduce(
-            (acc, model) => {
-                const provider = model.id.split("/")[0] || "other";
-                if (!acc[provider]) {
-                    acc[provider] = [];
-                }
-                acc[provider].push(model);
-                return acc;
-            },
-            {} as Record<string, typeof models>,
-        );
-    }, [otherModels]);
 
     // Get display text for the selected model
     const selectedModelDisplay = useMemo(() => {
@@ -313,73 +298,52 @@ export function ModelSelector({
                             </div>
                         )}
 
-                        {/* Provider groups */}
-                        {Object.entries(groupedModels).map(
-                            ([provider, providerModels]) => (
-                                <div key={provider}>
-                                    <div className="px-4 py-2 bg-muted/50 border-b border-border">
-                                        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                            {provider}
-                                        </span>
-                                    </div>
-                                    {providerModels.map((model) => (
-                                        <button
-                                            key={model.id}
-                                            type="button"
-                                            onClick={() =>
-                                                handleSelect(model.id)
-                                            }
-                                            className={cn(
-                                                "w-full text-left px-4 py-2.5 text-sm transition-all duration-150 hover:bg-primary/5 cursor-pointer flex items-center gap-2.5 group",
-                                                model.id === selectedModel &&
-                                                    "bg-primary/10 border-l-2 border-primary",
-                                            )}
-                                        >
-                                            <div
-                                                role="button"
-                                                tabIndex={0}
-                                                onClick={(e) =>
-                                                    handleToggleFavorite(
-                                                        e,
-                                                        model.id,
-                                                    )
-                                                }
-                                                onKeyDown={(e) =>
-                                                    e.key === "Enter" &&
-                                                    handleToggleFavorite(
-                                                        e as unknown as React.MouseEvent,
-                                                        model.id,
-                                                    )
-                                                }
-                                                className="p-1 hover:bg-muted rounded-xs transition-colors cursor-pointer"
-                                                title={
-                                                    favoriteModels.includes(
-                                                        model.id,
-                                                    )
-                                                        ? "Remove from favorites"
-                                                        : "Add to favorites"
-                                                }
-                                            >
-                                                <Star
-                                                    size={12}
-                                                    className={cn(
-                                                        "flex-shrink-0 transition-colors",
-                                                        favoriteModels.includes(
-                                                            model.id,
-                                                        )
-                                                            ? "text-primary fill-primary"
-                                                            : "text-muted-foreground group-hover:text-primary/50",
-                                                    )}
-                                                />
-                                            </div>
-                                            <span className="truncate text-foreground">
-                                                {model.name}
-                                            </span>
-                                        </button>
-                                    ))}
+                        {otherModels.map((model) => (
+                            <button
+                                key={model.id}
+                                type="button"
+                                onClick={() => handleSelect(model.id)}
+                                className={cn(
+                                    "w-full text-left px-4 py-2.5 text-sm transition-all duration-150 hover:bg-primary/5 cursor-pointer flex items-center gap-2.5 group",
+                                    model.id === selectedModel &&
+                                        "bg-primary/10 border-l-2 border-primary",
+                                )}
+                            >
+                                <div
+                                    role="button"
+                                    tabIndex={0}
+                                    onClick={(e) =>
+                                        handleToggleFavorite(e, model.id)
+                                    }
+                                    onKeyDown={(e) =>
+                                        e.key === "Enter" &&
+                                        handleToggleFavorite(
+                                            e as unknown as React.MouseEvent,
+                                            model.id,
+                                        )
+                                    }
+                                    className="p-1 hover:bg-muted rounded-xs transition-colors cursor-pointer"
+                                    title={
+                                        favoriteModels.includes(model.id)
+                                            ? "Remove from favorites"
+                                            : "Add to favorites"
+                                    }
+                                >
+                                    <Star
+                                        size={12}
+                                        className={cn(
+                                            "flex-shrink-0 transition-colors",
+                                            favoriteModels.includes(model.id)
+                                                ? "text-primary fill-primary"
+                                                : "text-muted-foreground group-hover:text-primary/50",
+                                        )}
+                                    />
                                 </div>
-                            ),
-                        )}
+                                <span className="truncate text-foreground">
+                                    {model.name}
+                                </span>
+                            </button>
+                        ))}
                     </div>
                 </div>
             )}

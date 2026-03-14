@@ -185,79 +185,20 @@ describe("ModelSelector logic", () => {
         });
     });
 
-    describe("groupedModels", () => {
-        test("groups by provider from id", () => {
-            const others = mockModels.filter(
-                (model) => !favoriteModels.includes(model.id),
-            );
+    describe("otherModels", () => {
+        test("sorts non-favorites alphabetically by name", () => {
+            const others = mockModels
+                .filter((model) => !favoriteModels.includes(model.id))
+                .sort((a, b) => a.name.localeCompare(b.name));
 
-            const grouped = others.reduce(
-                (acc, model) => {
-                    const provider = model.id.split("/")[0] || "other";
-                    if (!acc[provider]) {
-                        acc[provider] = [];
-                    }
-                    acc[provider].push(model);
-                    return acc;
-                },
-                {} as Record<string, ProviderModel[]>,
-            );
-
-            expect(Object.keys(grouped)).toEqual([
-                "anthropic",
-                "openai",
-                "google",
-                "meta",
+            expect(others.map((model) => model.name)).toEqual([
+                "claude-3-5-sonnet",
+                "claude-3-haiku",
+                "gemini-pro",
+                "gpt-4o",
+                "gpt-4o-mini",
+                "llama-3-70b",
             ]);
-        });
-
-        test("groups have correct models", () => {
-            const others = mockModels.filter(
-                (model) => !favoriteModels.includes(model.id),
-            );
-
-            const grouped = others.reduce(
-                (acc, model) => {
-                    const provider = model.id.split("/")[0] || "other";
-                    if (!acc[provider]) {
-                        acc[provider] = [];
-                    }
-                    acc[provider].push(model);
-                    return acc;
-                },
-                {} as Record<string, ProviderModel[]>,
-            );
-
-            expect(grouped["anthropic"]).toHaveLength(2);
-            expect(grouped["openai"]).toHaveLength(2);
-            expect(grouped["google"]).toHaveLength(1);
-            expect(grouped["meta"]).toHaveLength(1);
-        });
-
-        test("handles model without provider prefix", () => {
-            const modelsWithNoProvider: ProviderModel[] = [
-                {
-                    id: "no-slash-model",
-                    name: "no-slash-model",
-                    provider: "Unknown",
-                },
-            ];
-
-            const grouped = modelsWithNoProvider.reduce(
-                (acc, model) => {
-                    const parts = model.id.split("/");
-                    const provider = parts.length > 1 ? parts[0] : "other";
-                    if (!acc[provider]) {
-                        acc[provider] = [];
-                    }
-                    acc[provider].push(model);
-                    return acc;
-                },
-                {} as Record<string, ProviderModel[]>,
-            );
-
-            expect(grouped["other"]).toBeDefined();
-            expect(grouped["other"]).toHaveLength(1);
         });
     });
 

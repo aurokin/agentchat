@@ -71,6 +71,13 @@ function buildConfig(homeDir: string, authMode: AuthMode, allowedEmail: string) 
                 modelCacheTtlSeconds: 300,
                 models: [
                     {
+                        id: "gpt-5.1-codex-mini",
+                        label: "GPT-5.1 Codex Mini",
+                        enabled: true,
+                        supportsReasoning: false,
+                        variants: [{ id: "fast", label: "Fast", enabled: true }],
+                    },
+                    {
                         id: "gpt-5.4",
                         label: "GPT-5.4",
                         enabled: true,
@@ -111,7 +118,7 @@ function buildConfig(homeDir: string, authMode: AuthMode, allowedEmail: string) 
                 rootPath: path.join(fixturesRoot, "smoke"),
                 providerIds: ["codex-main"],
                 defaultProviderId: "codex-main",
-                defaultModel: "gpt-5.3-codex-lite",
+                defaultModel: "gpt-5.1-codex-mini",
                 defaultVariant: "fast",
                 modelAllowlist: [],
                 variantAllowlist: [],

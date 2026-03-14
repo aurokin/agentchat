@@ -22,8 +22,6 @@ import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
 import {
     filterModels,
     splitFavoriteModels,
-    groupModelsByProvider,
-    getProviderOrder,
 } from "@/components/chat/model-selector-utils";
 
 interface ModelSelectorProps {
@@ -76,46 +74,6 @@ export function ModelSelector({
         () => splitFavoriteModels(filteredModels, favoriteModels),
         [filteredModels, favoriteModels],
     );
-
-    const groupedModels = useMemo(
-        () => groupModelsByProvider(otherModels),
-        [otherModels],
-    );
-    const providerOrder = useMemo(
-        () => getProviderOrder(otherModels),
-        [otherModels],
-    );
-
-    const sections = useMemo(() => {
-        const results: {
-            key: string;
-            title: string;
-            models: ProviderModel[];
-            isFavorites?: boolean;
-        }[] = [];
-
-        if (favoriteModelList.length > 0) {
-            results.push({
-                key: "favorites",
-                title: "Favorites",
-                models: favoriteModelList,
-                isFavorites: true,
-            });
-        }
-
-        for (const provider of providerOrder) {
-            const providerModels = groupedModels[provider];
-            if (providerModels && providerModels.length > 0) {
-                results.push({
-                    key: provider,
-                    title: provider,
-                    models: providerModels,
-                });
-            }
-        }
-
-        return results;
-    }, [favoriteModelList, groupedModels, providerOrder]);
 
     const selectedModelDisplay = useMemo(() => {
         if (!selectedModelId) return "Select Model";
@@ -239,11 +197,11 @@ export function ModelSelector({
                             </View>
                         ) : (
                             <FlatList
-                                data={sections}
-                                keyExtractor={(section) => section.key}
-                                renderItem={({ item: section }) => (
-                                    <View>
-                                        {section.isFavorites ? (
+                                data={otherModels}
+                                keyExtractor={(model) => model.id}
+                                ListHeaderComponent={
+                                    favoriteModelList.length > 0 ? (
+                                        <View>
                                             <View
                                                 style={styles.favoritesHeader}
                                             >
@@ -260,77 +218,138 @@ export function ModelSelector({
                                                     Favorites
                                                 </Text>
                                             </View>
-                                        ) : (
-                                            <Text style={styles.providerHeader}>
-                                                {section.title}
-                                            </Text>
-                                        )}
-                                        {section.models.map((model) => {
-                                            const isFavorite =
-                                                favoriteModels.includes(
-                                                    model.id,
-                                                );
-                                            return (
-                                                <TouchableOpacity
-                                                    key={model.id}
-                                                    style={[
-                                                        styles.option,
-                                                        selectedModelId ===
-                                                            model.id &&
-                                                            styles.optionSelected,
-                                                    ]}
-                                                    onPress={() =>
-                                                        handleSelect(model.id)
-                                                    }
-                                                >
-                                                    <View
-                                                        style={
-                                                            styles.optionContent
+                                            {favoriteModelList.map((model) => {
+                                                const isFavorite =
+                                                    favoriteModels.includes(
+                                                        model.id,
+                                                    );
+                                                return (
+                                                    <TouchableOpacity
+                                                        key={model.id}
+                                                        style={[
+                                                            styles.option,
+                                                            selectedModelId ===
+                                                                model.id &&
+                                                                styles.optionSelected,
+                                                        ]}
+                                                        onPress={() =>
+                                                            handleSelect(
+                                                                model.id,
+                                                            )
                                                         }
                                                     >
-                                                        <TouchableOpacity
+                                                        <View
                                                             style={
-                                                                styles.favoriteButton
+                                                                styles.optionContent
                                                             }
-                                                            onPress={(event) =>
-                                                                handleToggleFavorite(
+                                                        >
+                                                            <TouchableOpacity
+                                                                style={
+                                                                    styles.favoriteButton
+                                                                }
+                                                                onPress={(
                                                                     event,
-                                                                    model.id,
-                                                                )
-                                                            }
-                                                            activeOpacity={0.7}
-                                                        >
-                                                            <MaterialIcons
-                                                                name={
-                                                                    isFavorite
-                                                                        ? "star"
-                                                                        : "star-border"
+                                                                ) =>
+                                                                    handleToggleFavorite(
+                                                                        event,
+                                                                        model.id,
+                                                                    )
                                                                 }
-                                                                size={16}
-                                                                color={
-                                                                    isFavorite
-                                                                        ? colors.accent
-                                                                        : colors.textFaint
+                                                                activeOpacity={
+                                                                    0.7
                                                                 }
-                                                            />
-                                                        </TouchableOpacity>
-                                                        <Text
-                                                            style={[
-                                                                styles.optionText,
-                                                                selectedModelId ===
-                                                                    model.id &&
-                                                                    styles.optionTextSelected,
-                                                            ]}
-                                                            numberOfLines={1}
-                                                        >
-                                                            {model.name}
-                                                        </Text>
-                                                    </View>
+                                                            >
+                                                                <MaterialIcons
+                                                                    name={
+                                                                        isFavorite
+                                                                            ? "star"
+                                                                            : "star-border"
+                                                                    }
+                                                                    size={16}
+                                                                    color={
+                                                                        isFavorite
+                                                                            ? colors.accent
+                                                                            : colors.textFaint
+                                                                    }
+                                                                />
+                                                            </TouchableOpacity>
+                                                            <Text
+                                                                style={[
+                                                                    styles.optionText,
+                                                                    selectedModelId ===
+                                                                        model.id &&
+                                                                        styles.optionTextSelected,
+                                                                ]}
+                                                                numberOfLines={
+                                                                    1
+                                                                }
+                                                            >
+                                                                {model.name}
+                                                            </Text>
+                                                        </View>
+                                                    </TouchableOpacity>
+                                                );
+                                            })}
+                                        </View>
+                                    ) : null
+                                }
+                                renderItem={({ item: model }) => {
+                                    const isFavorite = favoriteModels.includes(
+                                        model.id,
+                                    );
+                                    return (
+                                        <TouchableOpacity
+                                            style={[
+                                                styles.option,
+                                                selectedModelId === model.id &&
+                                                    styles.optionSelected,
+                                            ]}
+                                            onPress={() =>
+                                                handleSelect(model.id)
+                                            }
+                                        >
+                                            <View style={styles.optionContent}>
+                                                <TouchableOpacity
+                                                    style={
+                                                        styles.favoriteButton
+                                                    }
+                                                    onPress={(event) =>
+                                                        handleToggleFavorite(
+                                                            event,
+                                                            model.id,
+                                                        )
+                                                    }
+                                                    activeOpacity={0.7}
+                                                >
+                                                    <MaterialIcons
+                                                        name={
+                                                            isFavorite
+                                                                ? "star"
+                                                                : "star-border"
+                                                        }
+                                                        size={16}
+                                                        color={
+                                                            isFavorite
+                                                                ? colors.accent
+                                                                : colors.textFaint
+                                                        }
+                                                    />
                                                 </TouchableOpacity>
-                                            );
-                                        })}
-                                    </View>
-                                )}
+                                                <Text
+                                                    style={[
+                                                        styles.optionText,
+                                                        selectedModelId ===
+                                                            model.id &&
+                                                            styles.optionTextSelected,
+                                                    ]}
+                                                    numberOfLines={1}
+                                                >
+                                                    {model.name}
+                                                </Text>
+                                            </View>
+                                        </TouchableOpacity>
+                                    );
+                                }}
                                 style={styles.list}
                                 keyboardShouldPersistTaps="handled"
                             />
@@ -419,15 +438,6 @@ const createStyles = (colors: ThemeColors) =>
         },
         list: {
             maxHeight: 400,
-        },
-        providerHeader: {
-            paddingHorizontal: 16,
-            paddingVertical: 8,
-            backgroundColor: colors.surfaceMuted,
-            fontSize: 12,
-            fontWeight: "600",
-            color: colors.textMuted,
-            textTransform: "uppercase",
         },
         favoritesHeader: {
             flexDirection: "row",
