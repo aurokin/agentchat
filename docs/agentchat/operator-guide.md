@@ -188,6 +188,20 @@ These commands cover:
 - missing runtime env diagnostics
 - stale persisted runtime bindings that should fall back safely on the next turn
 
+## 6a. Mobile Platform Boundary
+
+Use:
+
+- [mobile-integration-testing.md](./mobile-integration-testing.md)
+
+as the source of truth for what this host can and cannot test.
+
+Short version for this Linux environment:
+
+- Android is the primary native automation target.
+- iPhone testing is currently manual-device testing via Expo Go.
+- iOS simulator and local native iOS build workflows require macOS.
+
 ## 7. Common Failure Modes
 
 If bootstrap fails in the web app:

@@ -16,6 +16,7 @@
         "dev:web": "concurrently -k -n convex,server,web -c green,yellow,blue \"bun run --cwd packages/convex dev\" \"bun run --cwd apps/server dev\" \"bun run --cwd apps/web dev\"",
         "dev:server": "bun run --cwd apps/server dev",
         "dev:mobile": "concurrently -k -n convex,mobile -c green,magenta \"bun run --cwd packages/convex dev\" \"bun run --cwd apps/mobile dev-client\"",
+        "dev:mobile:expo-go": "concurrently -k -n convex,server,mobile -c green,yellow,magenta \"bun run --cwd packages/convex dev\" \"bun run --cwd apps/server dev\" \"bun run --cwd apps/mobile start:lan\"",
         "dev:all": "concurrently -k -n convex,server,web,mobile -c green,yellow,blue,magenta \"bun run --cwd packages/convex dev\" \"bun run --cwd apps/server dev\" \"bun run --cwd apps/web dev\" \"bun run --cwd apps/mobile dev-client\"",
         "install:all": "bun run install:web && bun run install:server && bun run install:mobile && bun run install:shared && bun run install:convex",
         "install:web": "bun install --cwd apps/web",

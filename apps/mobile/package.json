@@ -4,6 +4,8 @@
     "main": "index.tsx",
     "scripts": {
         "start": "expo start",
+        "start:lan": "expo start --lan",
+        "start:tunnel": "expo start --tunnel",
         "android": "expo run:android",
         "ios": "expo run:ios",
         "android:local": "mkdir -p build/android && TIMESTAMP=$(date +%Y%m%d-%H%M%S) && bunx eas-cli build --profile development --platform android --local --output=./build/android/agentchat-dev-${TIMESTAMP}.apk",

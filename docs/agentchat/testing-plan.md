@@ -202,6 +202,22 @@ Coverage targets:
 - missing provider `codex.cwd` is surfaced in diagnostics
 - missing required runtime env values are surfaced by the runtime env diagnostics
 
+### 7. Mobile Platform Boundaries
+
+Purpose:
+
+- keep mobile integration work honest about what this host can actually run
+
+Reference:
+
+- [mobile-integration-testing.md](./mobile-integration-testing.md)
+
+Current rule:
+
+- Android is the preferred automation target on Linux
+- iOS on Linux is manual-device testing only
+- iOS simulator automation remains a macOS-only path
+
 ## Manual QA Checklist
 
 Use [manual-qa-checklist.md](./manual-qa-checklist.md) for the explicit Codex confidence pass tied to these fixtures.

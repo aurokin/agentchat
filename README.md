@@ -120,7 +120,7 @@ Agentchat uses a small set of local/runtime environment surfaces:
 Set these in `apps/web/.env.local` for local use. A template lives at `apps/web/.env.example`.
 
 - `NEXT_PUBLIC_CONVEX_URL` - Convex client URL (`*.convex.cloud`).
-- `NEXT_PUBLIC_AGENTCHAT_SERVER_URL` - Base URL for the self-hosted Agentchat backend server used for provider/agent metadata. Example: `http://localhost:8787` in local dev. If you open the web app from another device on your LAN, Agentchat will automatically rewrite loopback hosts like `localhost` or `127.0.0.1` to the browser's current hostname while keeping the configured port.
+- `NEXT_PUBLIC_AGENTCHAT_SERVER_URL` - Base URL for the self-hosted Agentchat backend server used for provider/agent metadata. Example: `http://localhost:3030` in local dev. If you open the web app from another device on your LAN, Agentchat will automatically rewrite loopback hosts like `localhost` or `127.0.0.1` to the browser's current hostname while keeping the configured port.
 - `NEXT_ALLOWED_DEV_ORIGINS` - Optional comma-separated extra LAN hostnames or IPs to allow in Next dev when you access the web app from other devices on your network.
 
 **Mobile app runtime (`apps/mobile`)**
@@ -128,7 +128,7 @@ Set these in `apps/web/.env.local` for local use. A template lives at `apps/web/
 Set these in `apps/mobile/.env` for local runs. A template lives at `apps/mobile/.env.example`.
 
 - `EXPO_PUBLIC_CONVEX_URL` - Convex client URL for this build (same as web `NEXT_PUBLIC_CONVEX_URL`).
-- `EXPO_PUBLIC_AGENTCHAT_SERVER_URL` - Base URL for the self-hosted Agentchat backend server used for provider/model metadata and mobile runtime access. Example: `http://localhost:8787` in local dev.
+- `EXPO_PUBLIC_AGENTCHAT_SERVER_URL` - Base URL for the self-hosted Agentchat backend server used for provider/model metadata and mobile runtime access. Example: `http://localhost:3030` in local dev. For physical-device testing, use a reachable LAN host instead of `localhost`.
 - `EXPO_PUBLIC_GOOGLE_CLIENT_ID` - Optional. Only needed for the current Google sign-in path when auth mode is `google`.
 
 **Convex CLI (`packages/convex`)**
@@ -199,6 +199,9 @@ bun run dev:web
 
 # Convex + mobile dev client
 bun run dev:mobile
+
+# Convex + server + mobile Expo Go over LAN
+bun run dev:mobile:expo-go
 
 # Convex + web + mobile dev client
 bun run dev:all

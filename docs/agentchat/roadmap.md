@@ -33,6 +33,7 @@ This roadmap describes the current implementation state and the next major steps
 - Use [Run Output Model Proposal](./run-output-model-proposal.md) as the source doc for the future multi-message run migration
 - Keep targeted regression coverage for browser-visible runtime state so manual catches like stale stop buttons and false reconnect banners stay scriptable checks
 - Add regression fixtures for long streamed assistant prose formatting and LAN browser access during local development
+- Keep mobile integration testing explicitly gated by host-platform support instead of implying universal simulator/device coverage
 
 ## Next Milestones
 
@@ -77,6 +78,7 @@ This roadmap describes the current implementation state and the next major steps
 - Continue aligning mobile UX and runtime behavior with web
 - Reduce remaining mobile-specific assumptions and polish the agent-centric flow
 - Validate mobile manually against the same dedicated test-agent fixtures used for web
+- Follow [Mobile Integration Testing](./mobile-integration-testing.md) for Linux-vs-macOS testing boundaries
 
 ## Later, Not V1
 

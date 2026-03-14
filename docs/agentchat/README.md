@@ -25,6 +25,7 @@ It exists for both humans and agents:
 - [Testing Plan](./testing-plan.md)
 - [Manual QA Checklist](./manual-qa-checklist.md)
 - [Mobile Follow-Up](./mobile-followup.md)
+- [Mobile Integration Testing](./mobile-integration-testing.md)
 
 ## Scope
 

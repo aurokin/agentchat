@@ -127,16 +127,26 @@ Only do this if you want to exercise the current mobile app alongside the web/se
 
 - Expo tooling
 - Android Studio or a physical Android device
-- Xcode for iOS simulator builds on macOS
+- Xcode only if you are on macOS and need iOS simulator or local native iOS builds
 
 3B) Create `apps/mobile/.env` from `apps/mobile/.env.example`.
 
 Set:
 
 - `EXPO_PUBLIC_CONVEX_URL=https://<your-deployment>.convex.cloud`
-- `EXPO_PUBLIC_AGENTCHAT_SERVER_URL=http://<your-local-server-host>:8787`
+- `EXPO_PUBLIC_AGENTCHAT_SERVER_URL=http://<your-local-server-host>:3030`
 
-3C) Start a mobile build:
+3C) Fastest iPhone manual path from Linux: Expo Go over LAN.
+
+```bash
+bun run dev:mobile:expo-go
+```
+
+Then scan the QR code in Expo Go on the iPhone.
+
+Use a reachable LAN host for `EXPO_PUBLIC_AGENTCHAT_SERVER_URL`; do not leave it at `localhost` when testing from another device.
+
+3D) Start a native mobile build:
 
 ```bash
 cd apps/mobile && bun run android
@@ -148,14 +158,15 @@ or
 cd apps/mobile && bun run ios
 ```
 
-3D) For development client workflows:
+3E) For development client workflows:
 
 ```bash
 cd apps/mobile && bun run dev-client
 ```
 
-3E) Current expectation:
+3F) Current expectation:
 
 - Mobile follows the same backend-driven runtime model as web.
 - Mobile is still catching up to web in a few UX and parity areas.
 - Use `docs/agentchat/mobile-followup.md` for the remaining mobile work list.
+- Use `docs/agentchat/mobile-integration-testing.md` for the supported-platform testing boundaries.
