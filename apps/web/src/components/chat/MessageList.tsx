@@ -8,14 +8,19 @@ import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import {
     Brain,
+    Check,
     MessageCircle,
     ChevronDown,
     ChevronRight,
     Cpu,
+    Copy,
 } from "lucide-react";
 import { cn, externalLinkProps } from "@/lib/utils";
 import { MessageListSkeleton } from "./MessageListSkeleton";
-import { normalizeAssistantDisplayText } from "@shared/core/text";
+import {
+    exportConversationAsMarkdown,
+    normalizeAssistantDisplayText,
+} from "@shared/core/text";
 
 interface MessageListProps {
     messages: Message[];
@@ -82,12 +87,29 @@ export function MessageList({
     runSummariesByMessageId,
 }: MessageListProps) {
     const bottomRef = useRef<HTMLDivElement>(null);
+    const [copiedLatestMessageId, setCopiedLatestMessageId] = useState<
+        string | null
+    >(null);
 
     useEffect(() => {
         bottomRef.current?.scrollIntoView({
             behavior: sending ? "auto" : "smooth",
         });
     }, [messages, sending]);
+
+    useEffect(() => {
+        if (!copiedLatestMessageId) {
+            return;
+        }
+
+        const timeoutId = window.setTimeout(() => {
+            setCopiedLatestMessageId(null);
+        }, 2000);
+
+        return () => {
+            window.clearTimeout(timeoutId);
+        };
+    }, [copiedLatestMessageId]);
 
     if (loading) {
         return <MessageListSkeleton count={3} />;
@@ -112,6 +134,8 @@ export function MessageList({
         );
     }
 
+    const conversationMarkdown = exportConversationAsMarkdown(messages);
+
     return (
         <div className="max-w-4xl mx-auto p-6 space-y-8">
             {messages.map((message, index) => (
@@ -121,6 +145,28 @@ export function MessageList({
                     index={index}
                     sending={sending && index === messages.length - 1}
                     runSummary={runSummariesByMessageId?.get(message.id)}
+                    canExportConversation={index === messages.length - 1}
+                    exportCopied={copiedLatestMessageId === message.id}
+                    onExportConversation={async () => {
+                        if (!navigator.clipboard?.writeText) {
+                            console.error(
+                                "Clipboard export is not available in this browser.",
+                            );
+                            return;
+                        }
+
+                        try {
+                            await navigator.clipboard.writeText(
+                                conversationMarkdown,
+                            );
+                            setCopiedLatestMessageId(message.id);
+                        } catch (error) {
+                            console.error(
+                                "Failed to copy conversation markdown:",
+                                error,
+                            );
+                        }
+                    }}
                 />
             ))}
 
@@ -180,11 +226,17 @@ function MessageItem({
     index,
     sending,
     runSummary,
+    canExportConversation,
+    exportCopied,
+    onExportConversation,
 }: {
     message: Message;
     index: number;
     sending?: boolean;
     runSummary?: ChatRunSummary;
+    canExportConversation: boolean;
+    exportCopied: boolean;
+    onExportConversation: () => Promise<void>;
 }) {
     const isUser = message.role === "user";
     const isAssistantStatus = !isUser && message.kind === "assistant_status";
@@ -323,6 +375,30 @@ function MessageItem({
                         >
                             {runState.label}
                         </span>
+                    )}
+
+                    {canExportConversation && (
+                        <>
+                            <span className="w-px h-3 bg-border" />
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    void onExportConversation();
+                                }}
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 border border-border text-muted-foreground hover:text-foreground hover:border-primary/30 transition-colors"
+                                title="Copy conversation as markdown"
+                                aria-label="Copy conversation as markdown"
+                            >
+                                {exportCopied ? (
+                                    <Check size={12} />
+                                ) : (
+                                    <Copy size={12} />
+                                )}
+                                <span>
+                                    {exportCopied ? "Copied" : "Copy Markdown"}
+                                </span>
+                            </button>
+                        </>
                     )}
                 </div>
 

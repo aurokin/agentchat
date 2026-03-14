@@ -1,5 +1,9 @@
 import { describe, expect, it } from "bun:test";
-import { normalizeAssistantDisplayText, trimTrailingEmptyLines } from "../text";
+import {
+    exportConversationAsMarkdown,
+    normalizeAssistantDisplayText,
+    trimTrailingEmptyLines,
+} from "../text";
 
 describe("trimTrailingEmptyLines", () => {
     it("returns undefined for undefined input", () => {
@@ -66,5 +70,53 @@ describe("normalizeAssistantDisplayText", () => {
                 "Intro.The code:\n```ts\nconst value = 1;\n```\n- item",
             ),
         ).toBe("Intro. The code:\n```ts\nconst value = 1;\n```\n\n- item");
+    });
+});
+
+describe("exportConversationAsMarkdown", () => {
+    it("formats a conversation transcript as markdown", () => {
+        expect(
+            exportConversationAsMarkdown([
+                {
+                    role: "user",
+                    content: "Hello",
+                    reasoning: undefined,
+                    kind: "assistant_message",
+                    createdAt: 1,
+                },
+                {
+                    role: "assistant",
+                    content: "Working through the request.",
+                    reasoning: undefined,
+                    kind: "assistant_status",
+                    createdAt: 2,
+                },
+                {
+                    role: "assistant",
+                    content: "Done",
+                    reasoning: "Checked the latest state first.",
+                    kind: "assistant_message",
+                    createdAt: 3,
+                },
+            ]),
+        ).toBe(
+            [
+                "## User",
+                "",
+                "Hello",
+                "",
+                "## Assistant Working Note",
+                "",
+                "Working through the request.",
+                "",
+                "## Assistant",
+                "",
+                "Done",
+                "",
+                "### Reasoning",
+                "",
+                "Checked the latest state first.",
+            ].join("\n"),
+        );
     });
 });

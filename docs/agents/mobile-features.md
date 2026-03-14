@@ -5,6 +5,7 @@ This document should reflect the current Agentchat product direction, not older 
 ## Current Direction
 
 - Mobile is still behind web in some polish and parity areas.
+- Web currently supports copying a full conversation transcript as markdown from the latest message. Mobile does not support transcript export yet.
 - The target architecture matches web:
   - agent selection first
   - conversations scoped to the selected agent

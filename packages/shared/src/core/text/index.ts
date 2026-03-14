@@ -1,3 +1,5 @@
+import type { Message } from "../types";
+
 export function trimTrailingEmptyLines(
     value: string | undefined,
 ): string | undefined {
@@ -83,4 +85,28 @@ export function normalizeAssistantDisplayText(
         /(```[\s\S]*?```)\n(\s*(?:[-*]\s+|\d+\.\s+))/g,
         "$1\n\n$2",
     );
+}
+
+export function exportConversationAsMarkdown(
+    messages: Pick<
+        Message,
+        "role" | "content" | "reasoning" | "kind" | "createdAt"
+    >[],
+): string {
+    return messages
+        .map((message) => {
+            const heading =
+                message.role === "user"
+                    ? "## User"
+                    : message.kind === "assistant_status"
+                      ? "## Assistant Working Note"
+                      : "## Assistant";
+            const content = message.content.trim() || "_No content_";
+            const reasoning = message.reasoning?.trim()
+                ? `\n\n### Reasoning\n\n${message.reasoning.trim()}`
+                : "";
+
+            return `${heading}\n\n${content}${reasoning}`;
+        })
+        .join("\n\n");
 }
