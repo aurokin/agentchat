@@ -110,6 +110,8 @@ Invocation:
 
 - `bun run test:manual:live-runtime-smoke`
 - `bun run test:manual:live-runtime-interrupt`
+- `bun run test:manual:config-reload-smoke`
+- `bun run test:manual:runtime-confidence`
 
 Coverage targets:
 
@@ -165,6 +167,8 @@ Current manual confidence command:
 - `bun run test:manual:codex-confidence`
 - `bun run test:manual:live-runtime-smoke`
 - `bun run test:manual:live-runtime-interrupt`
+- `bun run test:manual:config-reload-smoke`
+- `bun run test:manual:runtime-confidence`
 
 This runs live Convex codegen, the server doctor, and the targeted server and web confidence suites without turning them into always-on checks.
 It also runs the targeted mobile confidence suite for agent selection, provider/model/variant state, and runtime recovery helpers.

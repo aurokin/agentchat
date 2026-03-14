@@ -14,6 +14,13 @@ For live runtime persistence validation with a running local server, also run:
 ```bash
 bun run test:manual:live-runtime-smoke
 bun run test:manual:live-runtime-interrupt
+bun run test:manual:config-reload-smoke
+```
+
+Or use the bundled command:
+
+```bash
+bun run test:manual:runtime-confidence
 ```
 
 ## Fixtures
@@ -99,6 +106,7 @@ Use `/home/auro/agents/agentchat_test/workspace`.
 - Refresh `/api/diagnostics` or rerun `bun run doctor:server`
 - Confirm the UI adapts safely
 - Confirm broken or removed resources do not produce silent failures
+- `bun run test:manual:config-reload-smoke` covers the hot-reload path automatically against the local server
 
 ## 8. Mobile Parity Pass
 

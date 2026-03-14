@@ -1,9 +1,13 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { createBackendSessionToken } from "../../packages/shared/src/core/backend-token";
+import {
+    parseConvexRunOutput,
+    trimTrailingSlash,
+    tryReadEnvValue,
+} from "./lib";
 
 type Identity = {
     subject: string;
@@ -81,10 +85,6 @@ function getRepoRoot(): string {
     return path.resolve(scriptDir, "..", "..");
 }
 
-function trimTrailingSlash(value: string): string {
-    return value.replace(/\/+$/, "");
-}
-
 function parseArgs(argv: string[]): LiveSmokeArgs {
     let mode: Mode = "smoke";
     let serverUrl = DEFAULT_SERVER_URL;
@@ -152,50 +152,6 @@ function getConvexCwd(repoRoot: string): string {
 
 function getServerEnvPath(repoRoot: string): string {
     return path.join(repoRoot, "apps", "server", ".env.local");
-}
-
-function tryReadEnvValue(filePath: string, key: string): string | null {
-    if (!existsSync(filePath)) {
-        return null;
-    }
-
-    const lines = readFileSync(filePath, "utf8").split(/\r?\n/u);
-    for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith("#")) {
-            continue;
-        }
-
-        const separator = trimmed.indexOf("=");
-        if (separator === -1) {
-            continue;
-        }
-
-        const envKey = trimmed.slice(0, separator).trim();
-        if (envKey !== key) {
-            continue;
-        }
-
-        return trimmed.slice(separator + 1).trim() || null;
-    }
-
-    return null;
-}
-
-function parseConvexRunOutput(stdout: string): unknown {
-    const lines = stdout
-        .split(/\r?\n/u)
-        .map((line) => line.trim())
-        .filter((line) => line.length > 0)
-        .filter((line) => !line.startsWith("✔ "))
-        .filter((line) => !line.startsWith("- "))
-        .filter((line) => !line.startsWith("Preparing Convex functions"));
-
-    if (lines.length === 0) {
-        return null;
-    }
-
-    return JSON.parse(lines.join("\n")) as unknown;
 }
 
 function runConvex<T>(params: {

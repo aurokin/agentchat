@@ -35,6 +35,8 @@ This roadmap describes the current implementation state and the next major steps
 - Keep generated Convex bindings in sync with the live deployment before manual confidence passes
 - Run `bun run test:manual:live-runtime-smoke` against a real local `apps/server` instance to verify the full Codex plus Convex persistence path
 - Run `bun run test:manual:live-runtime-interrupt` to verify partial-output retention and interrupted run persistence
+- Run `bun run test:manual:config-reload-smoke` to verify watched config changes disable or fallback safely without restarting the server
+- Keep `bun run test:manual:runtime-confidence` as the single manual operator command for the local runtime stack
 - Prefer Convex-issued backend session tokens for these live passes; allow the local signing fallback only while the deployment is still missing `BACKEND_TOKEN_SECRET`
 - Add browser-level end-to-end coverage for agent selection, chat send, interruption, refresh, and recovery
 - Build a manual QA checklist for real Codex-backed instances

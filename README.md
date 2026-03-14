@@ -221,6 +221,9 @@ bun run test:manual:live-runtime-smoke
 
 # Verify interrupted runs retain partial output and persist interruption state
 bun run test:manual:live-runtime-interrupt
+
+# Run the full local server runtime confidence stack (requires apps/server to be running)
+bun run test:manual:runtime-confidence
 ```
 
 ## Architecture Notes

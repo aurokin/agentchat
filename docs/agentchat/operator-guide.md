@@ -148,6 +148,13 @@ For direct local runtime verification with a running `apps/server`, also use:
 ```bash
 bun run test:manual:live-runtime-smoke
 bun run test:manual:live-runtime-interrupt
+bun run test:manual:config-reload-smoke
+```
+
+Or run the combined path:
+
+```bash
+bun run test:manual:runtime-confidence
 ```
 
 ## 7. Common Failure Modes
