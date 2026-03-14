@@ -37,7 +37,6 @@ This roadmap describes the current implementation state and the next major steps
 - Keep the active roadmap narrowly focused on Codex confidence rather than adding more providers
 - Use the live Convex deployment for real codegen, runtime persistence validation, and end-to-end confidence passes
 - Use disabled-auth mode aggressively for integration and browser confidence work that does not need Google sign-in coverage
-- Use [Run Output Model Proposal](./run-output-model-proposal.md) as the source doc for further refinement of the multi-message run model
 - Use [Local Auth Plan](./local-auth-plan.md) as the source doc for moving from mode-based auth to provider-oriented local auth
 - Keep targeted regression coverage for browser-visible runtime state so manual catches like stale stop buttons and false reconnect banners stay scriptable checks
 - Add regression fixtures for long streamed assistant prose formatting and LAN browser access during local development
