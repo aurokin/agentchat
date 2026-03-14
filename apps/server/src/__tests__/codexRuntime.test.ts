@@ -716,6 +716,101 @@ describe("CodexRuntimeManager", () => {
         });
     });
 
+    test("splits status preambles and later structured output into multiple assistant transcript messages", async () => {
+        const config = createConfig();
+        const persistence = createPersistence(null);
+        const fakeClient = new FakeCodexClient({
+            startedThreadId: "thread-fresh",
+            autoComplete: false,
+        });
+        const events: Array<{
+            type: string;
+            payload: Record<string, unknown>;
+        }> = [];
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: () => fakeClient,
+        });
+
+        const sendPromise = manager.sendMessage({
+            userSub: "sub-1",
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: (event) => {
+                events.push(event);
+            },
+        });
+
+        await Bun.sleep(0);
+        fakeClient.emit({
+            method: "item/agentMessage/delta",
+            params: {
+                delta: "I’m loading the local Warcraft skill and checking what Warcraft CLI is available in this repo, then I’ll use that to look up the guild on Mal’Ganis.I found the local `warcraft` skill. Next I’m reading its workflow and then querying the guild through the Warcraft CLI rather than guessing from memory.`gn` is a Horde guild on US Mal'Ganis.",
+            },
+        });
+        await Bun.sleep(300);
+        fakeClient.emit({
+            method: "item/agentMessage/delta",
+            params: {
+                delta: "\n\nThe most useful current snapshot I found is from WowProgress:\n- Current raid progress: `8/8 Mythic`",
+            },
+        });
+        await Bun.sleep(300);
+        fakeClient.emit({
+            method: "turn/completed",
+            params: {
+                turn: {
+                    status: "completed",
+                },
+            },
+        });
+        await sendPromise;
+
+        expect(events.map((event) => event.type)).toEqual([
+            "run.started",
+            "message.started",
+            "message.completed",
+            "message.started",
+            "message.delta",
+            "message.completed",
+            "message.started",
+            "message.delta",
+            "message.completed",
+            "run.completed",
+        ]);
+        expect(events[3]).toMatchObject({
+            type: "message.started",
+            payload: {
+                previousMessageId: "assistant-1",
+                previousKind: "assistant_status",
+                kind: "assistant_message",
+                messageIndex: 1,
+            },
+        });
+        expect(events[6]).toMatchObject({
+            type: "message.started",
+            payload: {
+                previousKind: "assistant_message",
+                kind: "assistant_message",
+                messageIndex: 2,
+            },
+        });
+        expect(persistence.messageStartedCalls).toHaveLength(2);
+        expect(persistence.messageStartedCalls[0]).toMatchObject({
+            previousAssistantMessageLocalId: "assistant-1",
+            previousKind: "assistant_status",
+            kind: "assistant_message",
+            runMessageIndex: 1,
+        });
+        expect(persistence.messageStartedCalls[1]).toMatchObject({
+            previousKind: "assistant_message",
+            kind: "assistant_message",
+            runMessageIndex: 2,
+        });
+    });
+
     test("treats turn/aborted as a terminal interrupted run", async () => {
         const config = createConfig();
         const persistence = createPersistence(null);

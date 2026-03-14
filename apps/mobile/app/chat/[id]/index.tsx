@@ -414,6 +414,16 @@ export default function ChatScreen(): ReactElement {
             }
 
             if (resolution.type === "message.started") {
+                if (resolution.previousMessagePatch) {
+                    patchMessage(
+                        resolution.previousMessagePatch.id,
+                        currentChatRef.current?.id ??
+                            resolution.activeRun.conversationId,
+                        {
+                            kind: resolution.previousMessagePatch.kind,
+                        },
+                    );
+                }
                 insertMessage(resolution.message);
                 setActiveRun(resolution.activeRun);
                 setStreamingMessage(resolution.streamingMessage);
@@ -814,6 +824,7 @@ export default function ChatScreen(): ReactElement {
 
     const renderMessage = ({ item }: { item: Message }) => {
         const isUser = item.role === "user";
+        const isAssistantStatus = !isUser && item.kind === "assistant_status";
         const displayContent = item.content;
         const displayThinking = item.thinking;
         const isStreamingMessage = activeRun?.assistantMessageId === item.id;
@@ -892,8 +903,21 @@ export default function ChatScreen(): ReactElement {
                             isUser
                                 ? styles.userMessage
                                 : styles.assistantMessage,
+                            isAssistantStatus && styles.assistantStatusMessage,
                         ]}
                     >
+                        {isAssistantStatus && (
+                            <View style={styles.statusMessageLabelRow}>
+                                <MaterialCommunityIcons
+                                    name="cpu-64-bit"
+                                    size={12}
+                                    color={colors.textMuted}
+                                />
+                                <Text style={styles.statusMessageLabel}>
+                                    Working note
+                                </Text>
+                            </View>
+                        )}
                         {showGenerating ? (
                             <View style={styles.generatingRow}>
                                 <ActivityIndicator
@@ -1501,6 +1525,23 @@ const createStyles = (colors: ThemeColors) =>
         assistantMessage: {
             alignSelf: "flex-start",
             backgroundColor: colors.surfaceMuted,
+        },
+        assistantStatusMessage: {
+            borderWidth: 1,
+            borderColor: colors.border,
+        },
+        statusMessageLabelRow: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+            marginBottom: 8,
+        },
+        statusMessageLabel: {
+            fontSize: 11,
+            fontWeight: "600",
+            textTransform: "uppercase",
+            letterSpacing: 1,
+            color: colors.textMuted,
         },
         emptyMessageText: {
             fontSize: 14,

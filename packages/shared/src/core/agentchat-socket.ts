@@ -80,6 +80,8 @@ export type AgentchatSocketEvent =
               messageIndex: number;
               kind: "assistant_message" | "assistant_status";
               content: string;
+              previousMessageId?: string;
+              previousKind?: "assistant_message" | "assistant_status";
           };
       }
     | {

@@ -55,7 +55,10 @@ type UseConversationRuntimeParams = {
     patchMessage: (
         id: string,
         updates: Partial<
-            Pick<Message, "content" | "contextContent" | "thinking" | "status">
+            Pick<
+                Message,
+                "content" | "contextContent" | "thinking" | "status" | "kind"
+            >
         >,
     ) => void;
     updateChat: (chat: ChatSession) => Promise<void>;
@@ -228,6 +231,11 @@ export function useConversationRuntime({
 
             if (resolution.type === "message.started") {
                 activeRunRef.current = resolution.activeRun;
+                if (resolution.previousMessagePatch) {
+                    patchMessage(resolution.previousMessagePatch.id, {
+                        kind: resolution.previousMessagePatch.kind,
+                    });
+                }
                 insertMessage(resolution.message);
                 queueStreamingMessageUpdate(resolution.streamingMessage);
                 return;

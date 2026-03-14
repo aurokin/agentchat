@@ -489,6 +489,8 @@ describe("conversation runtime controller", () => {
                 messageIndex: 1,
                 kind: "assistant_message",
                 content: "Report\n- Done",
+                previousMessageId: "assistant-1",
+                previousKind: "assistant_status",
             },
         };
 
@@ -529,6 +531,10 @@ describe("conversation runtime controller", () => {
             streamingMessage: {
                 id: "assistant-2",
                 content: "Report\n- Done",
+            },
+            previousMessagePatch: {
+                id: "assistant-1",
+                kind: "assistant_status",
             },
         });
     });

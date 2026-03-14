@@ -74,7 +74,10 @@ interface ChatContextType {
     patchMessage: (
         id: string,
         updates: Partial<
-            Pick<Message, "content" | "contextContent" | "thinking" | "status">
+            Pick<
+                Message,
+                "content" | "contextContent" | "thinking" | "status" | "kind"
+            >
         >,
     ) => void;
     clearCurrentChat: () => void;
@@ -566,7 +569,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             updates: Partial<
                 Pick<
                     Message,
-                    "content" | "contextContent" | "thinking" | "status"
+                    | "content"
+                    | "contextContent"
+                    | "thinking"
+                    | "status"
+                    | "kind"
                 >
             >,
         ) => {

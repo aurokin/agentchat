@@ -64,7 +64,10 @@ interface ChatContextValue {
         id: string,
         chatId: string,
         updates: Partial<
-            Pick<Message, "content" | "contextContent" | "thinking" | "status">
+            Pick<
+                Message,
+                "content" | "contextContent" | "thinking" | "status" | "kind"
+            >
         >,
     ) => void;
     setDefaultModel: (modelId: string) => void;

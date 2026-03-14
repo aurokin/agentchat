@@ -292,6 +292,10 @@ export type SocketEventResolution =
           activeRun: ActiveRunState;
           message: Message;
           streamingMessage: StreamingMessageState;
+          previousMessagePatch: {
+              id: string;
+              kind: "assistant_message" | "assistant_status";
+          } | null;
       }
     | {
           type: "message.updated";
@@ -376,18 +380,28 @@ export function resolveConversationSocketEvent(params: {
             params.messages.find(
                 (message) => message.id === event.payload.messageId,
             ) ?? null;
-        const nextMessage: Message = existingMessage ?? {
-            id: event.payload.messageId,
-            sessionId: event.payload.conversationId,
-            role: "assistant",
-            kind: event.payload.kind,
-            content: event.payload.content,
-            contextContent: event.payload.content,
-            status: "streaming",
-            runId: event.payload.runId,
-            runMessageIndex: event.payload.messageIndex,
-            createdAt: Date.now(),
-        };
+        const nextMessage: Message = existingMessage
+            ? {
+                  ...existingMessage,
+                  kind: event.payload.kind,
+                  content: event.payload.content,
+                  contextContent: event.payload.content,
+                  status: "streaming",
+                  runId: event.payload.runId,
+                  runMessageIndex: event.payload.messageIndex,
+              }
+            : {
+                  id: event.payload.messageId,
+                  sessionId: event.payload.conversationId,
+                  role: "assistant",
+                  kind: event.payload.kind,
+                  content: event.payload.content,
+                  contextContent: event.payload.content,
+                  status: "streaming",
+                  runId: event.payload.runId,
+                  runMessageIndex: event.payload.messageIndex,
+                  createdAt: Date.now(),
+              };
         const nextActiveRun: ActiveRunState = {
             conversationId: event.payload.conversationId,
             assistantMessageId: event.payload.messageId,
@@ -409,6 +423,13 @@ export function resolveConversationSocketEvent(params: {
                 id: nextMessage.id,
                 content: nextMessage.content,
             },
+            previousMessagePatch:
+                event.payload.previousMessageId && event.payload.previousKind
+                    ? {
+                          id: event.payload.previousMessageId,
+                          kind: event.payload.previousKind,
+                      }
+                    : null,
         };
     }
 

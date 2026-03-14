@@ -187,6 +187,7 @@ function MessageItem({
     runSummary?: ChatRunSummary;
 }) {
     const isUser = message.role === "user";
+    const isAssistantStatus = !isUser && message.kind === "assistant_status";
     const runState =
         !isUser && !sending
             ? resolveMessageRunDisplayState({ message, runSummary })
@@ -230,9 +231,17 @@ function MessageItem({
                                 "p-5 prose prose-sm dark:prose-invert max-w-none",
                                 isUser
                                     ? "bg-primary/20 border border-primary/30 text-left"
-                                    : "bg-background-elevated border border-border prose-headings:text-foreground prose-p:text-foreground prose-pre:bg-muted prose-pre:border prose-pre:border-border prose-code:text-primary",
+                                    : isAssistantStatus
+                                      ? "bg-muted/40 border border-border-accent/70 prose-headings:text-foreground prose-p:text-foreground prose-pre:bg-muted prose-pre:border prose-pre:border-border prose-code:text-primary"
+                                      : "bg-background-elevated border border-border prose-headings:text-foreground prose-p:text-foreground prose-pre:bg-muted prose-pre:border prose-pre:border-border prose-code:text-primary",
                             )}
                         >
+                            {isAssistantStatus && (
+                                <div className="mb-3 flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                                    <Cpu size={12} />
+                                    <span>Working Note</span>
+                                </div>
+                            )}
                             {sending && !message.content ? (
                                 <div className="flex items-center gap-3 text-muted-foreground">
                                     <div className="typing-indicator flex gap-1">

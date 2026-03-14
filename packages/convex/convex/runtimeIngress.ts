@@ -424,6 +424,12 @@ export const messageStarted = internalMutation({
         conversationLocalId: v.string(),
         previousAssistantMessageLocalId: v.string(),
         previousCompletedSequence: v.number(),
+        previousKind: v.optional(
+            v.union(
+                v.literal("assistant_message"),
+                v.literal("assistant_status"),
+            ),
+        ),
         assistantMessageLocalId: v.string(),
         messageStartedSequence: v.number(),
         externalRunId: v.string(),
@@ -449,6 +455,7 @@ export const messageStarted = internalMutation({
         const previousMessage = await updateAssistantMessage(ctx, {
             userId: args.userId,
             localId: args.previousAssistantMessageLocalId,
+            kind: args.previousKind,
             content: args.previousContent,
             status: "completed",
             runId: args.externalRunId,
