@@ -141,6 +141,8 @@ bun run dev-client
 
 6. Open the installed development build on the phone and connect to Metro.
 
+The repo's `dev-client` command should use LAN mode for physical-device testing so the generated connection target is reachable from the phone.
+
 ## Android Guidance
 
 Android is the preferred target for repeatable native testing from Linux.

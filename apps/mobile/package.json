@@ -12,7 +12,7 @@
         "ios:local": "mkdir -p build/ios && TIMESTAMP=$(date +%Y%m%d-%H%M%S) && bunx eas-cli build --profile development --platform ios --local --output=./build/ios/agentchat-dev-simulator-${TIMESTAMP}.tar.gz",
         "ios:eas-device": "bunx eas-cli build --profile development-device --platform ios",
         "ios:eas-register-device": "bunx eas-cli device:create",
-        "dev-client": "expo start --dev-client",
+        "dev-client": "expo start --dev-client --lan",
         "web": "expo start --web",
         "format": "prettier --write \"app/**/*.{js,jsx,ts,tsx,json,css,md}\" \"src/**/*.{js,jsx,ts,tsx,json,css,md}\" \"*.{js,jsx,ts,tsx,json,css,md}\"",
         "format:check": "prettier --check \"app/**/*.{js,jsx,ts,tsx,json,css,md}\" \"src/**/*.{js,jsx,ts,tsx,json,css,md}\" \"*.{js,jsx,ts,tsx,json,css,md}\"",

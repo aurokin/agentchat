@@ -209,6 +209,9 @@ bun run dev:mobile:expo-go
 cd apps/mobile && bun run ios:eas-register-device
 cd apps/mobile && bun run ios:eas-device
 
+# Connect an installed development build over LAN
+cd apps/mobile && bun run dev-client
+
 # Convex + web + mobile dev client
 bun run dev:all
 

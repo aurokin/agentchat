@@ -1,4 +1,5 @@
 import * as SecureStore from "expo-secure-store";
+import { Platform } from "react-native";
 
 const CONVEX_URL_KEY = "agentchat-convex-url";
 
@@ -18,7 +19,7 @@ export function getEnvConvexUrl(): string | null {
 }
 
 export function getConvexUrlOverride(): string | null {
-    if (!__DEV__ || typeof window === "undefined") {
+    if (!__DEV__ || typeof window === "undefined" || Platform.OS !== "web") {
         return null;
     }
     const override = SecureStore.getItem(CONVEX_URL_KEY);

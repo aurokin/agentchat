@@ -33,16 +33,17 @@
         "web": {
             "favicon": "./assets/favicon.png"
         },
-        "extra": {
-            "eas": {
-                "projectId": "48d2ca6b-f5c6-4d6b-afe2-dd560e22f0f7"
-            }
-        },
         "owner": "aurokins-organization",
         "plugins": [
             "expo-router",
             "expo-secure-store",
             "./plugins/withAndroidShareIntent"
-        ]
+        ],
+        "extra": {
+            "router": {},
+            "eas": {
+                "projectId": "46c85cff-e7c6-443a-aa93-d9fd89440c0d"
+            }
+        }
     }
 }

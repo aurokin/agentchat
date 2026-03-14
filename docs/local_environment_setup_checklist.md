@@ -159,6 +159,8 @@ Then start Metro for the installed development build:
 cd apps/mobile && bun run dev-client
 ```
 
+This now starts the Expo development client in LAN mode so a physical iPhone can reach Metro directly.
+
 3D) Start a native mobile build:
 
 ```bash

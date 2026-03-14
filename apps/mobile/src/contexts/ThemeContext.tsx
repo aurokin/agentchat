@@ -321,9 +321,11 @@ export function ThemeProvider({
     }, []);
 
     useEffect(() => {
-        void SystemUI.setBackgroundColorAsync(colors.background).catch(
-            () => undefined,
-        );
+        if (Platform.OS === "android") {
+            void SystemUI.setBackgroundColorAsync(colors.background).catch(
+                () => undefined,
+            );
+        }
 
         if (Platform.OS !== "android") {
             return;

@@ -1,6 +1,5 @@
 import React, {
     createContext,
-    startTransition,
     useContext,
     useEffect,
     useMemo,
@@ -39,53 +38,44 @@ export function AgentchatSocketProvider({
     const [connectionError, setConnectionError] = useState<string | null>(null);
     const isConfigured = Boolean(getAgentchatServerUrl());
     const ensureConnected = React.useCallback(async () => {
-        await socketClient.ensureConnected(getBackendSessionToken);
-    }, [getBackendSessionToken, socketClient]);
-
-    useEffect(() => {
-        let cancelled = false;
-
         if (!isAuthenticated || !isConfigured) {
-            socketClient.close();
-            startTransition(() => {
-                setConnectionState("idle");
-                setConnectionError(null);
-            });
-            return;
+            throw new Error("Agentchat server is not ready for mobile.");
         }
 
-        startTransition(() => {
-            setConnectionState("connecting");
-            setConnectionError(null);
-        });
+        setConnectionState("connecting");
+        setConnectionError(null);
 
-        void ensureConnected().then(
-            () => {
-                if (cancelled) return;
-                setConnectionState("connected");
-            },
-            (error: unknown) => {
-                if (cancelled) return;
-                const message =
-                    error instanceof Error
-                        ? error.message
-                        : "Failed to connect to the Agentchat server.";
-                setConnectionState("error");
-                setConnectionError(message);
-            },
-        );
+        try {
+            await socketClient.ensureConnected(getBackendSessionToken);
+            setConnectionState("connected");
+        } catch (error) {
+            const message =
+                error instanceof Error
+                    ? error.message
+                    : "Failed to connect to the Agentchat server.";
+            setConnectionState("error");
+            setConnectionError(message);
+            throw error;
+        }
+    }, [getBackendSessionToken, isAuthenticated, isConfigured, socketClient]);
 
-        return () => {
-            cancelled = true;
-        };
-    }, [ensureConnected, isAuthenticated, isConfigured, socketClient]);
+    useEffect(() => {
+        if (!isAuthenticated || !isConfigured) {
+            socketClient.close();
+        }
+    }, [isAuthenticated, isConfigured, socketClient]);
+
+    const effectiveConnectionState: SocketConnectionState =
+        !isAuthenticated || !isConfigured ? "idle" : connectionState;
+    const effectiveConnectionError =
+        !isAuthenticated || !isConfigured ? null : connectionError;
 
     return (
         <AgentchatSocketContext.Provider
             value={{
                 socketClient,
-                connectionState,
-                connectionError,
+                connectionState: effectiveConnectionState,
+                connectionError: effectiveConnectionError,
                 isConfigured,
                 ensureConnected,
             }}

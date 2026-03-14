@@ -8,6 +8,7 @@ import React, {
     useRef,
     type ReactNode,
 } from "react";
+import { Platform } from "react-native";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { FunctionReference } from "convex/server";
@@ -118,28 +119,31 @@ export function ChatProvider({
     const currentChatIdRef = useRef<string | null>(null);
 
     const isWorkspaceActive = isConvexAvailable && isWorkspaceReady;
+    const enableLiveWorkspaceSubscriptions = Platform.OS === "web";
+    const isLiveWorkspaceActive =
+        isWorkspaceActive && enableLiveWorkspaceSubscriptions;
     const currentChatId = currentChat?.id ?? null;
     const workspaceChats = useQuery(
         api.chats.listByUser,
-        isWorkspaceActive && workspaceUserId
+        isLiveWorkspaceActive && workspaceUserId
             ? { userId: workspaceUserId }
             : "skip",
     );
     const workspaceCurrentChat = useQuery(
         api.chats.getByLocalId,
-        isWorkspaceActive && workspaceUserId && currentChatId
+        isLiveWorkspaceActive && workspaceUserId && currentChatId
             ? { userId: workspaceUserId, localId: currentChatId }
             : "skip",
     );
     const workspaceMessages = useQuery(
         api.messages.listByChat,
-        isWorkspaceActive && workspaceCurrentChat?._id
+        isLiveWorkspaceActive && workspaceCurrentChat?._id
             ? { chatId: workspaceCurrentChat._id }
             : "skip",
     );
     const workspaceRunSummaries = useQuery(
         convexApi.runs.listByChat,
-        isWorkspaceActive && workspaceCurrentChat?._id
+        isLiveWorkspaceActive && workspaceCurrentChat?._id
             ? { chatId: workspaceCurrentChat._id }
             : "skip",
     );
@@ -197,7 +201,7 @@ export function ChatProvider({
             setCurrentChat(null);
             return;
         }
-        if (!isWorkspaceActive || !workspaceChats) return;
+        if (!isLiveWorkspaceActive || !workspaceChats) return;
 
         const mapped = workspaceChats
             .map(mapConvexChatToSession)
@@ -215,10 +219,14 @@ export function ChatProvider({
                 (a, b) => b.updatedAt - a.updatedAt,
             ),
         );
-    }, [isWorkspaceActive, selectedAgentId, workspaceChats]);
+    }, [isLiveWorkspaceActive, selectedAgentId, workspaceChats]);
 
     useEffect(() => {
-        if (!isWorkspaceActive || !workspaceCurrentChat || !workspaceMessages) {
+        if (
+            !isLiveWorkspaceActive ||
+            !workspaceCurrentChat ||
+            !workspaceMessages
+        ) {
             return;
         }
 
@@ -242,15 +250,15 @@ export function ChatProvider({
             ),
         }));
         setIsMessagesLoading(false);
-    }, [isWorkspaceActive, workspaceCurrentChat, workspaceMessages]);
+    }, [isLiveWorkspaceActive, workspaceCurrentChat, workspaceMessages]);
 
     useEffect(() => {
-        if (!isWorkspaceActive || !currentChatId) return;
+        if (!isLiveWorkspaceActive || !currentChatId) return;
         if (workspaceCurrentChat && workspaceMessages) return;
         setIsMessagesLoading(true);
     }, [
         currentChatId,
-        isWorkspaceActive,
+        isLiveWorkspaceActive,
         workspaceCurrentChat,
         workspaceMessages,
     ]);
@@ -417,7 +425,6 @@ export function ChatProvider({
     const updateChat = useCallback(
         async (chat: ChatSession) => {
             await adapter.updateChat(chat);
-
             setChats((prev) => prev.map((c) => (c.id === chat.id ? chat : c)));
             setCurrentChat((prev) => (prev?.id === chat.id ? chat : prev));
         },

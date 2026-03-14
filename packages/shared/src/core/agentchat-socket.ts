@@ -222,7 +222,7 @@ export class AgentchatSocketClient {
         url.searchParams.set("token", token);
 
         await new Promise<void>((resolve, reject) => {
-            const socket = new WebSocket(url);
+            const socket = new WebSocket(url.toString());
             let settled = false;
 
             const settleResolve = () => {

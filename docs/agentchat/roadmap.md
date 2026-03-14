@@ -24,6 +24,11 @@ This roadmap describes the current implementation state and the next major steps
 - Tighten end-to-end reliability across web, server, Convex, and Codex
 - Close the remaining mobile parity gaps
 - Keep Codex-backed model and variant discovery well-tested and operator-friendly
+- Investigate Codex model and variant mapping in the live product path
+- Verify that thinking variants map correctly to Codex behavior
+- Verify whether Codex Spark is functioning correctly in the current integration
+- Make mobile theme default honor the device system theme correctly, especially iOS dark mode
+- Improve assistant output segmentation so streamed progress and final report content do not collapse into one bulk message shape
 - Improve operator-facing diagnostics and health reporting
 - Build a practical testing stack around the dedicated local fixtures in `/home/auro/agents/agentchat_test`
 - Keep the active roadmap narrowly focused on Codex confidence rather than adding more providers

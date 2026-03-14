@@ -125,6 +125,17 @@ export default function ChatScreen(): ReactElement {
     const currentChatRef = useRef<ChatSession | null>(currentChat);
     const chatMessagesRef = useRef<Message[]>(EMPTY_MESSAGES);
     const activeRunRef = useRef<ActiveRunState | null>(null);
+    const conversationSubscriptionCleanupRef = useRef<(() => void) | null>(
+        null,
+    );
+
+    const scrollToEnd = useCallback(() => {
+        try {
+            flatListRef.current?.scrollToEnd?.({ animated: false });
+        } catch {
+            // Ignore best-effort scroll failures during layout churn.
+        }
+    }, []);
 
     useEffect(() => {
         if (chatId) {
@@ -167,8 +178,15 @@ export default function ChatScreen(): ReactElement {
             if (inputSuppressionTimeoutRef.current) {
                 clearTimeout(inputSuppressionTimeoutRef.current);
             }
+            conversationSubscriptionCleanupRef.current?.();
+            conversationSubscriptionCleanupRef.current = null;
         };
     }, []);
+
+    useEffect(() => {
+        conversationSubscriptionCleanupRef.current?.();
+        conversationSubscriptionCleanupRef.current = null;
+    }, [chatId]);
 
     useEffect(() => {
         if (!currentChat) {
@@ -179,10 +197,10 @@ export default function ChatScreen(): ReactElement {
     useEffect(() => {
         if (flatListRef.current && messages[chatId]) {
             setTimeout(() => {
-                flatListRef.current?.scrollToEnd?.({ animated: true });
+                scrollToEnd();
             }, 100);
         }
-    }, [messages, chatId]);
+    }, [messages, chatId, scrollToEnd]);
 
     const currentModel = models.find((m) => m.id === currentChat?.modelId);
     const reasoningSupported = modelSupportsReasoning(currentModel);
@@ -213,6 +231,10 @@ export default function ChatScreen(): ReactElement {
     useEffect(() => {
         if (!currentChat || !hasLoadedMessages) return;
         if (lastInitializedChatIdRef.current === currentChat.id) return;
+        if (currentChat.settingsLockedAt != null) {
+            lastInitializedChatIdRef.current = currentChat.id;
+            return;
+        }
         const defaults = {
             modelId: defaultModel,
             variantId: selectedVariantId,
@@ -259,6 +281,7 @@ export default function ChatScreen(): ReactElement {
 
     useEffect(() => {
         if (!currentChat || !currentModel) return;
+        if (currentChat.settingsLockedAt != null) return;
         const currentVariantIsValid =
             !currentChat.variantId ||
             (currentModel.variants?.some(
@@ -288,6 +311,7 @@ export default function ChatScreen(): ReactElement {
 
     const handleModelChange = async (modelId: string) => {
         if (!currentChat) return;
+        if (currentChat.settingsLockedAt != null) return;
         await setSelectedModel(modelId);
         const nextModel = models.find((model) => model.id === modelId);
         const nextThinking = nextModel
@@ -314,6 +338,7 @@ export default function ChatScreen(): ReactElement {
 
     const handleVariantChange = async (variantId: string) => {
         if (!currentChat) return;
+        if (currentChat.settingsLockedAt != null) return;
         await setSelectedVariant(variantId);
         const updatedChat = {
             ...currentChat,
@@ -496,27 +521,6 @@ export default function ChatScreen(): ReactElement {
         });
     }, [chatMessages, currentChat, runtimeState]);
 
-    useEffect(() => {
-        if (!currentChat) {
-            return;
-        }
-
-        const unsubscribe = socketClient.subscribeToConversation(
-            currentChat.id,
-        );
-        void ensureConnected().catch((connectError: unknown) => {
-            setError({
-                message:
-                    connectError instanceof Error
-                        ? connectError.message
-                        : "Failed to connect to the Agentchat server.",
-                isRetryable: true,
-            });
-        });
-
-        return unsubscribe;
-    }, [currentChat, ensureConnected, socketClient]);
-
     const handleSendMessage = async (content: string): Promise<boolean> => {
         if (!currentChat) {
             setError({ message: "No chat selected", isRetryable: false });
@@ -534,7 +538,21 @@ export default function ChatScreen(): ReactElement {
                 updateChat,
                 setDefaultModel: setSelectedModel,
                 queueStreamingMessageUpdate: setStreamingMessage,
-                ensureConnected,
+                ensureConnected: async () => {
+                    if (!conversationSubscriptionCleanupRef.current) {
+                        conversationSubscriptionCleanupRef.current =
+                            socketClient.subscribeToConversation(
+                                currentChat.id,
+                            );
+                    }
+                    try {
+                        await ensureConnected();
+                    } catch (error) {
+                        conversationSubscriptionCleanupRef.current?.();
+                        conversationSubscriptionCleanupRef.current = null;
+                        throw error;
+                    }
+                },
                 sendCommand: (command) => {
                     socketClient.send(command);
                 },
@@ -1145,9 +1163,7 @@ export default function ChatScreen(): ReactElement {
                     scrollEventThrottle={16}
                     onContentSizeChange={() => {
                         if (isAtBottomRef.current) {
-                            flatListRef.current?.scrollToEnd?.({
-                                animated: true,
-                            });
+                            scrollToEnd();
                         }
                     }}
                 />

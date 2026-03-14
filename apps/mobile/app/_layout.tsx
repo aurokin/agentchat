@@ -1,4 +1,4 @@
-import type { ReactElement, ReactNode } from "react";
+import type { ReactElement } from "react";
 import { Stack } from "expo-router";
 import { Platform, StatusBar } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -10,15 +10,34 @@ import { ConvexProvider } from "@/lib/convex";
 import { ModelProvider } from "@/contexts/ModelContext";
 import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
 import { AgentchatSocketProvider } from "@/contexts/AgentchatSocketContext";
-import { ShareIntentBridge } from "@/components/share/ShareIntentBridge";
 import { AgentProvider } from "@/contexts/AgentContext";
 import OnboardingScreen from "./onboarding";
 
-function OnboardingWrapper({
-    children,
-}: {
-    children: ReactNode;
-}): ReactElement {
+function RuntimeProviders(): ReactElement {
+    return (
+        <ConvexProvider>
+            <AgentProvider>
+                <AuthProvider>
+                    <AgentchatSocketProvider>
+                        <ModelProvider>
+                            <WorkspaceProvider>
+                                <ChatProvider>
+                                    <Stack
+                                        screenOptions={{
+                                            headerShown: false,
+                                        }}
+                                    />
+                                </ChatProvider>
+                            </WorkspaceProvider>
+                        </ModelProvider>
+                    </AgentchatSocketProvider>
+                </AuthProvider>
+            </AgentProvider>
+        </ConvexProvider>
+    );
+}
+
+function AppShell(): ReactElement {
     const { isInitialized, hasCompletedOnboarding, completeOnboarding } =
         useAppContext();
     const shouldShowOnboarding = isInitialized && !hasCompletedOnboarding;
@@ -31,19 +50,24 @@ function OnboardingWrapper({
         return <OnboardingScreen onComplete={handleOnboardingComplete} />;
     }
 
-    return <>{children}</>;
+    return <RuntimeProviders />;
 }
 
 function ThemedStatusBar(): React.ReactElement {
     const { scheme, colors } = useTheme();
 
+    const androidStatusBarProps =
+        Platform.OS === "android"
+            ? {
+                  translucent: true,
+                  backgroundColor: "transparent" as const,
+              }
+            : {};
+
     return (
         <StatusBar
             barStyle={scheme === "dark" ? "light-content" : "dark-content"}
-            translucent={Platform.OS === "android"}
-            backgroundColor={
-                Platform.OS === "android" ? "transparent" : colors.background
-            }
+            {...androidStatusBarProps}
         />
     );
 }
@@ -53,30 +77,9 @@ export default function Layout(): ReactElement {
         <SafeAreaProvider>
             <ThemeProvider>
                 <ThemedStatusBar />
-                <ConvexProvider>
-                    <AgentProvider>
-                        <AuthProvider>
-                            <AgentchatSocketProvider>
-                                <ModelProvider>
-                                    <WorkspaceProvider>
-                                        <AppProvider>
-                                            <ChatProvider>
-                                                <ShareIntentBridge />
-                                                <OnboardingWrapper>
-                                                    <Stack
-                                                        screenOptions={{
-                                                            headerShown: false,
-                                                        }}
-                                                    />
-                                                </OnboardingWrapper>
-                                            </ChatProvider>
-                                        </AppProvider>
-                                    </WorkspaceProvider>
-                                </ModelProvider>
-                            </AgentchatSocketProvider>
-                        </AuthProvider>
-                    </AgentProvider>
-                </ConvexProvider>
+                <AppProvider>
+                    <AppShell />
+                </AppProvider>
             </ThemeProvider>
         </SafeAreaProvider>
     );
