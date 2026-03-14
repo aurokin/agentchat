@@ -25,6 +25,7 @@ This roadmap describes the current implementation state and the next major steps
 - Tighten end-to-end reliability across web, server, Convex, and Codex
 - Close the remaining mobile parity gaps
 - Keep Codex-backed model and variant discovery well-tested and operator-friendly
+- Plan and implement local multi-user auth in a provider-oriented way so Agentchat is not limited to Google or disabled-auth forever
 - Investigate Codex model and variant mapping in the live product path
 - Remove the remaining legacy thinking-toggle assumptions so Codex model and variant selection stays direct
 - Verify whether Codex Spark is functioning correctly in the current integration
@@ -36,6 +37,7 @@ This roadmap describes the current implementation state and the next major steps
 - Use the live Convex deployment for real codegen, runtime persistence validation, and end-to-end confidence passes
 - Use disabled-auth mode aggressively for integration and browser confidence work that does not need Google sign-in coverage
 - Use [Run Output Model Proposal](./run-output-model-proposal.md) as the source doc for further refinement of the multi-message run model
+- Use [Local Auth Plan](./local-auth-plan.md) as the source doc for moving from mode-based auth to provider-oriented local auth
 - Keep targeted regression coverage for browser-visible runtime state so manual catches like stale stop buttons and false reconnect banners stay scriptable checks
 - Add regression fixtures for long streamed assistant prose formatting and LAN browser access during local development
 - Keep mobile integration testing explicitly gated by host-platform support instead of implying universal simulator/device coverage

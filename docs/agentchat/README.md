@@ -22,6 +22,7 @@ It exists for both humans and agents:
 - [Backend API Spec](./backend-api-spec.md)
 - [Codex Runtime Spec](./codex-runtime-spec.md)
 - [Run Output Model Proposal](./run-output-model-proposal.md)
+- [Local Auth Plan](./local-auth-plan.md)
 - [Testing Plan](./testing-plan.md)
 - [Manual QA Checklist](./manual-qa-checklist.md)
 - [Mobile Follow-Up](./mobile-followup.md)
