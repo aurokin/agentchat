@@ -27,7 +27,6 @@ type ActiveTurn = {
     nextSequence: number;
     lastPersistedContent: string;
     pendingDeltaFlush: ReturnType<typeof setTimeout> | null;
-    splitCount: number;
     reject: (error: Error) => void;
     resolve: () => void;
 };
@@ -142,163 +141,26 @@ function resolveCodexEffort(command: ConversationSendCommand): string {
     return command.payload.variantId ?? "medium";
 }
 
-const REPORT_HEADING_PATTERN =
-    /\n{2,}(Report|Assessment|Structure|Summary|Findings?|Recommendations?|Notable details|What [^\n:]+)\n/i;
-
-const STRUCTURED_LIST_PATTERN = /(?:\d+\.\s+|[-*]\s+)/g;
-
-const STATUS_PREAMBLE_PATTERN =
-    /^(?:i(?:['’]?m| am)\b|i found\b|i have\b|i need to\b|next i(?:['’]?m| am)\b|the tree is\b|the structure is\b|the relevant sources here are\b|`[^`]+`\s+went down the wrong path\b)/i;
-
-type TranscriptSplitDecision = {
-    boundaryIndex: number;
-    previousKind: "assistant_message" | "assistant_status";
-    nextKind: "assistant_message" | "assistant_status";
-};
-
-type SentenceSpan = {
-    start: number;
-    end: number;
-    text: string;
-};
-
-function findStructuredListBoundary(text: string): number | null {
-    for (const match of text.matchAll(STRUCTURED_LIST_PATTERN)) {
-        const index = match.index ?? -1;
-        if (index <= 0) {
-            continue;
-        }
-
-        const prefix = text.slice(0, index);
-        const trimmedPrefix = trimTrailingMessageContent(prefix) ?? "";
-        if (trimmedPrefix.length < 48) {
-            continue;
-        }
-
-        const recentPrefix = prefix.slice(Math.max(0, prefix.length - 4));
-        const hasParagraphBoundary =
-            recentPrefix.includes("\n\n") ||
-            /[.!?]\s*$/.test(prefix) ||
-            /[.!?:]\s*$/.test(prefix) ||
-            /[.!?:]$/.test(prefix);
-        if (!hasParagraphBoundary) {
-            continue;
-        }
-
-        return index;
-    }
-
-    return null;
+function getCodexEventMessage(
+    params: Record<string, unknown> | undefined,
+): Record<string, unknown> | null {
+    const message = params?.msg;
+    return message && typeof message === "object"
+        ? (message as Record<string, unknown>)
+        : null;
 }
 
-function collectSentenceSpans(text: string): SentenceSpan[] {
-    const spans: SentenceSpan[] = [];
-    const matcher = /[^.!?]+(?:[.!?]+|$)/g;
-
-    for (const match of text.matchAll(matcher)) {
-        const raw = match[0];
-        const start = match.index ?? -1;
-        if (start < 0) {
-            continue;
-        }
-
-        const end = start + raw.length;
-        const trimmed = raw.trim();
-        if (!trimmed) {
-            continue;
-        }
-
-        spans.push({ start, end, text: trimmed });
-    }
-
-    return spans;
-}
-
-function isStatusPreambleSentence(sentence: string): boolean {
-    if (!STATUS_PREAMBLE_PATTERN.test(sentence)) {
-        return false;
-    }
-
-    if (
-        /^(?:the tree is\b|the structure is\b|the relevant sources here are\b|i have\b)/i.test(
-            sentence,
-        )
-    ) {
-        return true;
-    }
-
-    return /\b(reading|loading|checking|surveying|pulling|switching|determining|looking|doing|extract|return|include|querying|checking|found)\b/i.test(
-        sentence,
-    );
-}
-
-function findLeadingStatusBoundary(text: string): number | null {
-    const spans = collectSentenceSpans(text);
-    if (spans.length < 3) {
-        return null;
-    }
-
-    let statusCount = 0;
-    let statusEnd = 0;
-    for (const span of spans) {
-        if (!isStatusPreambleSentence(span.text)) {
-            break;
-        }
-        statusCount += 1;
-        statusEnd = span.end;
-    }
-
-    if (statusCount < 2 || statusEnd <= 0) {
-        return null;
-    }
-
-    const prefix = trimTrailingMessageContent(text.slice(0, statusEnd)) ?? "";
-    const remainder = trimLeadingMessageContent(text.slice(statusEnd)) ?? "";
-    if (prefix.length < 80 || remainder.length < 24) {
-        return null;
-    }
-
-    return statusEnd;
-}
-
-function detectTranscriptSplit(
-    text: string,
-    splitCount: number,
-): TranscriptSplitDecision | null {
-    if (text.length < 48) {
-        return null;
-    }
-
-    if (splitCount === 0) {
-        const statusBoundary = findLeadingStatusBoundary(text);
-        if (statusBoundary !== null) {
-            return {
-                boundaryIndex: statusBoundary,
-                previousKind: "assistant_status",
-                nextKind: "assistant_message",
-            };
-        }
-    }
-
-    const match = REPORT_HEADING_PATTERN.exec(text);
-    if (match && match.index > 0) {
-        return {
-            boundaryIndex: match.index + (match[0].startsWith("\n\n") ? 2 : 0),
-            previousKind: "assistant_message",
-            nextKind: "assistant_message",
-        };
-    }
-
-    const listBoundary = findStructuredListBoundary(text);
-    if (listBoundary === null) {
-        return null;
-    }
-
-    return {
-        boundaryIndex: listBoundary,
-        previousKind: "assistant_message",
-        nextKind: "assistant_message",
-    };
+function getAgentReasoningText(
+    params: Record<string, unknown> | undefined,
+): string | null {
+    const message = getCodexEventMessage(params);
+    const text =
+        typeof message?.text === "string"
+            ? message.text
+            : typeof params?.text === "string"
+              ? params.text
+              : null;
+    return text?.trim() ? text.trim() : null;
 }
 
 export class CodexRuntimeManager {
@@ -371,7 +233,6 @@ export class CodexRuntimeManager {
                 nextSequence: 3,
                 lastPersistedContent: "",
                 pendingDeltaFlush: null,
-                splitCount: 0,
                 reject,
                 resolve,
             };
@@ -860,14 +721,97 @@ export class CodexRuntimeManager {
             return;
         }
 
+        if (notification.method === "codex/event/agent_reasoning") {
+            const description = getAgentReasoningText(notification.params);
+            if (!description) {
+                return;
+            }
+
+            if (activeTurn.currentMessageIndex !== 0) {
+                return;
+            }
+
+            const isFirstStatusChunk =
+                activeTurn.currentMessageKind === "assistant_message" &&
+                activeTurn.text.length === 0;
+            if (
+                !isFirstStatusChunk &&
+                activeTurn.currentMessageKind !== "assistant_status"
+            ) {
+                return;
+            }
+
+            const delta = isFirstStatusChunk ? description : `\n${description}`;
+
+            if (isFirstStatusChunk) {
+                activeTurn.currentMessageKind = "assistant_status";
+
+                this.emitToSubscribers(
+                    runtime,
+                    createServerEvent("message.started", {
+                        conversationId: runtime.conversationId,
+                        runId: activeTurn.runId,
+                        messageId: activeTurn.currentMessageId,
+                        messageIndex: activeTurn.currentMessageIndex,
+                        kind: activeTurn.currentMessageKind,
+                        content: description,
+                    }),
+                );
+            } else {
+                activeTurn.text += delta;
+                activeTurn.lastPersistedContent = activeTurn.text;
+                this.emitToSubscribers(
+                    runtime,
+                    createServerEvent("message.delta", {
+                        conversationId: runtime.conversationId,
+                        messageId: activeTurn.currentMessageId,
+                        delta,
+                        content: activeTurn.text,
+                    }),
+                );
+            }
+
+            if (isFirstStatusChunk) {
+                activeTurn.text = description;
+                activeTurn.lastPersistedContent = description;
+            }
+
+            void this.persistence
+                .messageDelta({
+                    userId: activeTurn.userId,
+                    conversationLocalId: runtime.conversationId,
+                    assistantMessageLocalId: activeTurn.currentMessageId,
+                    externalRunId: activeTurn.runId,
+                    sequence: activeTurn.nextSequence++,
+                    content: activeTurn.text,
+                    delta,
+                    kind: activeTurn.currentMessageKind,
+                    runMessageIndex: activeTurn.currentMessageIndex,
+                    createdAt: Date.now(),
+                })
+                .catch((error) => {
+                    console.error(
+                        "[agentchat-server] failed to persist agent reasoning status",
+                        error,
+                    );
+                });
+            return;
+        }
+
         if (notification.method === "item/agentMessage/delta") {
             const delta = notification.params?.delta;
             if (typeof delta !== "string") {
                 return;
             }
 
+            if (activeTurn.currentMessageKind === "assistant_status") {
+                this.transitionStatusMessageToAssistantOutput(
+                    runtime,
+                    activeTurn,
+                );
+            }
+
             activeTurn.text += delta;
-            this.splitActiveTurnIfNeeded(runtime, activeTurn);
             this.emitToSubscribers(
                 runtime,
                 createServerEvent("message.delta", {
@@ -1046,41 +990,18 @@ export class CodexRuntimeManager {
         activeTurn.reject(new Error(errorMessage));
     }
 
-    private splitActiveTurnIfNeeded(
+    private transitionStatusMessageToAssistantOutput(
         runtime: ConversationRuntime,
         activeTurn: ActiveTurn,
     ): void {
-        if (activeTurn.splitCount >= 2) {
-            return;
-        }
-
-        const split = detectTranscriptSplit(
-            activeTurn.text,
-            activeTurn.splitCount,
-        );
-        if (!split) {
-            return;
-        }
-
-        const previousContent =
-            trimTrailingMessageContent(
-                activeTurn.text.slice(0, split.boundaryIndex),
-            ) ?? "";
-        const nextContent =
-            trimLeadingMessageContent(
-                activeTurn.text.slice(split.boundaryIndex),
-            ) ?? "";
-
-        if (!previousContent || !nextContent) {
+        if (activeTurn.currentMessageKind !== "assistant_status") {
             return;
         }
 
         this.cancelPendingMessageDelta(activeTurn);
-        activeTurn.splitCount += 1;
-        activeTurn.text = nextContent;
-        activeTurn.lastPersistedContent = nextContent;
 
         const previousMessageId = activeTurn.currentMessageId;
+        const previousContent = activeTurn.text;
         const nextMessageId = crypto.randomUUID();
         const previousCompletedSequence = activeTurn.nextSequence++;
         const messageStartedSequence = activeTurn.nextSequence++;
@@ -1096,8 +1017,10 @@ export class CodexRuntimeManager {
         );
 
         activeTurn.currentMessageId = nextMessageId;
-        activeTurn.currentMessageKind = split.nextKind;
+        activeTurn.currentMessageKind = "assistant_message";
         activeTurn.currentMessageIndex += 1;
+        activeTurn.text = "";
+        activeTurn.lastPersistedContent = "";
 
         this.emitToSubscribers(
             runtime,
@@ -1107,9 +1030,9 @@ export class CodexRuntimeManager {
                 messageId: activeTurn.currentMessageId,
                 messageIndex: activeTurn.currentMessageIndex,
                 kind: activeTurn.currentMessageKind,
-                content: activeTurn.text,
+                content: "",
                 previousMessageId,
-                previousKind: split.previousKind,
+                previousKind: "assistant_status",
             }),
         );
 
@@ -1119,19 +1042,19 @@ export class CodexRuntimeManager {
                 conversationLocalId: runtime.conversationId,
                 previousAssistantMessageLocalId: previousMessageId,
                 previousCompletedSequence,
-                previousKind: split.previousKind,
+                previousKind: "assistant_status",
                 assistantMessageLocalId: nextMessageId,
                 messageStartedSequence,
                 externalRunId: activeTurn.runId,
-                kind: split.nextKind,
+                kind: "assistant_message",
                 runMessageIndex: activeTurn.currentMessageIndex,
                 previousContent,
-                content: nextContent,
+                content: "",
                 createdAt,
             })
             .catch((error) => {
                 console.error(
-                    "[agentchat-server] failed to persist split output message",
+                    "[agentchat-server] failed to persist assistant output transition",
                     error,
                 );
             });
@@ -1221,16 +1144,6 @@ export class CodexRuntimeManager {
             createdAt: Date.now(),
         });
     }
-}
-
-function trimLeadingMessageContent(value: string): string | undefined {
-    const trimmed = value.replace(/^\s+/, "");
-    return trimmed.length > 0 ? trimmed : undefined;
-}
-
-function trimTrailingMessageContent(value: string): string | undefined {
-    const trimmed = value.replace(/\s+$/, "");
-    return trimmed.length > 0 ? trimmed : undefined;
 }
 
 function resolveRuntimeResources(

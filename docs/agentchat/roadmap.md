@@ -30,10 +30,9 @@ This roadmap describes the current implementation state and the next major steps
 - Remove the remaining legacy thinking-toggle assumptions so Codex model and variant selection stays direct
 - Verify whether Codex Spark is functioning correctly in the current integration
 - Make mobile theme default honor the device system theme correctly, especially iOS dark mode
-- Refine assistant output segmentation heuristics now that one run can emit multiple assistant transcript messages
-- Evolve multi-message output from heuristic-only splitting toward provider-native runtime item types
+- Expand provider-native runtime item mapping so multi-message output follows real Codex events instead of transcript inference
   - emit first-class progress/status items when the provider gives us typed runtime events
-  - keep sentence/list/report splitting as a fallback only for raw text streams
+  - keep transcript formatting cleanup separate from transcript structure
 - Improve operator-facing diagnostics and health reporting
 - Build a practical testing stack around the dedicated local fixtures in `/home/auro/agents/agentchat_test`
 - Keep the active roadmap narrowly focused on Codex confidence rather than adding more providers

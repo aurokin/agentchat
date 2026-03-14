@@ -560,6 +560,13 @@ export const messageDelta = internalMutation({
         sequence: v.number(),
         content: v.string(),
         delta: v.string(),
+        kind: v.optional(
+            v.union(
+                v.literal("assistant_message"),
+                v.literal("assistant_status"),
+            ),
+        ),
+        runMessageIndex: v.optional(v.number()),
         createdAt: v.number(),
     },
     handler: async (ctx, args) => {
@@ -575,9 +582,11 @@ export const messageDelta = internalMutation({
         const assistantMessage = await updateAssistantMessage(ctx, {
             userId: args.userId,
             localId: args.assistantMessageLocalId,
+            kind: args.kind,
             content: args.content,
             status: "streaming",
             runId: args.externalRunId,
+            runMessageIndex: args.runMessageIndex,
             updatedAt: args.createdAt,
             completedAt: null,
         });
