@@ -8,7 +8,6 @@ import React, {
 import * as WebBrowser from "expo-web-browser";
 import { makeRedirectUri } from "expo-auth-session";
 import { useAction, useConvexAuth, useQuery } from "convex/react";
-import { useMutation } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { api } from "@convex/_generated/api";
 import {
@@ -33,7 +32,6 @@ interface AuthContextValue {
     userId: string | null;
     authProviderId: string | null;
     authProviderKind: "google" | "local" | "disabled" | null;
-    usesAutomaticAccessUser: boolean;
     isAuthenticated: boolean;
     isLoading: boolean;
     isConvexAvailable: boolean;
@@ -65,68 +63,23 @@ export function AuthProvider({
     children,
 }: AuthProviderProps): React.ReactElement {
     const isConvexAvailable = useIsConvexAvailable();
-    const {
-        authProviderId,
-        authProviderKind,
-        usesAutomaticAccessUser,
-        loadingAgents,
-    } = useAgent();
+    const { authProviderId, authProviderKind, loadingAgents } = useAgent();
     const { isAuthenticated: isConvexAuthenticated, isLoading: isAuthLoading } =
         useConvexAuth();
     const authActions = useAuthActions();
     const issueBackendSessionToken = useAction(api.backendTokens.issue);
-    const ensureAccessUser = useMutation(api.users.ensureAccessUser);
-    const [defaultUserId, setDefaultUserId] =
-        React.useState<ConvexId<"users"> | null>(null);
     const userId = useQuery(
         api.users.getCurrentUserId,
-        isConvexAvailable &&
-            !loadingAgents &&
-            (usesAutomaticAccessUser || isConvexAuthenticated)
+        isConvexAvailable && !loadingAgents && isConvexAuthenticated
             ? {}
             : "skip",
     ) as ConvexId<"users"> | null | undefined;
-    const effectiveUserId =
-        (usesAutomaticAccessUser ? (defaultUserId ?? userId) : userId) ?? null;
+    const effectiveUserId = userId ?? null;
     const user = useQuery(
         api.users.get,
         effectiveUserId ? { id: effectiveUserId } : "skip",
     );
-
-    React.useEffect(() => {
-        let cancelled = false;
-
-        if (!isConvexAvailable || loadingAgents || !usesAutomaticAccessUser) {
-            return;
-        }
-
-        void ensureAccessUser({})
-            .then((nextUserId) => {
-                if (cancelled) return;
-                setDefaultUserId(nextUserId as ConvexId<"users">);
-            })
-            .catch((error) => {
-                if (cancelled) return;
-                console.error(
-                    "Failed to initialize default access user:",
-                    error,
-                );
-                setDefaultUserId(null);
-            });
-
-        return () => {
-            cancelled = true;
-        };
-    }, [
-        ensureAccessUser,
-        isConvexAvailable,
-        loadingAgents,
-        usesAutomaticAccessUser,
-    ]);
-
-    const isAuthenticated = usesAutomaticAccessUser
-        ? Boolean(isConvexAvailable && effectiveUserId)
-        : isConvexAuthenticated;
+    const isAuthenticated = isConvexAuthenticated;
 
     const isUserLoading =
         isAuthenticated &&
@@ -145,14 +98,16 @@ export function AuthProvider({
 
     const signIn = useCallback(
         async (options?: { username?: string; password?: string }) => {
-            if (usesAutomaticAccessUser) {
-                return;
-            }
             if (!authActions?.signIn) {
                 throw new Error("Convex auth is not configured");
             }
             if (!isConvexAvailable || !isConvexConfigured()) {
                 throw new Error("Convex is not configured");
+            }
+            if (authProviderKind === "disabled") {
+                throw new Error(
+                    "Disabled auth is a deprecated compatibility mode. Switch this instance to local or Google auth.",
+                );
             }
 
             const redirectUri = makeRedirectUri({
@@ -247,32 +202,20 @@ export function AuthProvider({
                 authActions.signIn(undefined as any, { code } as any),
             );
         },
-        [
-            authActions,
-            authProviderKind,
-            isConvexAvailable,
-            usesAutomaticAccessUser,
-        ],
+        [authActions, authProviderKind, isConvexAvailable],
     );
 
     const signOut = useCallback(async () => {
-        if (usesAutomaticAccessUser) {
-            return;
-        }
         try {
             await authActions?.signOut?.();
         } finally {
             await clearAllCredentials();
         }
-    }, [authActions, usesAutomaticAccessUser]);
+    }, [authActions]);
 
     const getBackendSessionToken = useCallback(async () => {
         if (!isConvexAvailable || !isAuthenticated) {
-            throw new Error(
-                usesAutomaticAccessUser
-                    ? "The default workspace user is not ready yet."
-                    : "You must be signed in to connect to Agentchat.",
-            );
+            throw new Error("You must be signed in to connect to Agentchat.");
         }
 
         const result = await issueBackendSessionToken({});
@@ -283,12 +226,7 @@ export function AuthProvider({
         }
 
         return result.token;
-    }, [
-        isAuthenticated,
-        isConvexAvailable,
-        issueBackendSessionToken,
-        usesAutomaticAccessUser,
-    ]);
+    }, [isAuthenticated, isConvexAvailable, issueBackendSessionToken]);
 
     const configureConvex = useCallback(async (url: string) => {
         await setConvexUrl(url);
@@ -305,7 +243,6 @@ export function AuthProvider({
                 userId: effectiveUserId,
                 authProviderId,
                 authProviderKind,
-                usesAutomaticAccessUser,
                 isAuthenticated,
                 isLoading,
                 isConvexAvailable,

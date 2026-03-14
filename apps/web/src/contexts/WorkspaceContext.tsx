@@ -1,13 +1,7 @@
 "use client";
 
-import React, {
-    createContext,
-    useContext,
-    useEffect,
-    useMemo,
-    useState,
-} from "react";
-import { useConvex, useConvexAuth, useMutation, useQuery } from "convex/react";
+import React, { createContext, useContext, useMemo } from "react";
+import { useConvex, useConvexAuth, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { WorkspaceStatus } from "@/lib/workspace/types";
 import type { PersistenceAdapter } from "@/lib/workspace/persistence-adapter";
@@ -41,55 +35,13 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
         authProviderId,
         authProviderKind,
         authRequiresLogin,
-        usesAutomaticAccessUser,
         loadingAgents,
     } = useAgent();
-    const ensureAccessUser = useMutation(api.users.ensureAccessUser);
-    const [accessUserId, setAccessUserId] = useState<ConvexId<"users"> | null>(
-        null,
-    );
     const userId = useQuery(
         api.users.getCurrentUserId,
-        isConvexAvailable &&
-            !loadingAgents &&
-            (usesAutomaticAccessUser || isAuthenticated)
-            ? {}
-            : "skip",
+        isConvexAvailable && !loadingAgents && isAuthenticated ? {} : "skip",
     ) as ConvexId<"users"> | null | undefined;
-
-    useEffect(() => {
-        let cancelled = false;
-
-        if (!isConvexAvailable || loadingAgents || !usesAutomaticAccessUser) {
-            return;
-        }
-
-        void ensureAccessUser({})
-            .then((nextUserId) => {
-                if (cancelled) return;
-                setAccessUserId(nextUserId as ConvexId<"users">);
-            })
-            .catch((error) => {
-                if (cancelled) return;
-                console.error(
-                    "Failed to initialize default access user:",
-                    error,
-                );
-                setAccessUserId(null);
-            });
-
-        return () => {
-            cancelled = true;
-        };
-    }, [
-        ensureAccessUser,
-        isConvexAvailable,
-        loadingAgents,
-        usesAutomaticAccessUser,
-    ]);
-
-    const workspaceUserId =
-        (usesAutomaticAccessUser ? (accessUserId ?? userId) : userId) ?? null;
+    const workspaceUserId = userId ?? null;
 
     const workspaceStatus: WorkspaceStatus =
         isConvexAvailable && workspaceUserId ? "ready" : "unavailable";

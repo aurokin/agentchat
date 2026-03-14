@@ -139,7 +139,7 @@ V1 decision:
 
 - in Google mode, instance access is granted only if the signed-in email is present in `allowedEmails`
 - in local mode, Convex Auth owns password verification and every successful login maps to one concrete `users` row
-- disabled is still supported as a transitional provider shape, but it is not the desired long-term product model
+- disabled is still accepted as a compatibility provider shape, but clients should treat it as deprecated and operators should migrate to `local` or `google`
 
 Legacy note:
 

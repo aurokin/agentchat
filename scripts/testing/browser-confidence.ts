@@ -321,9 +321,18 @@ async function runInterrupt(page: Page): Promise<void> {
             .getByTestId("cancel-run-button")
             .isVisible()
             .catch(() => false);
+        const sendVisible = await page
+            .getByTestId("send-message-button")
+            .isVisible()
+            .catch(() => false);
         const assistantMessages = page.locator(
             '[data-testid^="message-assistant-"]',
         );
+        if (!cancelVisible && sendVisible) {
+            await assertComposerSettled(page);
+            await assertNoRecoveryBanner(page);
+            return;
+        }
         const assistantCount = await assistantMessages.count();
         if (!cancelVisible && assistantCount > 0) {
             const lastText =

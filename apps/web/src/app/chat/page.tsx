@@ -10,7 +10,6 @@ import { Loader2 } from "lucide-react";
 import { useIsConvexAvailable } from "@/contexts/ConvexProvider";
 import { useSettings } from "@/contexts/SettingsContext";
 import { OperatorNotice } from "@/components/chat/OperatorNotice";
-import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { BackgroundRuntimeSubscriptions } from "@/components/chat/BackgroundRuntimeSubscriptions";
 
 export default function ChatPage() {
@@ -19,13 +18,11 @@ export default function ChatPage() {
         loadingAgents,
         authProviderKind,
         authRequiresLogin,
-        usesAutomaticAccessUser,
         bootstrapIssue,
         agentOptionsIssue,
         refreshBootstrap,
     } = useAgent();
     const { modelsIssue, refreshModels } = useSettings();
-    const { isWorkspaceReady } = useWorkspace();
     const isConvexAvailable = useIsConvexAvailable();
     const { isAuthenticated, isLoading: isAuthLoading } = useConvexAuth();
     const { signIn } = useAuthActions() ?? {};
@@ -36,9 +33,8 @@ export default function ChatPage() {
         null,
     );
     const [isLocalSigningIn, setIsLocalSigningIn] = useState(false);
-    const hasAccess =
-        isConvexAvailable &&
-        (usesAutomaticAccessUser ? isWorkspaceReady : isAuthenticated);
+    const hasAccess = isConvexAvailable && isAuthenticated;
+    const isDisabledAuthCompatibilityMode = authProviderKind === "disabled";
 
     const handleLocalSignIn = async () => {
         if (!signIn) {
@@ -113,11 +109,7 @@ export default function ChatPage() {
         selectChat,
     ]);
 
-    if (
-        isAuthLoading ||
-        loadingAgents ||
-        (usesAutomaticAccessUser && !isWorkspaceReady)
-    ) {
+    if (isAuthLoading || loadingAgents) {
         return (
             <div className="flex h-dvh items-center justify-center bg-background">
                 <Loader2 size={24} className="animate-spin text-primary" />
@@ -149,17 +141,17 @@ export default function ChatPage() {
             <div className="flex h-dvh items-center justify-center bg-background px-6">
                 <div className="w-full max-w-md border border-border bg-background-elevated p-8 text-center">
                     <h1 className="text-xl font-semibold">
-                        {usesAutomaticAccessUser
-                            ? "Workspace unavailable"
+                        {isDisabledAuthCompatibilityMode
+                            ? "Auth upgrade required"
                             : "Sign in required"}
                     </h1>
                     <p className="mt-3 text-sm text-muted-foreground">
-                        {usesAutomaticAccessUser
-                            ? "This instance has authentication disabled, but the default workspace user could not be initialized."
+                        {isDisabledAuthCompatibilityMode
+                            ? "This instance is still configured for the deprecated disabled-auth compatibility mode. Switch it to local or Google auth before using the web app."
                             : "Agentchat runs against your Convex workspace only. Sign in to access chats and the agents exposed by this instance."}
                     </p>
-                    {!authRequiresLogin ? null : authProviderKind ===
-                      "local" ? (
+                    {isDisabledAuthCompatibilityMode ||
+                    !authRequiresLogin ? null : authProviderKind === "local" ? (
                         <div className="mt-6 space-y-3 text-left">
                             <input
                                 type="text"

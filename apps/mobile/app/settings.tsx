@@ -28,7 +28,6 @@ export default function SettingsScreen(): ReactElement {
     const {
         user,
         authProviderKind,
-        usesAutomaticAccessUser,
         isAuthenticated,
         isLoading: isAuthLoading,
         signIn,
@@ -47,10 +46,11 @@ export default function SettingsScreen(): ReactElement {
     const [localPassword, setLocalPassword] = useState("");
 
     const convexUnavailableMessage = "Convex isn't configured for this build.";
-    const authSummaryLabel = usesAutomaticAccessUser
-        ? user?.email || "Default user"
-        : isAuthenticated
-          ? user?.email || "Signed in"
+    const isDisabledAuthCompatibilityMode = authProviderKind === "disabled";
+    const authSummaryLabel = isAuthenticated
+        ? user?.email || "Signed in"
+        : isDisabledAuthCompatibilityMode
+          ? "Compatibility mode"
           : "Signed out";
 
     const handleSignOut = async () => {
@@ -78,9 +78,6 @@ export default function SettingsScreen(): ReactElement {
         username?: string;
         password?: string;
     }) => {
-        if (usesAutomaticAccessUser) {
-            return;
-        }
         setIsSigningIn(true);
         try {
             await signIn(options);
@@ -106,9 +103,6 @@ export default function SettingsScreen(): ReactElement {
     };
 
     const handleGoogleSignIn = async () => {
-        if (usesAutomaticAccessUser) {
-            return;
-        }
         if (!isConvexAvailable) {
             Alert.alert("Convex Not Configured", convexUnavailableMessage, [
                 { text: "OK" },
@@ -120,9 +114,6 @@ export default function SettingsScreen(): ReactElement {
     };
 
     const handleLocalSignIn = async () => {
-        if (usesAutomaticAccessUser) {
-            return;
-        }
         if (!isConvexAvailable) {
             Alert.alert("Convex Not Configured", convexUnavailableMessage, [
                 { text: "OK" },
@@ -156,8 +147,7 @@ export default function SettingsScreen(): ReactElement {
             selectedVariantId,
         ],
     );
-    const isGoogleButtonBusy =
-        !usesAutomaticAccessUser && (isAuthLoading || isSigningIn);
+    const isGoogleButtonBusy = isAuthLoading || isSigningIn;
     const isTwoPaneLayout = Math.min(windowWidth, windowHeight) >= 700;
     const settingsRailWidth = Math.max(256, Math.min(320, windowWidth * 0.28));
     const settingsContentMaxWidth = Math.max(
@@ -301,8 +291,8 @@ export default function SettingsScreen(): ReactElement {
                                         </View>
                                     ) : (
                                         <Text style={styles.notSignedIn}>
-                                            {usesAutomaticAccessUser
-                                                ? "This instance is running with authentication disabled. Agentchat uses the default workspace user for this device."
+                                            {isDisabledAuthCompatibilityMode
+                                                ? "This instance is still configured for the deprecated disabled-auth compatibility mode. Switch it to local or Google auth before using the mobile app."
                                                 : "Sign in to access your Agentchat workspace."}
                                         </Text>
                                     )}
@@ -310,6 +300,7 @@ export default function SettingsScreen(): ReactElement {
                                     {isConvexAvailable && (
                                         <>
                                             {!isAuthenticated &&
+                                            !isDisabledAuthCompatibilityMode &&
                                             authProviderKind === "local" ? (
                                                 <View
                                                     style={styles.localAuthForm}
@@ -352,11 +343,11 @@ export default function SettingsScreen(): ReactElement {
                                                     styles.googleButton,
                                                     isGoogleButtonBusy &&
                                                         styles.googleButtonDisabled,
-                                                    usesAutomaticAccessUser &&
+                                                    isDisabledAuthCompatibilityMode &&
                                                         styles.googleButtonDisabled,
                                                 ]}
                                                 onPress={
-                                                    usesAutomaticAccessUser
+                                                    isDisabledAuthCompatibilityMode
                                                         ? undefined
                                                         : isAuthenticated
                                                           ? handleSignOut
@@ -367,7 +358,7 @@ export default function SettingsScreen(): ReactElement {
                                                 }
                                                 disabled={
                                                     isGoogleButtonBusy ||
-                                                    usesAutomaticAccessUser
+                                                    isDisabledAuthCompatibilityMode
                                                 }
                                             >
                                                 {isGoogleButtonBusy ? (
@@ -400,8 +391,8 @@ export default function SettingsScreen(): ReactElement {
                                                             styles.googleButtonText
                                                         }
                                                     >
-                                                        {usesAutomaticAccessUser
-                                                            ? "Authentication Disabled"
+                                                        {isDisabledAuthCompatibilityMode
+                                                            ? "Auth upgrade required"
                                                             : isAuthenticated
                                                               ? "Sign Out"
                                                               : authProviderKind ===
@@ -414,16 +405,16 @@ export default function SettingsScreen(): ReactElement {
                                         </>
                                     )}
 
-                                    {usesAutomaticAccessUser && (
+                                    {isDisabledAuthCompatibilityMode && (
                                         <Text style={styles.storageInfoText}>
-                                            The server config is using automatic
-                                            access through{" "}
+                                            The server config is still using the
+                                            deprecated compatibility provider{" "}
                                             <Text style={styles.codeText}>
                                                 {authProviderKind}
                                             </Text>
-                                            . Agentchat will use the default
-                                            workspace user until auth is turned
-                                            back on for this instance.
+                                            . Switch to local or Google auth so
+                                            each session resolves to a real
+                                            Convex user.
                                         </Text>
                                     )}
 

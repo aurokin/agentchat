@@ -26,7 +26,6 @@ interface AgentContextValue {
     authProviderId: string | null;
     authProviderKind: BootstrapAuthProvider["kind"] | null;
     authRequiresLogin: boolean;
-    usesAutomaticAccessUser: boolean;
     selectedAgentId: string | null;
     selectedAgent: BootstrapAgent | null;
     selectedAgentOptions: AgentOptionsResponse | null;
@@ -168,8 +167,6 @@ export function AgentProvider({
                 authProviderKind:
                     bootstrap?.auth.activeProvider?.kind ?? "google",
                 authRequiresLogin: bootstrap?.auth.requiresLogin ?? true,
-                usesAutomaticAccessUser:
-                    bootstrap?.auth.activeProvider?.kind === "disabled",
                 selectedAgentId,
                 selectedAgent,
                 selectedAgentOptions,

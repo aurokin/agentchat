@@ -46,13 +46,8 @@ export function WorkspaceProvider({
 }): React.ReactElement {
     const isConvexAvailable = useIsConvexAvailable();
     const convexClient = useConvex() as unknown as ConvexClientInterface;
-    const {
-        authProviderId,
-        authProviderKind,
-        usesAutomaticAccessUser,
-        isAuthenticated,
-        userId,
-    } = useAuthContext();
+    const { authProviderId, authProviderKind, isAuthenticated, userId } =
+        useAuthContext();
     const workspaceUserId = (userId as ConvexId<"users"> | null) ?? null;
 
     const workspaceStatus: WorkspaceStatus =
@@ -72,7 +67,7 @@ export function WorkspaceProvider({
         () => ({
             authProviderId,
             authProviderKind,
-            isAuthRequired: !usesAutomaticAccessUser,
+            isAuthRequired: authProviderKind !== "disabled",
             workspaceStatus,
             isWorkspaceReady,
             isConvexAvailable,
@@ -88,7 +83,6 @@ export function WorkspaceProvider({
             isConvexAvailable,
             isWorkspaceReady,
             persistenceAdapter,
-            usesAutomaticAccessUser,
             workspaceUserId,
             workspaceStatus,
         ],

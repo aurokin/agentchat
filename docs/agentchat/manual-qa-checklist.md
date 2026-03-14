@@ -27,7 +27,7 @@ Or use the bundled command:
 bun run test:manual:runtime-confidence
 ```
 
-For the current disabled-auth browser confidence path, also run:
+For the current local-auth browser confidence path, also run:
 
 ```bash
 bun run test:manual:web-browser-confidence
@@ -49,7 +49,6 @@ Run those browser commands sequentially. The operator smoke command intentionall
 - `apps/server` is running
 - the web app is running
 - if auth mode is `google`, the selected Google account is allowlisted
-- if auth provider kind is `disabled`, the default workspace user can be initialized successfully
 - if auth provider kind is `local`, a seeded user such as `smoke_1` can sign in successfully
 - `bun run doctor:server` reports the configured Codex provider and target agents as ready, and shows live Codex model access for each enabled provider
 
@@ -65,7 +64,7 @@ If the Convex deployment is still missing `BACKEND_TOKEN_SECRET`, the live runti
 Use `/home/auro/agents/agentchat_test/smoke`.
 
 - Run `bun run doctor:server`
-- Sign in if auth mode is `google`
+- Sign in if auth mode is `google` or `local`
 - Select the smoke agent
 - Start a new conversation
 - Send a greeting
