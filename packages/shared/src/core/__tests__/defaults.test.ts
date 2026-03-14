@@ -15,20 +15,20 @@ describe("defaults", () => {
             {
                 role: "assistant",
                 modelId: "m1",
-                variantId: "fast",
+                variantId: "low",
                 thinkingLevel: "low",
             },
             {
                 role: "user",
                 modelId: "m2",
-                variantId: "deep",
+                variantId: "high",
                 thinkingLevel: "high",
             },
         ];
 
         expect(getLastUserSettings(messages)).toEqual({
             modelId: "m2",
-            variantId: "deep",
+            variantId: "high",
             thinking: "high",
         });
     });
@@ -40,7 +40,7 @@ describe("defaults", () => {
             {
                 role: "assistant",
                 modelId: "m1",
-                variantId: "fast",
+                variantId: "low",
                 thinkingLevel: "low",
             },
         ];
@@ -51,12 +51,12 @@ describe("defaults", () => {
     it("resolves initial settings from last user when available", () => {
         const defaults: ChatDefaults = {
             modelId: "default-model",
-            variantId: "balanced",
+            variantId: "medium",
             thinking: "medium",
         };
         const lastUser = {
             modelId: "user-model",
-            variantId: "deep",
+            variantId: "high",
             thinking: "high" as ThinkingLevel,
         };
 
@@ -68,7 +68,7 @@ describe("defaults", () => {
             }),
         ).toEqual({
             modelId: "user-model",
-            variantId: "deep",
+            variantId: "high",
             thinking: "high",
         });
     });
@@ -76,7 +76,7 @@ describe("defaults", () => {
     it("falls back to defaults when last user is missing", () => {
         const defaults: ChatDefaults = {
             modelId: "default-model",
-            variantId: "balanced",
+            variantId: "medium",
             thinking: "medium",
         };
 
@@ -92,7 +92,7 @@ describe("defaults", () => {
     it("applies model capability constraints", () => {
         const settings: ChatDefaults = {
             modelId: "model",
-            variantId: "balanced",
+            variantId: "medium",
             thinking: "high",
         };
 
@@ -102,7 +102,7 @@ describe("defaults", () => {
             }),
         ).toEqual({
             modelId: "model",
-            variantId: "balanced",
+            variantId: "medium",
             thinking: "none",
         });
     });

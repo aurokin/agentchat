@@ -143,15 +143,8 @@ function resolveCodexEffort(command: ConversationSendCommand): string {
             return "medium";
         case "deep":
             return "high";
-        case "xhigh":
-        case "high":
-        case "medium":
-        case "low":
-        case "minimal":
-        case "none":
-            return command.payload.variantId;
         default:
-            return command.payload.thinking;
+            return command.payload.variantId ?? command.payload.thinking;
     }
 }
 
@@ -212,8 +205,8 @@ export class CodexRuntimeManager {
                 nextSequence: 2,
                 lastPersistedContent: "",
                 pendingDeltaFlush: null,
-                resolve,
                 reject,
+                resolve,
             };
 
             try {

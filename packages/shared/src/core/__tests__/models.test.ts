@@ -35,7 +35,10 @@ describe("model capabilities", () => {
         expect(modelSupportsVision(undefined)).toBe(false);
     });
 
-    it("maps provider variants to thinking levels", () => {
+    it("uses Codex effort variants directly and tolerates legacy aliases", () => {
+        expect(resolveThinkingLevelForVariant("low")).toBe("low");
+        expect(resolveThinkingLevelForVariant("medium")).toBe("medium");
+        expect(resolveThinkingLevelForVariant("high")).toBe("high");
         expect(resolveThinkingLevelForVariant("fast")).toBe("low");
         expect(resolveThinkingLevelForVariant("balanced")).toBe("medium");
         expect(resolveThinkingLevelForVariant("deep")).toBe("high");

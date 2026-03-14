@@ -57,15 +57,13 @@ function toTitleCase(value: string): string {
 function mapCodexEffortToVariant(
     effort: string,
 ): { id: string; label: string } | null {
+    if (effort === "none") {
+        return null;
+    }
+
     switch (effort) {
-        case "low":
-            return { id: "fast", label: "Fast" };
-        case "medium":
-            return { id: "balanced", label: "Balanced" };
-        case "high":
-            return { id: "deep", label: "Deep" };
-        case "none":
-            return null;
+        case "xhigh":
+            return { id: effort, label: "X-High" };
         default:
             return {
                 id: effort,

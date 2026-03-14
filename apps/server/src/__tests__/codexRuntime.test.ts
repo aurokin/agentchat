@@ -348,7 +348,7 @@ describe("CodexRuntimeManager", () => {
         ]);
     });
 
-    test("maps the selected variant onto Codex effort", async () => {
+    test("uses the selected Codex effort variant directly", async () => {
         const config = createConfig();
         const persistence = createPersistence(null);
         const fakeClient = new FakeCodexClient();
@@ -366,7 +366,7 @@ describe("CodexRuntimeManager", () => {
                 ...createCommand(),
                 payload: {
                     ...createCommand().payload,
-                    variantId: "deep",
+                    variantId: "high",
                     thinking: "low",
                 },
             },

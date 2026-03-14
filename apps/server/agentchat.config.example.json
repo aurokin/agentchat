@@ -23,31 +23,51 @@
                     "supportsReasoning": true,
                     "variants": [
                         {
-                            "id": "fast",
-                            "label": "Fast",
+                            "id": "low",
+                            "label": "Low",
                             "enabled": true
                         },
                         {
-                            "id": "balanced",
-                            "label": "Balanced",
+                            "id": "medium",
+                            "label": "Medium",
                             "enabled": true
                         },
                         {
-                            "id": "deep",
-                            "label": "Deep",
+                            "id": "high",
+                            "label": "High",
+                            "enabled": true
+                        },
+                        {
+                            "id": "xhigh",
+                            "label": "X-High",
                             "enabled": true
                         }
                     ]
                 },
                 {
-                    "id": "gpt-5.3-codex-lite",
-                    "label": "GPT-5.3 Codex Lite",
+                    "id": "gpt-5.3-codex-spark",
+                    "label": "GPT-5.3 Codex Spark",
                     "enabled": true,
-                    "supportsReasoning": false,
+                    "supportsReasoning": true,
                     "variants": [
                         {
-                            "id": "fast",
-                            "label": "Fast",
+                            "id": "low",
+                            "label": "Low",
+                            "enabled": true
+                        },
+                        {
+                            "id": "medium",
+                            "label": "Medium",
+                            "enabled": true
+                        },
+                        {
+                            "id": "high",
+                            "label": "High",
+                            "enabled": true
+                        },
+                        {
+                            "id": "xhigh",
+                            "label": "X-High",
                             "enabled": true
                         }
                     ]
@@ -72,7 +92,7 @@
             "providerIds": ["codex-main"],
             "defaultProviderId": "codex-main",
             "defaultModel": "gpt-5.4",
-            "defaultVariant": "fast",
+            "defaultVariant": "low",
             "modelAllowlist": [],
             "variantAllowlist": [],
             "tags": ["example"],

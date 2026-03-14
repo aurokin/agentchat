@@ -29,8 +29,8 @@ function createConfig(): AgentchatConfig {
                         supportsReasoning: true,
                         variants: [
                             {
-                                id: "balanced",
-                                label: "Balanced",
+                                id: "medium",
+                                label: "Medium",
                                 enabled: true,
                             },
                         ],
@@ -99,9 +99,9 @@ describe("CodexModelCatalog", () => {
                     label: "GPT-5.3 Codex",
                     supportsReasoning: true,
                     variants: [
-                        { id: "fast", label: "Fast" },
-                        { id: "balanced", label: "Balanced" },
-                        { id: "deep", label: "Deep" },
+                        { id: "low", label: "Low" },
+                        { id: "medium", label: "Medium" },
+                        { id: "high", label: "High" },
                     ],
                 },
             ],
@@ -175,7 +175,7 @@ describe("CodexModelCatalog", () => {
                     {
                         id: "fallback-model",
                         label: "Fallback Model",
-                        variants: [{ id: "balanced", label: "Balanced" }],
+                        variants: [{ id: "medium", label: "Medium" }],
                     },
                 ],
             });

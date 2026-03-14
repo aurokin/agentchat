@@ -65,7 +65,7 @@ describe("server config", () => {
         expect(modelsPayload.models[0]?.supportsReasoning).toBe(true);
         expect(
             modelsPayload.models[0]?.variants.map((item) => item.id),
-        ).toEqual(["fast", "balanced", "deep"]);
+        ).toEqual(["low", "medium", "high", "xhigh"]);
 
         const optionsResponse = await fetch(
             new Request("http://localhost/api/agents/example-agent/options"),

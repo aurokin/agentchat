@@ -268,6 +268,13 @@ function getDefaultAgentId(mode: ExtendedMode): string {
 
 function resolveThinking(variantId: string | null): string {
     switch (variantId) {
+        case "low":
+        case "medium":
+        case "high":
+        case "xhigh":
+        case "minimal":
+        case "none":
+            return variantId;
         case "fast":
             return "low";
         case "balanced":
