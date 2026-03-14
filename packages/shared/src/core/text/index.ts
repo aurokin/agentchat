@@ -28,6 +28,12 @@ function normalizeDisplayTextSegment(segment: string): string {
     // Fix missing whitespace between completed sentences and the next sentence.
     normalized = normalized.replace(/([.!?])([A-Z])/g, "$1 $2");
 
+    // If prose runs directly into the start of a markdown list, force a paragraph break.
+    normalized = normalized.replace(
+        /([.!?])(?=(?:\d+\.\s+|[-*]\s+))/g,
+        "$1\n\n",
+    );
+
     // Prefer explicit paragraph breaks before common report-style section titles.
     const sectionPattern = DISPLAY_SECTION_TITLES.map((title) =>
         title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),

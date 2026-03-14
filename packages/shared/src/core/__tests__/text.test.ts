@@ -50,6 +50,16 @@ describe("normalizeAssistantDisplayText", () => {
         );
     });
 
+    it("adds a paragraph break before inline numbered lists", () => {
+        expect(
+            normalizeAssistantDisplayText(
+                "I will return a plan without editing files.1. Add a short introduction.",
+            ),
+        ).toBe(
+            "I will return a plan without editing files.\n\n1. Add a short introduction.",
+        );
+    });
+
     it("leaves fenced code blocks untouched", () => {
         expect(
             normalizeAssistantDisplayText(
