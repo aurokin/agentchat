@@ -77,7 +77,7 @@ const { user, isAuthenticated, isLoading, signIn, signOut, isConvexAvailable } =
 
 Google mode:
 
-1. User taps "Sign in with Google" in settings.
+1. User taps "Sign in with Google" on the welcome/login gate.
 2. Expo Auth Session opens Google OAuth.
 3. On success, Convex client queries `auth:user` with the access token.
 4. Auth context updates user state.
@@ -85,7 +85,7 @@ Google mode:
 
 Local mode:
 
-1. User enters a username and password in settings.
+1. User enters a username and password on the welcome/login gate.
 2. The mobile app calls Convex Auth with the `password` provider.
 3. Convex resolves the login to a concrete `users` row.
 4. The Convex-backed workspace becomes available.
@@ -96,7 +96,7 @@ Local mode:
 2. Auth context clears user state.
 3. Convex client is cleared.
 4. Credentials are cleared via `clearAllCredentials()`.
-5. The app returns to a signed-out, Convex-only state.
+5. The app returns to the welcome/login gate and remains unusable until the user signs in again.
 
 ## Convex Availability Check
 
@@ -111,8 +111,9 @@ const available = isConvexConfigured();
 ### State Transitions
 
 - Initial launch resolves whether Convex is configured and whether the user is authenticated.
+- Before sign-in, the app stays on the welcome/login gate and the workspace/chat stack does not mount.
 - After successful sign-in, the Convex-backed workspace becomes available.
-- After sign-out, the user returns to a signed-out/disconnected state.
+- After sign-out, the app returns to the login gate instead of exposing a usable signed-out workspace.
 
 ### Graceful Degradation
 
@@ -177,7 +178,7 @@ const KEYBINDINGS = [
 - Use `SafeAreaView` for proper edge handling.
 - Section titles use uppercase, 14px, 600 weight, gray color.
 
-## First-Run Onboarding
+## Welcome And Login Gate
 
 Onboarding completion is stored in SecureStore under `agentchat-has-completed-onboarding`.
 
@@ -192,46 +193,42 @@ const completed = await getHasCompletedOnboarding();
 await setHasCompletedOnboarding();
 ```
 
-### Onboarding State In AppContext
+### Welcome State In AppContext
 
 ```typescript
 import { useAppContext } from "../src/contexts/AppContext";
 
 const { hasCompletedOnboarding, completeOnboarding, isInitialized } = useAppContext();
-
-if (isInitialized && !hasCompletedOnboarding) {
-    // Show onboarding screen
-}
 ```
 
-### Onboarding Screen
+### Welcome Screen
 
 - File: `app/onboarding.tsx`
-- Steps: Welcome, Self-hosted workspace overview, workspace access guidance
+- Purpose: force sign-in before the runtime/chat stack mounts
+- The app should not be usable without authentication
 
-### Onboarding Wrapper Component
+### Auth Gate Wrapper
 
 ```typescript
-function OnboardingWrapper({ children }: { children: React.ReactNode }): React.ReactElement {
+function AppShell(): React.ReactElement {
     const { isInitialized, hasCompletedOnboarding, completeOnboarding } = useAppContext();
-    const [showOnboarding, setShowOnboarding] = useState(false);
+    const { isAuthenticated, isLoading } = useAuthContext();
 
     useEffect(() => {
-        if (isInitialized && !hasCompletedOnboarding) {
-            setShowOnboarding(true);
+        if (isAuthenticated && !hasCompletedOnboarding) {
+            void completeOnboarding();
         }
-    }, [isInitialized, hasCompletedOnboarding]);
+    }, [completeOnboarding, hasCompletedOnboarding, isAuthenticated]);
 
-    const handleOnboardingComplete = async () => {
-        await completeOnboarding();
-        setShowOnboarding(false);
-    };
-
-    if (showOnboarding) {
-        return <OnboardingScreen onComplete={handleOnboardingComplete} />;
+    if (!isInitialized || isLoading) {
+        return <LoadingScreen />;
     }
 
-    return <>{children}</>;
+    if (!isAuthenticated) {
+        return <OnboardingScreen onAuthenticated={completeOnboarding} />;
+    }
+
+    return <RuntimeProviders />;
 }
 ```
 

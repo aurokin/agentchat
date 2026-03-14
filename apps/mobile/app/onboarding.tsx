@@ -1,131 +1,172 @@
-import React, { type ReactElement, useMemo, useState } from "react";
+import React, { useMemo, useState, type ReactElement } from "react";
 import {
-    View,
-    Text,
-    TouchableOpacity,
+    ActivityIndicator,
     StyleSheet,
-    ScrollView,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
+import { useAuthContext } from "@/lib/convex/AuthContext";
+import { useAgent } from "@/contexts/AgentContext";
 
 interface OnboardingScreenProps {
-    onComplete: () => Promise<void>;
+    onAuthenticated: () => Promise<void>;
 }
 
 export default function OnboardingScreen({
-    onComplete,
+    onAuthenticated,
 }: OnboardingScreenProps): ReactElement {
     const router = useRouter();
-    const [currentStep, setCurrentStep] = useState(0);
     const { colors } = useTheme();
     const styles = useMemo(() => createStyles(colors), [colors]);
+    const {
+        authProviderKind,
+        isAuthenticated,
+        isLoading: isAuthLoading,
+        signIn,
+        isConvexAvailable,
+    } = useAuthContext();
+    const { bootstrap, loadingAgents } = useAgent();
+    const [username, setUsername] = useState("");
+    const [password, setPassword] = useState("");
+    const [error, setError] = useState<string | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const handleGetStarted = async () => {
-        await onComplete();
-        router.replace("/");
-    };
+    const handleSignIn = async () => {
+        if (!isConvexAvailable) {
+            setError("Convex is not configured for this mobile build.");
+            return;
+        }
 
-    const handleNext = async () => {
-        if (currentStep < 2) {
-            setCurrentStep(currentStep + 1);
-        } else {
-            await handleGetStarted();
+        setIsSubmitting(true);
+        setError(null);
+
+        try {
+            if (authProviderKind === "local") {
+                await signIn({
+                    username,
+                    password,
+                });
+            } else {
+                await signIn();
+            }
+
+            await onAuthenticated();
+            router.replace("/");
+        } catch (signInError) {
+            setError(
+                signInError instanceof Error
+                    ? signInError.message
+                    : "Sign in failed.",
+            );
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
-    const handleBack = () => {
-        if (currentStep > 0) {
-            setCurrentStep(currentStep - 1);
-        }
-    };
+    const isBusy = loadingAgents || isAuthLoading || isSubmitting;
+    const activeProviderLabel =
+        authProviderKind === "local" ? "local account" : "Google";
 
-    const steps = [
-        {
-            title: "Welcome to Agentchat",
-            subtitle: "A self-hosted chat app for your own agent stack",
-            content: [],
-        },
-        {
-            title: "Self-Hosted Design",
-            subtitle: "Connect the app to your own backend",
-            content: [
-                "• Chats and runtime state live in your Convex workspace",
-                "• Bring your own infrastructure and agent stack",
-                "• Keep full control of storage and auth",
-                "• The instance owner configures model provider access",
-            ],
-        },
-        {
-            title: "Convex Workspace",
-            subtitle: "Use one workspace across your devices",
-            content: [
-                "• Access can use Google sign-in or a default local user",
-                "• Chats sync across mobile and web",
-                "• Settings follow your account",
-                "• Agentchat stays aligned with its Convex backend",
-            ],
-        },
-    ];
-
-    const step = steps[currentStep];
+    if (isAuthenticated && !isSubmitting) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <View style={styles.centerContent}>
+                    <ActivityIndicator size="large" color={colors.accent} />
+                </View>
+            </SafeAreaView>
+        );
+    }
 
     return (
-        <SafeAreaProvider>
-            <SafeAreaView style={styles.container}>
-                <ScrollView
-                    style={styles.scrollContent}
-                    contentContainerStyle={styles.content}
-                >
-                    <View style={styles.progressContainer}>
-                        {[0, 1, 2].map((i) => (
-                            <View
-                                key={i}
-                                style={[
-                                    styles.progressDot,
-                                    i === currentStep &&
-                                        styles.progressDotActive,
-                                ]}
+        <SafeAreaView style={styles.container}>
+            <View style={styles.content}>
+                <View style={styles.hero}>
+                    <Text style={styles.title}>Welcome to Agentchat</Text>
+                    <Text style={styles.subtitle}>
+                        Sign in to access your workspace, chats, and runtime
+                        activity.
+                    </Text>
+                </View>
+
+                <View style={styles.card}>
+                    <Text style={styles.cardTitle}>Sign in required</Text>
+                    <Text style={styles.cardDescription}>
+                        This instance uses {activeProviderLabel} authentication.
+                        The app stays locked until you sign in.
+                    </Text>
+
+                    {authProviderKind === "local" ? (
+                        <View style={styles.form}>
+                            <TextInput
+                                value={username}
+                                onChangeText={setUsername}
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                                editable={!isBusy}
+                                placeholder="Username"
+                                placeholderTextColor={colors.textMuted}
+                                style={styles.input}
                             />
-                        ))}
-                    </View>
+                            <TextInput
+                                value={password}
+                                onChangeText={setPassword}
+                                secureTextEntry
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                                editable={!isBusy}
+                                placeholder="Password"
+                                placeholderTextColor={colors.textMuted}
+                                style={styles.input}
+                            />
+                        </View>
+                    ) : null}
 
-                    <Text style={styles.title}>{step.title}</Text>
-                    <Text style={styles.subtitle}>{step.subtitle}</Text>
+                    {error ? (
+                        <Text style={styles.errorText}>{error}</Text>
+                    ) : null}
 
-                    <View style={styles.featureList}>
-                        {step.content.map((item, index) => (
-                            <View key={index} style={styles.featureItem}>
-                                <Text style={styles.featureText}>{item}</Text>
+                    <TouchableOpacity
+                        style={[
+                            styles.primaryButton,
+                            isBusy && styles.primaryButtonDisabled,
+                        ]}
+                        onPress={handleSignIn}
+                        disabled={isBusy}
+                    >
+                        {isBusy ? (
+                            <View style={styles.buttonContent}>
+                                <ActivityIndicator
+                                    size="small"
+                                    color={colors.textOnAccent}
+                                />
+                                <Text style={styles.primaryButtonText}>
+                                    {isSubmitting
+                                        ? "Signing in..."
+                                        : "Loading..."}
+                                </Text>
                             </View>
-                        ))}
-                    </View>
-
-                    <View style={styles.buttonContainer}>
-                        {currentStep > 0 && (
-                            <TouchableOpacity
-                                style={styles.backButton}
-                                onPress={handleBack}
-                            >
-                                <Text style={styles.backButtonText}>Back</Text>
-                            </TouchableOpacity>
-                        )}
-                        <TouchableOpacity
-                            style={[
-                                styles.button,
-                                currentStep === 0 && styles.buttonFullWidth,
-                            ]}
-                            onPress={handleNext}
-                        >
-                            <Text style={styles.buttonText}>
-                                {currentStep === 2 ? "Get Started" : "Next"}
+                        ) : (
+                            <Text style={styles.primaryButtonText}>
+                                {authProviderKind === "local"
+                                    ? "Sign in with local user"
+                                    : "Sign in with Google"}
                             </Text>
-                        </TouchableOpacity>
-                    </View>
-                </ScrollView>
-            </SafeAreaView>
-        </SafeAreaProvider>
+                        )}
+                    </TouchableOpacity>
+
+                    {bootstrap?.auth.activeProvider?.id ? (
+                        <Text style={styles.providerHint}>
+                            Auth provider: {bootstrap.auth.activeProvider.id}
+                        </Text>
+                    ) : null}
+                </View>
+            </View>
+        </SafeAreaView>
     );
 }
 
@@ -135,90 +176,89 @@ const createStyles = (colors: ThemeColors) =>
             flex: 1,
             backgroundColor: colors.background,
         },
-        scrollContent: {
+        centerContent: {
             flex: 1,
+            alignItems: "center",
+            justifyContent: "center",
         },
         content: {
             flex: 1,
             justifyContent: "center",
-            alignItems: "center",
             paddingHorizontal: 24,
             paddingVertical: 32,
+            gap: 24,
         },
-        progressContainer: {
-            flexDirection: "row",
-            justifyContent: "center",
-            alignItems: "center",
-            marginBottom: 32,
-        },
-        progressDot: {
-            width: 8,
-            height: 8,
-            borderRadius: 4,
-            backgroundColor: colors.border,
-            marginHorizontal: 4,
-        },
-        progressDotActive: {
-            backgroundColor: colors.accent,
+        hero: {
+            gap: 10,
         },
         title: {
-            fontSize: 28,
-            fontWeight: "bold",
-            textAlign: "center",
-            marginBottom: 12,
+            fontSize: 30,
+            fontWeight: "700",
             color: colors.text,
         },
         subtitle: {
-            fontSize: 18,
-            textAlign: "center",
-            color: colors.textMuted,
-            marginBottom: 24,
-        },
-        featureList: {
-            width: "100%",
-            marginBottom: 32,
-        },
-        featureItem: {
-            paddingVertical: 8,
-        },
-        featureText: {
             fontSize: 16,
-            color: colors.text,
             lineHeight: 24,
-        },
-        buttonContainer: {
-            flexDirection: "row",
-            justifyContent: "center",
-            alignItems: "center",
-            width: "100%",
-            marginTop: 16,
-        },
-        button: {
-            backgroundColor: colors.accent,
-            paddingHorizontal: 32,
-            paddingVertical: 14,
-            borderRadius: 8,
-            alignItems: "center",
-            flex: 1,
-        },
-        buttonFullWidth: {
-            flex: 1,
-        },
-        backButton: {
-            paddingHorizontal: 24,
-            paddingVertical: 14,
-            alignItems: "center",
-            flex: 1,
-            marginRight: 12,
-        },
-        backButtonText: {
             color: colors.textMuted,
-            fontSize: 16,
-            fontWeight: "600",
         },
-        buttonText: {
+        card: {
+            backgroundColor: colors.surface,
+            borderColor: colors.border,
+            borderWidth: 1,
+            borderRadius: 20,
+            padding: 20,
+            gap: 16,
+        },
+        cardTitle: {
+            fontSize: 20,
+            fontWeight: "700",
+            color: colors.text,
+        },
+        cardDescription: {
+            fontSize: 15,
+            lineHeight: 22,
+            color: colors.textMuted,
+        },
+        form: {
+            gap: 12,
+        },
+        input: {
+            backgroundColor: colors.inputBackground,
+            borderColor: colors.inputBorder,
+            borderWidth: 1,
+            borderRadius: 12,
+            color: colors.text,
+            fontSize: 16,
+            paddingHorizontal: 14,
+            paddingVertical: 14,
+        },
+        primaryButton: {
+            alignItems: "center",
+            backgroundColor: colors.accent,
+            borderRadius: 12,
+            paddingHorizontal: 18,
+            paddingVertical: 14,
+        },
+        primaryButtonDisabled: {
+            opacity: 0.7,
+        },
+        primaryButtonText: {
             color: colors.textOnAccent,
-            fontSize: 18,
-            fontWeight: "600",
+            fontSize: 16,
+            fontWeight: "700",
+        },
+        buttonContent: {
+            alignItems: "center",
+            flexDirection: "row",
+            gap: 10,
+        },
+        errorText: {
+            color: colors.danger,
+            fontSize: 14,
+            lineHeight: 20,
+        },
+        providerHint: {
+            color: colors.textSubtle,
+            fontSize: 13,
         },
     });

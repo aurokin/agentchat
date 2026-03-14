@@ -1,6 +1,6 @@
-import type { ReactElement } from "react";
+import React, { useEffect, type ReactElement } from "react";
 import { Stack } from "expo-router";
-import { Platform, StatusBar } from "react-native";
+import { ActivityIndicator, Platform, StatusBar, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AppProvider, useAppContext } from "@/contexts/AppContext";
 import { ThemeProvider, useTheme } from "@/contexts/ThemeContext";
@@ -10,46 +10,67 @@ import { ConvexProvider } from "@/lib/convex";
 import { ModelProvider } from "@/contexts/ModelContext";
 import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
 import { AgentchatSocketProvider } from "@/contexts/AgentchatSocketContext";
-import { AgentProvider } from "@/contexts/AgentContext";
+import { AgentProvider, useAgent } from "@/contexts/AgentContext";
 import { BackgroundRuntimeSubscriptions } from "@/components/chat/BackgroundRuntimeSubscriptions";
 import OnboardingScreen from "./onboarding";
+import { useAuthContext } from "@/lib/convex/AuthContext";
+
+function LoadingScreen(): ReactElement {
+    const { colors } = useTheme();
+
+    return (
+        <View
+            style={{
+                flex: 1,
+                backgroundColor: colors.background,
+                alignItems: "center",
+                justifyContent: "center",
+            }}
+        >
+            <ActivityIndicator size="large" color={colors.accent} />
+        </View>
+    );
+}
 
 function RuntimeProviders(): ReactElement {
     return (
-        <ConvexProvider>
-            <AgentProvider>
-                <AuthProvider>
-                    <AgentchatSocketProvider>
-                        <ModelProvider>
-                            <WorkspaceProvider>
-                                <ChatProvider>
-                                    <BackgroundRuntimeSubscriptions />
-                                    <Stack
-                                        screenOptions={{
-                                            headerShown: false,
-                                        }}
-                                    />
-                                </ChatProvider>
-                            </WorkspaceProvider>
-                        </ModelProvider>
-                    </AgentchatSocketProvider>
-                </AuthProvider>
-            </AgentProvider>
-        </ConvexProvider>
+        <AgentchatSocketProvider>
+            <ModelProvider>
+                <WorkspaceProvider>
+                    <ChatProvider>
+                        <BackgroundRuntimeSubscriptions />
+                        <Stack
+                            screenOptions={{
+                                headerShown: false,
+                            }}
+                        />
+                    </ChatProvider>
+                </WorkspaceProvider>
+            </ModelProvider>
+        </AgentchatSocketProvider>
     );
 }
 
 function AppShell(): ReactElement {
     const { isInitialized, hasCompletedOnboarding, completeOnboarding } =
         useAppContext();
-    const shouldShowOnboarding = isInitialized && !hasCompletedOnboarding;
+    const { loadingAgents, authRequiresLogin } = useAgent();
+    const { isAuthenticated, isLoading: isAuthLoading } = useAuthContext();
 
-    const handleOnboardingComplete = async () => {
-        await completeOnboarding();
-    };
+    useEffect(() => {
+        if (!isAuthenticated || hasCompletedOnboarding) {
+            return;
+        }
 
-    if (shouldShowOnboarding) {
-        return <OnboardingScreen onComplete={handleOnboardingComplete} />;
+        void completeOnboarding();
+    }, [completeOnboarding, hasCompletedOnboarding, isAuthenticated]);
+
+    if (!isInitialized || loadingAgents || isAuthLoading) {
+        return <LoadingScreen />;
+    }
+
+    if (authRequiresLogin && !isAuthenticated) {
+        return <OnboardingScreen onAuthenticated={completeOnboarding} />;
     }
 
     return <RuntimeProviders />;
@@ -80,7 +101,13 @@ export default function Layout(): ReactElement {
             <ThemeProvider>
                 <ThemedStatusBar />
                 <AppProvider>
-                    <AppShell />
+                    <ConvexProvider>
+                        <AgentProvider>
+                            <AuthProvider>
+                                <AppShell />
+                            </AuthProvider>
+                        </AgentProvider>
+                    </ConvexProvider>
                 </AppProvider>
             </ThemeProvider>
         </SafeAreaProvider>
