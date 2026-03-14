@@ -194,6 +194,59 @@ export function interruptConversationRun(params: {
     }
 }
 
+export type RequestConversationInterruptResult = {
+    queued: boolean;
+    error: RuntimeErrorState | null;
+};
+
+export function requestConversationInterrupt(params: {
+    activeRun: ActiveRunState | null;
+    isSending: boolean;
+    queuePendingInterrupt: () => void;
+    sendCommand: (command: ConversationInterruptCommand) => void;
+}): RequestConversationInterruptResult {
+    if (params.activeRun) {
+        return {
+            queued: false,
+            error: interruptConversationRun({
+                activeRun: params.activeRun,
+                sendCommand: params.sendCommand,
+            }),
+        };
+    }
+
+    if (params.isSending) {
+        params.queuePendingInterrupt();
+        return {
+            queued: true,
+            error: null,
+        };
+    }
+
+    return {
+        queued: false,
+        error: {
+            message: "No active run is available to interrupt yet.",
+            isRetryable: true,
+        },
+    };
+}
+
+export function flushPendingConversationInterrupt(params: {
+    pendingInterrupt: boolean;
+    activeRun: ActiveRunState | null;
+    sendCommand: (command: ConversationInterruptCommand) => void;
+}): RuntimeErrorState | null {
+    if (!params.pendingInterrupt || !params.activeRun) {
+        return null;
+    }
+
+    return interruptConversationRun({
+        activeRun: params.activeRun,
+        sendCommand: params.sendCommand,
+    });
+}
+
 export type RuntimeSyncResolution = {
     shouldReset: boolean;
     recoveredRun: ActiveRunState | null;

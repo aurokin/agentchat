@@ -22,7 +22,8 @@ import {
 } from "./conversation-runtime-helpers";
 import {
     connectConversationSocket,
-    interruptConversationRun,
+    flushPendingConversationInterrupt,
+    requestConversationInterrupt,
     resolveConversationRuntimeSync,
     resolveConversationSocketEvent,
     runConversationSend,
@@ -92,6 +93,7 @@ export function useConversationRuntime({
     );
     const streamingFrameRef = useRef<number | null>(null);
     const activeRunRef = useRef<ActiveRunState | null>(null);
+    const pendingInterruptRef = useRef(false);
     const currentChatRef = useRef<ChatSession | null>(null);
     const messagesRef = useRef<Message[]>([]);
 
@@ -161,6 +163,7 @@ export function useConversationRuntime({
 
     const clearActiveRun = useCallback(() => {
         activeRunRef.current = null;
+        pendingInterruptRef.current = false;
         clearStreamingMessage();
         setRecoveredRunNotice(false);
         setSending(false);
@@ -181,6 +184,17 @@ export function useConversationRuntime({
 
             if (resolution.type === "run.started") {
                 activeRunRef.current = resolution.activeRun;
+                const pendingInterruptError = flushPendingConversationInterrupt(
+                    {
+                        pendingInterrupt: pendingInterruptRef.current,
+                        activeRun: resolution.activeRun,
+                        sendCommand: (command) => socketClient.send(command),
+                    },
+                );
+                pendingInterruptRef.current = false;
+                if (pendingInterruptError) {
+                    setError(pendingInterruptError);
+                }
                 if (resolution.recovered) {
                     setSending(true);
                     setRecoveredRunNotice(true);
@@ -203,6 +217,7 @@ export function useConversationRuntime({
                 resolution.type === "run.completed" ||
                 resolution.type === "run.interrupted"
             ) {
+                pendingInterruptRef.current = false;
                 activeRunRef.current = resolution.activeRun;
                 void persistActiveAssistantMessage(
                     resolution.finalContent,
@@ -216,6 +231,7 @@ export function useConversationRuntime({
                 resolution.type === "run.failed" ||
                 resolution.type === "connection.error"
             ) {
+                pendingInterruptRef.current = false;
                 activeRunRef.current = resolution.activeRun;
                 void persistActiveAssistantMessage(
                     resolution.finalContent,
@@ -230,6 +246,7 @@ export function useConversationRuntime({
             clearActiveRun,
             persistActiveAssistantMessage,
             queueStreamingMessageUpdate,
+            socketClient,
         ],
     );
 
@@ -317,6 +334,7 @@ export function useConversationRuntime({
             setError(null);
             setRetryChat(null);
             setRecoveredRunNotice(false);
+            pendingInterruptRef.current = false;
             clearStreamingMessage();
 
             let assistantMessageId: string | null = null;
@@ -368,14 +386,18 @@ export function useConversationRuntime({
     );
 
     const handleCancel = useCallback(() => {
-        const error = interruptConversationRun({
+        const result = requestConversationInterrupt({
             activeRun: activeRunRef.current,
+            isSending: sending,
+            queuePendingInterrupt: () => {
+                pendingInterruptRef.current = true;
+            },
             sendCommand: (command) => socketClient.send(command),
         });
-        if (error) {
-            setError(error);
+        if (result.error) {
+            setError(result.error);
         }
-    }, [socketClient]);
+    }, [sending, socketClient]);
 
     const handleRetry = useCallback(async () => {
         if (!retryChat || !currentChat) {

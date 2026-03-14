@@ -404,4 +404,47 @@ describe("createFetchHandler", () => {
             }),
         );
     });
+
+    test("adds CORS headers for browser requests", async () => {
+        const fetchHandler = createFetchHandler({
+            getConfig: () => createConfig(),
+        });
+
+        const response = await fetchHandler(
+            new Request("http://localhost:3030/api/bootstrap", {
+                headers: {
+                    origin: "http://127.0.0.1:4040",
+                },
+            }),
+        );
+
+        expect(response.status).toBe(200);
+        expect(response.headers.get("access-control-allow-origin")).toBe(
+            "http://127.0.0.1:4040",
+        );
+        expect(response.headers.get("access-control-allow-methods")).toBe(
+            "GET,OPTIONS",
+        );
+        expect(response.headers.get("vary")).toBe("origin");
+    });
+
+    test("responds to OPTIONS preflight requests", async () => {
+        const fetchHandler = createFetchHandler({
+            getConfig: () => createConfig(),
+        });
+
+        const response = await fetchHandler(
+            new Request("http://localhost:3030/api/bootstrap", {
+                method: "OPTIONS",
+                headers: {
+                    origin: "http://127.0.0.1:4040",
+                },
+            }),
+        );
+
+        expect(response.status).toBe(204);
+        expect(response.headers.get("access-control-allow-origin")).toBe(
+            "http://127.0.0.1:4040",
+        );
+    });
 });

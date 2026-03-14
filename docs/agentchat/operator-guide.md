@@ -163,6 +163,15 @@ Or run the combined path:
 bun run test:manual:runtime-confidence
 ```
 
+For the disabled-auth web path, also run:
+
+```bash
+bun run test:manual:web-browser-confidence
+bun run test:manual:web-operator-smoke
+```
+
+Run those browser commands sequentially. The operator smoke command intentionally mutates `apps/server/agentchat.config.json` to validate hot reload behavior.
+
 ## 7. Common Failure Modes
 
 If bootstrap fails in the web app:

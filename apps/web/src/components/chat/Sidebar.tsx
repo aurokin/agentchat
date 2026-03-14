@@ -321,6 +321,7 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                         title={isMac ? "Cmd+Shift+O" : "Ctrl+Shift+O"}
                         suppressHydrationWarning
                         disabled={!selectedAgentId}
+                        data-testid="new-conversation-button"
                     >
                         <Plus
                             size={16}
@@ -378,6 +379,7 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                                                         ? "bg-primary/10 border-l-2 border-primary"
                                                         : "hover:bg-muted/50 border-l-2 border-transparent hover:border-primary/30",
                                                 )}
+                                                data-testid={`chat-item-${chat.id}`}
                                             >
                                                 <div
                                                     className={cn(
@@ -453,6 +455,7 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                             }
                             disabled={loadingAgents || agents.length === 0}
                             className="w-full border border-border bg-background-elevated px-3 py-2 text-sm text-foreground outline-hidden transition-colors focus:border-primary/40 disabled:cursor-not-allowed disabled:opacity-60"
+                            data-testid="agent-select"
                         >
                             {agents.length === 0 ? (
                                 <option value="">No agents configured</option>

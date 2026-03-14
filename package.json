@@ -29,6 +29,8 @@
         "test:manual:live-runtime-smoke": "bun scripts/testing/live-runtime-smoke.ts --mode smoke",
         "test:manual:live-runtime-interrupt": "bun scripts/testing/live-runtime-smoke.ts --mode interrupt",
         "test:manual:config-reload-smoke": "bun scripts/testing/config-reload-smoke.ts",
+        "test:manual:web-browser-confidence": "bun scripts/testing/browser-confidence.ts --mode full",
+        "test:manual:web-operator-smoke": "bun scripts/testing/browser-operator-smoke.ts",
         "test:manual:runtime-confidence": "bun run doctor:server && bun run test:manual:live-runtime-smoke && bun run test:manual:live-runtime-interrupt && bun run test:manual:config-reload-smoke",
         "convex:env": "bun scripts/env/convex-env.ts",
         "convex:gen-secrets": "bun scripts/env/convex-secrets.ts",
@@ -68,6 +70,7 @@
         "@types/bun": "latest",
         "concurrently": "^9.2.1",
         "husky": "^9.1.7",
+        "playwright": "^1.58.2",
         "prettier": "^3.8.1"
     },
     "prettier": {

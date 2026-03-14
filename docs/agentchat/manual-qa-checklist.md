@@ -23,6 +23,15 @@ Or use the bundled command:
 bun run test:manual:runtime-confidence
 ```
 
+For the current disabled-auth browser confidence path, also run:
+
+```bash
+bun run test:manual:web-browser-confidence
+bun run test:manual:web-operator-smoke
+```
+
+Run those browser commands sequentially. The operator smoke command intentionally edits `apps/server/agentchat.config.json` to verify hot reload behavior.
+
 ## Fixtures
 
 - smoke: `/home/auro/agents/agentchat_test/smoke`
@@ -108,6 +117,7 @@ Use `/home/auro/agents/agentchat_test/workspace`.
 - Confirm the UI adapts safely
 - Confirm broken or removed resources do not produce silent failures
 - `bun run test:manual:config-reload-smoke` covers the hot-reload path automatically against the local server
+- `bun run test:manual:web-operator-smoke` covers the browser-visible hot-reload path against the local web app
 
 ## 8. Mobile Parity Pass
 

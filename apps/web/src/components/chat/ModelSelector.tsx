@@ -137,6 +137,7 @@ export function ModelSelector({
                     !loadingModels && !disabled && setIsOpen(!isOpen)
                 }
                 disabled={loadingModels || disabled}
+                data-testid="model-selector-button"
                 className={cn(
                     "flex items-center gap-2.5 bg-background-elevated border border-border transition-all duration-200 cursor-pointer",
                     "hover:border-primary/30 hover:bg-muted/50",

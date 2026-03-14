@@ -204,6 +204,7 @@ function MessageItem({
                 isUser ? "text-right" : "text-left",
             )}
             style={{ animationDelay: `${index * 30}ms` }}
+            data-testid={`message-${message.role}-${message.id}`}
         >
             <div
                 className={cn(

@@ -468,7 +468,10 @@ export function ChatWindow() {
             <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
 
             {error && (
-                <div className="px-6 py-3 bg-error/5 border-b border-error/20 flex items-center gap-3 relative z-20">
+                <div
+                    className="px-6 py-3 bg-error/5 border-b border-error/20 flex items-center gap-3 relative z-20"
+                    data-testid="runtime-error-banner"
+                >
                     <AlertCircle
                         size={16}
                         className="text-error flex-shrink-0"
@@ -491,7 +494,10 @@ export function ChatWindow() {
             )}
 
             {!error && effectiveRuntimeState.phase === "recovering" && (
-                <div className="px-6 py-3 bg-primary/5 border-b border-primary/20 flex items-center gap-3 relative z-20">
+                <div
+                    className="px-6 py-3 bg-primary/5 border-b border-primary/20 flex items-center gap-3 relative z-20"
+                    data-testid="runtime-recovering-banner"
+                >
                     <RefreshCw
                         size={16}
                         className="text-primary flex-shrink-0"
@@ -503,7 +509,10 @@ export function ChatWindow() {
             )}
 
             {!error && effectiveRuntimeState.phase === "failed" && (
-                <div className="px-6 py-3 bg-error/5 border-b border-error/20 flex items-center gap-3 relative z-20">
+                <div
+                    className="px-6 py-3 bg-error/5 border-b border-error/20 flex items-center gap-3 relative z-20"
+                    data-testid="runtime-failed-banner"
+                >
                     <AlertCircle
                         size={16}
                         className="text-error flex-shrink-0"
@@ -516,7 +525,10 @@ export function ChatWindow() {
             )}
 
             {!error && effectiveRuntimeState.phase === "interrupted" && (
-                <div className="px-6 py-3 bg-warning/5 border-b border-warning/20 flex items-center gap-3 relative z-20">
+                <div
+                    className="px-6 py-3 bg-warning/5 border-b border-warning/20 flex items-center gap-3 relative z-20"
+                    data-testid="runtime-interrupted-banner"
+                >
                     <AlertCircle
                         size={16}
                         className="text-warning flex-shrink-0"

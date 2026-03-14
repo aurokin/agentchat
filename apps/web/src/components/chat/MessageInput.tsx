@@ -120,6 +120,7 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
                             onChange={(e) => setContent(e.target.value)}
                             onKeyDown={handleKeyDown}
                             placeholder="Send a message..."
+                            data-testid="message-input"
                             className={cn(
                                 "w-full px-4 py-3.5 bg-transparent text-foreground resize-none pr-20",
                                 "placeholder:text-muted-foreground",
@@ -133,6 +134,7 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
                                 <button
                                     type="button"
                                     onClick={onCancel}
+                                    data-testid="cancel-run-button"
                                     className="p-2.5 transition-all duration-200 bg-error/10 text-error hover:bg-error/20"
                                 >
                                     <Square size={16} />
@@ -141,6 +143,7 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
                                 <button
                                     type="submit"
                                     disabled={!canSubmit}
+                                    data-testid="send-message-button"
                                     className={cn(
                                         "p-2.5 transition-all duration-200",
                                         canSubmit

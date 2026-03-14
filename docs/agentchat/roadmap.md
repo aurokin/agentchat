@@ -11,6 +11,8 @@ This roadmap describes the current implementation state and the next major steps
 - Backend token auth, websocket transport, streaming, interruption, and recovery
 - Codex as the first working provider
 - Manual live runtime smoke and interrupt commands for the real local Codex plus Convex path
+- Manual browser confidence coverage for the disabled-auth web flow
+- Manual operator browser smoke for config hot-reload and disabled agent/provider handling
 - Removal of billing, analytics, attachments, browser-local product modes, and hosted deployment assumptions
 
 ## Active Work
@@ -40,6 +42,9 @@ This roadmap describes the current implementation state and the next major steps
 - Keep `bun run test:manual:runtime-confidence` as the single manual operator command for the local runtime stack
 - Prefer Convex-issued backend session tokens for these live passes; allow the local signing fallback only while the deployment is still missing `BACKEND_TOKEN_SECRET`
 - Add browser-level end-to-end coverage for agent selection, chat send, interruption, refresh, and recovery
+- Keep the disabled-auth browser path as the primary local web confidence path
+- Run `bun run test:manual:web-browser-confidence` for the real web smoke, cancel, and refresh flow
+- Run `bun run test:manual:web-operator-smoke` for browser-visible agent/provider disable handling
 - Keep browser E2E work honest: do not add fake auth bypasses just to automate the chat flow
 - Build a manual QA checklist for real Codex-backed instances
 - Keep these tests manually invoked, not automatic on push

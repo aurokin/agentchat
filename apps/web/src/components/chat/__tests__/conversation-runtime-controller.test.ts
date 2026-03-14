@@ -10,9 +10,11 @@ import {
 import {
     buildInterruptCommand,
     connectConversationSocket,
+    flushPendingConversationInterrupt,
     getChatTitleUpdate,
     interruptConversationRun,
     prepareConversationSend,
+    requestConversationInterrupt,
     resolveConversationRuntimeSync,
     resolveConversationSocketEvent,
     runConversationSend,
@@ -386,6 +388,50 @@ describe("conversation runtime controller", () => {
             message: "cannot interrupt",
             isRetryable: true,
         });
+    });
+
+    test("queues an interrupt when send is in-flight before the run is bound", () => {
+        const calls: string[] = [];
+
+        expect(
+            requestConversationInterrupt({
+                activeRun: null,
+                isSending: true,
+                queuePendingInterrupt: () => {
+                    calls.push("queued");
+                },
+                sendCommand: () => {
+                    calls.push("sent");
+                },
+            }),
+        ).toEqual({
+            queued: true,
+            error: null,
+        });
+
+        expect(calls).toEqual(["queued"]);
+    });
+
+    test("flushes a queued interrupt once the run is available", () => {
+        const commands: string[] = [];
+
+        expect(
+            flushPendingConversationInterrupt({
+                pendingInterrupt: true,
+                activeRun: {
+                    conversationId: "chat-1",
+                    assistantMessageId: "assistant-1",
+                    userContent: "Hello",
+                    content: "",
+                    runId: "run-1",
+                },
+                sendCommand: (command) => {
+                    commands.push(command.type);
+                },
+            }),
+        ).toBeNull();
+
+        expect(commands).toEqual(["conversation.interrupt"]);
     });
 
     test("recovers a run from run.started when there is no active local run", () => {

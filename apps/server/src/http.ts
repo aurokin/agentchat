@@ -12,11 +12,32 @@ type HandlerDependencies = {
     modelCatalog?: Pick<CodexModelCatalog, "getProviderModels">;
 };
 
-function jsonResponse(body: unknown, init?: ResponseInit): Response {
+function getCorsHeaders(request: Request): HeadersInit {
+    const origin = request.headers.get("origin");
+    const allowOrigin =
+        origin &&
+        (origin.startsWith("http://") || origin.startsWith("https://"))
+            ? origin
+            : "*";
+
+    return {
+        "access-control-allow-origin": allowOrigin,
+        "access-control-allow-methods": "GET,OPTIONS",
+        "access-control-allow-headers": "content-type,authorization",
+        vary: "origin",
+    };
+}
+
+function jsonResponse(
+    request: Request,
+    body: unknown,
+    init?: ResponseInit,
+): Response {
     return Response.json(body, {
         ...init,
         headers: {
             "cache-control": "no-store",
+            ...getCorsHeaders(request),
             ...(init?.headers ?? {}),
         },
     });
@@ -134,9 +155,16 @@ export function createFetchHandler(deps: HandlerDependencies) {
         const url = new URL(request.url);
         const pathname = url.pathname;
 
+        if (request.method === "OPTIONS") {
+            return new Response(null, {
+                status: 204,
+                headers: getCorsHeaders(request),
+            });
+        }
+
         if (request.method === "GET" && pathname === "/health") {
             const diagnostics = getConfigDiagnostics(config);
-            return jsonResponse({
+            return jsonResponse(request, {
                 ok: diagnostics.ok,
                 configVersion: config.version,
                 summary: diagnostics.summary,
@@ -144,14 +172,14 @@ export function createFetchHandler(deps: HandlerDependencies) {
         }
 
         if (request.method === "GET" && pathname === "/api/diagnostics") {
-            return jsonResponse({
+            return jsonResponse(request, {
                 ...getConfigDiagnostics(config),
                 runtimeEnv: getRuntimeEnvDiagnostics(),
             });
         }
 
         if (request.method === "GET" && pathname === "/api/bootstrap") {
-            return jsonResponse({
+            return jsonResponse(request, {
                 auth: {
                     mode: config.auth.mode,
                     allowlistMode:
@@ -190,11 +218,12 @@ export function createFetchHandler(deps: HandlerDependencies) {
                 getProviderModelsFallback(config, providerId);
             if (!result) {
                 return jsonResponse(
+                    request,
                     { error: "Provider not found" },
                     { status: 404 },
                 );
             }
-            return jsonResponse(result);
+            return jsonResponse(request, result);
         }
 
         const agentOptionsMatch = pathname.match(
@@ -207,13 +236,14 @@ export function createFetchHandler(deps: HandlerDependencies) {
             );
             if (!result) {
                 return jsonResponse(
+                    request,
                     { error: "Agent not found" },
                     { status: 404 },
                 );
             }
-            return jsonResponse(result);
+            return jsonResponse(request, result);
         }
 
-        return jsonResponse({ error: "Not found" }, { status: 404 });
+        return jsonResponse(request, { error: "Not found" }, { status: 404 });
     };
 }

@@ -149,15 +149,17 @@ Coverage targets:
 - send/stream/interruption
 - refresh and reconnect recovery
 - agent-scoped conversation switching
+- operator-visible config hot reload for disabled agents and providers
 
 These should also be manually invoked, not run automatically on push.
 
-Current boundary:
+Current local browser path:
 
-- meaningful full-chat browser E2E still requires an authenticated, allowlisted Google session
-- auth-disabled mode is the preferred integration and browser-test path for local confidence work that does not specifically need the Google sign-in flow
-- until the project has an explicit local authenticated test harness, browser automation should focus on unauthenticated and operator-facing states
-- full authenticated chat confidence currently comes from the manual runtime commands plus the interactive checklist rather than unattended browser automation
+- auth-disabled mode is the preferred browser-test path for local confidence work that does not specifically need the Google sign-in flow
+- use `bun run test:manual:web-browser-confidence` for the real disabled-auth web chat flow
+- use `bun run test:manual:web-operator-smoke` for browser-visible config hot-reload checks
+- run those commands sequentially because the operator smoke mutates `apps/server/agentchat.config.json`
+- Google-auth browser coverage still remains a separate manual/operator concern
 
 ## Manual QA Checklist
 
@@ -176,6 +178,8 @@ Current manual confidence command:
 - `bun run test:manual:live-runtime-interrupt`
 - `bun run test:manual:config-reload-smoke`
 - `bun run test:manual:runtime-confidence`
+- `bun run test:manual:web-browser-confidence`
+- `bun run test:manual:web-operator-smoke`
 
 This runs live Convex codegen, the server doctor, and the targeted server and web confidence suites without turning them into always-on checks.
 It also runs the targeted mobile confidence suite for agent selection, provider/model/variant state, and runtime recovery helpers.
@@ -183,7 +187,7 @@ It also runs the targeted mobile confidence suite for agent selection, provider/
 ## Priority Order
 
 1. Web manual smoke and functional checks using the smoke and primary fixtures
-2. Server integration coverage around websocket, persistence, and resume
-3. Web browser end-to-end coverage
+2. Web browser confidence and operator hot-reload checks in disabled-auth mode
+3. Server integration coverage around websocket, persistence, and resume
 4. Mobile manual parity checks against the same fixtures
 5. Revisit provider-specific fixtures only after Codex is highly confident end to end
