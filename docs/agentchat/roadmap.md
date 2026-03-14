@@ -28,6 +28,8 @@ This roadmap describes the current implementation state and the next major steps
 - Use the live Convex deployment for real codegen, runtime persistence validation, and end-to-end confidence passes
 - Use disabled-auth mode aggressively for integration and browser confidence work that does not need Google sign-in coverage
 - Design the runtime event model so one assistant run can emit multiple assistant messages cleanly instead of forcing every stream into a single persisted message
+- Add targeted regression coverage for browser-visible runtime state so manual catches like stale stop buttons and false reconnect banners become scriptable checks
+- Add regression fixtures for long streamed assistant prose formatting and LAN browser access during local development
 
 ## Next Milestones
 
@@ -45,6 +47,10 @@ This roadmap describes the current implementation state and the next major steps
 - Keep `bun run test:manual:runtime-confidence` as the single manual operator command for the local runtime stack
 - Prefer Convex-issued backend session tokens for these live passes; allow the local signing fallback only while the deployment is still missing `BACKEND_TOKEN_SECRET`
 - Add browser-level end-to-end coverage for agent selection, chat send, interruption, refresh, and recovery
+- Add explicit browser/runtime assertions that terminal runs restore the send button and clear any stale stop state
+- Add explicit reconnect assertions so recovery banners only appear after a known disconnect and reconnect
+- Add long-stream rendering checks for assistant responses that naturally transition from progress narration into structured markdown
+- Add local LAN browser checks for dev-origin, bootstrap, and websocket reachability
 - Keep the disabled-auth browser path as the primary local web confidence path
 - Run `bun run test:manual:web-browser-confidence` for the real web smoke, cancel, and refresh flow
 - Run `bun run test:manual:web-operator-smoke` for browser-visible agent/provider disable handling

@@ -152,8 +152,12 @@ Coverage targets:
 - provider/model/variant selection
 - send/stream/interruption
 - refresh and reconnect recovery
+- terminal-state control recovery so completed or interrupted runs restore the send button and clear stale stop affordances
+- reconnect-banner gating so recovery UI only appears after a known disconnect/reconnect path
+- long streamed assistant responses that shift from status narration into structured markdown
 - agent-scoped conversation switching
 - operator-visible config hot reload for disabled agents and providers
+- LAN browser access, including dev-origin and backend bootstrap reachability
 
 These should also be manually invoked, not run automatically on push.
 
@@ -164,6 +168,7 @@ Current local browser path:
 - use `bun run test:manual:web-operator-smoke` for browser-visible config hot-reload checks
 - run those commands sequentially because the operator smoke mutates `apps/server/agentchat.config.json`
 - Google-auth browser coverage still remains a separate manual/operator concern
+- when a manual pass finds a browser-visible runtime regression, add a focused scripted check or unit regression around the exact state transition before treating it as closed
 
 ### 6. Operator Failure Smoke
 
