@@ -21,7 +21,7 @@ It exists for both humans and agents:
 - [Convex Spec](./convex-spec.md)
 - [Backend API Spec](./backend-api-spec.md)
 - [Codex Runtime Spec](./codex-runtime-spec.md)
-- [Local Auth Plan](./local-auth-plan.md)
+- [Runtime And Auth Plan](./runtime-and-auth-plan.md)
 - [Testing Plan](./testing-plan.md)
 - [Manual QA Checklist](./manual-qa-checklist.md)
 - [Mobile Follow-Up](./mobile-followup.md)
@@ -32,7 +32,7 @@ It exists for both humans and agents:
 These docs describe the active Agentchat direction:
 
 - Self-hosted and open source
-- Convex-managed access with either allowlisted Google sign-in or disabled-auth default-user mode
+- Convex-managed access moving toward a provider-oriented Google plus local-user model
 - Conversations stored in Convex
 - An instance-local backend server
 - A provider abstraction that is intentionally being hardened around Codex first

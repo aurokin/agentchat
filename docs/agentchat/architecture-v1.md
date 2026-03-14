@@ -18,7 +18,7 @@ Agentchat is moving to a split architecture:
 
 Responsibilities:
 
-- Authenticate with Convex or initialize the default workspace user when auth is disabled
+- Authenticate with Convex and always operate as a concrete workspace user
 - Let the user select an agent
 - Let the user select provider, model, and variant before the first message
 - Open a backend WebSocket connection using a short-lived backend token derived from Convex auth
@@ -31,7 +31,7 @@ Responsibilities:
 
 Responsibilities:
 
-- Google-based auth or disabled-auth default-user mode
+- Google-based auth today, moving to provider-oriented Google plus local user auth
 - Instance allowlist enforcement
 - User identity
 - Multi-user isolation for conversations, runs, runtime bindings, and subscriptions
@@ -68,7 +68,7 @@ Responsibilities:
 
 ### Before First Message
 
-1. The user signs in through Convex, or the default workspace user is initialized if auth is disabled.
+1. The user signs in through Convex as a concrete workspace user.
 2. The client loads the available agents from the backend.
 3. The user selects an agent.
 4. The client shows only conversations for that agent.
@@ -133,6 +133,18 @@ Agentchat should use a hybrid model:
 - Treat clients as subscribers to runtime state, not as the execution owner.
 
 This avoids treating the backend as the source of truth while still allowing reconnect and recovery after process restarts.
+
+## Auth Direction
+
+Agentchat should not depend on a long-term shared default-user mode.
+
+Target auth model:
+
+- Google auth for managed access
+- local Convex-backed users for insecure local or LAN-friendly deployments
+- provider-oriented auth configuration instead of a permanent `auth.mode` split
+
+For the migration plan, use [Runtime And Auth Plan](./runtime-and-auth-plan.md).
 
 ## Suggested Convex Entity Set
 

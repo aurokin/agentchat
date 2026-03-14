@@ -25,7 +25,7 @@ This roadmap describes the current implementation state and the next major steps
 - Tighten end-to-end reliability across web, server, Convex, and Codex
 - Close the remaining mobile parity gaps
 - Keep Codex-backed model and variant discovery well-tested and operator-friendly
-- Plan and implement local multi-user auth in a provider-oriented way so Agentchat is not limited to Google or disabled-auth forever
+- Plan and implement local multi-user auth together with the backend-owned runtime model so Agentchat is always user-based, even for insecure local usage
 - Bring the runtime fully in line with backend-owned execution semantics across web, mobile, server, and Convex
   - users can switch conversations or agents during submission
   - users can have active runs in multiple conversations and agents at the same time
@@ -33,6 +33,8 @@ This roadmap describes the current implementation state and the next major steps
   - multiple clients can observe the same run concurrently without duplicating execution
   - clients keep background subscriptions to all active conversations instead of only the visible thread
   - multiple users can use the same instance at the same time without crossing runtime state
+  - every accepted request resolves to a concrete Convex user
+  - disabled-auth default-user mode is replaced by local seeded users such as `smoke_1` and `smoke_2`
 - Investigate Codex model and variant mapping in the live product path
 - Verify whether Codex Spark is functioning correctly in the current integration
 - Expand provider-native runtime item mapping so multi-message output follows real Codex events instead of transcript inference
@@ -44,7 +46,7 @@ This roadmap describes the current implementation state and the next major steps
 - Keep the active roadmap narrowly focused on Codex confidence rather than adding more providers
 - Use the live Convex deployment for real codegen, runtime persistence validation, and end-to-end confidence passes
 - Use disabled-auth mode aggressively for integration and browser confidence work that does not need Google sign-in coverage
-- Use [Local Auth Plan](./local-auth-plan.md) as the source doc for moving from mode-based auth to provider-oriented local auth
+- Use [Runtime And Auth Plan](./runtime-and-auth-plan.md) as the source doc for replacing disabled-auth with real local users while finishing the backend-owned runtime model
 - Keep targeted regression coverage for browser-visible runtime state so manual catches like stale stop buttons and false reconnect banners stay scriptable checks
 - Add regression fixtures for long streamed assistant prose formatting and LAN browser access during local development
 - Keep mobile integration testing explicitly gated by host-platform support instead of implying universal simulator/device coverage

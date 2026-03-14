@@ -5,10 +5,11 @@ This document records user-facing rules and product decisions that should remain
 ## Access And Identity
 
 - Access is controlled per instance.
-- The supported access modes are allowlisted Google auth and disabled-auth default-user mode.
+- The long-term supported access providers are allowlisted Google auth and Convex-backed local users.
 - Convex is the primary authority for whether a user is allowed into the app.
 - The backend must enforce the same identity on every request as defense in depth.
 - Multiple users must be able to use the same Agentchat instance at the same time without leaking conversations, runs, or runtime events across users.
+- Every accepted request must resolve to a concrete user in Convex, even for insecure local instances.
 
 ## Agent Selection
 
