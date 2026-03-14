@@ -38,6 +38,14 @@ describe("deriveConversationRuntimeState", () => {
             deriveConversationRuntimeState({
                 messages: [],
                 runSummaries: [createRunSummary()],
+                runtimeBinding: {
+                    provider: "codex-default",
+                    status: "active",
+                    activeRunId: "run-1",
+                    lastError: null,
+                    lastEventAt: 2,
+                    updatedAt: 2,
+                },
             }),
         ).toEqual({
             phase: "active",
@@ -48,6 +56,32 @@ describe("deriveConversationRuntimeState", () => {
             startedAt: 1,
             completedAt: null,
             lastEventAt: 2,
+        });
+    });
+
+    test("treats a running summary as idle when the runtime binding is no longer active", () => {
+        expect(
+            deriveConversationRuntimeState({
+                messages: [],
+                runSummaries: [createRunSummary()],
+                runtimeBinding: {
+                    provider: "codex-default",
+                    status: "idle",
+                    activeRunId: null,
+                    lastError: null,
+                    lastEventAt: 3,
+                    updatedAt: 3,
+                },
+            }),
+        ).toEqual({
+            phase: "idle",
+            runId: null,
+            assistantMessageId: null,
+            provider: null,
+            errorMessage: null,
+            startedAt: null,
+            completedAt: null,
+            lastEventAt: null,
         });
     });
 

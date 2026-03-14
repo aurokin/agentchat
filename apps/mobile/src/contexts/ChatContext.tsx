@@ -16,7 +16,11 @@ import {
     useWorkspace,
 } from "@/contexts/WorkspaceContext";
 import type { ChatSession, Message } from "@shared/core/types";
-import type { ChatRunSummary, ConversationRuntimeState } from "@/lib/types";
+import type {
+    ChatRunSummary,
+    ConversationRuntimeState,
+    RuntimeBindingSummary,
+} from "@/lib/types";
 import { APP_DEFAULT_MODEL } from "@shared/core/models";
 import {
     mapConvexChatToSession,
@@ -71,6 +75,9 @@ const ChatContext = createContext<ChatContextValue | null>(null);
 const convexApi = api as typeof api & {
     runs: {
         listByChat: FunctionReference<"query">;
+    };
+    runtimeBindings: {
+        getByChat: FunctionReference<"query">;
     };
 };
 
@@ -148,9 +155,19 @@ export function ChatProvider({
             ? { chatId: workspaceCurrentChat._id }
             : "skip",
     );
+    const workspaceRuntimeBinding = useQuery(
+        convexApi.runtimeBindings.getByChat,
+        isWorkspaceActive && workspaceCurrentChat?._id
+            ? { chatId: workspaceCurrentChat._id }
+            : "skip",
+    );
     const runSummaries = useMemo(
         () => workspaceRunSummaries ?? [],
         [workspaceRunSummaries],
+    );
+    const runtimeBinding = useMemo<RuntimeBindingSummary | null | undefined>(
+        () => workspaceRuntimeBinding,
+        [workspaceRuntimeBinding],
     );
     const currentMessages = useMemo(() => {
         if (!currentChatId) {
@@ -164,8 +181,9 @@ export function ChatProvider({
             deriveConversationRuntimeState({
                 messages: currentMessages,
                 runSummaries,
+                runtimeBinding,
             }),
-        [currentMessages, runSummaries],
+        [currentMessages, runSummaries, runtimeBinding],
     );
 
     useEffect(() => {

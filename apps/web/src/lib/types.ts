@@ -46,6 +46,15 @@ export interface ChatRunSummary {
     latestEventAt: number | null;
 }
 
+export interface RuntimeBindingSummary {
+    provider: string;
+    status: "idle" | "active" | "expired" | "errored";
+    activeRunId: string | null;
+    lastError: string | null;
+    lastEventAt: number | null;
+    updatedAt: number;
+}
+
 export type ConversationRuntimePhase =
     | "idle"
     | "active"

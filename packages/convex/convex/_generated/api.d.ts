@@ -21,6 +21,7 @@ import type * as lib_subscription from "../lib/subscription.js";
 import type * as lib_workspace_usage from "../lib/workspace_usage.js";
 import type * as messages from "../messages.js";
 import type * as runs from "../runs.js";
+import type * as runtimeBindings from "../runtimeBindings.js";
 import type * as runtimeIngress from "../runtimeIngress.js";
 import type * as users from "../users.js";
 
@@ -44,6 +45,7 @@ declare const fullApi: ApiFromModules<{
   "lib/workspace_usage": typeof lib_workspace_usage;
   messages: typeof messages;
   runs: typeof runs;
+  runtimeBindings: typeof runtimeBindings;
   runtimeIngress: typeof runtimeIngress;
   users: typeof users;
 }>;

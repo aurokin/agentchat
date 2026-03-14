@@ -2,6 +2,7 @@ import type {
     ChatRunSummary,
     ConversationRuntimeState,
     Message,
+    RuntimeBindingSummary,
 } from "@/lib/types";
 
 const IDLE_RUNTIME_STATE: ConversationRuntimeState = {
@@ -18,6 +19,7 @@ const IDLE_RUNTIME_STATE: ConversationRuntimeState = {
 export function deriveConversationRuntimeState(params: {
     messages: Message[];
     runSummaries: ChatRunSummary[];
+    runtimeBinding?: RuntimeBindingSummary | null;
 }): ConversationRuntimeState {
     const latestRun = params.runSummaries[0] ?? null;
     if (!latestRun) {
@@ -51,6 +53,35 @@ export function deriveConversationRuntimeState(params: {
         latestRun.status === "queued" ||
         latestRun.status === "starting"
     ) {
+        if (params.runtimeBinding !== undefined) {
+            if (
+                !params.runtimeBinding ||
+                params.runtimeBinding.status !== "active" ||
+                params.runtimeBinding.activeRunId !== latestRun.externalId
+            ) {
+                if (params.runtimeBinding?.status === "errored") {
+                    return {
+                        phase: "failed",
+                        runId: latestRun.externalId,
+                        assistantMessageId: latestRun.outputMessageLocalId,
+                        provider: latestRun.provider,
+                        errorMessage:
+                            params.runtimeBinding.lastError ??
+                            latestRun.errorMessage,
+                        startedAt: latestRun.startedAt,
+                        completedAt:
+                            latestRun.completedAt ??
+                            params.runtimeBinding.updatedAt,
+                        lastEventAt:
+                            params.runtimeBinding.lastEventAt ??
+                            latestRun.latestEventAt,
+                    };
+                }
+
+                return IDLE_RUNTIME_STATE;
+            }
+        }
+
         return {
             phase: "active",
             runId: latestRun.externalId,

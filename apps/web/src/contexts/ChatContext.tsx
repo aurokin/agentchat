@@ -17,6 +17,7 @@ import type {
     ConversationRuntimeState,
     ChatSession,
     Message,
+    RuntimeBindingSummary,
 } from "@/lib/types";
 import { APP_DEFAULT_MODEL } from "@shared/core/models";
 import {
@@ -87,6 +88,9 @@ const convexApi = api as typeof api & {
     runs: {
         listByChat: FunctionReference<"query">;
     };
+    runtimeBindings: {
+        getByChat: FunctionReference<"query">;
+    };
 };
 
 export function ChatProvider({ children }: { children: React.ReactNode }) {
@@ -134,17 +138,28 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             ? { chatId: workspaceCurrentChat._id }
             : "skip",
     );
+    const workspaceRuntimeBinding = useQuery(
+        convexApi.runtimeBindings.getByChat,
+        isWorkspaceActive && workspaceCurrentChat?._id
+            ? { chatId: workspaceCurrentChat._id }
+            : "skip",
+    );
     const runSummaries = useMemo(
         () => workspaceRunSummaries ?? [],
         [workspaceRunSummaries],
+    );
+    const runtimeBinding = useMemo<RuntimeBindingSummary | null | undefined>(
+        () => workspaceRuntimeBinding,
+        [workspaceRuntimeBinding],
     );
     const runtimeState = useMemo(
         () =>
             deriveConversationRuntimeState({
                 messages,
                 runSummaries,
+                runtimeBinding,
             }),
-        [messages, runSummaries],
+        [messages, runSummaries, runtimeBinding],
     );
 
     useEffect(() => {
