@@ -165,9 +165,13 @@ Current local browser path:
 
 - auth-disabled mode is the preferred browser-test path for local confidence work that does not specifically need the Google sign-in flow
 - use `bun run test:manual:web-browser-confidence` for the real disabled-auth web chat flow
+    - covers smoke, interrupt, and refresh flows
+    - asserts terminal runs restore the send button and clear stale stop state
+    - asserts recovery banners stay absent on ordinary flows without a known reconnect
 - use `bun run test:manual:web-operator-smoke` for browser-visible config hot-reload checks
 - run those commands sequentially because the operator smoke mutates `apps/server/agentchat.config.json`
 - Google-auth browser coverage still remains a separate manual/operator concern
+- current scripted reconnect-banner assertions focus on in-page websocket reconnect behavior; full page refresh checks still verify clean recovery and settled controls, but not a positive reconnect banner
 - when a manual pass finds a browser-visible runtime regression, add a focused scripted check or unit regression around the exact state transition before treating it as closed
 
 ### 6. Operator Failure Smoke

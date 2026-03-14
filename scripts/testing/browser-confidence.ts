@@ -5,11 +5,11 @@ import { fileURLToPath } from "node:url";
 
 import { chromium, type Page } from "playwright";
 
-import { trimTrailingSlash } from "./lib";
+import {
+    parseBrowserConfidenceArgs,
+    type BrowserConfidenceMode as Mode,
+} from "./browser-confidence-helpers";
 
-type Mode = "smoke" | "interrupt" | "refresh" | "full";
-
-const DEFAULT_BASE_URL = "http://127.0.0.1:4040";
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 function invariant(condition: unknown, message: string): asserts condition {
@@ -25,45 +25,6 @@ function getRepoRoot(): string {
 
 function getOutputDir(repoRoot: string): string {
     return path.join(repoRoot, "output", "playwright");
-}
-
-function parseArgs(argv: string[]): { baseUrl: string; mode: Mode } {
-    let baseUrl = DEFAULT_BASE_URL;
-    let mode: Mode = "full";
-
-    for (let index = 0; index < argv.length; index += 1) {
-        const arg = argv[index];
-        if (arg === "--base-url") {
-            const value = argv[index + 1];
-            if (!value) {
-                throw new Error("--base-url requires a value.");
-            }
-            baseUrl = trimTrailingSlash(value);
-            index += 1;
-            continue;
-        }
-
-        if (arg === "--mode") {
-            const value = argv[index + 1];
-            if (
-                value !== "smoke" &&
-                value !== "interrupt" &&
-                value !== "refresh" &&
-                value !== "full"
-            ) {
-                throw new Error(
-                    "--mode must be smoke, interrupt, refresh, or full.",
-                );
-            }
-            mode = value;
-            index += 1;
-            continue;
-        }
-
-        throw new Error(`Unsupported argument: ${arg}`);
-    }
-
-    return { baseUrl, mode };
 }
 
 async function assertWebReady(baseUrl: string): Promise<void> {
@@ -148,15 +109,33 @@ async function sendPrompt(page: Page, prompt: string): Promise<void> {
     await page.getByTestId("send-message-button").click();
 }
 
-async function assertWorkspaceEmpty(page: Page): Promise<void> {
-    await page.getByText("No conversations for this agent").waitFor({
+async function assertComposerSettled(page: Page): Promise<void> {
+    await page.getByTestId("send-message-button").waitFor({
         timeout: DEFAULT_TIMEOUT_MS,
     });
+    invariant(
+        !(await page
+            .getByTestId("cancel-run-button")
+            .isVisible()
+            .catch(() => false)),
+        "Cancel button should be hidden once the run has settled.",
+    );
+}
+
+async function assertNoRecoveryBanner(page: Page): Promise<void> {
+    invariant(
+        !(await page
+            .getByTestId("runtime-recovering-banner")
+            .isVisible()
+            .catch(() => false)),
+        "Recovery banner should not be visible for this flow.",
+    );
 }
 
 async function runSmoke(page: Page): Promise<void> {
     await selectAgent(page, "agentchat-test");
     await startConversation(page);
+    await assertNoRecoveryBanner(page);
     await sendPrompt(
         page,
         "Read src/math.ts and reply with only the result of add(2, 3).",
@@ -166,12 +145,14 @@ async function runSmoke(page: Page): Promise<void> {
         assistantText.includes("5"),
         `Unexpected smoke response: ${JSON.stringify(assistantText)}`,
     );
+    await assertComposerSettled(page);
+    await assertNoRecoveryBanner(page);
 }
 
 async function runInterrupt(page: Page): Promise<void> {
     await selectAgent(page, "agentchat-workspace");
-    await assertWorkspaceEmpty(page);
     await startConversation(page);
+    await assertNoRecoveryBanner(page);
     await sendPrompt(
         page,
         [
@@ -193,6 +174,8 @@ async function runInterrupt(page: Page): Promise<void> {
             .isVisible()
             .catch(() => false);
         if (interruptedVisible) {
+            await assertComposerSettled(page);
+            await assertNoRecoveryBanner(page);
             return;
         }
 
@@ -210,6 +193,8 @@ async function runInterrupt(page: Page): Promise<void> {
                     .nth(assistantCount - 1)
                     .textContent()) ?? "";
             if (lastText.trim().length > 0) {
+                await assertComposerSettled(page);
+                await assertNoRecoveryBanner(page);
                 return;
             }
         }
@@ -223,22 +208,29 @@ async function runInterrupt(page: Page): Promise<void> {
     throw new Error("Timed out waiting for the canceled run to settle.");
 }
 
-async function waitForRecoverySignal(page: Page): Promise<void> {
+async function waitForRecoverySignal(page: Page): Promise<boolean> {
     const recoveringBanner = page.getByTestId("runtime-recovering-banner");
     const interruptedBanner = page.getByTestId("runtime-interrupted-banner");
     const failedBanner = page.getByTestId("runtime-failed-banner");
+    const cancelButton = page.getByTestId("cancel-run-button");
+    const sendButton = page.getByTestId("send-message-button");
     const assistantMessages = page.locator('[data-testid^="message-assistant-"]');
 
     const deadline = Date.now() + DEFAULT_TIMEOUT_MS;
     for (;;) {
         if (await recoveringBanner.isVisible().catch(() => false)) {
-            return;
+            return true;
         }
         if (await interruptedBanner.isVisible().catch(() => false)) {
-            return;
+            return false;
         }
         if (await failedBanner.isVisible().catch(() => false)) {
             throw new Error("Run failed after refresh.");
+        }
+        const cancelVisible = await cancelButton.isVisible().catch(() => false);
+        const sendVisible = await sendButton.isVisible().catch(() => false);
+        if (sendVisible && !cancelVisible) {
+            return false;
         }
         if ((await assistantMessages.count()) > 0) {
             const lastText =
@@ -246,7 +238,7 @@ async function waitForRecoverySignal(page: Page): Promise<void> {
                     .nth((await assistantMessages.count()) - 1)
                     .textContent()) ?? "";
             if (lastText.trim().length > 0) {
-                return;
+                return false;
             }
         }
         if (Date.now() >= deadline) {
@@ -263,6 +255,7 @@ async function waitForRecoverySignal(page: Page): Promise<void> {
 async function runRefresh(page: Page): Promise<void> {
     await selectAgent(page, "agentchat-workspace");
     await startConversation(page);
+    await assertNoRecoveryBanner(page);
     await sendPrompt(
         page,
         [
@@ -280,6 +273,7 @@ async function runRefresh(page: Page): Promise<void> {
         timeout: DEFAULT_TIMEOUT_MS,
     });
     await waitForRecoverySignal(page);
+    await assertComposerSettled(page);
 }
 
 async function captureScreenshot(page: Page, repoRoot: string, name: string) {
@@ -292,7 +286,7 @@ async function captureScreenshot(page: Page, repoRoot: string, name: string) {
 }
 
 async function main() {
-    const { baseUrl, mode } = parseArgs(process.argv.slice(2));
+    const { baseUrl, mode } = parseBrowserConfidenceArgs(process.argv.slice(2));
     const repoRoot = getRepoRoot();
 
     await assertWebReady(baseUrl);
