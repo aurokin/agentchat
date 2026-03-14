@@ -29,6 +29,7 @@
   "setup:test-agent-config": "bun scripts/testing/write-test-agent-config.ts",
   "setup:local-smoke-users": "bun scripts/testing/seed-local-users.ts",
   "setup:local-auth-smoke": "bun scripts/testing/setup-local-auth-smoke.ts",
+  "local-user:create": "bun scripts/testing/create-local-user.ts",
   "test:manual:local-auth-separation": "bun scripts/testing/local-auth-separation.ts",
   "test:manual:live-runtime-smoke": "bun scripts/testing/live-runtime-smoke.ts --mode smoke",
         "test:manual:live-runtime-status": "bun scripts/testing/live-runtime-smoke.ts --mode status",

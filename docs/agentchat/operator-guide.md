@@ -82,6 +82,18 @@ Then seed the standard local smoke users:
 bun run setup:local-smoke-users
 ```
 
+If you want to add a one-off local account interactively:
+
+```bash
+bun run local-user:create
+```
+
+That command prompts for:
+
+- username
+- display name
+- password
+
 Or do the full local-auth smoke migration in one step:
 
 ```bash
