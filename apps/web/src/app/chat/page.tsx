@@ -11,6 +11,7 @@ import { useIsConvexAvailable } from "@/contexts/ConvexProvider";
 import { useSettings } from "@/contexts/SettingsContext";
 import { OperatorNotice } from "@/components/chat/OperatorNotice";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { BackgroundRuntimeSubscriptions } from "@/components/chat/BackgroundRuntimeSubscriptions";
 
 export default function ChatPage() {
     const { chats, loading, selectChat, currentChat } = useChat();
@@ -135,6 +136,7 @@ export default function ChatPage() {
 
     return (
         <div className="relative h-dvh">
+            <BackgroundRuntimeSubscriptions />
             {(agentOptionsIssue || modelsIssue) && (
                 <div className="pointer-events-none absolute inset-x-0 top-4 z-20 mx-auto w-full max-w-3xl px-4">
                     <div className="pointer-events-auto space-y-3">

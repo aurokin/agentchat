@@ -11,6 +11,7 @@ import { ModelProvider } from "@/contexts/ModelContext";
 import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
 import { AgentchatSocketProvider } from "@/contexts/AgentchatSocketContext";
 import { AgentProvider } from "@/contexts/AgentContext";
+import { BackgroundRuntimeSubscriptions } from "@/components/chat/BackgroundRuntimeSubscriptions";
 import OnboardingScreen from "./onboarding";
 
 function RuntimeProviders(): ReactElement {
@@ -22,6 +23,7 @@ function RuntimeProviders(): ReactElement {
                         <ModelProvider>
                             <WorkspaceProvider>
                                 <ChatProvider>
+                                    <BackgroundRuntimeSubscriptions />
                                     <Stack
                                         screenOptions={{
                                             headerShown: false,

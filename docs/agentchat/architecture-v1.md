@@ -24,6 +24,7 @@ Responsibilities:
 - Open a backend WebSocket connection using a short-lived backend token derived from Convex auth
 - Render streamed run events and persisted conversation history
 - Subscribe and unsubscribe from conversations without owning runtime lifecycle
+- Keep background subscriptions for all currently active conversations owned by the user
 - Accept user input while other conversations or agents still have active runs
 
 ### Convex
@@ -93,6 +94,7 @@ Responsibilities:
 4. Another client for the same user may subscribe and observe the same active run.
 5. If all clients disconnect, the run still continues in the backend and persists state through Convex.
 6. A later subscriber recovers the current run state from backend memory and Convex summaries rather than restarting the run.
+7. Clients should automatically keep subscribing to active conversations even when those conversations are no longer the visible foreground thread.
 
 ### Later Messages
 

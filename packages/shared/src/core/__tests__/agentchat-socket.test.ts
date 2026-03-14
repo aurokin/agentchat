@@ -18,6 +18,7 @@ class FakeWebSocket {
     onmessage: ((event: { data: string }) => void) | null = null;
     onerror: (() => void) | null = null;
     onclose: (() => void) | null = null;
+    readonly sentMessages: string[] = [];
 
     static readonly OPEN = 1;
 
@@ -25,7 +26,9 @@ class FakeWebSocket {
         FakeWebSocket.instances.push(this);
     }
 
-    send(): void {}
+    send(message: string): void {
+        this.sentMessages.push(message);
+    }
 
     close(): void {
         this.onclose?.();
@@ -132,5 +135,58 @@ describe("agentchat socket helpers", () => {
             "connection.ready",
             "connection.reconnected",
         ]);
+    });
+
+    test("reference counts conversation subscriptions across multiple owners", async () => {
+        globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
+
+        const client = new AgentchatSocketClient({
+            getWebSocketUrl: () => "ws://localhost:3030/ws",
+            createId: () => "id-1",
+            notConfiguredMessage: "missing",
+        });
+
+        const connectPromise = client.ensureConnected(async () => "token-1");
+        await Promise.resolve();
+        const socket = FakeWebSocket.instances[0];
+        if (!socket) {
+            throw new Error("Expected a websocket connection");
+        }
+        socket.emitOpen();
+        socket.emitEvent({
+            type: "connection.ready",
+            payload: {
+                user: {
+                    sub: "sub-1",
+                    userId: "user-1",
+                    email: "user@example.com",
+                },
+                transport: "websocket",
+            },
+        });
+        await connectPromise;
+
+        const unsubscribeA = client.subscribeToConversation("chat-1");
+        const unsubscribeB = client.subscribeToConversation("chat-1");
+
+        expect(
+            socket.sentMessages.filter((message) =>
+                message.includes('"type":"conversation.subscribe"'),
+            ),
+        ).toHaveLength(1);
+
+        unsubscribeA();
+        expect(
+            socket.sentMessages.filter((message) =>
+                message.includes('"type":"conversation.unsubscribe"'),
+            ),
+        ).toHaveLength(0);
+
+        unsubscribeB();
+        expect(
+            socket.sentMessages.filter((message) =>
+                message.includes('"type":"conversation.unsubscribe"'),
+            ),
+        ).toHaveLength(1);
     });
 });

@@ -32,3 +32,31 @@ export const getByChat = query({
         };
     },
 });
+
+export const listActiveConversationIds = query({
+    args: {},
+    handler: async (ctx) => {
+        const authenticatedUserId = await requireWorkspaceUser(ctx);
+        const bindings = await ctx.db
+            .query("runtime_bindings")
+            .withIndex("by_userId_and_updatedAt", (q) =>
+                q.eq("userId", authenticatedUserId),
+            )
+            .collect();
+
+        const activeBindings = bindings.filter(
+            (binding) =>
+                binding.status === "active" && binding.activeRunId !== null,
+        );
+        const chats = await Promise.all(
+            activeBindings.map((binding) => ctx.db.get(binding.chatId)),
+        );
+
+        return chats
+            .filter((chat): chat is NonNullable<typeof chat> => chat !== null)
+            .map((chat) => ({
+                conversationId: chat.localId ?? chat._id,
+                agentId: chat.agentId,
+            }));
+    },
+});

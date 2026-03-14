@@ -150,7 +150,7 @@ export class AgentchatSocketClient {
     private socket: WebSocket | null = null;
     private connectPromise: Promise<void> | null = null;
     private readonly listeners = new Set<AgentchatSocketListener>();
-    private readonly conversationSubscriptions = new Set<string>();
+    private readonly conversationSubscriptions = new Map<string, number>();
     private ready = false;
     private tokenIssuer: TokenIssuer | null = null;
     private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -187,17 +187,31 @@ export class AgentchatSocketClient {
     }
 
     subscribeToConversation(conversationId: string): () => void {
-        this.conversationSubscriptions.add(conversationId);
-        this.sendConversationSubscription(
-            "conversation.subscribe",
-            conversationId,
-        );
+        const nextCount =
+            (this.conversationSubscriptions.get(conversationId) ?? 0) + 1;
+        this.conversationSubscriptions.set(conversationId, nextCount);
+        if (nextCount === 1) {
+            this.sendConversationSubscription(
+                "conversation.subscribe",
+                conversationId,
+            );
+        }
 
         return () => {
-            this.conversationSubscriptions.delete(conversationId);
-            this.sendConversationSubscription(
-                "conversation.unsubscribe",
+            const currentCount =
+                this.conversationSubscriptions.get(conversationId) ?? 0;
+            if (currentCount <= 1) {
+                this.conversationSubscriptions.delete(conversationId);
+                this.sendConversationSubscription(
+                    "conversation.unsubscribe",
+                    conversationId,
+                );
+                return;
+            }
+
+            this.conversationSubscriptions.set(
                 conversationId,
+                currentCount - 1,
             );
         };
     }
@@ -321,7 +335,7 @@ export class AgentchatSocketClient {
     }
 
     private replayConversationSubscriptions(): void {
-        for (const conversationId of this.conversationSubscriptions) {
+        for (const conversationId of this.conversationSubscriptions.keys()) {
             this.sendConversationSubscription(
                 "conversation.subscribe",
                 conversationId,
