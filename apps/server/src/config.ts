@@ -4,12 +4,22 @@ import { fileURLToPath } from "node:url";
 
 import { z } from "zod";
 
-const AuthConfigSchema = z.object({
+const GoogleAuthConfigSchema = z.object({
+    mode: z.literal("google"),
     allowlistMode: z.literal("email"),
     allowedEmails: z.array(z.email()),
     allowedDomains: z.array(z.string()),
     googleHostedDomain: z.union([z.string(), z.null()]),
 });
+
+const DisabledAuthConfigSchema = z.object({
+    mode: z.literal("disabled"),
+});
+
+const AuthConfigSchema = z.discriminatedUnion("mode", [
+    GoogleAuthConfigSchema,
+    DisabledAuthConfigSchema,
+]);
 
 const ProviderVariantSchema = z.object({
     id: z.string().min(1),

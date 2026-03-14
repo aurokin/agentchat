@@ -54,9 +54,9 @@ export default function Layout(): ReactElement {
             <ThemeProvider>
                 <ThemedStatusBar />
                 <ConvexProvider>
-                    <AuthProvider>
-                        <AgentchatSocketProvider>
-                            <AgentProvider>
+                    <AgentProvider>
+                        <AuthProvider>
+                            <AgentchatSocketProvider>
                                 <ModelProvider>
                                     <WorkspaceProvider>
                                         <AppProvider>
@@ -73,9 +73,9 @@ export default function Layout(): ReactElement {
                                         </AppProvider>
                                     </WorkspaceProvider>
                                 </ModelProvider>
-                            </AgentProvider>
-                        </AgentchatSocketProvider>
-                    </AuthProvider>
+                            </AgentchatSocketProvider>
+                        </AuthProvider>
+                    </AgentProvider>
                 </ConvexProvider>
             </ThemeProvider>
         </SafeAreaProvider>

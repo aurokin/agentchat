@@ -8,6 +8,7 @@ import React, {
 import * as WebBrowser from "expo-web-browser";
 import { makeRedirectUri } from "expo-auth-session";
 import { useAction, useConvexAuth, useQuery } from "convex/react";
+import { useMutation } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { api } from "@convex/_generated/api";
 import {
@@ -17,6 +18,8 @@ import {
 } from "@/lib/convex/config";
 import { clearAllCredentials } from "@/lib/storage";
 import { useIsConvexAvailable } from "@/lib/convex/ConvexProvider";
+import { useAgent } from "@/contexts/AgentContext";
+import type { ConvexId } from "@/lib/workspace/convex-types";
 
 interface User {
     id: string;
@@ -27,6 +30,9 @@ interface User {
 
 interface AuthContextValue {
     user: User | null;
+    userId: string | null;
+    authMode: "google" | "disabled";
+    isAuthDisabled: boolean;
     isAuthenticated: boolean;
     isLoading: boolean;
     isConvexAvailable: boolean;
@@ -55,30 +61,78 @@ export function AuthProvider({
     children,
 }: AuthProviderProps): React.ReactElement {
     const isConvexAvailable = useIsConvexAvailable();
-    const { isAuthenticated, isLoading: isAuthLoading } = useConvexAuth();
+    const { authMode, isAuthDisabled, loadingAgents } = useAgent();
+    const { isAuthenticated: isConvexAuthenticated, isLoading: isAuthLoading } =
+        useConvexAuth();
     const authActions = useAuthActions();
     const issueBackendSessionToken = useAction(api.backendTokens.issue);
+    const ensureAccessUser = useMutation(api.users.ensureAccessUser);
+    const [defaultUserId, setDefaultUserId] =
+        React.useState<ConvexId<"users"> | null>(null);
     const userId = useQuery(
         api.users.getCurrentUserId,
-        isAuthenticated ? {} : "skip",
+        isConvexAvailable &&
+            !loadingAgents &&
+            (isAuthDisabled || isConvexAuthenticated)
+            ? {}
+            : "skip",
+    ) as ConvexId<"users"> | null | undefined;
+    const effectiveUserId =
+        (isAuthDisabled ? (defaultUserId ?? userId) : userId) ?? null;
+    const user = useQuery(
+        api.users.get,
+        effectiveUserId ? { id: effectiveUserId } : "skip",
     );
-    const user = useQuery(api.users.get, userId ? { id: userId } : "skip");
+
+    React.useEffect(() => {
+        let cancelled = false;
+
+        if (!isConvexAvailable || loadingAgents || !isAuthDisabled) {
+            return;
+        }
+
+        void ensureAccessUser({})
+            .then((nextUserId) => {
+                if (cancelled) return;
+                setDefaultUserId(nextUserId as ConvexId<"users">);
+            })
+            .catch((error) => {
+                if (cancelled) return;
+                console.error(
+                    "Failed to initialize default access user:",
+                    error,
+                );
+                setDefaultUserId(null);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [ensureAccessUser, isAuthDisabled, isConvexAvailable, loadingAgents]);
+
+    const isAuthenticated = isAuthDisabled
+        ? Boolean(isConvexAvailable && effectiveUserId)
+        : isConvexAuthenticated;
 
     const isUserLoading =
-        isAuthenticated && (userId === undefined || user === undefined);
+        isAuthenticated &&
+        (effectiveUserId === undefined || user === undefined);
     const isLoading = isAuthLoading || isUserLoading;
 
     const userValue = useMemo<User | null>(() => {
-        if (!user || !userId) return null;
+        if (!user || !effectiveUserId) return null;
         return {
-            id: (user as any)._id ?? userId,
+            id: (user as any)._id ?? effectiveUserId,
             name: (user as any).name ?? undefined,
             email: (user as any).email ?? undefined,
             image: (user as any).image ?? undefined,
         };
-    }, [user, userId]);
+    }, [effectiveUserId, user]);
 
     const signIn = useCallback(async () => {
+        if (isAuthDisabled) {
+            return;
+        }
         if (!authActions?.signIn) {
             throw new Error("Convex auth is not configured");
         }
@@ -157,19 +211,26 @@ export function AuthProvider({
         await runWithRetry(() =>
             authActions.signIn(undefined as any, { code } as any),
         );
-    }, [authActions, isConvexAvailable]);
+    }, [authActions, isAuthDisabled, isConvexAvailable]);
 
     const signOut = useCallback(async () => {
+        if (isAuthDisabled) {
+            return;
+        }
         try {
             await authActions?.signOut?.();
         } finally {
             await clearAllCredentials();
         }
-    }, [authActions]);
+    }, [authActions, isAuthDisabled]);
 
     const getBackendSessionToken = useCallback(async () => {
         if (!isConvexAvailable || !isAuthenticated) {
-            throw new Error("You must be signed in to connect to Agentchat.");
+            throw new Error(
+                isAuthDisabled
+                    ? "The default workspace user is not ready yet."
+                    : "You must be signed in to connect to Agentchat.",
+            );
         }
 
         const result = await issueBackendSessionToken({});
@@ -180,7 +241,12 @@ export function AuthProvider({
         }
 
         return result.token;
-    }, [isAuthenticated, isConvexAvailable, issueBackendSessionToken]);
+    }, [
+        isAuthDisabled,
+        isAuthenticated,
+        isConvexAvailable,
+        issueBackendSessionToken,
+    ]);
 
     const configureConvex = useCallback(async (url: string) => {
         await setConvexUrl(url);
@@ -194,6 +260,9 @@ export function AuthProvider({
         <AuthContext.Provider
             value={{
                 user: userValue,
+                userId: effectiveUserId,
+                authMode,
+                isAuthDisabled,
                 isAuthenticated,
                 isLoading,
                 isConvexAvailable,

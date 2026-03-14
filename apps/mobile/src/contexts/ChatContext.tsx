@@ -111,17 +111,14 @@ export function ChatProvider({
         APP_DEFAULT_MODEL;
 
     const adapter = usePersistenceAdapter();
-    const { isWorkspaceReady, isConvexAvailable } = useWorkspace();
+    const { isWorkspaceReady, isConvexAvailable, workspaceUserId } =
+        useWorkspace();
     const pendingChatIdsRef = React.useRef<Set<string>>(new Set());
     const pendingMessageIdsRef = React.useRef<Set<string>>(new Set());
     const currentChatIdRef = useRef<string | null>(null);
 
     const isWorkspaceActive = isConvexAvailable && isWorkspaceReady;
     const currentChatId = currentChat?.id ?? null;
-    const workspaceUserId = useQuery(
-        api.users.getCurrentUserId,
-        isWorkspaceActive ? {} : "skip",
-    );
     const workspaceChats = useQuery(
         api.chats.listByUser,
         isWorkspaceActive && workspaceUserId

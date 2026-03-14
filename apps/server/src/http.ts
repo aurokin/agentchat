@@ -153,7 +153,11 @@ export function createFetchHandler(deps: HandlerDependencies) {
         if (request.method === "GET" && pathname === "/api/bootstrap") {
             return jsonResponse({
                 auth: {
-                    allowlistMode: config.auth.allowlistMode,
+                    mode: config.auth.mode,
+                    allowlistMode:
+                        config.auth.mode === "google"
+                            ? config.auth.allowlistMode
+                            : null,
                 },
                 providers: getVisibleProviders(config).map(toProviderSummary),
                 agents: getVisibleAgents(config).map((agent) => {

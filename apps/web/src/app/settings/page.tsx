@@ -174,9 +174,10 @@ function SettingsPageContent() {
                             <div className="flex items-center gap-2 text-muted-foreground text-sm p-3 bg-muted/30 border border-border">
                                 <Check size={14} className="text-success" />
                                 <span>
-                                    Keep Google sign-in restricted to approved
-                                    emails if you want to control who can use
-                                    your hosted agents.
+                                    Use allowlisted Google sign-in when you want
+                                    per-user access control, or disable auth
+                                    entirely when the instance is already
+                                    protected by your own network boundary.
                                 </span>
                             </div>
                         </div>

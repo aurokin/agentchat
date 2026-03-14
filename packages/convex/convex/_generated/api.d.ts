@@ -12,6 +12,7 @@ import type * as auth from "../auth.js";
 import type * as backendTokens from "../backendTokens.js";
 import type * as chats from "../chats.js";
 import type * as http from "../http.js";
+import type * as lib_auth_mode from "../lib/auth_mode.js";
 import type * as lib_authz from "../lib/authz.js";
 import type * as lib_batch from "../lib/batch.js";
 import type * as lib_limits from "../lib/limits.js";
@@ -34,6 +35,7 @@ declare const fullApi: ApiFromModules<{
   backendTokens: typeof backendTokens;
   chats: typeof chats;
   http: typeof http;
+  "lib/auth_mode": typeof lib_auth_mode;
   "lib/authz": typeof lib_authz;
   "lib/batch": typeof lib_batch;
   "lib/limits": typeof lib_limits;

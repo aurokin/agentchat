@@ -34,9 +34,17 @@ describe("server config", () => {
         );
         expect(bootstrapResponse.status).toBe(200);
         const bootstrap = (await bootstrapResponse.json()) as {
+            auth: {
+                mode: "google" | "disabled";
+                allowlistMode: "email" | null;
+            };
             agents: Array<{ id: string }>;
             providers: Array<{ id: string }>;
         };
+        expect(bootstrap.auth).toEqual({
+            mode: "google",
+            allowlistMode: "email",
+        });
         expect(bootstrap.agents[0]?.id).toBe("example-agent");
         expect(bootstrap.providers[0]?.id).toBe("codex-main");
 
@@ -69,5 +77,20 @@ describe("server config", () => {
         };
         expect(options.agentId).toBe("example-agent");
         expect(options.defaultProviderId).toBe("codex-main");
+    });
+
+    test("parses disabled auth config", () => {
+        const config = parseConfig({
+            version: 1,
+            auth: {
+                mode: "disabled",
+            },
+            providers: exampleConfig.providers,
+            agents: exampleConfig.agents,
+        });
+
+        expect(config.auth).toEqual({
+            mode: "disabled",
+        });
     });
 });

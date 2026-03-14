@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useMemo } from "react";
-import { useConvex, useConvexAuth, useQuery } from "convex/react";
-import { api } from "@convex/_generated/api";
+import { useConvex } from "convex/react";
 import type {
     PersistenceAdapter,
     WorkspaceStatus,
@@ -11,12 +10,16 @@ import type {
     ConvexId,
 } from "@/lib/workspace/convex-types";
 import { useIsConvexAvailable } from "@/lib/convex/ConvexProvider";
+import { useAuthContext } from "@/lib/convex/AuthContext";
 import { unavailablePersistenceAdapter } from "@/lib/workspace/unavailable-adapter";
 
 interface WorkspaceContextValue {
+    authMode: "google" | "disabled";
+    isAuthRequired: boolean;
     workspaceStatus: WorkspaceStatus;
     isWorkspaceReady: boolean;
     isConvexAvailable: boolean;
+    workspaceUserId: ConvexId<"users"> | null;
     persistenceAdapter: PersistenceAdapter;
     isInitialSyncLoaded: boolean;
 }
@@ -42,39 +45,43 @@ export function WorkspaceProvider({
 }): React.ReactElement {
     const isConvexAvailable = useIsConvexAvailable();
     const convexClient = useConvex() as unknown as ConvexClientInterface;
-    const { isAuthenticated } = useConvexAuth();
-    const userId = useQuery(
-        api.users.getCurrentUserId,
-        isConvexAvailable && isAuthenticated ? {} : "skip",
-    ) as ConvexId<"users"> | null | undefined;
+    const { authMode, isAuthDisabled, isAuthenticated, userId } =
+        useAuthContext();
+    const workspaceUserId = (userId as ConvexId<"users"> | null) ?? null;
 
     const workspaceStatus: WorkspaceStatus =
-        isConvexAvailable && isAuthenticated && userId
+        isConvexAvailable && isAuthenticated && workspaceUserId
             ? "ready"
             : "unavailable";
     const isWorkspaceReady = workspaceStatus === "ready";
 
     const persistenceAdapter = useMemo<PersistenceAdapter>(() => {
-        if (!isConvexAvailable || !userId) {
+        if (!isConvexAvailable || !workspaceUserId) {
             return unavailablePersistenceAdapter;
         }
-        return new ConvexPersistenceAdapter(convexClient, userId);
-    }, [convexClient, isConvexAvailable, userId]);
+        return new ConvexPersistenceAdapter(convexClient, workspaceUserId);
+    }, [convexClient, isConvexAvailable, workspaceUserId]);
 
     const contextValue = useMemo(
         () => ({
+            authMode,
+            isAuthRequired: !isAuthDisabled,
             workspaceStatus,
             isWorkspaceReady,
             isConvexAvailable,
+            workspaceUserId,
             persistenceAdapter,
-            isInitialSyncLoaded: !isAuthenticated || userId !== undefined,
+            isInitialSyncLoaded:
+                !isConvexAvailable || !isAuthenticated || !!workspaceUserId,
         }),
         [
+            authMode,
             isAuthenticated,
+            isAuthDisabled,
             isConvexAvailable,
             isWorkspaceReady,
             persistenceAdapter,
-            userId,
+            workspaceUserId,
             workspaceStatus,
         ],
     );

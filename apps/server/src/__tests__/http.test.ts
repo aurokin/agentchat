@@ -7,6 +7,7 @@ function createConfig(): AgentchatConfig {
     return {
         version: 1,
         auth: {
+            mode: "google",
             allowlistMode: "email",
             allowedEmails: ["operator@example.com"],
             allowedDomains: [],
@@ -142,6 +143,33 @@ describe("createFetchHandler", () => {
                 defaultVariant: "balanced",
             },
         ]);
+    });
+
+    test("reports disabled auth mode in bootstrap", async () => {
+        const fetchHandler = createFetchHandler({
+            getConfig: () => ({
+                ...createConfig(),
+                auth: {
+                    mode: "disabled",
+                },
+            }),
+        });
+
+        const response = await fetchHandler(
+            new Request("http://localhost:3030/api/bootstrap"),
+        );
+        const body = (await response.json()) as {
+            auth: {
+                mode: "google" | "disabled";
+                allowlistMode: "email" | null;
+            };
+        };
+
+        expect(response.status).toBe(200);
+        expect(body.auth).toEqual({
+            mode: "disabled",
+            allowlistMode: null,
+        });
     });
 
     test("returns agent options for enabled agents only", async () => {

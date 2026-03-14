@@ -6,7 +6,7 @@ This spec defines the operator-managed configuration file loaded by `apps/server
 
 The file is intended to be edited by humans. It configures:
 
-- global auth allowlist behavior
+- global auth behavior
 - globally configured providers
 - globally visible agents
 
@@ -54,12 +54,13 @@ Future support for YAML or TOML is allowed, but JSON is the only format specifie
 
 Purpose:
 
-- define who can access the instance after Google sign-in
+- define who can access the instance
 
-Shape:
+Google mode shape:
 
 ```json
 {
+  "mode": "google",
   "allowlistMode": "email",
   "allowedEmails": ["user@example.com"],
   "allowedDomains": [],
@@ -67,25 +68,37 @@ Shape:
 }
 ```
 
+Disabled mode shape:
+
+```json
+{
+  "mode": "disabled"
+}
+```
+
 Fields:
 
-- `allowlistMode`
+- `mode`
   - required
+  - allowed values for v1: `"google"` or `"disabled"`
+- `allowlistMode`
+  - required only when `mode` is `"google"`
   - allowed values for v1: `"email"`
 - `allowedEmails`
-  - required
+  - required only when `mode` is `"google"`
   - array of exact email strings
 - `allowedDomains`
-  - optional
+  - optional in Google mode
   - reserved for later
   - must be empty in v1 unless explicitly enabled in a later spec
 - `googleHostedDomain`
-  - optional string or `null`
+  - optional string or `null` in Google mode
   - hint only, not the authoritative allowlist
 
 V1 decision:
 
-- instance access is granted only if the signed-in email is present in `allowedEmails`
+- in Google mode, instance access is granted only if the signed-in email is present in `allowedEmails`
+- in disabled mode, the app uses a single default workspace user and does not require external sign-in
 
 ## `providers`
 

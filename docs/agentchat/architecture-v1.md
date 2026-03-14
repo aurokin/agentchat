@@ -18,7 +18,7 @@ Agentchat is moving to a split architecture:
 
 Responsibilities:
 
-- Authenticate with Convex
+- Authenticate with Convex or initialize the default workspace user when auth is disabled
 - Let the user select an agent
 - Let the user select provider, model, and variant before the first message
 - Open a backend WebSocket connection using a short-lived backend token derived from Convex auth
@@ -28,7 +28,7 @@ Responsibilities:
 
 Responsibilities:
 
-- Google-based auth
+- Google-based auth or disabled-auth default-user mode
 - Instance allowlist enforcement
 - User identity
 - Conversations
@@ -62,7 +62,7 @@ Responsibilities:
 
 ### Before First Message
 
-1. The user signs in through Convex.
+1. The user signs in through Convex, or the default workspace user is initialized if auth is disabled.
 2. The client loads the available agents from the backend.
 3. The user selects an agent.
 4. The client shows only conversations for that agent.

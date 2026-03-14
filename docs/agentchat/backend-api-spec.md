@@ -18,13 +18,13 @@ The backend does not replace Convex as the primary data store.
 Use a hybrid transport:
 
 - HTTP for bootstrap and provider metadata
-- one WebSocket connection per signed-in user for live runtime actions and events
+- one WebSocket connection per active access user for live runtime actions and events
 
 ## Authentication Model
 
 ### Client To Convex
 
-- the client authenticates with Convex using Google-backed auth
+- the client authenticates with Convex using Google-backed auth, or initializes the default workspace user when auth mode is disabled
 
 ### Client To Backend
 
@@ -98,7 +98,7 @@ Returns:
 
 ### `GET /ws`
 
-One connection per signed-in user.
+One connection per active access user.
 
 The socket must support multiplexing multiple subscribed conversations.
 

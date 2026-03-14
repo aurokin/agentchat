@@ -35,7 +35,8 @@ bun run test:manual:runtime-confidence
 - `bun run --cwd packages/convex codegen` succeeds against the selected deployment
 - `apps/server` is running
 - the web app is running
-- the selected Google account is allowlisted
+- if auth mode is `google`, the selected Google account is allowlisted
+- if auth mode is `disabled`, the default workspace user can be initialized successfully
 - `bun run doctor:server` reports the configured Codex provider and target agents as ready, and shows live Codex model access for each enabled provider
 
 For the fullest backend-auth coverage:
@@ -50,7 +51,7 @@ If the Convex deployment is still missing `BACKEND_TOKEN_SECRET`, the live runti
 Use `/home/auro/agents/agentchat_test/smoke`.
 
 - Run `bun run doctor:server`
-- Sign in
+- Sign in if auth mode is `google`
 - Select the smoke agent
 - Start a new conversation
 - Send a greeting
@@ -112,7 +113,7 @@ Use `/home/auro/agents/agentchat_test/workspace`.
 
 Run the same smoke and deterministic checks on mobile.
 
-- sign in
+- sign in if auth mode is `google`
 - select the same fixture agent
 - send and interrupt
 - reconnect if possible

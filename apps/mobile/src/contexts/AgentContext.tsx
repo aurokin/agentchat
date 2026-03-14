@@ -22,6 +22,8 @@ import { resolveSelectedAgentId } from "@/contexts/agent-helpers";
 
 interface AgentContextValue {
     agents: BootstrapAgent[];
+    authMode: "google" | "disabled";
+    isAuthDisabled: boolean;
     selectedAgentId: string | null;
     selectedAgent: BootstrapAgent | null;
     selectedAgentOptions: AgentOptionsResponse | null;
@@ -67,7 +69,14 @@ export function AgentProvider({
             }
         } catch (error) {
             console.error("Failed to load Agentchat bootstrap:", error);
-            setBootstrap({ agents: [], providers: [] });
+            setBootstrap({
+                auth: {
+                    mode: "google",
+                    allowlistMode: "email",
+                },
+                agents: [],
+                providers: [],
+            });
             setSelectedAgentIdState(null);
             await clearSelectedAgentId();
         } finally {
@@ -136,6 +145,8 @@ export function AgentProvider({
         <AgentContext.Provider
             value={{
                 agents: bootstrap?.agents ?? [],
+                authMode: bootstrap?.auth.mode ?? "google",
+                isAuthDisabled: bootstrap?.auth.mode === "disabled",
                 selectedAgentId,
                 selectedAgent,
                 selectedAgentOptions,

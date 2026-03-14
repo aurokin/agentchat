@@ -26,6 +26,8 @@ export default function SettingsScreen(): ReactElement {
     const router = useRouter();
     const {
         user,
+        authMode,
+        isAuthDisabled,
         isAuthenticated,
         isLoading: isAuthLoading,
         signIn,
@@ -42,6 +44,11 @@ export default function SettingsScreen(): ReactElement {
     const [isSigningIn, setIsSigningIn] = useState(false);
 
     const convexUnavailableMessage = "Convex isn't configured for this build.";
+    const authSummaryLabel = isAuthDisabled
+        ? user?.email || "Default user"
+        : isAuthenticated
+          ? user?.email || "Signed in"
+          : "Signed out";
 
     const handleSignOut = async () => {
         Alert.alert(
@@ -65,6 +72,9 @@ export default function SettingsScreen(): ReactElement {
     };
 
     const performSignIn = async () => {
+        if (isAuthDisabled) {
+            return;
+        }
         setIsSigningIn(true);
         try {
             await signIn();
@@ -90,6 +100,9 @@ export default function SettingsScreen(): ReactElement {
     };
 
     const handleGoogleSignIn = async () => {
+        if (isAuthDisabled) {
+            return;
+        }
         if (!isConvexAvailable) {
             Alert.alert("Convex Not Configured", convexUnavailableMessage, [
                 { text: "OK" },
@@ -120,7 +133,8 @@ export default function SettingsScreen(): ReactElement {
             selectedVariantId,
         ],
     );
-    const isGoogleButtonBusy = isAuthLoading || isSigningIn;
+    const isGoogleButtonBusy =
+        !isAuthDisabled && (isAuthLoading || isSigningIn);
     const isTwoPaneLayout = Math.min(windowWidth, windowHeight) >= 700;
     const settingsRailWidth = Math.max(256, Math.min(320, windowWidth * 0.28));
     const settingsContentMaxWidth = Math.max(
@@ -182,9 +196,7 @@ export default function SettingsScreen(): ReactElement {
                                     style={styles.tabletRailSummaryValue}
                                     numberOfLines={1}
                                 >
-                                    {isAuthenticated
-                                        ? user?.email || "Signed in"
-                                        : "Signed out"}
+                                    {authSummaryLabel}
                                 </Text>
                                 <Text style={styles.tabletRailSummaryLabel}>
                                     Agent
@@ -266,8 +278,9 @@ export default function SettingsScreen(): ReactElement {
                                         </View>
                                     ) : (
                                         <Text style={styles.notSignedIn}>
-                                            Sign in to access your Agentchat
-                                            workspace.
+                                            {isAuthDisabled
+                                                ? "This instance is running with authentication disabled. Agentchat uses the default workspace user for this device."
+                                                : "Sign in to access your Agentchat workspace."}
                                         </Text>
                                     )}
 
@@ -277,13 +290,20 @@ export default function SettingsScreen(): ReactElement {
                                                 styles.googleButton,
                                                 isGoogleButtonBusy &&
                                                     styles.googleButtonDisabled,
+                                                isAuthDisabled &&
+                                                    styles.googleButtonDisabled,
                                             ]}
                                             onPress={
-                                                isAuthenticated
-                                                    ? handleSignOut
-                                                    : handleGoogleSignIn
+                                                isAuthDisabled
+                                                    ? undefined
+                                                    : isAuthenticated
+                                                      ? handleSignOut
+                                                      : handleGoogleSignIn
                                             }
-                                            disabled={isGoogleButtonBusy}
+                                            disabled={
+                                                isGoogleButtonBusy ||
+                                                isAuthDisabled
+                                            }
                                         >
                                             {isGoogleButtonBusy ? (
                                                 <View
@@ -315,12 +335,27 @@ export default function SettingsScreen(): ReactElement {
                                                         styles.googleButtonText
                                                     }
                                                 >
-                                                    {isAuthenticated
-                                                        ? "Sign Out"
-                                                        : "Sign in with Google"}
+                                                    {isAuthDisabled
+                                                        ? "Authentication Disabled"
+                                                        : isAuthenticated
+                                                          ? "Sign Out"
+                                                          : "Sign in with Google"}
                                                 </Text>
                                             )}
                                         </TouchableOpacity>
+                                    )}
+
+                                    {isAuthDisabled && (
+                                        <Text style={styles.storageInfoText}>
+                                            The server config has auth mode set
+                                            to{" "}
+                                            <Text style={styles.codeText}>
+                                                {authMode}
+                                            </Text>
+                                            . Agentchat will use the default
+                                            workspace user until auth is turned
+                                            back on for this instance.
+                                        </Text>
                                     )}
 
                                     {!isConvexAvailable && (
@@ -961,6 +996,10 @@ const createStyles = (colors: ThemeColors) =>
         },
         storageInfoText: {
             fontSize: 14,
+            color: colors.text,
+        },
+        codeText: {
+            fontFamily: "monospace",
             color: colors.text,
         },
         storageInfoSpacing: {

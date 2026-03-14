@@ -21,17 +21,46 @@ function resolveGitUserEmail(repoRoot: string): string | null {
     }
 }
 
-function buildConfig(homeDir: string, allowedEmail: string) {
+type AuthMode = "google" | "disabled";
+
+function resolveAuthMode(): AuthMode {
+    const flag = process.argv.find((arg) => arg.startsWith("--auth-mode="));
+    const value =
+        flag?.slice("--auth-mode=".length).trim() ||
+        process.env.AGENTCHAT_TEST_AUTH_MODE?.trim() ||
+        "disabled";
+
+    if (value === "google" || value === "disabled") {
+        return value;
+    }
+
+    throw new Error(
+        `Unsupported auth mode '${value}'. Expected 'google' or 'disabled'.`,
+    );
+}
+
+function buildAuthConfig(authMode: AuthMode, allowedEmail: string) {
+    if (authMode === "disabled") {
+        return {
+            mode: "disabled" as const,
+        };
+    }
+
+    return {
+        mode: "google" as const,
+        allowlistMode: "email" as const,
+        allowedEmails: [allowedEmail],
+        allowedDomains: [],
+        googleHostedDomain: null,
+    };
+}
+
+function buildConfig(homeDir: string, authMode: AuthMode, allowedEmail: string) {
     const fixturesRoot = path.join(homeDir, "agents", "agentchat_test");
 
     return {
         version: 1,
-        auth: {
-            allowlistMode: "email" as const,
-            allowedEmails: [allowedEmail],
-            allowedDomains: [],
-            googleHostedDomain: null,
-        },
+        auth: buildAuthConfig(authMode, allowedEmail),
         providers: [
             {
                 id: "codex-main",
@@ -152,8 +181,9 @@ const allowedEmail =
     process.env.AGENTCHAT_ALLOWED_EMAIL?.trim() ||
     resolveGitUserEmail(repoRoot) ||
     "operator@example.com";
+const authMode = resolveAuthMode();
 
-const config = buildConfig(os.homedir(), allowedEmail);
+const config = buildConfig(os.homedir(), authMode, allowedEmail);
 const json = `${JSON.stringify(config, null, 4)}\n`;
 
 if (dryRun) {
@@ -163,4 +193,7 @@ if (dryRun) {
 
 writeFileSync(configPath, json, "utf8");
 console.log(`[agentchat] wrote ${configPath}`);
-console.log(`[agentchat] allowlisted email: ${allowedEmail}`);
+console.log(`[agentchat] auth mode: ${authMode}`);
+if (authMode === "google") {
+    console.log(`[agentchat] allowlisted email: ${allowedEmail}`);
+}

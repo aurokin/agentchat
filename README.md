@@ -59,7 +59,7 @@ Agentchat is designed to keep you in control of users, agents, and runtime infra
 ## Using the App
 
 1. Open your Agentchat instance
-2. Sign in with an approved account
+2. Sign in with an approved account, or use the default workspace user if the instance has auth disabled
 3. Select an agent
 4. Start a new conversation and choose a provider/model if needed
 
@@ -70,7 +70,7 @@ For local development and self-hosting.
 ### Prerequisites
 
 - Bun 1.x
-- Convex workspace with Google auth configured
+- Convex workspace configured for either Google auth or disabled-auth mode
 - A locally running provider runtime such as Codex app-server
 
 ### Installation
@@ -92,7 +92,9 @@ cd apps/web && bun dev
 
 ### Configuration
 
-1. Configure Google auth for your Convex workspace
+1. Choose an auth mode for your Convex workspace
+   - `google` for allowlisted Google sign-in
+   - `disabled` for a single default workspace user behind your own firewall
 2. Set the same `BACKEND_TOKEN_SECRET` in Convex and `apps/server/.env.local`
 3. Set the same `RUNTIME_INGRESS_SECRET` in Convex and `apps/server/.env.local`
 4. Point `AGENTCHAT_CONVEX_SITE_URL` in `apps/server/.env.local` at your Convex site URL
@@ -126,7 +128,7 @@ Set these in `apps/mobile/.env` for local runs. A template lives at `apps/mobile
 
 - `EXPO_PUBLIC_CONVEX_URL` - Convex client URL for this build (same as web `NEXT_PUBLIC_CONVEX_URL`).
 - `EXPO_PUBLIC_AGENTCHAT_SERVER_URL` - Base URL for the self-hosted Agentchat backend server used for provider/model metadata and mobile runtime access. Example: `http://localhost:8787` in local dev.
-- `EXPO_PUBLIC_GOOGLE_CLIENT_ID` - Optional. Only needed if you later add client-side Google OAuth flows.
+- `EXPO_PUBLIC_GOOGLE_CLIENT_ID` - Optional. Only needed for the current Google sign-in path when auth mode is `google`.
 
 **Convex CLI (`packages/convex`)**
 
@@ -140,8 +142,12 @@ Local dev only. Configure the Convex CLI target workspace in `packages/convex/.e
 These are Convex-managed environment variables. Set them in the Convex dashboard, or via `bun run convex:env`.
 
 - `SITE_URL` - Base URL for the local or self-hosted web app (no trailing slash). Used to validate auth redirects.
-- `AUTH_GOOGLE_ID` - Google OAuth client ID (from Google Cloud Console).
-- `AUTH_GOOGLE_SECRET` - Google OAuth client secret (from Google Cloud Console).
+- `AGENTCHAT_AUTH_MODE` - `google` or `disabled`.
+- `AUTH_GOOGLE_ID` - Google OAuth client ID (from Google Cloud Console). Required only when `AGENTCHAT_AUTH_MODE=google`.
+- `AUTH_GOOGLE_SECRET` - Google OAuth client secret (from Google Cloud Console). Required only when `AGENTCHAT_AUTH_MODE=google`.
+- `AGENTCHAT_DEFAULT_USER_EMAIL` - Optional email for the default workspace user when `AGENTCHAT_AUTH_MODE=disabled`.
+- `AGENTCHAT_DEFAULT_USER_NAME` - Optional display name for the default workspace user when `AGENTCHAT_AUTH_MODE=disabled`.
+- `AGENTCHAT_DEFAULT_USER_SUBJECT` - Optional stable subject for the default workspace user when `AGENTCHAT_AUTH_MODE=disabled`.
 - `BACKEND_TOKEN_SECRET` - Shared secret used to mint short-lived backend session tokens for `apps/server`.
 - `RUNTIME_INGRESS_SECRET` - Shared secret used by `apps/server` to persist run/runtime state into Convex HTTP ingress.
 - `JWKS` - JSON Web Key Set used by Convex auth.

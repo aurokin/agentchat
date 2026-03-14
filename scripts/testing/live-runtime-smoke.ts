@@ -29,6 +29,13 @@ type AgentOptions = {
     defaultVariant: string | null;
 };
 
+type BootstrapPayload = {
+    auth: {
+        mode: "google" | "disabled";
+        allowlistMode: "email" | null;
+    };
+};
+
 type ProviderModels = {
     providerId: string;
     models: Array<{
@@ -73,6 +80,8 @@ const DEFAULT_EMAIL = "agentchat-live-smoke@local.agentchat";
 const INTERRUPT_FALLBACK_DELAY_MS = 5000;
 const INTERRUPT_RETRY_INTERVAL_MS = 250;
 const RUNTIME_TIMEOUT_MS = 120_000;
+const DEFAULT_DISABLED_USER_EMAIL = "default@local.agentchat";
+const DEFAULT_DISABLED_USER_SUBJECT = "agentchat-default-user";
 
 function invariant(condition: unknown, message: string): asserts condition {
     if (!condition) {
@@ -276,6 +285,42 @@ async function ensureTestUser(params: {
         functionName: "users:create",
         args: { email: params.email },
     });
+}
+
+async function resolveAccessUser(params: {
+    repoRoot: string;
+    email: string;
+    authMode: "google" | "disabled";
+}): Promise<{
+    userId: string;
+    identity: Identity | null;
+}> {
+    if (params.authMode === "disabled") {
+        const userId = runConvex<string>({
+            repoRoot: params.repoRoot,
+            functionName: "users:ensureAccessUser",
+            args: {},
+            push: true,
+        });
+
+        return {
+            userId,
+            identity: null,
+        };
+    }
+
+    const userId = await ensureTestUser({
+        repoRoot: params.repoRoot,
+        email: params.email,
+    });
+    return {
+        userId,
+        identity: {
+            subject: userId,
+            email: params.email,
+            name: "Agentchat Live Smoke",
+        },
+    };
 }
 
 async function issueBackendToken(params: {
@@ -591,21 +636,20 @@ async function main() {
 
     await assertServerReady(args.serverUrl);
 
-    const userId = await ensureTestUser({
+    const bootstrap = await fetchJson<BootstrapPayload>(
+        `${args.serverUrl}/api/bootstrap`,
+    );
+    const { userId, identity } = await resolveAccessUser({
         repoRoot,
         email: args.email,
+        authMode: bootstrap.auth.mode,
     });
-    const identity: Identity = {
-        subject: userId,
-        email: args.email,
-        name: "Agentchat Live Smoke",
-    };
 
     runConvex<void>({
         repoRoot,
         functionName: "users:resetWorkspaceData",
         args: {},
-        identity,
+        identity: identity ?? undefined,
     });
 
     const agentId = args.agentId ?? getDefaultAgentId(args.mode);
@@ -658,7 +702,7 @@ async function main() {
             createdAt: now,
             updatedAt: now,
         },
-        identity,
+        identity: identity ?? undefined,
     });
 
     runConvex<string>({
@@ -676,7 +720,7 @@ async function main() {
             thinkingLevel: thinking,
             createdAt: now + 1,
         },
-        identity,
+        identity: identity ?? undefined,
     });
 
     runConvex<string>({
@@ -694,12 +738,21 @@ async function main() {
             thinkingLevel: thinking,
             createdAt: now + 2,
         },
-        identity,
+        identity: identity ?? undefined,
     });
 
     const token = await issueBackendToken({
         repoRoot,
-        identity,
+        identity:
+            identity ?? {
+                subject:
+                    process.env.AGENTCHAT_DEFAULT_USER_SUBJECT?.trim() ||
+                    DEFAULT_DISABLED_USER_SUBJECT,
+                email:
+                    process.env.AGENTCHAT_DEFAULT_USER_EMAIL?.trim() ||
+                    DEFAULT_DISABLED_USER_EMAIL,
+                name: "Agentchat Default User",
+            },
     });
 
     const outcome = await runLiveConversation({

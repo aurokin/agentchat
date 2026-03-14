@@ -42,9 +42,12 @@ await clearAllCredentials();
 - Expo SecureStore automatically encrypts data on Android and iOS.
 - Always use `clearAllCredentials()` for complete logout.
 
-## Google OAuth Via Convex Auth
+## Convex Access Modes
 
-The mobile app uses Expo Auth Session with Convex Auth for Google sign-in.
+The mobile app supports two current access modes:
+
+- `google`: Expo Auth Session with Convex Auth for Google sign-in
+- `disabled`: no external sign-in, the app initializes the default workspace user from Convex
 
 ### Required Packages
 
@@ -55,7 +58,7 @@ The mobile app uses Expo Auth Session with Convex Auth for Google sign-in.
 ### Auth Configuration
 
 - Convex URL is stored in SecureStore under `agentchat-convex-url`.
-- Env var: `EXPO_PUBLIC_GOOGLE_CLIENT_ID` (set in `app.config.js` or `app.config.ts`).
+- Env var: `EXPO_PUBLIC_GOOGLE_CLIENT_ID` (only needed for `google` mode).
 - Redirect URI: `agentchat://convex-auth`.
 - Provider access is configured by the instance owner on the Agentchat backend.
 
@@ -72,11 +75,20 @@ const { user, isAuthenticated, isLoading, signIn, signOut, isConvexAvailable } =
 
 ### Auth Flow
 
+Google mode:
+
 1. User taps "Sign in with Google" in settings.
 2. Expo Auth Session opens Google OAuth.
 3. On success, Convex client queries `auth:user` with the access token.
 4. Auth context updates user state.
 5. The Convex-backed workspace becomes available.
+
+Disabled mode:
+
+1. The app detects `auth.mode = "disabled"` from the Agentchat server bootstrap.
+2. The auth context calls `users.ensureAccessUser`.
+3. Convex returns or creates the default workspace user.
+4. The Convex-backed workspace becomes available without external sign-in.
 
 ### Sign-Out Flow
 
@@ -116,7 +128,7 @@ The mobile settings page should maintain parity with the web settings page.
 
 ### Required Settings Sections
 
-1. Account (Google OAuth sign-in/sign-out, user profile info)
+1. Account (Google OAuth sign-in/sign-out or disabled-auth default-user state)
 2. Model Provider (instance-managed provider information)
 3. Theme (Light/Dark/System toggle)
 4. Storage (Convex workspace status, no local storage UI)
@@ -195,7 +207,7 @@ if (isInitialized && !hasCompletedOnboarding) {
 ### Onboarding Screen
 
 - File: `app/onboarding.tsx`
-- Steps: Welcome, Self-hosted workspace overview, Google sign-in guidance
+- Steps: Welcome, Self-hosted workspace overview, workspace access guidance
 
 ### Onboarding Wrapper Component
 
@@ -231,5 +243,4 @@ function OnboardingWrapper({ children }: { children: React.ReactNode }): React.R
 - `src/lib/convex/index.ts`
 - `app/settings.tsx`
 - `src/lib/storage/sync-storage.ts`
-- `src/lib/quota.ts`
-- `src/contexts/SkillsContext.tsx`
+- `src/contexts/WorkspaceContext.tsx`

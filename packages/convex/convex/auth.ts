@@ -1,5 +1,6 @@
 import { convexAuth } from "@convex-dev/auth/server";
 import Google, { type GoogleProfile } from "@auth/core/providers/google";
+import { isAgentchatAuthDisabled } from "./lib/auth_mode";
 
 const getProfileUpdates = (
     profile: Record<string, unknown> & {
@@ -66,24 +67,28 @@ const resolveRedirectTo = (redirectTo: string) => {
     );
 };
 
+const providers = isAgentchatAuthDisabled()
+    ? []
+    : [
+          Google({
+              profile(profile: GoogleProfile) {
+                  const fallbackName = [profile.given_name, profile.family_name]
+                      .filter(Boolean)
+                      .join(" ");
+                  const name = profile.name ?? (fallbackName || undefined);
+                  return {
+                      id: profile.sub,
+                      name,
+                      email: profile.email,
+                      image: profile.picture,
+                      emailVerified: profile.email_verified,
+                  };
+              },
+          }),
+      ];
+
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
-    providers: [
-        Google({
-            profile(profile: GoogleProfile) {
-                const fallbackName = [profile.given_name, profile.family_name]
-                    .filter(Boolean)
-                    .join(" ");
-                const name = profile.name ?? (fallbackName || undefined);
-                return {
-                    id: profile.sub,
-                    name,
-                    email: profile.email,
-                    image: profile.picture,
-                    emailVerified: profile.email_verified,
-                };
-            },
-        }),
-    ],
+    providers,
     callbacks: {
         async redirect({ redirectTo }) {
             return resolveRedirectTo(redirectTo);

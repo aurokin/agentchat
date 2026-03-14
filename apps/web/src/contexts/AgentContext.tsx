@@ -25,6 +25,8 @@ import { resolveSelectedAgentId } from "@/contexts/agent-helpers";
 
 interface AgentContextType {
     agents: BootstrapAgent[];
+    authMode: "google" | "disabled";
+    isAuthDisabled: boolean;
     selectedAgentId: string | null;
     selectedAgent: BootstrapAgent | null;
     selectedAgentOptions: AgentOptionsResponse | null;
@@ -79,7 +81,14 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
                     error,
                 }),
             );
-            setBootstrap({ agents: [], providers: [] });
+            setBootstrap({
+                auth: {
+                    mode: "google",
+                    allowlistMode: "email",
+                },
+                agents: [],
+                providers: [],
+            });
             setSelectedAgentIdState(null);
             storage.clearSelectedAgentId();
         } finally {
@@ -155,6 +164,8 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
         <AgentContext.Provider
             value={{
                 agents: bootstrap?.agents ?? [],
+                authMode: bootstrap?.auth.mode ?? "google",
+                isAuthDisabled: bootstrap?.auth.mode === "disabled",
                 selectedAgentId,
                 selectedAgent,
                 selectedAgentOptions,

@@ -12,7 +12,7 @@
 ## Workspace Notes
 
 - Workspace availability is the only sync state that matters in the active app flow.
-- Auth: Google OAuth via Convex Auth.
+- Auth: Convex-managed Google auth or disabled-auth default-user mode.
 - Billing has been removed.
 - Model requests and provider runtime execution now route through `apps/server`.
 - Web browser storage is limited to UI preferences and selected agent/chat state.

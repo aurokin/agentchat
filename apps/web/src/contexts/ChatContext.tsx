@@ -85,7 +85,8 @@ const convexApi = api as typeof api & {
 
 export function ChatProvider({ children }: { children: React.ReactNode }) {
     const persistenceAdapter = usePersistenceAdapter();
-    const { isWorkspaceReady, isConvexAvailable } = useWorkspace();
+    const { isWorkspaceReady, isConvexAvailable, workspaceUserId } =
+        useWorkspace();
     const { selectedAgentId, selectedAgent, loadingAgents } = useAgent();
     const [chats, setChats] = useState<ChatSession[]>([]);
     const [currentChat, setCurrentChat] = useState<ChatSession | null>(null);
@@ -98,10 +99,6 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
     const isWorkspaceActive = isConvexAvailable && isWorkspaceReady;
     const currentChatId = currentChat?.id ?? null;
-    const workspaceUserId = useQuery(
-        api.users.getCurrentUserId,
-        isWorkspaceActive ? {} : "skip",
-    );
     const workspaceChatsPagination = usePaginatedQuery(
         api.chats.listByUserAndAgentPaginated,
         isWorkspaceActive && workspaceUserId && selectedAgentId

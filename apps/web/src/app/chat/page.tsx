@@ -10,24 +10,30 @@ import { Loader2 } from "lucide-react";
 import { useIsConvexAvailable } from "@/contexts/ConvexProvider";
 import { useSettings } from "@/contexts/SettingsContext";
 import { OperatorNotice } from "@/components/chat/OperatorNotice";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 
 export default function ChatPage() {
     const { chats, loading, selectChat, currentChat } = useChat();
     const {
         loadingAgents,
+        isAuthDisabled,
         bootstrapIssue,
         agentOptionsIssue,
         refreshBootstrap,
     } = useAgent();
     const { modelsIssue, refreshModels } = useSettings();
+    const { isWorkspaceReady } = useWorkspace();
     const isConvexAvailable = useIsConvexAvailable();
     const { isAuthenticated, isLoading: isAuthLoading } = useConvexAuth();
     const { signIn } = useAuthActions() ?? {};
     const [initialized, setInitialized] = useState(false);
+    const hasAccess =
+        isConvexAvailable &&
+        (isAuthDisabled ? isWorkspaceReady : isAuthenticated);
 
     // Select a chat on first load for the active agent.
     useEffect(() => {
-        if (!isAuthenticated) return;
+        if (!hasAccess) return;
         if (loadingAgents) return;
         if (!initialized && !loading) {
             requestAnimationFrame(() => {
@@ -45,13 +51,13 @@ export default function ChatPage() {
         loadingAgents,
         loading,
         chats,
-        isAuthenticated,
+        hasAccess,
         selectChat,
     ]);
 
     // If data loads later, select the latest chat when empty.
     useEffect(() => {
-        if (!isAuthenticated) return;
+        if (!hasAccess) return;
         if (loadingAgents) return;
         if (loading || !initialized) return;
         if (currentChat || chats.length === 0) return;
@@ -60,13 +66,17 @@ export default function ChatPage() {
         chats,
         currentChat,
         initialized,
-        isAuthenticated,
+        hasAccess,
         loading,
         loadingAgents,
         selectChat,
     ]);
 
-    if (isAuthLoading || loadingAgents) {
+    if (
+        isAuthLoading ||
+        loadingAgents ||
+        (isAuthDisabled && !isWorkspaceReady)
+    ) {
         return (
             <div className="flex h-dvh items-center justify-center bg-background">
                 <Loader2 size={24} className="animate-spin text-primary" />
@@ -93,25 +103,31 @@ export default function ChatPage() {
         );
     }
 
-    if (!isConvexAvailable || !isAuthenticated) {
+    if (!isConvexAvailable || !hasAccess) {
         return (
             <div className="flex h-dvh items-center justify-center bg-background px-6">
                 <div className="w-full max-w-md border border-border bg-background-elevated p-8 text-center">
-                    <h1 className="text-xl font-semibold">Sign in required</h1>
+                    <h1 className="text-xl font-semibold">
+                        {isAuthDisabled
+                            ? "Workspace unavailable"
+                            : "Sign in required"}
+                    </h1>
                     <p className="mt-3 text-sm text-muted-foreground">
-                        Agentchat runs against your Convex workspace only. Sign
-                        in to access chats and the agents exposed by this
-                        instance.
+                        {isAuthDisabled
+                            ? "This instance has authentication disabled, but the default workspace user could not be initialized."
+                            : "Agentchat runs against your Convex workspace only. Sign in to access chats and the agents exposed by this instance."}
                     </p>
-                    <button
-                        type="button"
-                        className="btn-deco btn-deco-primary mt-6 w-full"
-                        onClick={() =>
-                            signIn?.("google", { redirectTo: "/chat" })
-                        }
-                    >
-                        Sign in with Google
-                    </button>
+                    {isAuthDisabled ? null : (
+                        <button
+                            type="button"
+                            className="btn-deco btn-deco-primary mt-6 w-full"
+                            onClick={() =>
+                                signIn?.("google", { redirectTo: "/chat" })
+                            }
+                        >
+                            Sign in with Google
+                        </button>
+                    )}
                 </div>
             </div>
         );

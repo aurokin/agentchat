@@ -22,7 +22,7 @@ cd apps/web && bun dev
 
 - `http://localhost:4040`
 
-1D) Sign in with an allowed Google account if the local workspace has auth enabled.
+1D) If the local workspace uses `AGENTCHAT_AUTH_MODE=google`, sign in with an allowed Google account. If it uses `disabled`, the app will initialize the default workspace user automatically.
 
 ## 2) Optional: Local Dev With Convex
 
@@ -41,7 +41,8 @@ Notes:
 - Copy `./.env.convex.local.example` to `./.env.convex.local`
 - Fill in:
     - `CONVEX_DEPLOYMENT=dev:<your-deployment>`
-    - `AUTH_GOOGLE_ID=...` and `AUTH_GOOGLE_SECRET=...`
+    - `AGENTCHAT_AUTH_MODE=google` or `AGENTCHAT_AUTH_MODE=disabled`
+    - `AUTH_GOOGLE_ID=...` and `AUTH_GOOGLE_SECRET=...` only if auth mode is `google`
     - `JWKS=...`, `JWT_PRIVATE_KEY=...`
     - `BACKEND_TOKEN_SECRET=...`
     - `RUNTIME_INGRESS_SECRET=...`
@@ -90,6 +91,8 @@ This writes `apps/server/agentchat.config.json` pointing at:
 - `~/agents/agentchat_test`
 - `~/agents/agentchat_test/workspace`
 
+By default, this generated config uses `auth.mode = "disabled"` so local integration and manual runtime checks do not require Google sign-in.
+
 Re-run with `--force` only if you want to replace an existing local config:
 
 ```bash
@@ -111,7 +114,7 @@ bun run doctor:server
 
 `bun run doctor:server` now also reports whether the local `apps/server` runtime has the required env values for backend token verification and Convex runtime persistence.
 
-2J) Manual step (only if needed): fix Google OAuth redirect URI.
+2J) Manual step (only if needed and only when auth mode is `google`): fix Google OAuth redirect URI.
 
 - If sign-in fails with `Error 400: redirect_uri_mismatch`, add this Authorized redirect URI to the OAuth client matching `AUTH_GOOGLE_ID`:
     - `https://<your-deployment>.convex.site/api/auth/callback/google`

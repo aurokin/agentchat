@@ -23,6 +23,10 @@ export type BootstrapAgent = {
 };
 
 export type BootstrapResponse = {
+    auth: {
+        mode: "google" | "disabled";
+        allowlistMode: "email" | null;
+    };
     providers: BootstrapProvider[];
     agents: BootstrapAgent[];
 };

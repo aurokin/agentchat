@@ -30,7 +30,7 @@ It exists for both humans and agents:
 These docs describe the active Agentchat direction:
 
 - Self-hosted and open source
-- Google-authenticated, instance-allowlisted access
+- Convex-managed access with either allowlisted Google sign-in or disabled-auth default-user mode
 - Conversations stored in Convex
 - An instance-local backend server
 - A provider abstraction that is intentionally being hardened around Codex first

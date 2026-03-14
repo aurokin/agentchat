@@ -22,6 +22,7 @@ This roadmap describes the current implementation state and the next major steps
 - Build a practical testing stack around the dedicated local fixtures in `/home/auro/agents/agentchat_test`
 - Keep the active roadmap narrowly focused on Codex confidence rather than adding more providers
 - Use the live Convex deployment for real codegen, runtime persistence validation, and end-to-end confidence passes
+- Use disabled-auth mode aggressively for integration and browser confidence work that does not need Google sign-in coverage
 
 ## Next Milestones
 

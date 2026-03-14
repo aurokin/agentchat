@@ -5,9 +5,18 @@ import {
     mutation,
     query,
 } from "./_generated/server";
-import { getAuthUserId } from "@convex-dev/auth/server";
-import { requireAuthUserId, requireUserMatches } from "./lib/authz";
+import type { Id } from "./_generated/dataModel";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
+import {
+    getAccessUserId,
+    requireAuthUserId,
+    requireUserMatches,
+} from "./lib/authz";
 import { requireWorkspaceUser } from "./lib/subscription";
+import {
+    getDisabledUserProfile,
+    isAgentchatAuthDisabled,
+} from "./lib/auth_mode";
 import { drainBatches } from "./lib/batch";
 import {
     computeWorkspaceChatCount,
@@ -63,7 +72,7 @@ export const getByEmailInternal = internalQuery({
 export const getCurrentUserId = query({
     args: {},
     handler: async (ctx) => {
-        return await getAuthUserId(ctx);
+        return await getAccessUserId(ctx);
     },
 });
 
@@ -112,13 +121,75 @@ export const create = internalMutation({
     },
 });
 
+async function findUserByEmail(
+    ctx: Pick<MutationCtx, "db"> | Pick<QueryCtx, "db">,
+    email: string,
+) {
+    return await ctx.db
+        .query("users")
+        .withIndex("email", (q) => q.eq("email", email))
+        .unique();
+}
+
+async function ensureDefaultUser(ctx: MutationCtx): Promise<Id<"users">> {
+    const profile = getDisabledUserProfile();
+    const existing = await findUserByEmail(ctx, profile.email);
+    const now = Date.now();
+
+    if (existing) {
+        await ctx.db.patch(existing._id, {
+            name: profile.name,
+            email: profile.email,
+            updatedAt: now,
+        });
+        return existing._id;
+    }
+
+    return await ctx.db.insert("users", {
+        name: profile.name,
+        email: profile.email,
+        workspaceChatCount: 0,
+        workspaceMessageCount: 0,
+        createdAt: now,
+        updatedAt: now,
+    });
+}
+
+async function resolveAccessUserForMutation(
+    ctx: MutationCtx,
+): Promise<Id<"users">> {
+    if (isAgentchatAuthDisabled()) {
+        return await ensureDefaultUser(ctx);
+    }
+
+    const userId = await getAccessUserId(ctx);
+    if (!userId) {
+        throw new Error("Not authenticated");
+    }
+
+    return userId;
+}
+
+export const ensureAccessUser = mutation({
+    args: {},
+    handler: async (ctx) => {
+        if (isAgentchatAuthDisabled()) {
+            return await ensureDefaultUser(ctx);
+        }
+
+        const userId = await requireAuthUserId(ctx);
+        const user = await ctx.db.get(userId);
+        if (!user) {
+            throw new Error("Authenticated user not found");
+        }
+        return userId;
+    },
+});
+
 export const resetWorkspaceData = mutation({
     args: {},
     handler: async (ctx) => {
-        const userId = await getAuthUserId(ctx);
-        if (!userId) {
-            throw new Error("Not authenticated");
-        }
+        const userId = await resolveAccessUserForMutation(ctx);
 
         await drainBatches(
             () =>

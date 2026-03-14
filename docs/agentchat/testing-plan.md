@@ -42,7 +42,7 @@ Examples:
 - run `bun run --cwd packages/convex codegen`
 - run `bun run doctor:server`
     - confirm it reports live Codex model access for each enabled provider
-- sign in
+- sign in if auth mode is `google`, or let the default workspace user initialize if auth mode is `disabled`
 - select the smoke agent
 - send a greeting
 - confirm a fast concise response arrives
@@ -155,6 +155,7 @@ These should also be manually invoked, not run automatically on push.
 Current boundary:
 
 - meaningful full-chat browser E2E still requires an authenticated, allowlisted Google session
+- auth-disabled mode is the preferred integration and browser-test path for local confidence work that does not specifically need the Google sign-in flow
 - until the project has an explicit local authenticated test harness, browser automation should focus on unauthenticated and operator-facing states
 - full authenticated chat confidence currently comes from the manual runtime commands plus the interactive checklist rather than unattended browser automation
 

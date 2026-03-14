@@ -59,9 +59,9 @@ export default function OnboardingScreen({
         },
         {
             title: "Convex Workspace",
-            subtitle: "Sign in once and use the same data everywhere",
+            subtitle: "Use one workspace across your devices",
             content: [
-                "• Sign in with Google to access your workspace",
+                "• Access can use Google sign-in or a default local user",
                 "• Chats sync across mobile and web",
                 "• Settings follow your account",
                 "• Agentchat stays aligned with its Convex backend",

@@ -30,6 +30,7 @@ function createConfig(): AgentchatConfig {
     return {
         version: 1,
         auth: {
+            mode: "google",
             allowlistMode: "email",
             allowedEmails: ["operator@example.com"],
             allowedDomains: [],

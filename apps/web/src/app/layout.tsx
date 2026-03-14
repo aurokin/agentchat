@@ -43,13 +43,13 @@ export default function RootLayout({
                 className={`antialiased ${outfit.variable} ${ibmPlexMono.variable}`}
             >
                 <SafeConvexProvider>
-                    <WorkspaceProvider>
-                        <AgentProvider>
+                    <AgentProvider>
+                        <WorkspaceProvider>
                             <SettingsProvider>
                                 <ChatProvider>{children}</ChatProvider>
                             </SettingsProvider>
-                        </AgentProvider>
-                    </WorkspaceProvider>
+                        </WorkspaceProvider>
+                    </AgentProvider>
                 </SafeConvexProvider>
             </body>
         </html>
