@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useAgent } from "@/contexts/AgentContext";
+import { useChatContext } from "@/contexts/ChatContext";
 import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
 
 export function AgentSwitcher({
@@ -18,11 +19,22 @@ export function AgentSwitcher({
         setSelectedAgentId,
         loadingAgents,
     } = useAgent();
+    const { conversationRuntimeBindings } = useChatContext();
     const { colors } = useTheme();
     const styles = useMemo(() => createStyles(colors), [colors]);
     const [isOpen, setIsOpen] = useState(false);
 
     const visibleAgents = agents.filter((agent) => agent.enabled);
+    const activeRunCountsByAgent = useMemo(() => {
+        const counts = new Map<string, number>();
+        for (const binding of Object.values(conversationRuntimeBindings)) {
+            if (binding.status !== "active") {
+                continue;
+            }
+            counts.set(binding.agentId, (counts.get(binding.agentId) ?? 0) + 1);
+        }
+        return counts;
+    }, [conversationRuntimeBindings]);
 
     const handleSelect = async (agentId: string) => {
         await setSelectedAgentId(agentId);
@@ -40,6 +52,10 @@ export function AgentSwitcher({
             >
                 <Text style={styles.triggerText} numberOfLines={1}>
                     {selectedAgent?.name ?? "Select Agent"}
+                    {selectedAgentId &&
+                    (activeRunCountsByAgent.get(selectedAgentId) ?? 0) > 0
+                        ? ` · ${activeRunCountsByAgent.get(selectedAgentId)} active`
+                        : ""}
                 </Text>
                 <Feather
                     name="chevron-down"
@@ -63,6 +79,8 @@ export function AgentSwitcher({
                         <Text style={styles.modalTitle}>Switch Agent</Text>
                         {visibleAgents.map((agent) => {
                             const isSelected = agent.id === selectedAgentId;
+                            const activeCount =
+                                activeRunCountsByAgent.get(agent.id) ?? 0;
                             return (
                                 <TouchableOpacity
                                     key={agent.id}
@@ -82,6 +100,9 @@ export function AgentSwitcher({
                                             numberOfLines={1}
                                         >
                                             {agent.name}
+                                            {activeCount > 0
+                                                ? ` · ${activeCount} active`
+                                                : ""}
                                         </Text>
                                         {agent.description ? (
                                             <Text

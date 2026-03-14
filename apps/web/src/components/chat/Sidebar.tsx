@@ -70,6 +70,16 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
         () => chats.find((chat) => chat.id === pendingDeleteChatId) ?? null,
         [chats, pendingDeleteChatId],
     );
+    const activeRunCountsByAgent = useMemo(() => {
+        const counts = new Map<string, number>();
+        for (const binding of Object.values(conversationRuntimeBindings)) {
+            if (binding.status !== "active") {
+                continue;
+            }
+            counts.set(binding.agentId, (counts.get(binding.agentId) ?? 0) + 1);
+        }
+        return counts;
+    }, [conversationRuntimeBindings]);
 
     const isMobileActionMode = isMobile || isTablet || isTouchDevice;
 
@@ -495,6 +505,13 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                                 agents.map((agent) => (
                                     <option key={agent.id} value={agent.id}>
                                         {agent.name}
+                                        {(activeRunCountsByAgent.get(
+                                            agent.id,
+                                        ) ?? 0) > 0
+                                            ? ` (${activeRunCountsByAgent.get(
+                                                  agent.id,
+                                              )} active)`
+                                            : ""}
                                     </option>
                                 ))
                             )}
