@@ -438,7 +438,9 @@ async function ensureLocalTestUser(params: {
 
     if (
         existingSignIn.status !== 0 &&
-        !existingSignIn.stderr.includes("Invalid credentials")
+        !/Invalid credentials|InvalidAccountId/i.test(
+            existingSignIn.stderr,
+        )
     ) {
         throw new Error(
             `Failed to verify local user ${params.username}: ${existingSignIn.stderr}`,

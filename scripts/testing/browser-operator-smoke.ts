@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,10 +9,25 @@ import { trimTrailingSlash } from "./lib";
 
 const DEFAULT_BASE_URL = "http://127.0.0.1:4040";
 const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_LOCAL_USERNAME = "smoke_1";
+const DEFAULT_LOCAL_PASSWORD = "smoke_1_password";
+type AuthProviderKind = "google" | "local" | "disabled";
+type Identity = {
+    subject: string;
+    email: string;
+    name: string;
+};
 
 type AgentchatConfig = {
     version: number;
-    auth: unknown;
+    auth: {
+        defaultProviderId?: string | null;
+        providers?: Array<{
+            id: string;
+            kind: AuthProviderKind;
+            enabled?: boolean;
+        }>;
+    };
     providers: Array<{
         id: string;
         enabled: boolean;
@@ -45,6 +61,18 @@ function invariant(condition: unknown, message: string): asserts condition {
     }
 }
 
+function readAuthProviderKind(config: AgentchatConfig): AuthProviderKind {
+    const providers = config.auth?.providers ?? [];
+    const defaultProviderId = config.auth?.defaultProviderId ?? null;
+    const activeProvider =
+        providers.find(
+            (provider) =>
+                provider.id === defaultProviderId && provider.enabled !== false,
+        ) ?? providers.find((provider) => provider.enabled !== false);
+
+    return activeProvider?.kind ?? "google";
+}
+
 async function assertWebReady(baseUrl: string): Promise<void> {
     const response = await fetch(`${baseUrl}/chat`, {
         headers: {
@@ -73,12 +101,91 @@ async function waitForAgentOption(
         .waitFor({ state: "attached", timeout: DEFAULT_TIMEOUT_MS });
 }
 
+function runConvex<T>(params: {
+    repoRoot: string;
+    functionName: string;
+    args: Record<string, unknown>;
+    identity?: Identity;
+    push?: boolean;
+}): T {
+    const command = [
+        "convex",
+        "run",
+        params.functionName,
+        JSON.stringify(params.args),
+    ];
+    if (params.push) {
+        command.push("--push");
+    }
+    if (params.identity) {
+        command.push("--identity", JSON.stringify(params.identity));
+    }
+
+    const result = spawnSync("bunx", command, {
+        cwd: path.join(params.repoRoot, "packages", "convex"),
+        encoding: "utf8",
+    });
+
+    if (result.status !== 0) {
+        const stderr = `${result.stdout ?? ""}\n${result.stderr ?? ""}`.trim();
+        throw new Error(`Convex command failed for ${params.functionName}: ${stderr}`);
+    }
+
+    const lines = (result.stdout ?? "")
+        .split(/\r?\n/u)
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0)
+        .filter((line) => !line.startsWith("✔ "))
+        .filter((line) => !line.startsWith("- "))
+        .filter((line) => !line.startsWith("Preparing Convex functions"));
+
+    return JSON.parse(lines.join("\n")) as T;
+}
+
+async function signInIfNeeded(
+    page: import("playwright").Page,
+    authProviderKind: AuthProviderKind,
+    repoRoot: string,
+): Promise<void> {
+    if (authProviderKind === "disabled") {
+        return;
+    }
+
+    if (authProviderKind === "google") {
+        throw new Error(
+            "Browser operator smoke is not scripted for Google auth. Use local auth for automated local browser checks.",
+        );
+    }
+
+    const user = runConvex<{ _id: string } | null>({
+        repoRoot,
+        functionName: "users:getByUsernameInternal",
+        args: { username: DEFAULT_LOCAL_USERNAME },
+        push: true,
+    });
+    invariant(
+        user?._id,
+        "Missing seeded local user smoke_1. Run `bun run setup:local-auth-smoke` first.",
+    );
+
+    await page.getByTestId("local-username-input").waitFor({
+        timeout: DEFAULT_TIMEOUT_MS,
+    });
+    await page.getByTestId("local-username-input").fill(DEFAULT_LOCAL_USERNAME);
+    await page.getByTestId("local-password-input").fill(DEFAULT_LOCAL_PASSWORD);
+    await page.getByTestId("local-sign-in-button").click();
+    await page.getByTestId("agent-select").waitFor({
+        timeout: DEFAULT_TIMEOUT_MS,
+    });
+}
+
 async function main() {
     const baseUrl = trimTrailingSlash(process.argv[2]?.trim() || DEFAULT_BASE_URL);
     const repoRoot = getRepoRoot();
     const configPath = getConfigPath(repoRoot);
     const originalConfigText = readFileSync(configPath, "utf8");
     const originalConfig = JSON.parse(originalConfigText) as AgentchatConfig;
+    const authProviderKind = readAuthProviderKind(originalConfig);
 
     await assertWebReady(baseUrl);
 
@@ -87,6 +194,7 @@ async function main() {
 
     try {
         await page.goto(`${baseUrl}/chat`, { waitUntil: "domcontentloaded" });
+        await signInIfNeeded(page, authProviderKind, repoRoot);
         const agentSelect = page.getByTestId("agent-select");
         await agentSelect.waitFor({ timeout: DEFAULT_TIMEOUT_MS });
         await waitForAgentOption(page, "agentchat-test");

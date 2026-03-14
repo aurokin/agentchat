@@ -44,7 +44,9 @@ Examples:
     - confirm it reports live Codex model access for each enabled provider
 - sign in with Google if auth provider kind is `google`
 - sign in with a seeded user like `smoke_1` if auth provider kind is `local`
-- let the default workspace user initialize only if the transitional disabled provider is still in use
+- let the default workspace user initialize only if you are intentionally validating the transitional disabled provider path
+- run `bun run test:manual:local-auth-separation` when local auth is active
+    - confirm `smoke_1` and `smoke_2` stay isolated at the Convex user, chat, message, and backend-token layers
 - select the smoke agent
 - send a greeting
 - confirm a fast concise response arrives
@@ -115,6 +117,7 @@ Purpose:
 
 Invocation:
 
+- `bun run test:manual:local-auth-separation`
 - `bun run test:manual:live-runtime-smoke`
 - `bun run test:manual:live-runtime-status`
 - `bun run test:manual:live-runtime-repeat`
@@ -127,6 +130,11 @@ Invocation:
 
 Coverage targets:
 
+- seed or verify `smoke_1` and `smoke_2`
+- reset both workspaces independently
+- confirm each user sees only its own chats after reset
+- confirm cross-user chat and message reads fail
+- confirm Convex-issued backend tokens stay bound to the correct user
 - seed a real Convex user, conversation, user message, and assistant draft
 - mint a backend session token
 - connect to the local websocket transport
@@ -177,8 +185,8 @@ These should also be manually invoked, not run automatically on push.
 
 Current local browser path:
 
-- auth-disabled mode is the preferred browser-test path for local confidence work that does not specifically need the Google sign-in flow
-- use `bun run test:manual:web-browser-confidence` for the real disabled-auth web chat flow
+- local auth with seeded users is the preferred browser-test path for local confidence work that does not specifically need the Google sign-in flow
+- use `bun run test:manual:web-browser-confidence` for the real local-auth web chat flow
     - covers smoke, interrupt, and refresh flows
     - asserts terminal runs restore the send button and clear stale stop state
     - asserts recovery banners stay absent on ordinary flows without a known reconnect
@@ -235,6 +243,7 @@ Use [manual-qa-checklist.md](./manual-qa-checklist.md) for the explicit Codex co
 
 Current manual confidence command:
 
+- `bun run test:manual:local-auth-separation`
 - `bun run test:manual:codex-confidence`
 - `bun run test:manual:live-runtime-smoke`
 - `bun run test:manual:live-runtime-status`
@@ -254,7 +263,7 @@ It also runs the targeted mobile confidence suite for agent selection, provider/
 ## Priority Order
 
 1. Web manual smoke and functional checks using the smoke and primary fixtures
-2. Web browser confidence and operator hot-reload checks in disabled-auth mode
+2. Web browser confidence and operator hot-reload checks in local-auth mode
 3. Server integration coverage around websocket, persistence, and resume
 4. Mobile manual parity checks against the same fixtures
 5. Revisit provider-specific fixtures only after Codex is highly confident end to end

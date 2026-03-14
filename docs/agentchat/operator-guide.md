@@ -70,7 +70,7 @@ If you already have a local config and want to replace it:
 bun run setup:test-agent-config -- --force
 ```
 
-By default this helper writes a disabled auth provider so local runtime and integration checks can skip sign-in while the local-user rollout is still in progress. If you want the generated config to use local seeded users or require Google auth instead:
+By default this helper writes a local auth provider with the seeded smoke-user path. If you want to be explicit or switch to Google auth instead:
 
 ```bash
 bun run setup:test-agent-config -- --auth-mode=local --force
@@ -87,6 +87,8 @@ Or do the full local-auth smoke migration in one step:
 ```bash
 bun run setup:local-auth-smoke
 ```
+
+That helper also ensures the required Convex auth secrets exist locally and are applied to the active deployment before it seeds `smoke_1` and `smoke_2`.
 
 Or switch to Google auth:
 
@@ -182,7 +184,7 @@ Or run the combined path:
 bun run test:manual:runtime-confidence
 ```
 
-For the disabled-auth web path, also run:
+For the local-auth web path, also run:
 
 ```bash
 bun run test:manual:web-browser-confidence
@@ -242,7 +244,8 @@ If the UI shows no agents:
 - verify the agent is enabled
 - verify the agent references at least one enabled provider
 - if auth mode is `google`, verify the allowlisted Google account is the one you signed in with
-- if auth mode is `disabled`, verify `AGENTCHAT_AUTH_MODE=disabled` is set in the Convex runtime env and the app can initialize the default workspace user
+- if auth mode is `local`, verify `AGENTCHAT_AUTH_MODE=local` is set in the Convex runtime env and `smoke_1` can sign in
+- if auth mode is `disabled`, treat it as a short-lived compatibility path only
 
 ## 8. Current Rule
 

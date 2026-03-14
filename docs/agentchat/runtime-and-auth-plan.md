@@ -250,6 +250,11 @@ These should become the standard local multi-user test fixtures.
 - Add `smoke_2` separation checks.
 - Update browser, mobile, runtime, and operator confidence commands to use real local users.
 
+Current implementation note:
+
+- `bun run setup:local-auth-smoke` prepares the active local setup for `local` auth
+- `bun run test:manual:local-auth-separation` proves `smoke_1` and `smoke_2` stay isolated in Convex and backend token issuance
+
 ### Phase 6. Remove Disabled-Auth As A Primary Path
 
 - Stop treating disabled-auth as a normal product/testing mode.

@@ -28,7 +28,7 @@ function resolveAuthMode(): AuthMode {
     const value =
         flag?.slice("--auth-mode=".length).trim() ||
         process.env.AGENTCHAT_TEST_AUTH_MODE?.trim() ||
-        "disabled";
+        "local";
 
     if (value === "google" || value === "local" || value === "disabled") {
         return value;

@@ -167,6 +167,7 @@ export default function ChatPage() {
                                 onChange={(event) =>
                                     setLocalUsername(event.target.value)
                                 }
+                                data-testid="local-username-input"
                                 autoCapitalize="none"
                                 autoCorrect="off"
                                 placeholder="Username"
@@ -178,6 +179,7 @@ export default function ChatPage() {
                                 onChange={(event) =>
                                     setLocalPassword(event.target.value)
                                 }
+                                data-testid="local-password-input"
                                 placeholder="Password"
                                 className="w-full border border-border bg-background px-3 py-2 text-sm text-foreground outline-none"
                             />
@@ -191,6 +193,7 @@ export default function ChatPage() {
                                 className="btn-deco btn-deco-primary w-full"
                                 onClick={() => void handleLocalSignIn()}
                                 disabled={isLocalSigningIn}
+                                data-testid="local-sign-in-button"
                             >
                                 {isLocalSigningIn
                                     ? "Signing in..."

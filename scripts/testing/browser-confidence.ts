@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -11,6 +11,25 @@ import {
 } from "./browser-confidence-helpers";
 
 const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_LOCAL_USERNAME = "smoke_1";
+const DEFAULT_LOCAL_PASSWORD = "smoke_1_password";
+
+type AuthProviderKind = "google" | "local" | "disabled";
+type Identity = {
+    subject: string;
+    email: string;
+    name: string;
+};
+type AgentchatConfig = {
+    auth?: {
+        defaultProviderId?: string | null;
+        providers?: Array<{
+            id: string;
+            kind: AuthProviderKind;
+            enabled?: boolean;
+        }>;
+    };
+};
 
 function invariant(condition: unknown, message: string): asserts condition {
     if (!condition) {
@@ -25,6 +44,25 @@ function getRepoRoot(): string {
 
 function getOutputDir(repoRoot: string): string {
     return path.join(repoRoot, "output", "playwright");
+}
+
+function getConfigPath(repoRoot: string): string {
+    return path.join(repoRoot, "apps", "server", "agentchat.config.json");
+}
+
+function readAuthProviderKind(repoRoot: string): AuthProviderKind {
+    const config = JSON.parse(
+        readFileSync(getConfigPath(repoRoot), "utf8"),
+    ) as AgentchatConfig;
+    const providers = config.auth?.providers ?? [];
+    const defaultProviderId = config.auth?.defaultProviderId ?? null;
+    const activeProvider =
+        providers.find(
+            (provider) =>
+                provider.id === defaultProviderId && provider.enabled !== false,
+        ) ?? providers.find((provider) => provider.enabled !== false);
+
+    return activeProvider?.kind ?? "google";
 }
 
 async function assertWebReady(baseUrl: string): Promise<void> {
@@ -42,7 +80,82 @@ async function assertWebReady(baseUrl: string): Promise<void> {
     invariant(response.ok, `Web app returned ${response.status} for /chat.`);
 }
 
-function runConvexReset(repoRoot: string): void {
+function runConvex<T>(params: {
+    repoRoot: string;
+    functionName: string;
+    args: Record<string, unknown>;
+    identity?: Identity;
+    push?: boolean;
+}): T {
+    const command = [
+        "convex",
+        "run",
+        params.functionName,
+        JSON.stringify(params.args),
+    ];
+    if (params.push) {
+        command.push("--push");
+    }
+    if (params.identity) {
+        command.push("--identity", JSON.stringify(params.identity));
+    }
+
+    const result = spawnSync("bunx", command, {
+        cwd: path.join(params.repoRoot, "packages", "convex"),
+        encoding: "utf8",
+    });
+
+    if (result.status !== 0) {
+        const stderr = `${result.stdout ?? ""}\n${result.stderr ?? ""}`.trim();
+        throw new Error(`Convex command failed for ${params.functionName}: ${stderr}`);
+    }
+
+    const lines = (result.stdout ?? "")
+        .split(/\r?\n/u)
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0)
+        .filter((line) => !line.startsWith("✔ "))
+        .filter((line) => !line.startsWith("- "))
+        .filter((line) => !line.startsWith("Preparing Convex functions"));
+
+    if (lines.length === 0) {
+        return null as T;
+    }
+
+    return JSON.parse(lines.join("\n")) as T;
+}
+
+function runConvexReset(repoRoot: string, authProviderKind: AuthProviderKind): void {
+    if (authProviderKind === "google") {
+        throw new Error(
+            "Browser confidence is not scripted for Google auth. Use the local auth path for automated local browser checks.",
+        );
+    }
+
+    if (authProviderKind === "local") {
+        const user = runConvex<{ _id: string; email?: string | null } | null>({
+            repoRoot,
+            functionName: "users:getByUsernameInternal",
+            args: { username: DEFAULT_LOCAL_USERNAME },
+            push: true,
+        });
+        invariant(
+            user?._id,
+            "Missing seeded local user smoke_1. Run `bun run setup:local-auth-smoke` first.",
+        );
+        runConvex({
+            repoRoot,
+            functionName: "users:resetWorkspaceData",
+            args: {},
+            identity: {
+                subject: user._id,
+                email: user.email ?? `${DEFAULT_LOCAL_USERNAME}@local.agentchat`,
+                name: DEFAULT_LOCAL_USERNAME,
+            },
+        });
+        return;
+    }
+
     const result = spawnSync(
         "bunx",
         ["convex", "run", "users:resetWorkspaceData", "{}", "--push"],
@@ -56,6 +169,31 @@ function runConvexReset(repoRoot: string): void {
         const stderr = `${result.stdout ?? ""}\n${result.stderr ?? ""}`.trim();
         throw new Error(`Failed to reset workspace data: ${stderr}`);
     }
+}
+
+async function signInIfNeeded(
+    page: Page,
+    authProviderKind: AuthProviderKind,
+): Promise<void> {
+    if (authProviderKind === "disabled") {
+        return;
+    }
+
+    if (authProviderKind === "google") {
+        throw new Error(
+            "Browser confidence is not scripted for Google auth. Use local auth for automated local browser checks.",
+        );
+    }
+
+    await page.getByTestId("local-username-input").waitFor({
+        timeout: DEFAULT_TIMEOUT_MS,
+    });
+    await page.getByTestId("local-username-input").fill(DEFAULT_LOCAL_USERNAME);
+    await page.getByTestId("local-password-input").fill(DEFAULT_LOCAL_PASSWORD);
+    await page.getByTestId("local-sign-in-button").click();
+    await page.getByTestId("agent-select").waitFor({
+        timeout: DEFAULT_TIMEOUT_MS,
+    });
 }
 
 async function waitForAssistantMessage(
@@ -140,12 +278,12 @@ async function runSmoke(page: Page): Promise<void> {
         page,
         "Read src/math.ts and reply with only the result of add(2, 3).",
     );
+    await assertComposerSettled(page);
     const assistantText = await waitForAssistantMessage(page, /(^|[^0-9])5([^0-9]|$)/);
     invariant(
         assistantText.includes("5"),
         `Unexpected smoke response: ${JSON.stringify(assistantText)}`,
     );
-    await assertComposerSettled(page);
     await assertNoRecoveryBanner(page);
 }
 
@@ -288,15 +426,17 @@ async function captureScreenshot(page: Page, repoRoot: string, name: string) {
 async function main() {
     const { baseUrl, mode } = parseBrowserConfidenceArgs(process.argv.slice(2));
     const repoRoot = getRepoRoot();
+    const authProviderKind = readAuthProviderKind(repoRoot);
 
     await assertWebReady(baseUrl);
-    runConvexReset(repoRoot);
+    runConvexReset(repoRoot, authProviderKind);
 
     const browser = await chromium.launch({ headless: true });
     const page = await browser.newPage();
 
     try {
         await page.goto(`${baseUrl}/chat`, { waitUntil: "domcontentloaded" });
+        await signInIfNeeded(page, authProviderKind);
         await page.getByTestId("agent-select").waitFor({
             timeout: DEFAULT_TIMEOUT_MS,
         });

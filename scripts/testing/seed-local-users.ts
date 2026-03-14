@@ -54,7 +54,7 @@ function runConvexSignIn(
 }
 
 function isInvalidCredentialsError(stderr: string): boolean {
-    return /Invalid credentials/i.test(stderr);
+    return /Invalid credentials|InvalidAccountId/i.test(stderr);
 }
 
 function parseUsersFromArgs(argv: string[]): SeedUser[] {

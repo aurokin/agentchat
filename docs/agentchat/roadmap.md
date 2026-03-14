@@ -13,7 +13,8 @@ This roadmap describes the current implementation state and the next major steps
 - Codex as the first working provider
 - Manual live runtime smoke and interrupt commands for the real local Codex plus Convex path
 - Manual repeated live runtime smoke for intentionally probing transient runtime flakes
-- Manual browser confidence coverage for the disabled-auth web flow
+- Manual local-auth separation checks for `smoke_1` and `smoke_2`
+- Manual browser confidence coverage for the local-auth web flow
 - Manual operator browser smoke for config hot-reload and disabled agent/provider handling
 - Manual operator failure smoke for invalid config reloads, missing paths, and env diagnostics
 - Manual stale-runtime-resume smoke for recoverable runtime-binding fallback
@@ -45,8 +46,9 @@ This roadmap describes the current implementation state and the next major steps
 - Build a practical testing stack around the dedicated local fixtures in `/home/auro/agents/agentchat_test`
 - Keep the active roadmap narrowly focused on Codex confidence rather than adding more providers
 - Use the live Convex deployment for real codegen, runtime persistence validation, and end-to-end confidence passes
-- Use disabled-auth mode aggressively for integration and browser confidence work that does not need Google sign-in coverage
+- Use local seeded users like `smoke_1` and `smoke_2` as the default local integration and browser-confidence path
 - Use [Runtime And Auth Plan](./runtime-and-auth-plan.md) as the source doc for replacing disabled-auth with real local users while finishing the backend-owned runtime model
+- Use real local smoke users like `smoke_1` and `smoke_2` as the primary local multi-user runtime fixtures once the active deployment is flipped to local auth
 - Keep targeted regression coverage for browser-visible runtime state so manual catches like stale stop buttons and false reconnect banners stay scriptable checks
 - Add regression fixtures for long streamed assistant prose formatting and LAN browser access during local development
 - Keep mobile integration testing explicitly gated by host-platform support instead of implying universal simulator/device coverage
@@ -62,6 +64,7 @@ This roadmap describes the current implementation state and the next major steps
 - Add integration coverage across `apps/server`, Convex ingress, and websocket runtime flow
 - Keep generated Convex bindings in sync with the live deployment before manual confidence passes
 - Run `bun run test:manual:live-runtime-smoke` against a real local `apps/server` instance to verify the full Codex plus Convex persistence path
+- Run `bun run test:manual:local-auth-separation` after `bun run setup:local-auth-smoke` to verify `smoke_1` and `smoke_2` stay isolated
 - Run `bun run test:manual:live-runtime-status` to verify a real Codex turn persists both `assistant_status` and `assistant_message` transcript items
 - Use `bun run test:manual:live-runtime-repeat` when you need a small manually-invoked flake probe across repeated smoke turns
 - Run `bun run test:manual:live-runtime-interrupt` to verify partial-output retention and interrupted run persistence
@@ -74,7 +77,7 @@ This roadmap describes the current implementation state and the next major steps
 - Keep explicit reconnect assertions so recovery banners only appear after a known disconnect and reconnect
 - Add long-stream rendering checks for assistant responses that naturally transition from progress narration into structured markdown
 - Add local LAN browser checks for dev-origin, bootstrap, and websocket reachability
-- Keep the disabled-auth browser path as the primary local web confidence path
+- Keep the local-auth browser path as the primary local web confidence path
 - Run `bun run test:manual:web-browser-confidence` for the real web smoke, cancel, and refresh flow
 - Run `bun run test:manual:web-operator-smoke` for browser-visible agent/provider disable handling
 - Keep browser E2E work honest: do not add fake auth bypasses just to automate the chat flow

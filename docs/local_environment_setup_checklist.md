@@ -41,7 +41,7 @@ Notes:
 - Copy `./.env.convex.local.example` to `./.env.convex.local`
 - Fill in:
     - `CONVEX_DEPLOYMENT=dev:<your-deployment>`
-    - `AGENTCHAT_AUTH_MODE=google` or `AGENTCHAT_AUTH_MODE=disabled`
+    - `AGENTCHAT_AUTH_MODE=google` or `AGENTCHAT_AUTH_MODE=local`
     - `AUTH_GOOGLE_ID=...` and `AUTH_GOOGLE_SECRET=...` only if auth mode is `google`
     - `JWKS=...`, `JWT_PRIVATE_KEY=...`
     - `BACKEND_TOKEN_SECRET=...`
@@ -91,12 +91,10 @@ This writes `apps/server/agentchat.config.json` pointing at:
 - `~/agents/agentchat_test`
 - `~/agents/agentchat_test/workspace`
 
-By default, this generated config uses a disabled auth provider as a transitional local path so integration and manual runtime checks do not require sign-in.
-
-If you want the local seeded-user path instead:
+By default, this generated config uses local seeded users:
 
 ```bash
-bun run setup:test-agent-config -- --auth-mode=local --force
+bun run setup:test-agent-config -- --force
 bun run setup:local-smoke-users
 ```
 
@@ -105,6 +103,8 @@ Or run the combined helper:
 ```bash
 bun run setup:local-auth-smoke
 ```
+
+That combined helper also generates missing Convex auth secrets locally and applies them to the active deployment before seeding `smoke_1` and `smoke_2`.
 
 Re-run with `--force` only if you want to replace an existing local config:
 
