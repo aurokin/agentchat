@@ -245,7 +245,6 @@ If the UI shows no agents:
 - verify the agent references at least one enabled provider
 - if auth mode is `google`, verify the allowlisted Google account is the one you signed in with
 - if auth mode is `local`, verify `AGENTCHAT_AUTH_MODE=local` is set in the Convex runtime env and `smoke_1` can sign in
-- if auth mode is `disabled`, treat it as a short-lived compatibility path only
 
 ## 8. Current Rule
 

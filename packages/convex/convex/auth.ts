@@ -1,7 +1,7 @@
 import { convexAuth } from "@convex-dev/auth/server";
 import Google, { type GoogleProfile } from "@auth/core/providers/google";
 import { Password } from "@convex-dev/auth/providers/Password";
-import { isAgentchatAuthDisabled, isAgentchatLocalAuth } from "./lib/auth_mode";
+import { isAgentchatLocalAuth } from "./lib/auth_mode";
 import {
     localUsernameToEmail,
     normalizeLocalDisplayName,
@@ -85,51 +85,46 @@ const resolveRedirectTo = (redirectTo: string) => {
     );
 };
 
-const providers = isAgentchatAuthDisabled()
-    ? []
-    : isAgentchatLocalAuth()
-      ? [
-            Password({
-                profile(params) {
-                    const username = normalizeLocalUsername(
-                        String(params.username ?? ""),
-                    );
-                    return {
-                        email: localUsernameToEmail(username),
-                        username,
-                        name: normalizeLocalDisplayName(
-                            typeof params.displayName === "string"
-                                ? params.displayName
-                                : undefined,
-                            username,
-                        ),
-                        authProvider: "local",
-                        localAuthEnabled: true,
-                    };
-                },
-            }),
-        ]
-      : [
-            Google({
-                profile(profile: GoogleProfile) {
-                    const fallbackName = [
-                        profile.given_name,
-                        profile.family_name,
-                    ]
-                        .filter(Boolean)
-                        .join(" ");
-                    const name = profile.name ?? (fallbackName || undefined);
-                    return {
-                        id: profile.sub,
-                        name,
-                        email: profile.email,
-                        image: profile.picture,
-                        emailVerified: profile.email_verified,
-                        authProvider: "google",
-                    };
-                },
-            }),
-        ];
+const providers = isAgentchatLocalAuth()
+    ? [
+          Password({
+              profile(params) {
+                  const username = normalizeLocalUsername(
+                      String(params.username ?? ""),
+                  );
+                  return {
+                      email: localUsernameToEmail(username),
+                      username,
+                      name: normalizeLocalDisplayName(
+                          typeof params.displayName === "string"
+                              ? params.displayName
+                              : undefined,
+                          username,
+                      ),
+                      authProvider: "local",
+                      localAuthEnabled: true,
+                  };
+              },
+          }),
+      ]
+    : [
+          Google({
+              profile(profile: GoogleProfile) {
+                  const fallbackName = [profile.given_name, profile.family_name]
+                      .filter(Boolean)
+                      .join(" ");
+                  const name = profile.name ?? (fallbackName || undefined);
+                  return {
+                      id: profile.sub,
+                      name,
+                      email: profile.email,
+                      image: profile.picture,
+                      emailVerified: profile.email_verified,
+                      authProvider: "google",
+                  };
+              },
+          }),
+      ];
 
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
     providers,

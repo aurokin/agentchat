@@ -11,7 +11,7 @@ const DEFAULT_BASE_URL = "http://127.0.0.1:4040";
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_LOCAL_USERNAME = "smoke_1";
 const DEFAULT_LOCAL_PASSWORD = "smoke_1_password";
-type AuthProviderKind = "google" | "local" | "disabled";
+type AuthProviderKind = "google" | "local";
 type Identity = {
     subject: string;
     email: string;
@@ -147,10 +147,6 @@ async function signInIfNeeded(
     authProviderKind: AuthProviderKind,
     repoRoot: string,
 ): Promise<void> {
-    if (authProviderKind === "disabled") {
-        return;
-    }
-
     if (authProviderKind === "google") {
         throw new Error(
             "Browser operator smoke is not scripted for Google auth. Use local auth for automated local browser checks.",

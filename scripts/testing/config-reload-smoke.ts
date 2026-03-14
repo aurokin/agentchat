@@ -4,17 +4,26 @@ import { fileURLToPath } from "node:url";
 
 type AgentchatConfig = {
     version: number;
-    auth:
-        | {
-              mode: "google";
-              allowlistMode: string;
-              allowedEmails: string[];
-              allowedDomains: string[];
-              googleHostedDomain: string | null;
-          }
-        | {
-              mode: "disabled";
-          };
+    auth: {
+        defaultProviderId: string;
+        providers: Array<
+            | {
+                  id: string;
+                  kind: "google";
+                  enabled: boolean;
+                  allowlistMode: string;
+                  allowedEmails: string[];
+                  allowedDomains: string[];
+                  googleHostedDomain: string | null;
+              }
+            | {
+                  id: string;
+                  kind: "local";
+                  enabled: boolean;
+                  allowSignup: boolean;
+              }
+        >;
+    };
     providers: Array<{
         id: string;
         kind: string;

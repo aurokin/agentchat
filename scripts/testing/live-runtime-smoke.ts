@@ -33,7 +33,7 @@ type AgentOptions = {
 type BootstrapPayload = {
     auth: {
         activeProvider: {
-            kind: "google" | "local" | "disabled";
+            kind: "google" | "local";
         } | null;
     };
 };
@@ -116,8 +116,6 @@ const DEFAULT_LOCAL_PASSWORD = "smoke_1_password";
 const INTERRUPT_FALLBACK_DELAY_MS = 5000;
 const INTERRUPT_RETRY_INTERVAL_MS = 250;
 const RUNTIME_TIMEOUT_MS = 120_000;
-const DEFAULT_DISABLED_USER_EMAIL = "default@local.agentchat";
-const DEFAULT_DISABLED_USER_SUBJECT = "agentchat-default-user";
 
 function invariant(condition: unknown, message: string): asserts condition {
     if (!condition) {
@@ -490,25 +488,11 @@ async function resolveAccessUser(params: {
     email: string;
     username: string | null;
     password: string | null;
-    authProviderKind: "google" | "local" | "disabled";
+    authProviderKind: "google" | "local";
 }): Promise<{
     userId: string;
-    identity: Identity | null;
+    identity: Identity;
 }> {
-    if (params.authProviderKind === "disabled") {
-        const userId = runConvex<string>({
-            repoRoot: params.repoRoot,
-            functionName: "users:ensureAccessUser",
-            args: {},
-            push: true,
-        });
-
-        return {
-            userId,
-            identity: null,
-        };
-    }
-
     if (params.authProviderKind === "local") {
         const username = params.username ?? DEFAULT_LOCAL_USERNAME;
         const password = params.password ?? DEFAULT_LOCAL_PASSWORD;
@@ -1236,21 +1220,12 @@ async function main() {
             reasoningEffort,
             createdAt: now + 2,
         },
-        identity: identity ?? undefined,
+        identity,
     });
 
     const token = await issueBackendToken({
         repoRoot,
-        identity:
-            identity ?? {
-                subject:
-                    process.env.AGENTCHAT_DEFAULT_USER_SUBJECT?.trim() ||
-                    DEFAULT_DISABLED_USER_SUBJECT,
-                email:
-                    process.env.AGENTCHAT_DEFAULT_USER_EMAIL?.trim() ||
-                    DEFAULT_DISABLED_USER_EMAIL,
-                name: "Agentchat Default User",
-            },
+        identity,
     });
 
     let outcome: LiveOutcome;

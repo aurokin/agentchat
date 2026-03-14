@@ -195,26 +195,15 @@ describe("configDiagnostics", () => {
         });
     });
 
-    test("flags disabled auth as a deprecated compatibility mode", () => {
+    test("reports the active auth provider kind", () => {
         const config = createConfig();
-        config.auth = {
-            defaultProviderId: "disabled-default",
-            providers: [
-                {
-                    id: "disabled-default",
-                    kind: "disabled",
-                    enabled: true,
-                },
-            ],
-        };
+        config.auth.defaultProviderId = "google-main";
 
         const diagnostics = getConfigDiagnostics(config);
 
         expect(diagnostics.auth).toEqual({
-            activeProviderKind: "disabled",
-            issues: [
-                "Disabled auth is deprecated; switch this instance to local or Google auth.",
-            ],
+            activeProviderKind: "google",
+            issues: [],
         });
     });
 });

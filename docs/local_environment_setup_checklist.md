@@ -22,7 +22,7 @@ cd apps/web && bun dev
 
 - `http://localhost:4040`
 
-1D) If the local workspace uses `AGENTCHAT_AUTH_MODE=google`, sign in with an allowed Google account. If it uses `local`, sign in with a seeded local user such as `smoke_1`. Treat `disabled` only as a short-lived compatibility mode, not the normal local workflow.
+1D) If the local workspace uses `AGENTCHAT_AUTH_MODE=google`, sign in with an allowed Google account. If it uses `local`, sign in with a seeded local user such as `smoke_1`.
 
 ## 2) Optional: Local Dev With Convex
 

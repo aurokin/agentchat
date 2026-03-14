@@ -220,7 +220,7 @@ export function createFetchHandler(deps: HandlerDependencies) {
             return jsonResponse(request, {
                 auth: {
                     defaultProviderId: config.auth.defaultProviderId,
-                    requiresLogin: activeAuthProvider?.kind !== "disabled",
+                    requiresLogin: true,
                     activeProvider:
                         activeAuthProvider !== null
                             ? toAuthProviderSummary(activeAuthProvider)

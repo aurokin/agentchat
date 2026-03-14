@@ -13,10 +13,6 @@ import {
     requireUserMatches,
 } from "./lib/authz";
 import { requireWorkspaceUser } from "./lib/subscription";
-import {
-    getDisabledUserProfile,
-    isAgentchatAuthDisabled,
-} from "./lib/auth_mode";
 import { drainBatches } from "./lib/batch";
 import { normalizeLocalUsername } from "./lib/localAuth";
 import {
@@ -149,67 +145,10 @@ async function findUserByEmail(
         .unique();
 }
 
-async function ensureDefaultUser(ctx: MutationCtx): Promise<Id<"users">> {
-    const profile = getDisabledUserProfile();
-    const existing = await findUserByEmail(ctx, profile.email);
-    const now = Date.now();
-
-    if (existing) {
-        await ctx.db.patch(existing._id, {
-            name: profile.name,
-            email: profile.email,
-            authProvider: "disabled",
-            updatedAt: now,
-        });
-        return existing._id;
-    }
-
-    return await ctx.db.insert("users", {
-        name: profile.name,
-        email: profile.email,
-        authProvider: "disabled",
-        workspaceChatCount: 0,
-        workspaceMessageCount: 0,
-        createdAt: now,
-        updatedAt: now,
-    });
-}
-
-async function resolveAccessUserForMutation(
-    ctx: MutationCtx,
-): Promise<Id<"users">> {
-    if (isAgentchatAuthDisabled()) {
-        return await ensureDefaultUser(ctx);
-    }
-
-    const userId = await getAccessUserId(ctx);
-    if (!userId) {
-        throw new Error("Not authenticated");
-    }
-
-    return userId;
-}
-
-export const ensureAccessUser = mutation({
-    args: {},
-    handler: async (ctx) => {
-        if (isAgentchatAuthDisabled()) {
-            return await ensureDefaultUser(ctx);
-        }
-
-        const userId = await requireAuthUserId(ctx);
-        const user = await ctx.db.get(userId);
-        if (!user) {
-            throw new Error("Authenticated user not found");
-        }
-        return userId;
-    },
-});
-
 export const resetWorkspaceData = mutation({
     args: {},
     handler: async (ctx) => {
-        const userId = await resolveAccessUserForMutation(ctx);
+        const userId = await requireAuthUserId(ctx);
 
         await drainBatches(
             () =>

@@ -14,12 +14,6 @@ const GoogleAuthProviderSchema = z.object({
     googleHostedDomain: z.union([z.string(), z.null()]),
 });
 
-const DisabledAuthProviderSchema = z.object({
-    id: z.string().min(1),
-    kind: z.literal("disabled"),
-    enabled: z.boolean(),
-});
-
 const LocalAuthProviderSchema = z.object({
     id: z.string().min(1),
     kind: z.literal("local"),
@@ -30,7 +24,6 @@ const LocalAuthProviderSchema = z.object({
 const AuthProviderSchema = z.discriminatedUnion("kind", [
     GoogleAuthProviderSchema,
     LocalAuthProviderSchema,
-    DisabledAuthProviderSchema,
 ]);
 
 const ProviderAuthConfigSchema = z
@@ -75,13 +68,8 @@ const LegacyGoogleAuthConfigSchema = z.object({
     googleHostedDomain: z.union([z.string(), z.null()]),
 });
 
-const LegacyDisabledAuthConfigSchema = z.object({
-    mode: z.literal("disabled"),
-});
-
 const LegacyAuthConfigSchema = z.discriminatedUnion("mode", [
     LegacyGoogleAuthConfigSchema,
-    LegacyDisabledAuthConfigSchema,
 ]);
 
 const ProviderVariantSchema = z.object({
@@ -229,19 +217,6 @@ function normalizeAuthConfig(
 ): AuthConfig {
     if ("providers" in auth) {
         return auth;
-    }
-
-    if (auth.mode === "disabled") {
-        return {
-            defaultProviderId: "disabled-default",
-            providers: [
-                {
-                    id: "disabled-default",
-                    kind: "disabled",
-                    enabled: true,
-                },
-            ],
-        };
     }
 
     return {

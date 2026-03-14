@@ -91,21 +91,6 @@ Google provider shape:
 }
 ```
 
-Disabled transitional shape:
-
-```json
-{
-  "defaultProviderId": "disabled-default",
-  "providers": [
-    {
-      "id": "disabled-default",
-      "kind": "disabled",
-      "enabled": true
-    }
-  ]
-}
-```
-
 Fields:
 
 - `defaultProviderId`
@@ -117,7 +102,7 @@ Fields:
 - `providers[].id`
   - stable auth provider id
 - `providers[].kind`
-  - current values: `"google"`, `"local"`, or `"disabled"`
+  - current values: `"google"` or `"local"`
 - `providers[].enabled`
   - boolean
 - `providers[].allowSignup`
@@ -139,11 +124,10 @@ V1 decision:
 
 - in Google mode, instance access is granted only if the signed-in email is present in `allowedEmails`
 - in local mode, Convex Auth owns password verification and every successful login maps to one concrete `users` row
-- disabled is still accepted as a compatibility provider shape, but clients should treat it as deprecated and operators should migrate to `local` or `google`
 
 Legacy note:
 
-- `auth.mode` legacy configs are still accepted and normalized internally
+- `auth.mode: "google"` legacy configs are still accepted and normalized internally
 - new configs should use `auth.defaultProviderId` plus `auth.providers[]`
 
 ## `providers`

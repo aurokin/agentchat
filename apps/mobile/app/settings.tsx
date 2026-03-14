@@ -46,12 +46,9 @@ export default function SettingsScreen(): ReactElement {
     const [localPassword, setLocalPassword] = useState("");
 
     const convexUnavailableMessage = "Convex isn't configured for this build.";
-    const isDisabledAuthCompatibilityMode = authProviderKind === "disabled";
     const authSummaryLabel = isAuthenticated
         ? user?.email || "Signed in"
-        : isDisabledAuthCompatibilityMode
-          ? "Compatibility mode"
-          : "Signed out";
+        : "Signed out";
 
     const handleSignOut = async () => {
         Alert.alert(
@@ -291,16 +288,14 @@ export default function SettingsScreen(): ReactElement {
                                         </View>
                                     ) : (
                                         <Text style={styles.notSignedIn}>
-                                            {isDisabledAuthCompatibilityMode
-                                                ? "This instance is still configured for the deprecated disabled-auth compatibility mode. Switch it to local or Google auth before using the mobile app."
-                                                : "Sign in to access your Agentchat workspace."}
+                                            Sign in to access your Agentchat
+                                            workspace.
                                         </Text>
                                     )}
 
                                     {isConvexAvailable && (
                                         <>
                                             {!isAuthenticated &&
-                                            !isDisabledAuthCompatibilityMode &&
                                             authProviderKind === "local" ? (
                                                 <View
                                                     style={styles.localAuthForm}
@@ -343,23 +338,16 @@ export default function SettingsScreen(): ReactElement {
                                                     styles.googleButton,
                                                     isGoogleButtonBusy &&
                                                         styles.googleButtonDisabled,
-                                                    isDisabledAuthCompatibilityMode &&
-                                                        styles.googleButtonDisabled,
                                                 ]}
                                                 onPress={
-                                                    isDisabledAuthCompatibilityMode
-                                                        ? undefined
-                                                        : isAuthenticated
-                                                          ? handleSignOut
-                                                          : authProviderKind ===
-                                                              "local"
-                                                            ? handleLocalSignIn
-                                                            : handleGoogleSignIn
+                                                    isAuthenticated
+                                                        ? handleSignOut
+                                                        : authProviderKind ===
+                                                            "local"
+                                                          ? handleLocalSignIn
+                                                          : handleGoogleSignIn
                                                 }
-                                                disabled={
-                                                    isGoogleButtonBusy ||
-                                                    isDisabledAuthCompatibilityMode
-                                                }
+                                                disabled={isGoogleButtonBusy}
                                             >
                                                 {isGoogleButtonBusy ? (
                                                     <View
@@ -391,31 +379,16 @@ export default function SettingsScreen(): ReactElement {
                                                             styles.googleButtonText
                                                         }
                                                     >
-                                                        {isDisabledAuthCompatibilityMode
-                                                            ? "Auth upgrade required"
-                                                            : isAuthenticated
-                                                              ? "Sign Out"
-                                                              : authProviderKind ===
-                                                                  "local"
-                                                                ? "Sign in with local user"
-                                                                : "Sign in with Google"}
+                                                        {isAuthenticated
+                                                            ? "Sign Out"
+                                                            : authProviderKind ===
+                                                                "local"
+                                                              ? "Sign in with local user"
+                                                              : "Sign in with Google"}
                                                     </Text>
                                                 )}
                                             </TouchableOpacity>
                                         </>
-                                    )}
-
-                                    {isDisabledAuthCompatibilityMode && (
-                                        <Text style={styles.storageInfoText}>
-                                            The server config is still using the
-                                            deprecated compatibility provider{" "}
-                                            <Text style={styles.codeText}>
-                                                {authProviderKind}
-                                            </Text>
-                                            . Switch to local or Google auth so
-                                            each session resolves to a real
-                                            Convex user.
-                                        </Text>
                                     )}
 
                                     {!isConvexAvailable && (

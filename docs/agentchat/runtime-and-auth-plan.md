@@ -5,7 +5,7 @@
 This plan combines two closely related product changes:
 
 - finish the move to a backend-owned runtime model
-- replace disabled-auth default-user mode with a real Convex-backed local user system
+- keep local access user-based through a real Convex-backed local auth system
 
 These should be planned together because they meet at the same boundary:
 
@@ -55,9 +55,9 @@ Remaining gaps are mostly about:
 Current auth states are:
 
 - `google`
-- `disabled`
+- `local`
 
-`disabled` is still useful as a transitional testing tool, but it is not the desired end state. It keeps Agentchat from modeling all runtime behavior through real users.
+Agentchat no longer treats disabled-auth as a supported product mode. Local seeded users such as `smoke_1` and `smoke_2` are now the normal local testing and operator path.
 
 ## Goals
 
@@ -155,15 +155,9 @@ Target shape:
 
 ### Required Rule
 
-There should no longer be a long-term no-user product mode.
+There is no no-user product mode.
 
-Instead of `disabled`:
-
-- local instances should use a `local` auth provider
-- Convex should still mint or resolve a real user identity
-- testing should use real seeded users
-
-`disabled` may remain briefly as a migration shim, but the plan is to remove it from normal product operation and testing.
+Local instances use a `local` auth provider, Convex still resolves a real user identity, and testing uses real seeded users.
 
 ### Local User Model
 
@@ -220,7 +214,6 @@ These should become the standard local multi-user test fixtures.
 ### Phase 1. Canonical Runtime/Auth Contract
 
 - Update docs and shared types around the rule that all runtime activity is user-owned.
-- Treat `disabled` as transitional only.
 - Define the provider-oriented auth config shape.
 - Define the migration path from current `auth.mode` to `auth.providers[]`.
 
@@ -246,7 +239,6 @@ These should become the standard local multi-user test fixtures.
 
 ### Phase 5. Smoke And Integration Migration
 
-- Move current local smoke flows off disabled-auth and onto `smoke_1`.
 - Add `smoke_2` separation checks.
 - Update browser, mobile, runtime, and operator confidence commands to use real local users.
 
@@ -257,9 +249,9 @@ Current implementation note:
 
 ### Phase 6. Remove Disabled-Auth As A Primary Path
 
-- Stop treating disabled-auth as a normal product/testing mode.
-- Keep it only as a short-lived compatibility shim if absolutely required.
-- Remove it entirely once local auth and seeded smoke users cover the same needs.
+- Completed.
+- Local auth and seeded smoke users now cover the local product and testing path.
+- The remaining work is runtime/auth hardening, not compatibility cleanup.
 
 ## Immediate Follow-Up Work
 

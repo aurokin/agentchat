@@ -39,14 +39,14 @@ describe("server config", () => {
                 requiresLogin: boolean;
                 activeProvider: {
                     id: string;
-                    kind: "google" | "local" | "disabled";
+                    kind: "google" | "local";
                     enabled: boolean;
                     allowlistMode: "email" | null;
                     allowSignup: boolean | null;
                 } | null;
                 providers: Array<{
                     id: string;
-                    kind: "google" | "local" | "disabled";
+                    kind: "google" | "local";
                     enabled: boolean;
                     allowlistMode: "email" | null;
                     allowSignup: boolean | null;
@@ -107,28 +107,6 @@ describe("server config", () => {
         };
         expect(options.agentId).toBe("example-agent");
         expect(options.defaultProviderId).toBe("codex-main");
-    });
-
-    test("parses disabled auth config", () => {
-        const config = parseConfig({
-            version: 1,
-            auth: {
-                mode: "disabled",
-            },
-            providers: exampleConfig.providers,
-            agents: exampleConfig.agents,
-        });
-
-        expect(config.auth).toEqual({
-            defaultProviderId: "disabled-default",
-            providers: [
-                {
-                    id: "disabled-default",
-                    kind: "disabled",
-                    enabled: true,
-                },
-            ],
-        });
     });
 
     test("parses provider-oriented auth config without rewriting it", () => {

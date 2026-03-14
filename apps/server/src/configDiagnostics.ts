@@ -261,12 +261,6 @@ export function getConfigDiagnostics(
         ) ??
         config.auth.providers.find((provider) => provider.enabled) ??
         null;
-    const authIssues =
-        activeAuthProvider?.kind === "disabled"
-            ? [
-                  "Disabled auth is deprecated; switch this instance to local or Google auth.",
-              ]
-            : [];
 
     return {
         ok:
@@ -275,7 +269,7 @@ export function getConfigDiagnostics(
             ) && agents.every((agent) => !agent.enabled || agent.ready),
         auth: {
             activeProviderKind: activeAuthProvider?.kind ?? null,
-            issues: authIssues,
+            issues: [],
         },
         summary: {
             enabledProviderCount: providers.filter(

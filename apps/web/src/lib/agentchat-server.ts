@@ -10,7 +10,7 @@ type BootstrapProvider = {
 
 export type BootstrapAuthProvider = {
     id: string;
-    kind: "google" | "local" | "disabled";
+    kind: "google" | "local";
     enabled: boolean;
     allowlistMode: "email" | null;
     allowSignup: boolean | null;

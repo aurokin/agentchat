@@ -31,7 +31,7 @@ interface AuthContextValue {
     user: User | null;
     userId: string | null;
     authProviderId: string | null;
-    authProviderKind: "google" | "local" | "disabled" | null;
+    authProviderKind: "google" | "local" | null;
     isAuthenticated: boolean;
     isLoading: boolean;
     isConvexAvailable: boolean;
@@ -104,12 +104,6 @@ export function AuthProvider({
             if (!isConvexAvailable || !isConvexConfigured()) {
                 throw new Error("Convex is not configured");
             }
-            if (authProviderKind === "disabled") {
-                throw new Error(
-                    "Disabled auth is a deprecated compatibility mode. Switch this instance to local or Google auth.",
-                );
-            }
-
             const redirectUri = makeRedirectUri({
                 scheme: "agentchat",
                 path: "convex-auth",

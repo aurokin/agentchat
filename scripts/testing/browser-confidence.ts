@@ -14,7 +14,7 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_LOCAL_USERNAME = "smoke_1";
 const DEFAULT_LOCAL_PASSWORD = "smoke_1_password";
 
-type AuthProviderKind = "google" | "local" | "disabled";
+type AuthProviderKind = "google" | "local";
 type Identity = {
     subject: string;
     email: string;
@@ -132,53 +132,32 @@ function runConvexReset(repoRoot: string, authProviderKind: AuthProviderKind): v
         );
     }
 
-    if (authProviderKind === "local") {
-        const user = runConvex<{ _id: string; email?: string | null } | null>({
-            repoRoot,
-            functionName: "users:getByUsernameInternal",
-            args: { username: DEFAULT_LOCAL_USERNAME },
-            push: true,
-        });
-        invariant(
-            user?._id,
-            "Missing seeded local user smoke_1. Run `bun run setup:local-auth-smoke` first.",
-        );
-        runConvex({
-            repoRoot,
-            functionName: "users:resetWorkspaceData",
-            args: {},
-            identity: {
-                subject: user._id,
-                email: user.email ?? `${DEFAULT_LOCAL_USERNAME}@local.agentchat`,
-                name: DEFAULT_LOCAL_USERNAME,
-            },
-        });
-        return;
-    }
-
-    const result = spawnSync(
-        "bunx",
-        ["convex", "run", "users:resetWorkspaceData", "{}", "--push"],
-        {
-            cwd: path.join(repoRoot, "packages", "convex"),
-            encoding: "utf8",
-        },
+    const user = runConvex<{ _id: string; email?: string | null } | null>({
+        repoRoot,
+        functionName: "users:getByUsernameInternal",
+        args: { username: DEFAULT_LOCAL_USERNAME },
+        push: true,
+    });
+    invariant(
+        user?._id,
+        "Missing seeded local user smoke_1. Run `bun run setup:local-auth-smoke` first.",
     );
-
-    if (result.status !== 0) {
-        const stderr = `${result.stdout ?? ""}\n${result.stderr ?? ""}`.trim();
-        throw new Error(`Failed to reset workspace data: ${stderr}`);
-    }
+    runConvex({
+        repoRoot,
+        functionName: "users:resetWorkspaceData",
+        args: {},
+        identity: {
+            subject: user._id,
+            email: user.email ?? `${DEFAULT_LOCAL_USERNAME}@local.agentchat`,
+            name: DEFAULT_LOCAL_USERNAME,
+        },
+    });
 }
 
 async function signInIfNeeded(
     page: Page,
     authProviderKind: AuthProviderKind,
 ): Promise<void> {
-    if (authProviderKind === "disabled") {
-        return;
-    }
-
     if (authProviderKind === "google") {
         throw new Error(
             "Browser confidence is not scripted for Google auth. Use local auth for automated local browser checks.",

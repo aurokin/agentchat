@@ -35,7 +35,7 @@ This roadmap describes the current implementation state and the next major steps
   - clients keep background subscriptions to all active conversations instead of only the visible thread
   - multiple users can use the same instance at the same time without crossing runtime state
   - every accepted request resolves to a concrete Convex user
-  - disabled-auth default-user mode is replaced by local seeded users such as `smoke_1` and `smoke_2`
+  - local seeded users such as `smoke_1` and `smoke_2` are the standard local multi-user runtime fixtures
 - Investigate Codex model and variant mapping in the live product path
 - Verify whether Codex Spark is functioning correctly in the current integration
 - Expand provider-native runtime item mapping so multi-message output follows real Codex events instead of transcript inference
@@ -47,7 +47,7 @@ This roadmap describes the current implementation state and the next major steps
 - Keep the active roadmap narrowly focused on Codex confidence rather than adding more providers
 - Use the live Convex deployment for real codegen, runtime persistence validation, and end-to-end confidence passes
 - Use local seeded users like `smoke_1` and `smoke_2` as the default local integration and browser-confidence path
-- Use [Runtime And Auth Plan](./runtime-and-auth-plan.md) as the source doc for replacing disabled-auth with real local users while finishing the backend-owned runtime model
+- Use [Runtime And Auth Plan](./runtime-and-auth-plan.md) as the detailed source doc for the remaining backend-owned runtime and provider-oriented auth work
 - Use real local smoke users like `smoke_1` and `smoke_2` as the primary local multi-user runtime fixtures once the active deployment is flipped to local auth
 - Keep targeted regression coverage for browser-visible runtime state so manual catches like stale stop buttons and false reconnect banners stay scriptable checks
 - Add regression fixtures for long streamed assistant prose formatting and LAN browser access during local development

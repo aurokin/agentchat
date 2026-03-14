@@ -34,7 +34,6 @@ export default function ChatPage() {
     );
     const [isLocalSigningIn, setIsLocalSigningIn] = useState(false);
     const hasAccess = isConvexAvailable && isAuthenticated;
-    const isDisabledAuthCompatibilityMode = authProviderKind === "disabled";
 
     const handleLocalSignIn = async () => {
         if (!signIn) {
@@ -140,18 +139,14 @@ export default function ChatPage() {
         return (
             <div className="flex h-dvh items-center justify-center bg-background px-6">
                 <div className="w-full max-w-md border border-border bg-background-elevated p-8 text-center">
-                    <h1 className="text-xl font-semibold">
-                        {isDisabledAuthCompatibilityMode
-                            ? "Auth upgrade required"
-                            : "Sign in required"}
-                    </h1>
+                    <h1 className="text-xl font-semibold">Sign in required</h1>
                     <p className="mt-3 text-sm text-muted-foreground">
-                        {isDisabledAuthCompatibilityMode
-                            ? "This instance is still configured for the deprecated disabled-auth compatibility mode. Switch it to local or Google auth before using the web app."
-                            : "Agentchat runs against your Convex workspace only. Sign in to access chats and the agents exposed by this instance."}
+                        Agentchat runs against your Convex workspace only. Sign
+                        in to access chats and the agents exposed by this
+                        instance.
                     </p>
-                    {isDisabledAuthCompatibilityMode ||
-                    !authRequiresLogin ? null : authProviderKind === "local" ? (
+                    {!authRequiresLogin ? null : authProviderKind ===
+                      "local" ? (
                         <div className="mt-6 space-y-3 text-left">
                             <input
                                 type="text"
