@@ -14,7 +14,7 @@ Use this document when you need to:
 This guide assumes:
 
 - you are using the current Codex-first architecture
-- Convex is configured for conversation persistence and either Google auth or disabled-auth mode
+- Convex is configured for conversation persistence and a valid instance access path
 - `apps/server` runs locally on the same machine that has access to the agent workspaces
 
 Required shared secrets:
@@ -70,7 +70,7 @@ If you already have a local config and want to replace it:
 bun run setup:test-agent-config -- --force
 ```
 
-By default this helper writes `auth.mode = "disabled"` so local runtime and integration checks can skip Google sign-in. If you want the generated config to require Google auth instead:
+By default this helper writes a disabled auth provider so local runtime and integration checks can skip Google sign-in. If you want the generated config to require Google auth instead:
 
 ```bash
 bun run setup:test-agent-config -- --auth-mode=google --force

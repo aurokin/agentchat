@@ -7,11 +7,18 @@ function createConfig(): AgentchatConfig {
     return {
         version: 1,
         auth: {
-            mode: "google",
-            allowlistMode: "email",
-            allowedEmails: ["operator@example.com"],
-            allowedDomains: [],
-            googleHostedDomain: null,
+            defaultProviderId: "google-main",
+            providers: [
+                {
+                    id: "google-main",
+                    kind: "google",
+                    enabled: true,
+                    allowlistMode: "email",
+                    allowedEmails: ["operator@example.com"],
+                    allowedDomains: [],
+                    googleHostedDomain: null,
+                },
+            ],
         },
         providers: [
             {
@@ -150,7 +157,14 @@ describe("createFetchHandler", () => {
             getConfig: () => ({
                 ...createConfig(),
                 auth: {
-                    mode: "disabled",
+                    defaultProviderId: "disabled-default",
+                    providers: [
+                        {
+                            id: "disabled-default",
+                            kind: "disabled",
+                            enabled: true,
+                        },
+                    ],
                 },
             }),
         });
@@ -160,15 +174,41 @@ describe("createFetchHandler", () => {
         );
         const body = (await response.json()) as {
             auth: {
-                mode: "google" | "disabled";
-                allowlistMode: "email" | null;
+                defaultProviderId: string;
+                requiresLogin: boolean;
+                activeProvider: {
+                    id: string;
+                    kind: "google" | "disabled";
+                    enabled: boolean;
+                    allowlistMode: "email" | null;
+                } | null;
+                providers: Array<{
+                    id: string;
+                    kind: "google" | "disabled";
+                    enabled: boolean;
+                    allowlistMode: "email" | null;
+                }>;
             };
         };
 
         expect(response.status).toBe(200);
         expect(body.auth).toEqual({
-            mode: "disabled",
-            allowlistMode: null,
+            defaultProviderId: "disabled-default",
+            requiresLogin: false,
+            activeProvider: {
+                id: "disabled-default",
+                kind: "disabled",
+                enabled: true,
+                allowlistMode: null,
+            },
+            providers: [
+                {
+                    id: "disabled-default",
+                    kind: "disabled",
+                    enabled: true,
+                    allowlistMode: null,
+                },
+            ],
         });
     });
 

@@ -14,7 +14,8 @@ import { useAuthContext } from "@/lib/convex/AuthContext";
 import { unavailablePersistenceAdapter } from "@/lib/workspace/unavailable-adapter";
 
 interface WorkspaceContextValue {
-    authMode: "google" | "disabled";
+    authProviderId: string | null;
+    authProviderKind: "google" | "disabled" | null;
     isAuthRequired: boolean;
     workspaceStatus: WorkspaceStatus;
     isWorkspaceReady: boolean;
@@ -45,8 +46,13 @@ export function WorkspaceProvider({
 }): React.ReactElement {
     const isConvexAvailable = useIsConvexAvailable();
     const convexClient = useConvex() as unknown as ConvexClientInterface;
-    const { authMode, isAuthDisabled, isAuthenticated, userId } =
-        useAuthContext();
+    const {
+        authProviderId,
+        authProviderKind,
+        usesAutomaticAccessUser,
+        isAuthenticated,
+        userId,
+    } = useAuthContext();
     const workspaceUserId = (userId as ConvexId<"users"> | null) ?? null;
 
     const workspaceStatus: WorkspaceStatus =
@@ -64,8 +70,9 @@ export function WorkspaceProvider({
 
     const contextValue = useMemo(
         () => ({
-            authMode,
-            isAuthRequired: !isAuthDisabled,
+            authProviderId,
+            authProviderKind,
+            isAuthRequired: !usesAutomaticAccessUser,
             workspaceStatus,
             isWorkspaceReady,
             isConvexAvailable,
@@ -75,12 +82,13 @@ export function WorkspaceProvider({
                 !isConvexAvailable || !isAuthenticated || !!workspaceUserId,
         }),
         [
-            authMode,
+            authProviderId,
+            authProviderKind,
             isAuthenticated,
-            isAuthDisabled,
             isConvexAvailable,
             isWorkspaceReady,
             persistenceAdapter,
+            usesAutomaticAccessUser,
             workspaceUserId,
             workspaceStatus,
         ],

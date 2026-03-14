@@ -4,7 +4,62 @@ import { fileURLToPath } from "node:url";
 
 import { z } from "zod";
 
-const GoogleAuthConfigSchema = z.object({
+const GoogleAuthProviderSchema = z.object({
+    id: z.string().min(1),
+    kind: z.literal("google"),
+    enabled: z.boolean(),
+    allowlistMode: z.literal("email"),
+    allowedEmails: z.array(z.email()),
+    allowedDomains: z.array(z.string()),
+    googleHostedDomain: z.union([z.string(), z.null()]),
+});
+
+const DisabledAuthProviderSchema = z.object({
+    id: z.string().min(1),
+    kind: z.literal("disabled"),
+    enabled: z.boolean(),
+});
+
+const AuthProviderSchema = z.discriminatedUnion("kind", [
+    GoogleAuthProviderSchema,
+    DisabledAuthProviderSchema,
+]);
+
+const ProviderAuthConfigSchema = z
+    .object({
+        defaultProviderId: z.string().min(1),
+        providers: z.array(AuthProviderSchema).min(1),
+    })
+    .superRefine((auth, ctx) => {
+        const providerIds = new Set<string>();
+
+        for (const provider of auth.providers) {
+            if (providerIds.has(provider.id)) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: `Duplicate auth provider id '${provider.id}'.`,
+                });
+            }
+            providerIds.add(provider.id);
+        }
+
+        const defaultProvider = auth.providers.find(
+            (provider) => provider.id === auth.defaultProviderId,
+        );
+        if (!defaultProvider) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: `Auth defaultProviderId '${auth.defaultProviderId}' must exist in auth.providers.`,
+            });
+        } else if (!defaultProvider.enabled) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: `Auth defaultProviderId '${auth.defaultProviderId}' must reference an enabled provider.`,
+            });
+        }
+    });
+
+const LegacyGoogleAuthConfigSchema = z.object({
     mode: z.literal("google"),
     allowlistMode: z.literal("email"),
     allowedEmails: z.array(z.email()),
@@ -12,13 +67,13 @@ const GoogleAuthConfigSchema = z.object({
     googleHostedDomain: z.union([z.string(), z.null()]),
 });
 
-const DisabledAuthConfigSchema = z.object({
+const LegacyDisabledAuthConfigSchema = z.object({
     mode: z.literal("disabled"),
 });
 
-const AuthConfigSchema = z.discriminatedUnion("mode", [
-    GoogleAuthConfigSchema,
-    DisabledAuthConfigSchema,
+const LegacyAuthConfigSchema = z.discriminatedUnion("mode", [
+    LegacyGoogleAuthConfigSchema,
+    LegacyDisabledAuthConfigSchema,
 ]);
 
 const ProviderVariantSchema = z.object({
@@ -84,10 +139,10 @@ const AgentSchema = z
         }
     });
 
-const AgentchatConfigSchema = z
+const AgentchatConfigInputSchema = z
     .object({
         version: z.literal(1),
-        auth: AuthConfigSchema,
+        auth: z.union([ProviderAuthConfigSchema, LegacyAuthConfigSchema]),
         providers: z.array(CodexProviderSchema),
         agents: z.array(AgentSchema),
     })
@@ -131,7 +186,14 @@ const AgentchatConfigSchema = z
         }
     });
 
-export type AgentchatConfig = z.infer<typeof AgentchatConfigSchema>;
+export type AuthProviderConfig = z.infer<typeof AuthProviderSchema>;
+export type AuthConfig = z.infer<typeof ProviderAuthConfigSchema>;
+export type AgentchatConfig = Omit<
+    z.infer<typeof AgentchatConfigInputSchema>,
+    "auth"
+> & {
+    auth: AuthConfig;
+};
 export type AgentConfig = AgentchatConfig["agents"][number];
 export type ProviderConfig = AgentchatConfig["providers"][number];
 export type ConfigStoreStatus = {
@@ -152,8 +214,50 @@ export function resolveDefaultConfigPath(): string {
     return exampleConfigPath;
 }
 
+function normalizeAuthConfig(
+    auth:
+        | z.infer<typeof ProviderAuthConfigSchema>
+        | z.infer<typeof LegacyAuthConfigSchema>,
+): AuthConfig {
+    if ("providers" in auth) {
+        return auth;
+    }
+
+    if (auth.mode === "disabled") {
+        return {
+            defaultProviderId: "disabled-default",
+            providers: [
+                {
+                    id: "disabled-default",
+                    kind: "disabled",
+                    enabled: true,
+                },
+            ],
+        };
+    }
+
+    return {
+        defaultProviderId: "google-main",
+        providers: [
+            {
+                id: "google-main",
+                kind: "google",
+                enabled: true,
+                allowlistMode: auth.allowlistMode,
+                allowedEmails: auth.allowedEmails,
+                allowedDomains: auth.allowedDomains,
+                googleHostedDomain: auth.googleHostedDomain,
+            },
+        ],
+    };
+}
+
 export function parseConfig(input: unknown): AgentchatConfig {
-    return AgentchatConfigSchema.parse(input);
+    const parsed = AgentchatConfigInputSchema.parse(input);
+    return {
+        ...parsed,
+        auth: normalizeAuthConfig(parsed.auth),
+    };
 }
 
 export function loadConfigFile(

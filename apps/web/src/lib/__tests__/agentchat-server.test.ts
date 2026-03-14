@@ -66,6 +66,24 @@ describe("agentchat-server", () => {
         fetchMock.mockResolvedValueOnce(
             new Response(
                 JSON.stringify({
+                    auth: {
+                        defaultProviderId: "google-main",
+                        requiresLogin: true,
+                        activeProvider: {
+                            id: "google-main",
+                            kind: "google",
+                            enabled: true,
+                            allowlistMode: "email",
+                        },
+                        providers: [
+                            {
+                                id: "google-main",
+                                kind: "google",
+                                enabled: true,
+                                allowlistMode: "email",
+                            },
+                        ],
+                    },
                     providers: [{ id: "codex-main", enabled: true }],
                     agents: [{ id: "example-agent", name: "Example Agent" }],
                 }),
@@ -136,6 +154,24 @@ describe("agentchat-server", () => {
             .mockResolvedValueOnce(
                 new Response(
                     JSON.stringify({
+                        auth: {
+                            defaultProviderId: "google-main",
+                            requiresLogin: true,
+                            activeProvider: {
+                                id: "google-main",
+                                kind: "google",
+                                enabled: true,
+                                allowlistMode: "email",
+                            },
+                            providers: [
+                                {
+                                    id: "google-main",
+                                    kind: "google",
+                                    enabled: true,
+                                    allowlistMode: "email",
+                                },
+                            ],
+                        },
                         providers: [
                             {
                                 id: "codex-main",

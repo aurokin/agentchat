@@ -21,7 +21,8 @@ import { useAgent } from "@/contexts/AgentContext";
 import { unavailablePersistenceAdapter } from "@/lib/workspace/unavailable-adapter";
 
 interface WorkspaceContextType {
-    authMode: "google" | "disabled";
+    authProviderId: string | null;
+    authProviderKind: "google" | "disabled" | null;
     isAuthRequired: boolean;
     workspaceStatus: WorkspaceStatus;
     isWorkspaceReady: boolean;
@@ -36,7 +37,13 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     const isConvexAvailable = useIsConvexAvailable();
     const convexClient = useConvex() as unknown as ConvexClientInterface;
     const { isAuthenticated } = useConvexAuth();
-    const { authMode, isAuthDisabled, loadingAgents } = useAgent();
+    const {
+        authProviderId,
+        authProviderKind,
+        authRequiresLogin,
+        usesAutomaticAccessUser,
+        loadingAgents,
+    } = useAgent();
     const ensureAccessUser = useMutation(api.users.ensureAccessUser);
     const [accessUserId, setAccessUserId] = useState<ConvexId<"users"> | null>(
         null,
@@ -45,7 +52,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
         api.users.getCurrentUserId,
         isConvexAvailable &&
             !loadingAgents &&
-            (isAuthDisabled || isAuthenticated)
+            (usesAutomaticAccessUser || isAuthenticated)
             ? {}
             : "skip",
     ) as ConvexId<"users"> | null | undefined;
@@ -53,7 +60,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         let cancelled = false;
 
-        if (!isConvexAvailable || loadingAgents || !isAuthDisabled) {
+        if (!isConvexAvailable || loadingAgents || !usesAutomaticAccessUser) {
             return;
         }
 
@@ -74,10 +81,15 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
         return () => {
             cancelled = true;
         };
-    }, [ensureAccessUser, isAuthDisabled, isConvexAvailable, loadingAgents]);
+    }, [
+        ensureAccessUser,
+        isConvexAvailable,
+        loadingAgents,
+        usesAutomaticAccessUser,
+    ]);
 
     const workspaceUserId =
-        (isAuthDisabled ? (accessUserId ?? userId) : userId) ?? null;
+        (usesAutomaticAccessUser ? (accessUserId ?? userId) : userId) ?? null;
 
     const workspaceStatus: WorkspaceStatus =
         isConvexAvailable && workspaceUserId ? "ready" : "unavailable";
@@ -92,8 +104,9 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 
     const contextValue = useMemo<WorkspaceContextType>(
         () => ({
-            authMode,
-            isAuthRequired: !isAuthDisabled,
+            authProviderId,
+            authProviderKind,
+            isAuthRequired: authRequiresLogin,
             workspaceStatus,
             isWorkspaceReady,
             isConvexAvailable,
@@ -101,8 +114,9 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
             persistenceAdapter,
         }),
         [
-            authMode,
-            isAuthDisabled,
+            authProviderId,
+            authProviderKind,
+            authRequiresLogin,
             isConvexAvailable,
             isWorkspaceReady,
             persistenceAdapter,

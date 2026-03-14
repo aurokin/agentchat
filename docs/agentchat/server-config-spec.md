@@ -56,49 +56,74 @@ Purpose:
 
 - define who can access the instance
 
-Google mode shape:
+Preferred auth shape:
 
 ```json
 {
-  "mode": "google",
-  "allowlistMode": "email",
-  "allowedEmails": ["user@example.com"],
-  "allowedDomains": [],
-  "googleHostedDomain": null
+  "defaultProviderId": "google-main",
+  "providers": [
+    {
+      "id": "google-main",
+      "kind": "google",
+      "enabled": true,
+      "allowlistMode": "email",
+      "allowedEmails": ["user@example.com"],
+      "allowedDomains": [],
+      "googleHostedDomain": null
+    }
+  ]
 }
 ```
 
-Disabled mode shape:
+Disabled transitional shape:
 
 ```json
 {
-  "mode": "disabled"
+  "defaultProviderId": "disabled-default",
+  "providers": [
+    {
+      "id": "disabled-default",
+      "kind": "disabled",
+      "enabled": true
+    }
+  ]
 }
 ```
 
 Fields:
 
-- `mode`
+- `defaultProviderId`
   - required
-  - allowed values for v1: `"google"` or `"disabled"`
-- `allowlistMode`
-  - required only when `mode` is `"google"`
-  - allowed values for v1: `"email"`
-- `allowedEmails`
-  - required only when `mode` is `"google"`
+  - must reference an enabled auth provider
+- `providers`
+  - required
+  - array of auth providers
+- `providers[].id`
+  - stable auth provider id
+- `providers[].kind`
+  - current values: `"google"` or `"disabled"`
+- `providers[].enabled`
+  - boolean
+- `providers[].allowlistMode`
+  - required only for Google providers
+  - current allowed value: `"email"`
+- `providers[].allowedEmails`
+  - required only for Google providers
   - array of exact email strings
-- `allowedDomains`
-  - optional in Google mode
+- `providers[].allowedDomains`
   - reserved for later
-  - must be empty in v1 unless explicitly enabled in a later spec
-- `googleHostedDomain`
-  - optional string or `null` in Google mode
-  - hint only, not the authoritative allowlist
+- `providers[].googleHostedDomain`
+  - optional string or `null`
 
 V1 decision:
 
 - in Google mode, instance access is granted only if the signed-in email is present in `allowedEmails`
-- in disabled mode, the app uses a single default workspace user and does not require external sign-in
+- disabled is still supported as a transitional provider shape, but it is not the desired long-term product model
+
+Legacy note:
+
+- `auth.mode` legacy configs are still accepted and normalized internally
+- new configs should use `auth.defaultProviderId` plus `auth.providers[]`
 
 ## `providers`
 

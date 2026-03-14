@@ -31,8 +31,9 @@ interface User {
 interface AuthContextValue {
     user: User | null;
     userId: string | null;
-    authMode: "google" | "disabled";
-    isAuthDisabled: boolean;
+    authProviderId: string | null;
+    authProviderKind: "google" | "disabled" | null;
+    usesAutomaticAccessUser: boolean;
     isAuthenticated: boolean;
     isLoading: boolean;
     isConvexAvailable: boolean;
@@ -61,7 +62,12 @@ export function AuthProvider({
     children,
 }: AuthProviderProps): React.ReactElement {
     const isConvexAvailable = useIsConvexAvailable();
-    const { authMode, isAuthDisabled, loadingAgents } = useAgent();
+    const {
+        authProviderId,
+        authProviderKind,
+        usesAutomaticAccessUser,
+        loadingAgents,
+    } = useAgent();
     const { isAuthenticated: isConvexAuthenticated, isLoading: isAuthLoading } =
         useConvexAuth();
     const authActions = useAuthActions();
@@ -73,12 +79,12 @@ export function AuthProvider({
         api.users.getCurrentUserId,
         isConvexAvailable &&
             !loadingAgents &&
-            (isAuthDisabled || isConvexAuthenticated)
+            (usesAutomaticAccessUser || isConvexAuthenticated)
             ? {}
             : "skip",
     ) as ConvexId<"users"> | null | undefined;
     const effectiveUserId =
-        (isAuthDisabled ? (defaultUserId ?? userId) : userId) ?? null;
+        (usesAutomaticAccessUser ? (defaultUserId ?? userId) : userId) ?? null;
     const user = useQuery(
         api.users.get,
         effectiveUserId ? { id: effectiveUserId } : "skip",
@@ -87,7 +93,7 @@ export function AuthProvider({
     React.useEffect(() => {
         let cancelled = false;
 
-        if (!isConvexAvailable || loadingAgents || !isAuthDisabled) {
+        if (!isConvexAvailable || loadingAgents || !usesAutomaticAccessUser) {
             return;
         }
 
@@ -108,9 +114,14 @@ export function AuthProvider({
         return () => {
             cancelled = true;
         };
-    }, [ensureAccessUser, isAuthDisabled, isConvexAvailable, loadingAgents]);
+    }, [
+        ensureAccessUser,
+        isConvexAvailable,
+        loadingAgents,
+        usesAutomaticAccessUser,
+    ]);
 
-    const isAuthenticated = isAuthDisabled
+    const isAuthenticated = usesAutomaticAccessUser
         ? Boolean(isConvexAvailable && effectiveUserId)
         : isConvexAuthenticated;
 
@@ -130,7 +141,7 @@ export function AuthProvider({
     }, [effectiveUserId, user]);
 
     const signIn = useCallback(async () => {
-        if (isAuthDisabled) {
+        if (usesAutomaticAccessUser) {
             return;
         }
         if (!authActions?.signIn) {
@@ -211,10 +222,10 @@ export function AuthProvider({
         await runWithRetry(() =>
             authActions.signIn(undefined as any, { code } as any),
         );
-    }, [authActions, isAuthDisabled, isConvexAvailable]);
+    }, [authActions, isConvexAvailable, usesAutomaticAccessUser]);
 
     const signOut = useCallback(async () => {
-        if (isAuthDisabled) {
+        if (usesAutomaticAccessUser) {
             return;
         }
         try {
@@ -222,12 +233,12 @@ export function AuthProvider({
         } finally {
             await clearAllCredentials();
         }
-    }, [authActions, isAuthDisabled]);
+    }, [authActions, usesAutomaticAccessUser]);
 
     const getBackendSessionToken = useCallback(async () => {
         if (!isConvexAvailable || !isAuthenticated) {
             throw new Error(
-                isAuthDisabled
+                usesAutomaticAccessUser
                     ? "The default workspace user is not ready yet."
                     : "You must be signed in to connect to Agentchat.",
             );
@@ -242,10 +253,10 @@ export function AuthProvider({
 
         return result.token;
     }, [
-        isAuthDisabled,
         isAuthenticated,
         isConvexAvailable,
         issueBackendSessionToken,
+        usesAutomaticAccessUser,
     ]);
 
     const configureConvex = useCallback(async (url: string) => {
@@ -261,8 +272,9 @@ export function AuthProvider({
             value={{
                 user: userValue,
                 userId: effectiveUserId,
-                authMode,
-                isAuthDisabled,
+                authProviderId,
+                authProviderKind,
+                usesAutomaticAccessUser,
                 isAuthenticated,
                 isLoading,
                 isConvexAvailable,

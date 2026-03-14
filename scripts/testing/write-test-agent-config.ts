@@ -42,16 +42,30 @@ function resolveAuthMode(): AuthMode {
 function buildAuthConfig(authMode: AuthMode, allowedEmail: string) {
     if (authMode === "disabled") {
         return {
-            mode: "disabled" as const,
+            defaultProviderId: "disabled-default",
+            providers: [
+                {
+                    id: "disabled-default",
+                    kind: "disabled" as const,
+                    enabled: true,
+                },
+            ],
         };
     }
 
     return {
-        mode: "google" as const,
-        allowlistMode: "email" as const,
-        allowedEmails: [allowedEmail],
-        allowedDomains: [],
-        googleHostedDomain: null,
+        defaultProviderId: "google-main",
+        providers: [
+            {
+                id: "google-main",
+                kind: "google" as const,
+                enabled: true,
+                allowlistMode: "email" as const,
+                allowedEmails: [allowedEmail],
+                allowedDomains: [],
+                googleHostedDomain: null,
+            },
+        ],
     };
 }
 
@@ -213,7 +227,7 @@ if (dryRun) {
 
 writeFileSync(configPath, json, "utf8");
 console.log(`[agentchat] wrote ${configPath}`);
-console.log(`[agentchat] auth mode: ${authMode}`);
+console.log(`[agentchat] auth provider kind: ${authMode}`);
 if (authMode === "google") {
     console.log(`[agentchat] allowlisted email: ${allowedEmail}`);
 }

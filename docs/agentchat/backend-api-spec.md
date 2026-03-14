@@ -28,7 +28,9 @@ Important rule:
 
 ### Client To Convex
 
-- the client authenticates with Convex using Google-backed auth, or initializes the default workspace user when auth mode is disabled
+- the client authenticates with Convex as a concrete user
+- today that user may come from Google auth or the transitional automatic-access path
+- the target direction is provider-oriented Google plus local-user auth, not a permanent shared default-user mode
 
 ### Client To Backend
 
@@ -58,7 +60,7 @@ Purpose:
 
 Returns:
 
-- user identity summary
+- auth provider summary for the active instance access path
 - visible agents
 - provider summaries
 - currently supported capabilities
@@ -66,6 +68,7 @@ Returns:
 Notes:
 
 - no conversation history is returned here because Convex owns persistent data access
+- `auth` should be treated as provider-oriented metadata, not a raw mode flag
 
 ### `GET /api/providers/:providerId/models`
 

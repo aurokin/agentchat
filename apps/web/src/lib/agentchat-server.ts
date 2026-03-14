@@ -8,6 +8,13 @@ type BootstrapProvider = {
     enabled: boolean;
 };
 
+export type BootstrapAuthProvider = {
+    id: string;
+    kind: "google" | "disabled";
+    enabled: boolean;
+    allowlistMode: "email" | null;
+};
+
 export type BootstrapAgent = {
     id: string;
     name: string;
@@ -24,8 +31,10 @@ export type BootstrapAgent = {
 
 export type BootstrapResponse = {
     auth: {
-        mode: "google" | "disabled";
-        allowlistMode: "email" | null;
+        defaultProviderId: string;
+        requiresLogin: boolean;
+        activeProvider: BootstrapAuthProvider | null;
+        providers: BootstrapAuthProvider[];
     };
     providers: BootstrapProvider[];
     agents: BootstrapAgent[];

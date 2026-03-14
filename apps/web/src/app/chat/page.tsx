@@ -17,7 +17,8 @@ export default function ChatPage() {
     const { chats, loading, selectChat, currentChat } = useChat();
     const {
         loadingAgents,
-        isAuthDisabled,
+        authRequiresLogin,
+        usesAutomaticAccessUser,
         bootstrapIssue,
         agentOptionsIssue,
         refreshBootstrap,
@@ -30,7 +31,7 @@ export default function ChatPage() {
     const [initialized, setInitialized] = useState(false);
     const hasAccess =
         isConvexAvailable &&
-        (isAuthDisabled ? isWorkspaceReady : isAuthenticated);
+        (usesAutomaticAccessUser ? isWorkspaceReady : isAuthenticated);
 
     // Select a chat on first load for the active agent.
     useEffect(() => {
@@ -76,7 +77,7 @@ export default function ChatPage() {
     if (
         isAuthLoading ||
         loadingAgents ||
-        (isAuthDisabled && !isWorkspaceReady)
+        (usesAutomaticAccessUser && !isWorkspaceReady)
     ) {
         return (
             <div className="flex h-dvh items-center justify-center bg-background">
@@ -109,16 +110,16 @@ export default function ChatPage() {
             <div className="flex h-dvh items-center justify-center bg-background px-6">
                 <div className="w-full max-w-md border border-border bg-background-elevated p-8 text-center">
                     <h1 className="text-xl font-semibold">
-                        {isAuthDisabled
+                        {usesAutomaticAccessUser
                             ? "Workspace unavailable"
                             : "Sign in required"}
                     </h1>
                     <p className="mt-3 text-sm text-muted-foreground">
-                        {isAuthDisabled
+                        {usesAutomaticAccessUser
                             ? "This instance has authentication disabled, but the default workspace user could not be initialized."
                             : "Agentchat runs against your Convex workspace only. Sign in to access chats and the agents exposed by this instance."}
                     </p>
-                    {isAuthDisabled ? null : (
+                    {!authRequiresLogin ? null : (
                         <button
                             type="button"
                             className="btn-deco btn-deco-primary mt-6 w-full"

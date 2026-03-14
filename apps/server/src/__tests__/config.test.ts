@@ -35,15 +35,41 @@ describe("server config", () => {
         expect(bootstrapResponse.status).toBe(200);
         const bootstrap = (await bootstrapResponse.json()) as {
             auth: {
-                mode: "google" | "disabled";
-                allowlistMode: "email" | null;
+                defaultProviderId: string;
+                requiresLogin: boolean;
+                activeProvider: {
+                    id: string;
+                    kind: "google" | "disabled";
+                    enabled: boolean;
+                    allowlistMode: "email" | null;
+                } | null;
+                providers: Array<{
+                    id: string;
+                    kind: "google" | "disabled";
+                    enabled: boolean;
+                    allowlistMode: "email" | null;
+                }>;
             };
             agents: Array<{ id: string }>;
             providers: Array<{ id: string }>;
         };
         expect(bootstrap.auth).toEqual({
-            mode: "google",
-            allowlistMode: "email",
+            defaultProviderId: "google-main",
+            requiresLogin: true,
+            activeProvider: {
+                id: "google-main",
+                kind: "google",
+                enabled: true,
+                allowlistMode: "email",
+            },
+            providers: [
+                {
+                    id: "google-main",
+                    kind: "google",
+                    enabled: true,
+                    allowlistMode: "email",
+                },
+            ],
         });
         expect(bootstrap.agents[0]?.id).toBe("example-agent");
         expect(bootstrap.providers[0]?.id).toBe("codex-main");
@@ -90,7 +116,51 @@ describe("server config", () => {
         });
 
         expect(config.auth).toEqual({
-            mode: "disabled",
+            defaultProviderId: "disabled-default",
+            providers: [
+                {
+                    id: "disabled-default",
+                    kind: "disabled",
+                    enabled: true,
+                },
+            ],
+        });
+    });
+
+    test("parses provider-oriented auth config without rewriting it", () => {
+        const config = parseConfig({
+            version: 1,
+            auth: {
+                defaultProviderId: "google-main",
+                providers: [
+                    {
+                        id: "google-main",
+                        kind: "google",
+                        enabled: true,
+                        allowlistMode: "email",
+                        allowedEmails: ["operator@example.com"],
+                        allowedDomains: [],
+                        googleHostedDomain: null,
+                    },
+                ],
+            },
+            providers: exampleConfig.providers,
+            agents: exampleConfig.agents,
+        });
+
+        expect(config.auth).toEqual({
+            defaultProviderId: "google-main",
+            providers: [
+                {
+                    id: "google-main",
+                    kind: "google",
+                    enabled: true,
+                    allowlistMode: "email",
+                    allowedEmails: ["operator@example.com"],
+                    allowedDomains: [],
+                    googleHostedDomain: null,
+                },
+            ],
         });
     });
 });

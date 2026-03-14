@@ -1,6 +1,7 @@
 import type {
     AgentchatConfig,
     AgentConfig,
+    AuthProviderConfig,
     ConfigStoreStatus,
     ProviderConfig,
 } from "./config.ts";
@@ -56,6 +57,28 @@ function toProviderSummary(provider: ProviderConfig) {
         label: provider.label,
         enabled: provider.enabled,
     };
+}
+
+function toAuthProviderSummary(provider: AuthProviderConfig) {
+    return {
+        id: provider.id,
+        kind: provider.kind,
+        enabled: provider.enabled,
+        allowlistMode:
+            provider.kind === "google" ? provider.allowlistMode : null,
+    };
+}
+
+function getActiveAuthProvider(
+    config: AgentchatConfig,
+): AuthProviderConfig | null {
+    return (
+        config.auth.providers.find(
+            (provider) =>
+                provider.id === config.auth.defaultProviderId &&
+                provider.enabled,
+        ) ?? null
+    );
 }
 
 function toAgentSummary(agent: AgentConfig) {
@@ -192,13 +215,16 @@ export function createFetchHandler(deps: HandlerDependencies) {
         }
 
         if (request.method === "GET" && pathname === "/api/bootstrap") {
+            const activeAuthProvider = getActiveAuthProvider(config);
             return jsonResponse(request, {
                 auth: {
-                    mode: config.auth.mode,
-                    allowlistMode:
-                        config.auth.mode === "google"
-                            ? config.auth.allowlistMode
+                    defaultProviderId: config.auth.defaultProviderId,
+                    requiresLogin: activeAuthProvider?.kind !== "disabled",
+                    activeProvider:
+                        activeAuthProvider !== null
+                            ? toAuthProviderSummary(activeAuthProvider)
                             : null,
+                    providers: config.auth.providers.map(toAuthProviderSummary),
                 },
                 providers: getVisibleProviders(config).map(toProviderSummary),
                 agents: getVisibleAgents(config).map((agent) => {

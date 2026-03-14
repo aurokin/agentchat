@@ -14,6 +14,7 @@ import {
     fetchBootstrap,
     type AgentOptionsResponse,
     type BootstrapAgent,
+    type BootstrapAuthProvider,
     type BootstrapResponse,
 } from "@/lib/agentchat-server";
 import {
@@ -25,8 +26,10 @@ import { resolveSelectedAgentId } from "@/contexts/agent-helpers";
 
 interface AgentContextType {
     agents: BootstrapAgent[];
-    authMode: "google" | "disabled";
-    isAuthDisabled: boolean;
+    authProviderId: string | null;
+    authProviderKind: BootstrapAuthProvider["kind"] | null;
+    authRequiresLogin: boolean;
+    usesAutomaticAccessUser: boolean;
     selectedAgentId: string | null;
     selectedAgent: BootstrapAgent | null;
     selectedAgentOptions: AgentOptionsResponse | null;
@@ -83,8 +86,22 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
             );
             setBootstrap({
                 auth: {
-                    mode: "google",
-                    allowlistMode: "email",
+                    defaultProviderId: "google-main",
+                    requiresLogin: true,
+                    activeProvider: {
+                        id: "google-main",
+                        kind: "google",
+                        enabled: true,
+                        allowlistMode: "email",
+                    },
+                    providers: [
+                        {
+                            id: "google-main",
+                            kind: "google",
+                            enabled: true,
+                            allowlistMode: "email",
+                        },
+                    ],
                 },
                 agents: [],
                 providers: [],
@@ -164,8 +181,12 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
         <AgentContext.Provider
             value={{
                 agents: bootstrap?.agents ?? [],
-                authMode: bootstrap?.auth.mode ?? "google",
-                isAuthDisabled: bootstrap?.auth.mode === "disabled",
+                authProviderId: bootstrap?.auth.activeProvider?.id ?? null,
+                authProviderKind:
+                    bootstrap?.auth.activeProvider?.kind ?? "google",
+                authRequiresLogin: bootstrap?.auth.requiresLogin ?? true,
+                usesAutomaticAccessUser:
+                    bootstrap?.auth.activeProvider?.kind === "disabled",
                 selectedAgentId,
                 selectedAgent,
                 selectedAgentOptions,
