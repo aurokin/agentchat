@@ -27,10 +27,17 @@ describe("sync-storage", () => {
         expect(await storage.getTheme()).toBe("system");
     });
 
+    it("treats legacy stored theme values as system until explicitly set", async () => {
+        store.set("agentchat-theme", "light");
+
+        expect(await storage.getTheme()).toBe("system");
+    });
+
     it("stores theme under the agentchat secure-store key", async () => {
         await storage.setTheme("dark");
 
         expect(store.get("agentchat-theme")).toBe("dark");
+        expect(store.get("agentchat-theme-selection-set")).toBe("true");
         expect(await storage.getTheme()).toBe("dark");
     });
 

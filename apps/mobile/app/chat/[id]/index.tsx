@@ -125,6 +125,7 @@ export default function ChatScreen(): ReactElement {
     const currentChatRef = useRef<ChatSession | null>(currentChat);
     const chatMessagesRef = useRef<Message[]>(EMPTY_MESSAGES);
     const activeRunRef = useRef<ActiveRunState | null>(null);
+    const pendingReconnectNoticeRef = useRef(false);
     const conversationSubscriptionCleanupRef = useRef<(() => void) | null>(
         null,
     );
@@ -381,6 +382,11 @@ export default function ChatScreen(): ReactElement {
 
     useEffect(() => {
         const unsubscribe = socketClient.subscribe((event) => {
+            if (event.type === "connection.reconnected") {
+                pendingReconnectNoticeRef.current = true;
+                return;
+            }
+
             if (event.type === "connection.error") {
                 const nextActiveRun = activeRunRef.current;
                 if (!nextActiveRun) {
@@ -417,7 +423,8 @@ export default function ChatScreen(): ReactElement {
                 setActiveRun(resolution.activeRun);
                 setIsLoading(true);
                 if (resolution.recovered) {
-                    setRecoveredRunNotice(true);
+                    setRecoveredRunNotice(pendingReconnectNoticeRef.current);
+                    pendingReconnectNoticeRef.current = false;
                     if (resolution.streamingMessage) {
                         setStreamingMessage(resolution.streamingMessage);
                     }
@@ -499,6 +506,12 @@ export default function ChatScreen(): ReactElement {
         });
 
         if (!recoveredRun) {
+            if (
+                runtimeState.phase !== "active" &&
+                runtimeState.phase !== "recovering"
+            ) {
+                pendingReconnectNoticeRef.current = false;
+            }
             if (activeRunRef.current?.conversationId !== currentChat.id) {
                 startTransition(() => {
                     setActiveRun(null);
@@ -516,7 +529,8 @@ export default function ChatScreen(): ReactElement {
                 id: recoveredRun.assistantMessageId,
                 content: recoveredRun.content,
             });
-            setRecoveredRunNotice(true);
+            setRecoveredRunNotice(pendingReconnectNoticeRef.current);
+            pendingReconnectNoticeRef.current = false;
             setIsLoading(true);
         });
     }, [chatMessages, currentChat, runtimeState]);
