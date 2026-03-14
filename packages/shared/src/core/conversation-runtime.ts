@@ -5,10 +5,10 @@ import {
 } from "./agentchat-socket";
 import {
     modelSupportsReasoning,
-    resolveThinkingLevelForVariant,
+    resolveReasoningEffortForVariant,
     type ProviderModel,
 } from "./models";
-import type { ChatSession, Message, ThinkingLevel } from "./types";
+import type { ChatSession, Message, ReasoningEffort } from "./types";
 
 export interface RuntimeErrorState {
     message: string;
@@ -23,7 +23,7 @@ export interface RetryChatState {
 export interface StreamingMessageState {
     id: string;
     content: string;
-    thinking?: string;
+    reasoning?: string;
 }
 
 export interface ActiveRunState {
@@ -47,7 +47,7 @@ export interface ConversationMessageDraft {
     contextContent: string;
     modelId: string;
     variantId?: string | null;
-    thinkingLevel: ThinkingLevel;
+    reasoningEffort: ReasoningEffort;
     chatId: string;
 }
 
@@ -56,7 +56,7 @@ export interface PreparedConversationSend {
     assistantMessage: ConversationMessageDraft;
     command: ConversationSendCommand;
     titleUpdate: ChatSession | null;
-    effectiveThinking: ThinkingLevel;
+    effectiveReasoningEffort: ReasoningEffort;
     activeRun: ActiveRunState;
 }
 
@@ -127,8 +127,8 @@ export function prepareConversationSend(params: {
         (model) => model.id === params.chat.modelId,
     );
     const supportsReasoning = modelSupportsReasoning(currentModel);
-    const effectiveThinking = supportsReasoning
-        ? resolveThinkingLevelForVariant(params.chat.variantId)
+    const effectiveReasoningEffort = supportsReasoning
+        ? resolveReasoningEffortForVariant(params.chat.variantId)
         : "none";
     const userMessageId = createId();
     const assistantMessageId = createId();
@@ -141,7 +141,7 @@ export function prepareConversationSend(params: {
             contextContent: params.content,
             modelId: params.chat.modelId,
             variantId: params.chat.variantId ?? null,
-            thinkingLevel: effectiveThinking,
+            reasoningEffort: effectiveReasoningEffort,
             chatId: params.chat.id,
         },
         assistantMessage: {
@@ -151,7 +151,7 @@ export function prepareConversationSend(params: {
             contextContent: "",
             modelId: params.chat.modelId,
             variantId: params.chat.variantId ?? null,
-            thinkingLevel: effectiveThinking,
+            reasoningEffort: effectiveReasoningEffort,
             chatId: params.chat.id,
         },
         command: {
@@ -176,7 +176,7 @@ export function prepareConversationSend(params: {
             params.content,
             params.messages.length,
         ),
-        effectiveThinking,
+        effectiveReasoningEffort,
         activeRun: {
             conversationId: params.chat.id,
             assistantMessageId,
@@ -271,7 +271,7 @@ export function applyStreamingMessageOverlay(
                   ...message,
                   content: streamingMessage.content,
                   contextContent: streamingMessage.content,
-                  thinking: streamingMessage.thinking,
+                  reasoning: streamingMessage.reasoning,
               }
             : message,
     );

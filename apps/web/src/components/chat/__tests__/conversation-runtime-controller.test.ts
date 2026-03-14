@@ -82,7 +82,7 @@ describe("conversation runtime controller", () => {
             createId: () => ids.shift() ?? "unexpected-id",
         });
 
-        expect(sendPlan.effectiveThinking).toBe("high");
+        expect(sendPlan.effectiveReasoningEffort).toBe("high");
         expect(sendPlan.titleUpdate?.title).toBe("New prompt");
         expect(sendPlan.userMessage).toMatchObject({
             id: "user-1",
@@ -90,7 +90,7 @@ describe("conversation runtime controller", () => {
             content: "New prompt",
             contextContent: "New prompt",
             modelId: "gpt-5.3-codex",
-            thinkingLevel: "high",
+            reasoningEffort: "high",
             chatId: "chat-1",
         });
         expect(sendPlan.assistantMessage).toMatchObject({
@@ -99,7 +99,7 @@ describe("conversation runtime controller", () => {
             content: "",
             contextContent: "",
             modelId: "gpt-5.3-codex",
-            thinkingLevel: "high",
+            reasoningEffort: "high",
             chatId: "chat-1",
         });
         expect(sendPlan.command).toEqual({
@@ -125,7 +125,7 @@ describe("conversation runtime controller", () => {
         });
     });
 
-    test("falls back to no thinking when the selected model does not support reasoning", () => {
+    test("falls back to no reasoning effort when the selected model does not support reasoning", () => {
         const sendPlan = prepareConversationSend({
             chat: createChat({ modelId: "basic-codex" }),
             messages: [],
@@ -137,8 +137,8 @@ describe("conversation runtime controller", () => {
             })(),
         });
 
-        expect(sendPlan.effectiveThinking).toBe("none");
-        expect(sendPlan.userMessage.thinkingLevel).toBe("none");
+        expect(sendPlan.effectiveReasoningEffort).toBe("none");
+        expect(sendPlan.userMessage.reasoningEffort).toBe("none");
         expect(sendPlan.command.payload.variantId).toBe("high");
     });
 
@@ -253,7 +253,7 @@ describe("conversation runtime controller", () => {
                         content: message.content,
                         contextContent: message.contextContent,
                         modelId: message.modelId,
-                        thinkingLevel: message.thinkingLevel,
+                        reasoningEffort: message.reasoningEffort,
                         createdAt: 1,
                     };
                 },
@@ -314,7 +314,7 @@ describe("conversation runtime controller", () => {
                     content: message.content,
                     contextContent: message.contextContent,
                     modelId: message.modelId,
-                    thinkingLevel: message.thinkingLevel,
+                    reasoningEffort: message.reasoningEffort,
                     createdAt: 1,
                 }),
                 updateChat: async () => {},

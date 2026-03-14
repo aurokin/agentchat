@@ -10,7 +10,7 @@ export {
 export * from "./core/defaults";
 export * from "./core/errors";
 export {
-    ThinkingLevel,
+    ReasoningEffort,
     Message,
     ChatSession,
     UserSettings,

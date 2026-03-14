@@ -1,4 +1,4 @@
-import type { Message, ThinkingLevel } from "../types";
+import type { Message } from "../types";
 
 export interface ChatDefaults {
     modelId: string;
@@ -12,7 +12,7 @@ export interface LastUserSettings {
 
 export function getLastUserSettings(
     messages: Array<
-        Pick<Message, "role" | "modelId" | "variantId" | "thinkingLevel">
+        Pick<Message, "role" | "modelId" | "variantId" | "reasoningEffort">
     >,
 ): LastUserSettings | null {
     for (let i = messages.length - 1; i >= 0; i -= 1) {

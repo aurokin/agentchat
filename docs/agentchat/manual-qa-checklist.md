@@ -13,6 +13,7 @@ For live runtime persistence validation with a running local server, also run:
 
 ```bash
 bun run test:manual:live-runtime-smoke
+bun run test:manual:live-runtime-status
 bun run test:manual:live-runtime-interrupt
 bun run test:manual:stale-runtime-resume
 bun run test:manual:config-reload-smoke
@@ -132,7 +133,15 @@ Use the primary fixture.
 - Confirm a deliberately stale persisted runtime binding falls back to a fresh Codex thread
 - Confirm the runtime binding is replaced rather than left stale
 
-## 9. Mobile Parity Pass
+## 9. Provider-Native Status Items
+
+Use the primary fixture.
+
+- Run `bun run test:manual:live-runtime-status`
+- Confirm the run persists a short `assistant_status` item before the final `assistant_message`
+- Confirm the final run output still points at the final assistant reply, not the status item
+
+## 10. Mobile Parity Pass
 
 Run the same smoke and deterministic checks on mobile.
 

@@ -1,6 +1,6 @@
-import type { ChatSession, Message, ThinkingLevel } from "../types";
+import type { ChatSession, Message, ReasoningEffort } from "../types";
 
-const THINKING_LEVELS = new Set<string>([
+const REASONING_EFFORTS = new Set<string>([
     "xhigh",
     "high",
     "medium",
@@ -9,16 +9,16 @@ const THINKING_LEVELS = new Set<string>([
     "none",
 ]);
 
-export function isThinkingLevel(
+export function isReasoningEffort(
     value: string | null | undefined,
-): value is ThinkingLevel {
-    return typeof value === "string" && THINKING_LEVELS.has(value);
+): value is ReasoningEffort {
+    return typeof value === "string" && REASONING_EFFORTS.has(value);
 }
 
-export function toThinkingLevel(
+export function toReasoningEffort(
     value: string | null | undefined,
-): ThinkingLevel {
-    return isThinkingLevel(value) ? value : "none";
+): ReasoningEffort {
+    return isReasoningEffort(value) ? value : "none";
 }
 
 export function mergeByIdWithPending<T extends { id: string }>(
@@ -62,13 +62,13 @@ export interface ConvexMessageLike {
     kind?: Message["kind"] | null;
     content: string;
     contextContent: string;
-    thinking?: string | null;
+    reasoning?: string | null;
     status?: Message["status"] | null;
     runId?: string | null;
     runMessageIndex?: number | null;
     modelId?: string | null;
     variantId?: string | null;
-    thinkingLevel?: string | null;
+    reasoningEffort?: string | null;
     createdAt: number;
     updatedAt?: number | null;
     completedAt?: number | null;
@@ -99,12 +99,12 @@ export function mapConvexMessageToMessage(
         content: msg.content,
         contextContent: msg.contextContent,
         status: msg.status ?? undefined,
-        thinking: msg.thinking ?? undefined,
+        reasoning: msg.reasoning ?? undefined,
         runId: msg.runId ?? null,
         runMessageIndex: msg.runMessageIndex ?? null,
         modelId: msg.modelId ?? undefined,
         variantId: msg.variantId ?? null,
-        thinkingLevel: toThinkingLevel(msg.thinkingLevel),
+        reasoningEffort: toReasoningEffort(msg.reasoningEffort),
         createdAt: msg.createdAt,
         updatedAt: msg.updatedAt ?? undefined,
         completedAt: msg.completedAt ?? null,

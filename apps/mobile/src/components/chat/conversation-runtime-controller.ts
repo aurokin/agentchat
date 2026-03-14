@@ -67,7 +67,7 @@ export async function runMobileConversationSend(params: {
             runId: null,
             modelId: sendPlan.userMessage.modelId,
             variantId: sendPlan.userMessage.variantId ?? null,
-            thinkingLevel: sendPlan.userMessage.thinkingLevel,
+            reasoningEffort: sendPlan.userMessage.reasoningEffort,
             completedAt: Date.now(),
         });
 
@@ -94,15 +94,15 @@ export async function runMobileConversationSend(params: {
             runId: null,
             modelId: sendPlan.assistantMessage.modelId,
             variantId: sendPlan.assistantMessage.variantId ?? null,
-            thinkingLevel: sendPlan.assistantMessage.thinkingLevel,
-            thinking: undefined,
+            reasoningEffort: sendPlan.assistantMessage.reasoningEffort,
+            reasoning: undefined,
             completedAt: null,
         });
 
         await params.dependencies.queueStreamingMessageUpdate({
             id: sendPlan.assistantMessage.id,
             content: "",
-            thinking: undefined,
+            reasoning: undefined,
         });
 
         await params.dependencies.ensureConnected();

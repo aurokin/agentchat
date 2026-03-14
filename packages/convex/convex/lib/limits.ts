@@ -19,8 +19,8 @@ export const LIMITS = {
         "AGENTCHAT_MAX_MESSAGE_CONTEXT_CHARS",
         200_000,
     ),
-    maxMessageThinkingChars: readPositiveIntEnv(
-        "AGENTCHAT_MAX_MESSAGE_THINKING_CHARS",
+    maxMessageReasoningChars: readPositiveIntEnv(
+        "AGENTCHAT_MAX_MESSAGE_REASONING_CHARS",
         200_000,
     ),
     maxLocalIdChars: readPositiveIntEnv("AGENTCHAT_MAX_LOCAL_ID_CHARS", 200),

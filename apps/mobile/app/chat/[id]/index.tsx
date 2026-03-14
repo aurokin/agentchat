@@ -113,7 +113,7 @@ export default function ChatScreen(): ReactElement {
     const inputSuppressionTimeoutRef = useRef<ReturnType<
         typeof setTimeout
     > | null>(null);
-    const [expandedThinking, setExpandedThinking] = useState<
+    const [expandedReasoning, setExpandedReasoning] = useState<
         Record<string, boolean>
     >({});
     const { width: windowWidth, height: windowHeight } = useWindowDimensions();
@@ -797,8 +797,8 @@ export default function ChatScreen(): ReactElement {
         );
     };
 
-    const toggleThinking = (messageId: string) => {
-        setExpandedThinking((prev) => ({
+    const toggleReasoning = (messageId: string) => {
+        setExpandedReasoning((prev) => ({
             ...prev,
             [messageId]: !prev[messageId],
         }));
@@ -826,19 +826,20 @@ export default function ChatScreen(): ReactElement {
         const isUser = item.role === "user";
         const isAssistantStatus = !isUser && item.kind === "assistant_status";
         const displayContent = item.content;
-        const displayThinking = item.thinking;
+        const displayReasoning = item.reasoning;
         const isStreamingMessage = activeRun?.assistantMessageId === item.id;
-        const showThinkingIndicator = false;
+        const showReasoningIndicator = false;
         const hideContentWhileReasoning = false;
         const showGenerating =
             isStreamingMessage &&
             !displayContent &&
-            !displayThinking &&
+            !displayReasoning &&
             item.role === "assistant";
-        const hasThinkingBadge =
-            item.thinkingLevel !== undefined && item.thinkingLevel !== "none";
+        const hasReasoningBadge =
+            item.reasoningEffort !== undefined &&
+            item.reasoningEffort !== "none";
         const hasModelBadge = Boolean(item.modelId);
-        const showDivider = hasThinkingBadge || hasModelBadge;
+        const showDivider = hasReasoningBadge || hasModelBadge;
         const modelDisplayName = getModelDisplayName(item.modelId, models);
 
         return (
@@ -850,47 +851,47 @@ export default function ChatScreen(): ReactElement {
                         : styles.messageGroupAssistant,
                 ]}
             >
-                {displayThinking && (
+                {displayReasoning && (
                     <View
                         style={[
-                            styles.thinkingPanel,
-                            styles.thinkingPanelOutside,
+                            styles.reasoningPanel,
+                            styles.reasoningPanelOutside,
                         ]}
                     >
                         <TouchableOpacity
-                            style={styles.thinkingHeader}
-                            onPress={() => toggleThinking(item.id)}
+                            style={styles.reasoningHeader}
+                            onPress={() => toggleReasoning(item.id)}
                             activeOpacity={0.7}
                         >
                             <Feather
                                 name={
-                                    expandedThinking[item.id]
+                                    expandedReasoning[item.id]
                                         ? "chevron-down"
                                         : "chevron-right"
                                 }
                                 size={14}
                                 color={colors.warning}
-                                style={styles.thinkingChevron}
+                                style={styles.reasoningChevron}
                             />
                             <MaterialCommunityIcons
                                 name="brain"
                                 size={14}
                                 color={colors.warning}
-                                style={styles.thinkingIcon}
+                                style={styles.reasoningIcon}
                             />
-                            <Text style={styles.thinkingLabel}>Reasoning</Text>
-                            {showThinkingIndicator && (
+                            <Text style={styles.reasoningLabel}>Reasoning</Text>
+                            {showReasoningIndicator && (
                                 <ActivityIndicator
                                     size="small"
                                     color={colors.warning}
-                                    style={styles.thinkingIndicator}
+                                    style={styles.reasoningIndicator}
                                 />
                             )}
                         </TouchableOpacity>
-                        {expandedThinking[item.id] && (
-                            <View style={styles.thinkingContent}>
-                                <Text style={styles.thinkingText}>
-                                    {displayThinking}
+                        {expandedReasoning[item.id] && (
+                            <View style={styles.reasoningContent}>
+                                <Text style={styles.reasoningText}>
+                                    {displayReasoning}
                                 </Text>
                             </View>
                         )}
@@ -955,17 +956,17 @@ export default function ChatScreen(): ReactElement {
                         {formatMessageTime(item.createdAt)}
                     </Text>
                     {showDivider && <View style={styles.messageMetaDivider} />}
-                    {hasThinkingBadge && (
+                    {hasReasoningBadge && (
                         <View
-                            style={[styles.messageBadge, styles.thinkingBadge]}
+                            style={[styles.messageBadge, styles.reasoningBadge]}
                         >
                             <Text
                                 style={[
                                     styles.messageBadgeText,
-                                    styles.thinkingBadgeText,
+                                    styles.reasoningBadgeText,
                                 ]}
                             >
-                                {item.thinkingLevel?.toUpperCase()}
+                                {item.reasoningEffort?.toUpperCase()}
                             </Text>
                         </View>
                     )}
@@ -1610,11 +1611,11 @@ const createStyles = (colors: ThemeColors) =>
         searchBadgeTextUser: {
             color: colors.accent,
         },
-        thinkingBadge: {
+        reasoningBadge: {
             backgroundColor: colors.warningSoft,
             borderColor: colors.warningBorder,
         },
-        thinkingBadgeText: {
+        reasoningBadgeText: {
             color: colors.warning,
         },
         modelBadge: {
@@ -1633,7 +1634,7 @@ const createStyles = (colors: ThemeColors) =>
             textTransform: "none" as const,
             fontWeight: "500",
         },
-        thinkingPanel: {
+        reasoningPanel: {
             marginTop: 8,
             borderWidth: 1,
             borderColor: colors.warningBorder,
@@ -1641,42 +1642,42 @@ const createStyles = (colors: ThemeColors) =>
             borderRadius: 8,
             overflow: "hidden",
         },
-        thinkingPanelOutside: {
+        reasoningPanelOutside: {
             marginTop: 6,
             marginBottom: 4,
             maxWidth: "85%",
         },
-        thinkingHeader: {
+        reasoningHeader: {
             flexDirection: "row",
             alignItems: "center",
             paddingHorizontal: 12,
             paddingVertical: 8,
             backgroundColor: colors.warningSoft,
         },
-        thinkingIndicator: {
+        reasoningIndicator: {
             marginLeft: 8,
         },
-        thinkingChevron: {
+        reasoningChevron: {
             marginRight: 6,
         },
-        thinkingIcon: {
+        reasoningIcon: {
             marginRight: 6,
         },
-        thinkingLabel: {
+        reasoningLabel: {
             fontSize: 12,
             fontWeight: "600",
             color: colors.warning,
             textTransform: "uppercase" as const,
             letterSpacing: 0.5,
         },
-        thinkingContent: {
+        reasoningContent: {
             paddingHorizontal: 12,
             paddingTop: 8,
             paddingBottom: 8,
             borderTopWidth: 1,
             borderTopColor: colors.warningBorder,
         },
-        thinkingText: {
+        reasoningText: {
             fontSize: 13,
             color: colors.textMuted,
             lineHeight: 19,

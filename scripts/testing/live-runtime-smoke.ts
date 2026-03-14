@@ -15,7 +15,7 @@ type Identity = {
     name: string;
 };
 
-type Mode = "smoke" | "interrupt";
+type Mode = "smoke" | "interrupt" | "status";
 type ExtendedMode = Mode | "stale-resume";
 
 type AgentOptions = {
@@ -140,10 +140,11 @@ function parseArgs(argv: string[]): LiveSmokeArgs {
             if (
                 value !== "smoke" &&
                 value !== "interrupt" &&
+                value !== "status" &&
                 value !== "stale-resume"
             ) {
                 throw new Error(
-                    "--mode must be smoke, interrupt, or stale-resume.",
+                    "--mode must be smoke, interrupt, status, or stale-resume.",
                 );
             }
             mode = value;
@@ -292,7 +293,7 @@ function getDefaultAgentId(mode: ExtendedMode): string {
     return mode === "interrupt" ? "agentchat-workspace" : "agentchat-test";
 }
 
-function resolveThinking(variantId: string | null): string {
+function resolveReasoningEffort(variantId: string | null): string {
     switch (variantId) {
         case "low":
         case "medium":
@@ -318,6 +319,16 @@ function buildPrompt(mode: ExtendedMode): string {
             "Open notes.md.",
             "Write a one hundred item improvement plan for that file.",
             "Keep every item to one short sentence.",
+        ].join(" ");
+    }
+
+    if (mode === "status") {
+        return [
+            "Read README.md, STATUS.md, and src/math.ts.",
+            "First decide which file best explains the current test status.",
+            "Then answer with two short sections:",
+            "1. one brief working note",
+            "2. one sentence with the answer and add(2, 3).",
         ].join(" ");
     }
 
@@ -449,7 +460,6 @@ async function runLiveConversation(params: {
     agentId: string;
     modelId: string;
     variantId: string | null;
-    thinking: string;
     content: string;
     userMessageId: string;
     assistantMessageId: string;
@@ -598,7 +608,6 @@ async function runLiveConversation(params: {
                             agentId: params.agentId,
                             modelId: params.modelId,
                             variantId: params.variantId,
-                            thinking: params.thinking,
                             content: params.content,
                             userMessageId: params.userMessageId,
                             assistantMessageId: params.assistantMessageId,
@@ -816,6 +825,18 @@ function assertSmokeContent(content: string): void {
     );
 }
 
+function assertStatusContent(content: string): void {
+    const normalized = content.trim();
+    invariant(
+        normalized.includes("STATUS.md"),
+        `Expected status response to reference STATUS.md, got ${JSON.stringify(content)}`,
+    );
+    invariant(
+        /add\(2,\s*3\).*5|5.*add\(2,\s*3\)/isu.test(normalized),
+        `Expected status response to mention add(2, 3) = 5, got ${JSON.stringify(content)}`,
+    );
+}
+
 function assertTerminalBinding(params: {
     binding: {
         provider: string;
@@ -982,7 +1003,13 @@ async function main() {
         (args.mode === "interrupt" &&
         model.variants.some((variant) => variant.id === "high")
             ? "high"
-            : agentOptions.defaultVariant);
+            : args.mode === "status" &&
+                model.variants.some((variant) => variant.id === "xhigh")
+              ? "xhigh"
+              : args.mode === "status" &&
+                  model.variants.some((variant) => variant.id === "high")
+                ? "high"
+                : agentOptions.defaultVariant);
     if (variantId !== null) {
         invariant(
             model.variants.some((variant) => variant.id === variantId),
@@ -992,7 +1019,7 @@ async function main() {
 
     const now = Date.now();
     const ids = createIds(args.mode, now);
-    const thinking = resolveThinking(variantId);
+    const reasoningEffort = resolveReasoningEffort(variantId);
 
     const chatId = runConvex<string>({
         repoRoot,
@@ -1007,7 +1034,6 @@ async function main() {
                     : "Live runtime smoke",
             modelId,
             variantId,
-            thinking,
             createdAt: now,
             updatedAt: now,
         },
@@ -1026,7 +1052,7 @@ async function main() {
             contextContent: buildPrompt(args.mode),
             modelId,
             variantId,
-            thinkingLevel: thinking,
+            reasoningEffort,
             createdAt: now + 1,
         },
         identity: identity ?? undefined,
@@ -1064,7 +1090,7 @@ async function main() {
             contextContent: "",
             modelId,
             variantId,
-            thinkingLevel: thinking,
+            reasoningEffort,
             createdAt: now + 2,
         },
         identity: identity ?? undefined,
@@ -1093,11 +1119,15 @@ async function main() {
             agentId,
             modelId,
             variantId,
-            thinking,
             content: buildPrompt(args.mode),
             userMessageId: ids.userMessageId,
             assistantMessageId: ids.assistantMessageId,
-            mode: args.mode === "interrupt" ? "interrupt" : "smoke",
+            mode:
+                args.mode === "interrupt"
+                    ? "interrupt"
+                    : args.mode === "status"
+                      ? "status"
+                      : "smoke",
         });
     } catch (error) {
         const snapshot = await tryCollectFailureSnapshot({
@@ -1125,6 +1155,7 @@ async function main() {
         status: string;
         content: string;
         runId: string | null;
+        kind?: string | null;
     } | null>({
         repoRoot,
         functionName: "messages:getByLocalId",
@@ -1135,6 +1166,21 @@ async function main() {
         identity,
     });
     invariant(assistantMessage, "Assistant message was not persisted.");
+    const persistedMessages = runConvex<
+        Array<{
+            localId?: string | null;
+            kind?: string | null;
+            content: string;
+            runId?: string | null;
+            runMessageIndex?: number | null;
+            status?: string | null;
+        }>
+    >({
+        repoRoot,
+        functionName: "messages:listByChat",
+        args: { chatId },
+        identity,
+    });
 
     const runs = runConvex<
         Array<{
@@ -1182,7 +1228,7 @@ async function main() {
         },
     });
 
-    if (args.mode === "smoke" || args.mode === "stale-resume") {
+    if (args.mode === "smoke" || args.mode === "status" || args.mode === "stale-resume") {
         invariant(
             assistantMessage.status === "completed",
             `Expected a completed assistant message, got ${assistantMessage.status}.`,
@@ -1195,7 +1241,11 @@ async function main() {
             run.latestEventKind === "run_completed",
             `Expected latest run event kind run_completed, got ${run.latestEventKind}.`,
         );
-        assertSmokeContent(assistantMessage.content);
+        if (args.mode === "status") {
+            assertStatusContent(assistantMessage.content);
+        } else {
+            assertSmokeContent(assistantMessage.content);
+        }
         assertRunEventTimeline({
             events: runEvents,
             assistantMessageId: ids.assistantMessageId,
@@ -1208,6 +1258,39 @@ async function main() {
             expectedProvider: providerId,
             expectedStatus: "idle",
         });
+
+        if (args.mode === "status") {
+            const statusMessages = persistedMessages.filter(
+                (message) =>
+                    message.runId === outcome.runId &&
+                    message.kind === "assistant_status",
+            );
+            const outputMessages = persistedMessages.filter(
+                (message) =>
+                    message.runId === outcome.runId &&
+                    message.kind === "assistant_message",
+            );
+            invariant(
+                statusMessages.length >= 1,
+                "Expected at least one persisted assistant_status message for status mode.",
+            );
+            invariant(
+                outputMessages.length >= 1,
+                "Expected at least one persisted assistant_message for status mode.",
+            );
+            invariant(
+                statusMessages.some((message) => message.content.trim().length > 0),
+                "Expected persisted assistant_status content for status mode.",
+            );
+            invariant(
+                outputMessages.some(
+                    (message) =>
+                        message.localId === run.outputMessageLocalId &&
+                        message.content.trim().length > 0,
+                ),
+                "Expected the run output message to match a persisted assistant_message with content.",
+            );
+        }
 
         if (args.mode === "stale-resume") {
             invariant(

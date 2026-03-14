@@ -101,11 +101,11 @@ function createServices(client: ConvexClientInterface): ConvexAdapterServices {
                     kind: message.kind,
                     content: message.content,
                     contextContent: message.contextContent,
-                    thinking: message.thinking,
+                    reasoning: message.reasoning,
                     runMessageIndex: message.runMessageIndex ?? null,
                     modelId: message.modelId,
                     variantId: message.variantId ?? null,
-                    thinkingLevel: message.thinkingLevel,
+                    reasoningEffort: message.reasoningEffort,
                     createdAt: message.createdAt,
                 })) as string,
             getByLocalId: async ({ userId, localId }) =>
@@ -131,7 +131,7 @@ function createServices(client: ConvexClientInterface): ConvexAdapterServices {
                     id: id as ConvexId<"messages">,
                     content: message.content,
                     contextContent: message.contextContent,
-                    thinking: message.thinking,
+                    reasoning: message.reasoning,
                     runMessageIndex: message.runMessageIndex ?? null,
                     variantId: message.variantId ?? null,
                 });

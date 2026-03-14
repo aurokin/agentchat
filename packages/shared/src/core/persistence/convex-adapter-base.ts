@@ -41,11 +41,11 @@ export interface ConvexMessageLike {
     kind?: Message["kind"];
     content: string;
     contextContent: string;
-    thinking?: string;
+    reasoning?: string;
     modelId?: string;
     runMessageIndex?: number | null;
     variantId?: string | null;
-    thinkingLevel?: Message["thinkingLevel"];
+    reasoningEffort?: Message["reasoningEffort"];
     createdAt: number;
 }
 
@@ -280,11 +280,11 @@ export abstract class ConvexAdapterBase implements PersistenceAdapter {
             kind: msg.kind,
             content: msg.content,
             contextContent: msg.contextContent,
-            thinking: msg.thinking,
+            reasoning: msg.reasoning,
             modelId: msg.modelId,
             runMessageIndex: msg.runMessageIndex ?? null,
             variantId: msg.variantId ?? null,
-            thinkingLevel: msg.thinkingLevel,
+            reasoningEffort: msg.reasoningEffort,
             createdAt: msg.createdAt,
         };
     }

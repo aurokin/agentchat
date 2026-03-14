@@ -65,11 +65,11 @@ export interface ConvexMessage {
     contextContent: string;
     status?: Message["status"];
     runId?: Message["runId"];
-    thinking?: string;
+    reasoning?: string;
     runMessageIndex?: number | null;
     modelId?: string;
     variantId?: string | null;
-    thinkingLevel?: Message["thinkingLevel"];
+    reasoningEffort?: Message["reasoningEffort"];
     createdAt: number;
     updatedAt?: number | null;
     completedAt?: number | null;
@@ -141,11 +141,11 @@ export interface ConvexAPI {
                 kind?: Message["kind"];
                 content: string;
                 contextContent: string;
-                thinking?: string;
+                reasoning?: string;
                 runMessageIndex?: number | null;
                 modelId?: string;
                 variantId?: string | null;
-                thinkingLevel?: Message["thinkingLevel"];
+                reasoningEffort?: Message["reasoningEffort"];
                 createdAt: number;
             },
             ConvexId<"messages">
@@ -171,7 +171,7 @@ export interface ConvexAPI {
                 id: ConvexId<"messages">;
                 content: string;
                 contextContent: string;
-                thinking?: string;
+                reasoning?: string;
                 runMessageIndex?: number | null;
                 variantId?: string | null;
             },

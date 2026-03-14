@@ -3,7 +3,7 @@ import {
     modelSupportsSearch,
     modelSupportsReasoning,
     modelSupportsVision,
-    resolveThinkingLevelForVariant,
+    resolveReasoningEffortForVariant,
     SupportedParameter,
     type ProviderModel,
 } from "../models";
@@ -35,11 +35,13 @@ describe("model capabilities", () => {
         expect(modelSupportsVision(undefined)).toBe(false);
     });
 
-    it("uses provider variants directly without legacy aliases", () => {
-        expect(resolveThinkingLevelForVariant("low")).toBe("low");
-        expect(resolveThinkingLevelForVariant("medium")).toBe("medium");
-        expect(resolveThinkingLevelForVariant("high")).toBe("high");
-        expect(resolveThinkingLevelForVariant("minimal")).toBe("minimal");
-        expect(resolveThinkingLevelForVariant("unknown", "none")).toBe("none");
+    it("uses provider variants directly as reasoning efforts", () => {
+        expect(resolveReasoningEffortForVariant("low")).toBe("low");
+        expect(resolveReasoningEffortForVariant("medium")).toBe("medium");
+        expect(resolveReasoningEffortForVariant("high")).toBe("high");
+        expect(resolveReasoningEffortForVariant("minimal")).toBe("minimal");
+        expect(resolveReasoningEffortForVariant("unknown", "none")).toBe(
+            "none",
+        );
     });
 });

@@ -39,7 +39,7 @@ export type {
 };
 
 type MessageUpdate = Partial<
-    Pick<Message, "content" | "contextContent" | "thinking">
+    Pick<Message, "content" | "contextContent" | "reasoning">
 >;
 
 export type ConversationSendRuntimeDependencies = {
@@ -49,7 +49,7 @@ export type ConversationSendRuntimeDependencies = {
         content: string;
         contextContent: string;
         modelId: string;
-        thinkingLevel?: Message["thinkingLevel"];
+        reasoningEffort?: Message["reasoningEffort"];
         chatId: string;
     }) => Promise<Message>;
     updateChat: (chat: ChatSession) => Promise<void>;
@@ -127,7 +127,7 @@ export async function runConversationSend(params: {
         await params.dependencies.queueStreamingMessageUpdate({
             id: sendPlan.assistantMessage.id,
             content: "",
-            thinking: undefined,
+            reasoning: undefined,
         });
         await params.dependencies.ensureConnected();
         params.dependencies.sendCommand(sendPlan.command);

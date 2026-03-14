@@ -42,14 +42,14 @@ type UseConversationRuntimeParams = {
         content: string;
         contextContent: string;
         modelId?: string;
-        thinkingLevel?: Message["thinkingLevel"];
+        reasoningEffort?: Message["reasoningEffort"];
         chatId?: string;
     }) => Promise<Message>;
     insertMessage: (message: Message) => void;
     updateMessage: (
         id: string,
         updates: Partial<
-            Pick<Message, "content" | "contextContent" | "thinking">
+            Pick<Message, "content" | "contextContent" | "reasoning">
         >,
     ) => Promise<void>;
     patchMessage: (
@@ -57,7 +57,7 @@ type UseConversationRuntimeParams = {
         updates: Partial<
             Pick<
                 Message,
-                "content" | "contextContent" | "thinking" | "status" | "kind"
+                "content" | "contextContent" | "reasoning" | "status" | "kind"
             >
         >,
     ) => void;

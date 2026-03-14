@@ -59,16 +59,16 @@ interface ChatContextType {
         role: string;
         content: string;
         contextContent: string;
-        thinking?: string;
+        reasoning?: string;
         modelId?: string;
-        thinkingLevel?: Message["thinkingLevel"];
+        reasoningEffort?: Message["reasoningEffort"];
         chatId?: string;
     }) => Promise<Message>;
     insertMessage: (message: Message) => void;
     updateMessage: (
         id: string,
         updates: Partial<
-            Pick<Message, "content" | "contextContent" | "thinking">
+            Pick<Message, "content" | "contextContent" | "reasoning">
         >,
     ) => Promise<void>;
     patchMessage: (
@@ -76,7 +76,7 @@ interface ChatContextType {
         updates: Partial<
             Pick<
                 Message,
-                "content" | "contextContent" | "thinking" | "status" | "kind"
+                "content" | "contextContent" | "reasoning" | "status" | "kind"
             >
         >,
     ) => void;
@@ -454,9 +454,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             role: string;
             content: string;
             contextContent: string;
-            thinking?: string;
+            reasoning?: string;
             modelId?: string;
-            thinkingLevel?: Message["thinkingLevel"];
+            reasoningEffort?: Message["reasoningEffort"];
             chatId?: string;
         }): Promise<Message> => {
             const targetChatId = message.chatId ?? currentChat?.id;
@@ -468,9 +468,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 role: message.role as Message["role"],
                 content: message.content,
                 contextContent: message.contextContent,
-                thinking: message.thinking,
+                reasoning: message.reasoning,
                 modelId: message.modelId,
-                thinkingLevel: message.thinkingLevel,
+                reasoningEffort: message.reasoningEffort,
                 sessionId: targetChatId,
                 id: message.id ?? uuid(),
                 createdAt: Date.now(),
@@ -511,7 +511,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         async (
             id: string,
             updates: Partial<
-                Pick<Message, "content" | "contextContent" | "thinking">
+                Pick<Message, "content" | "contextContent" | "reasoning">
             >,
         ) => {
             let updatedMessage: Message | undefined;
@@ -571,7 +571,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                     Message,
                     | "content"
                     | "contextContent"
-                    | "thinking"
+                    | "reasoning"
                     | "status"
                     | "kind"
                 >

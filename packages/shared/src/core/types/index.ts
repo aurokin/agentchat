@@ -1,4 +1,4 @@
-export type ThinkingLevel =
+export type ReasoningEffort =
     | "xhigh"
     | "high"
     | "medium"
@@ -14,12 +14,12 @@ export interface Message {
     content: string;
     contextContent: string;
     status?: "draft" | "streaming" | "completed" | "interrupted" | "errored";
-    thinking?: string;
+    reasoning?: string;
     runId?: string | null;
     runMessageIndex?: number | null;
     modelId?: string;
     variantId?: string | null;
-    thinkingLevel?: ThinkingLevel;
+    reasoningEffort?: ReasoningEffort;
     createdAt: number;
     updatedAt?: number;
     completedAt?: number | null;

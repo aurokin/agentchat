@@ -2,10 +2,10 @@ import type {
     Message as SharedMessage,
     ChatSession as SharedChatSession,
     UserSettings as SharedUserSettings,
-    ThinkingLevel as SharedThinkingLevel,
+    ReasoningEffort as SharedReasoningEffort,
 } from "@shared/core/types";
 
-export type ThinkingLevel = SharedThinkingLevel;
+export type ReasoningEffort = SharedReasoningEffort;
 
 export interface Message extends SharedMessage {
     contextContent: string;

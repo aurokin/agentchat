@@ -10,19 +10,19 @@ import {
 describe("defaults", () => {
     it("returns last user settings", () => {
         const messages: Array<
-            Pick<Message, "role" | "modelId" | "variantId" | "thinkingLevel">
+            Pick<Message, "role" | "modelId" | "variantId" | "reasoningEffort">
         > = [
             {
                 role: "assistant",
                 modelId: "m1",
                 variantId: "low",
-                thinkingLevel: "low",
+                reasoningEffort: "low",
             },
             {
                 role: "user",
                 modelId: "m2",
                 variantId: "high",
-                thinkingLevel: "high",
+                reasoningEffort: "high",
             },
         ];
 
@@ -34,13 +34,13 @@ describe("defaults", () => {
 
     it("returns null when no user messages", () => {
         const messages: Array<
-            Pick<Message, "role" | "modelId" | "variantId" | "thinkingLevel">
+            Pick<Message, "role" | "modelId" | "variantId" | "reasoningEffort">
         > = [
             {
                 role: "assistant",
                 modelId: "m1",
                 variantId: "low",
-                thinkingLevel: "low",
+                reasoningEffort: "low",
             },
         ];
 

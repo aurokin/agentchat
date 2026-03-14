@@ -2,8 +2,8 @@ import type { ChatSession, Message } from "../types";
 
 export type { WorkspaceStatus } from "./types";
 export {
-    isThinkingLevel,
-    toThinkingLevel,
+    isReasoningEffort,
+    toReasoningEffort,
     mergeByIdWithPending,
     mapConvexChatToSession,
     mapConvexMessageToMessage,

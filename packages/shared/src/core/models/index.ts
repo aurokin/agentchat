@@ -1,4 +1,4 @@
-import type { ThinkingLevel } from "../types";
+import type { ReasoningEffort } from "../types";
 
 export const APP_DEFAULT_MODEL = "gpt-5.4";
 
@@ -43,7 +43,7 @@ export function modelSupportsVision(model: ProviderModel | undefined): boolean {
     );
 }
 
-const THINKING_LEVEL_VARIANTS = new Set<ThinkingLevel>([
+const REASONING_EFFORT_VARIANTS = new Set<ReasoningEffort>([
     "xhigh",
     "high",
     "medium",
@@ -52,16 +52,16 @@ const THINKING_LEVEL_VARIANTS = new Set<ThinkingLevel>([
     "none",
 ]);
 
-export function resolveThinkingLevelForVariant(
+export function resolveReasoningEffortForVariant(
     variantId: string | null | undefined,
-    fallback: ThinkingLevel = "none",
-): ThinkingLevel {
+    fallback: ReasoningEffort = "none",
+): ReasoningEffort {
     if (!variantId) {
         return fallback;
     }
 
-    if (THINKING_LEVEL_VARIANTS.has(variantId as ThinkingLevel)) {
-        return variantId as ThinkingLevel;
+    if (REASONING_EFFORT_VARIANTS.has(variantId as ReasoningEffort)) {
+        return variantId as ReasoningEffort;
     }
 
     return fallback;

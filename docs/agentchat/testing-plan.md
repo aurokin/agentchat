@@ -114,6 +114,7 @@ Purpose:
 Invocation:
 
 - `bun run test:manual:live-runtime-smoke`
+- `bun run test:manual:live-runtime-status`
 - `bun run test:manual:live-runtime-repeat`
 - `bun run test:manual:live-runtime-interrupt`
 - `bun run test:manual:stale-runtime-resume`
@@ -128,6 +129,7 @@ Coverage targets:
 - mint a backend session token
 - connect to the local websocket transport
 - send a live Codex turn
+- probe whether provider-native `assistant_status` messages persist before the final assistant reply when Codex emits reasoning events
 - persist completed and interrupted run state back into Convex
 - verify assistant message and run status after the socket flow completes
 - verify terminal runtime bindings settle to the expected persisted idle state
@@ -233,6 +235,7 @@ Current manual confidence command:
 
 - `bun run test:manual:codex-confidence`
 - `bun run test:manual:live-runtime-smoke`
+- `bun run test:manual:live-runtime-status`
 - `bun run test:manual:live-runtime-repeat`
 - `bun run test:manual:live-runtime-interrupt`
 - `bun run test:manual:stale-runtime-resume`

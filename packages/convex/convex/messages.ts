@@ -135,11 +135,11 @@ export const create = mutation({
         ),
         content: v.string(),
         contextContent: v.string(),
-        thinking: v.optional(v.string()),
+        reasoning: v.optional(v.string()),
         modelId: v.optional(v.string()),
         runMessageIndex: v.optional(v.union(v.number(), v.null())),
         variantId: v.union(v.string(), v.null()),
-        thinkingLevel: v.optional(v.string()),
+        reasoningEffort: v.optional(v.string()),
         createdAt: v.optional(v.number()),
     },
     handler: async (ctx, args) => {
@@ -153,7 +153,11 @@ export const create = mutation({
             LIMITS.maxMessageContextChars,
             "contextContent",
         );
-        assertMaxLen(args.thinking, LIMITS.maxMessageThinkingChars, "thinking");
+        assertMaxLen(
+            args.reasoning,
+            LIMITS.maxMessageReasoningChars,
+            "reasoning",
+        );
 
         const chat = await ctx.db.get(args.chatId);
         if (!isOwner(chat, authenticatedUserId)) {
@@ -184,11 +188,11 @@ export const create = mutation({
                     ? "draft"
                     : "completed",
             runId: null,
-            thinking: args.thinking,
+            reasoning: args.reasoning,
             runMessageIndex: args.runMessageIndex ?? null,
             modelId: args.modelId,
             variantId: args.variantId,
-            thinkingLevel: args.thinkingLevel,
+            reasoningEffort: args.reasoningEffort,
             createdAt: args.createdAt ?? now,
             updatedAt: args.createdAt ?? now,
             completedAt:
@@ -216,7 +220,7 @@ export const update = mutation({
         id: v.id("messages"),
         content: v.optional(v.string()),
         contextContent: v.optional(v.string()),
-        thinking: v.optional(v.string()),
+        reasoning: v.optional(v.string()),
         runMessageIndex: v.optional(v.union(v.number(), v.null())),
         variantId: v.optional(v.union(v.string(), v.null())),
     },
@@ -233,7 +237,11 @@ export const update = mutation({
             LIMITS.maxMessageContextChars,
             "contextContent",
         );
-        assertMaxLen(args.thinking, LIMITS.maxMessageThinkingChars, "thinking");
+        assertMaxLen(
+            args.reasoning,
+            LIMITS.maxMessageReasoningChars,
+            "reasoning",
+        );
 
         const { id, ...updates } = args;
         const filteredUpdates = Object.fromEntries(

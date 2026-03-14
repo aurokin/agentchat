@@ -66,7 +66,7 @@ interface ChatContextValue {
         updates: Partial<
             Pick<
                 Message,
-                "content" | "contextContent" | "thinking" | "status" | "kind"
+                "content" | "contextContent" | "reasoning" | "status" | "kind"
             >
         >,
     ) => void;
@@ -537,7 +537,7 @@ export function ChatProvider({
             updates: Partial<
                 Pick<
                     Message,
-                    "content" | "contextContent" | "thinking" | "status"
+                    "content" | "contextContent" | "reasoning" | "status"
                 >
             >,
         ) => {

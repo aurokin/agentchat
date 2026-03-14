@@ -27,12 +27,11 @@ This roadmap describes the current implementation state and the next major steps
 - Keep Codex-backed model and variant discovery well-tested and operator-friendly
 - Plan and implement local multi-user auth in a provider-oriented way so Agentchat is not limited to Google or disabled-auth forever
 - Investigate Codex model and variant mapping in the live product path
-- Remove the remaining legacy thinking-toggle assumptions so Codex model and variant selection stays direct
 - Verify whether Codex Spark is functioning correctly in the current integration
-- Make mobile theme default honor the device system theme correctly, especially iOS dark mode
 - Expand provider-native runtime item mapping so multi-message output follows real Codex events instead of transcript inference
   - emit first-class progress/status items when the provider gives us typed runtime events
   - keep transcript formatting cleanup separate from transcript structure
+- Validate provider-native `assistant_status` items with real Codex turns and keep them covered by manual smoke commands
 - Improve operator-facing diagnostics and health reporting
 - Build a practical testing stack around the dedicated local fixtures in `/home/auro/agents/agentchat_test`
 - Keep the active roadmap narrowly focused on Codex confidence rather than adding more providers
@@ -55,6 +54,7 @@ This roadmap describes the current implementation state and the next major steps
 - Add integration coverage across `apps/server`, Convex ingress, and websocket runtime flow
 - Keep generated Convex bindings in sync with the live deployment before manual confidence passes
 - Run `bun run test:manual:live-runtime-smoke` against a real local `apps/server` instance to verify the full Codex plus Convex persistence path
+- Run `bun run test:manual:live-runtime-status` to verify a real Codex turn persists both `assistant_status` and `assistant_message` transcript items
 - Use `bun run test:manual:live-runtime-repeat` when you need a small manually-invoked flake probe across repeated smoke turns
 - Run `bun run test:manual:live-runtime-interrupt` to verify partial-output retention and interrupted run persistence
 - Keep live runtime smoke assertions on terminal runtime bindings and persisted run-event timelines, not just final transcript rows

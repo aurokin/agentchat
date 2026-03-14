@@ -130,10 +130,10 @@ export function MessageList({
 }
 
 function ReasoningSection({
-    thinking,
+    reasoning,
     isStreaming,
 }: {
-    thinking: string;
+    reasoning: string;
     isStreaming?: boolean;
 }) {
     const [isExpanded, setIsExpanded] = useState(false);
@@ -167,7 +167,7 @@ function ReasoningSection({
             {isExpanded && (
                 <div className="px-4 pb-3 border-t border-warning/20">
                     <p className="text-foreground text-sm whitespace-pre-wrap mono leading-relaxed pt-3 max-h-64 sm:max-h-96 overflow-y-auto">
-                        {thinking}
+                        {reasoning}
                     </p>
                 </div>
             )}
@@ -217,14 +217,14 @@ function MessageItem({
                     isUser ? "items-end" : "items-start",
                 )}
             >
-                {message.thinking && (
+                {message.reasoning && (
                     <ReasoningSection
-                        thinking={message.thinking}
+                        reasoning={message.reasoning}
                         isStreaming={sending && !message.content}
                     />
                 )}
 
-                {!(sending && message.thinking && !message.content) && (
+                {!(sending && message.reasoning && !message.content) && (
                     <div className="inline-flex max-w-[90%]">
                         <div
                             className={cn(
@@ -280,18 +280,18 @@ function MessageItem({
                         {format(message.createdAt, "h:mm a")}
                     </span>
 
-                    {((message.thinkingLevel &&
-                        message.thinkingLevel !== "none") ||
+                    {((message.reasoningEffort &&
+                        message.reasoningEffort !== "none") ||
                         message.modelId) && (
                         <span className="w-px h-3 bg-border" />
                     )}
 
-                    {message.thinkingLevel &&
-                        message.thinkingLevel !== "none" && (
+                    {message.reasoningEffort &&
+                        message.reasoningEffort !== "none" && (
                             <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-warning/10 border border-warning/20 text-warning">
                                 <Brain size={10} />
                                 <span className="uppercase tracking-wider font-medium">
-                                    {message.thinkingLevel}
+                                    {message.reasoningEffort}
                                 </span>
                             </span>
                         )}

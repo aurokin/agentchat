@@ -3,7 +3,7 @@ export interface Message {
     sessionId: string;
     role: "user" | "assistant" | "system";
     content: string;
-    thinking?: string;
+    reasoning?: string;
     createdAt: number;
 }
 
@@ -12,7 +12,7 @@ export interface ChatSession {
     agentId: string;
     title: string;
     modelId: string;
-    thinkingEnabled: boolean;
+    reasoningEnabled: boolean;
     createdAt: number;
     updatedAt: number;
 }
