@@ -45,6 +45,7 @@ export interface ServerEvent {
         | "connection.ready"
         | "connection.error"
         | "run.started"
+        | "message.started"
         | "run.completed"
         | "run.failed"
         | "run.interrupted"

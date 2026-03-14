@@ -19,12 +19,15 @@ type ActiveTurn = {
     runId: string;
     userId: string;
     triggerMessageId: string;
-    assistantMessageId: string;
     turnId: string | null;
+    currentMessageId: string;
+    currentMessageKind: "assistant_message" | "assistant_status";
+    currentMessageIndex: number;
     text: string;
     nextSequence: number;
     lastPersistedContent: string;
     pendingDeltaFlush: ReturnType<typeof setTimeout> | null;
+    hasSplitTranscript: boolean;
     reject: (error: Error) => void;
     resolve: () => void;
 };
@@ -148,6 +151,22 @@ function resolveCodexEffort(command: ConversationSendCommand): string {
     }
 }
 
+const REPORT_HEADING_PATTERN =
+    /\n{2,}(Report|Assessment|Structure|Summary|Findings?|Recommendations?|Notable details|What [^\n:]+)\n/i;
+
+function detectTranscriptSplitBoundary(text: string): number | null {
+    if (text.length < 48) {
+        return null;
+    }
+
+    const match = REPORT_HEADING_PATTERN.exec(text);
+    if (!match || match.index <= 0) {
+        return null;
+    }
+
+    return match.index + (match[0].startsWith("\n\n") ? 2 : 0);
+}
+
 export class CodexRuntimeManager {
     private readonly runtimes = new Map<string, ConversationRuntime>();
     private readonly getConfig: () => AgentchatConfig;
@@ -193,18 +212,32 @@ export class CodexRuntimeManager {
                 messageId: params.command.payload.assistantMessageId,
             }),
         );
+        this.emitToSubscribers(
+            runtime,
+            createServerEvent("message.started", {
+                conversationId: params.command.payload.conversationId,
+                runId,
+                messageId: params.command.payload.assistantMessageId,
+                messageIndex: 0,
+                kind: "assistant_message",
+                content: "",
+            }),
+        );
 
         await new Promise<void>(async (resolve, reject) => {
             runtime.activeTurn = {
                 runId,
                 userId: params.userId,
                 triggerMessageId: params.command.payload.userMessageId,
-                assistantMessageId: params.command.payload.assistantMessageId,
                 turnId: null,
+                currentMessageId: params.command.payload.assistantMessageId,
+                currentMessageKind: "assistant_message",
+                currentMessageIndex: 0,
                 text: "",
-                nextSequence: 2,
+                nextSequence: 3,
                 lastPersistedContent: "",
                 pendingDeltaFlush: null,
+                hasSplitTranscript: false,
                 reject,
                 resolve,
             };
@@ -290,7 +323,7 @@ export class CodexRuntimeManager {
                             conversationLocalId:
                                 params.command.payload.conversationId,
                             assistantMessageLocalId:
-                                failedTurn.assistantMessageId,
+                                failedTurn.currentMessageId,
                             externalRunId: failedTurn.runId,
                             sequence: failedTurn.nextSequence,
                             content: failedTurn.text,
@@ -390,7 +423,17 @@ export class CodexRuntimeManager {
             createServerEvent("run.started", {
                 conversationId: runtime.conversationId,
                 runId: runtime.activeTurn.runId,
-                messageId: runtime.activeTurn.assistantMessageId,
+                messageId: runtime.activeTurn.currentMessageId,
+            }),
+        );
+        params.sendEvent(
+            createServerEvent("message.started", {
+                conversationId: runtime.conversationId,
+                runId: runtime.activeTurn.runId,
+                messageId: runtime.activeTurn.currentMessageId,
+                messageIndex: runtime.activeTurn.currentMessageIndex,
+                kind: runtime.activeTurn.currentMessageKind,
+                content: runtime.activeTurn.text,
             }),
         );
 
@@ -398,7 +441,7 @@ export class CodexRuntimeManager {
             params.sendEvent(
                 createServerEvent("message.delta", {
                     conversationId: runtime.conversationId,
-                    messageId: runtime.activeTurn.assistantMessageId,
+                    messageId: runtime.activeTurn.currentMessageId,
                     delta: runtime.activeTurn.text,
                     content: runtime.activeTurn.text,
                 }),
@@ -577,7 +620,7 @@ export class CodexRuntimeManager {
                     runtime,
                     createServerEvent("message.completed", {
                         conversationId: runtime.conversationId,
-                        messageId: activeTurn.assistantMessageId,
+                        messageId: activeTurn.currentMessageId,
                         content: activeTurn.text,
                     }),
                 );
@@ -589,7 +632,7 @@ export class CodexRuntimeManager {
                 .runFailed({
                     userId: activeTurn.userId,
                     conversationLocalId: runtime.conversationId,
-                    assistantMessageLocalId: activeTurn.assistantMessageId,
+                    assistantMessageLocalId: activeTurn.currentMessageId,
                     externalRunId: activeTurn.runId,
                     sequence,
                     content: activeTurn.text,
@@ -660,11 +703,12 @@ export class CodexRuntimeManager {
             }
 
             activeTurn.text += delta;
+            this.splitActiveTurnIfNeeded(runtime, activeTurn);
             this.emitToSubscribers(
                 runtime,
                 createServerEvent("message.delta", {
                     conversationId: runtime.conversationId,
-                    messageId: activeTurn.assistantMessageId,
+                    messageId: activeTurn.currentMessageId,
                     delta,
                     content: activeTurn.text,
                 }),
@@ -678,7 +722,7 @@ export class CodexRuntimeManager {
                 runtime,
                 createServerEvent("message.completed", {
                     conversationId: runtime.conversationId,
-                    messageId: activeTurn.assistantMessageId,
+                    messageId: activeTurn.currentMessageId,
                     content: activeTurn.text,
                 }),
             );
@@ -691,7 +735,7 @@ export class CodexRuntimeManager {
                 .runInterrupted({
                     userId: activeTurn.userId,
                     conversationLocalId: runtime.conversationId,
-                    assistantMessageLocalId: activeTurn.assistantMessageId,
+                    assistantMessageLocalId: activeTurn.currentMessageId,
                     externalRunId: activeTurn.runId,
                     sequence,
                     content: activeTurn.text,
@@ -733,7 +777,7 @@ export class CodexRuntimeManager {
             runtime,
             createServerEvent("message.completed", {
                 conversationId: runtime.conversationId,
-                messageId: activeTurn.assistantMessageId,
+                messageId: activeTurn.currentMessageId,
                 content: activeTurn.text,
             }),
         );
@@ -747,7 +791,7 @@ export class CodexRuntimeManager {
                 .runCompleted({
                     userId: activeTurn.userId,
                     conversationLocalId: runtime.conversationId,
-                    assistantMessageLocalId: activeTurn.assistantMessageId,
+                    assistantMessageLocalId: activeTurn.currentMessageId,
                     externalRunId: activeTurn.runId,
                     sequence,
                     content: activeTurn.text,
@@ -779,7 +823,7 @@ export class CodexRuntimeManager {
                 .runInterrupted({
                     userId: activeTurn.userId,
                     conversationLocalId: runtime.conversationId,
-                    assistantMessageLocalId: activeTurn.assistantMessageId,
+                    assistantMessageLocalId: activeTurn.currentMessageId,
                     externalRunId: activeTurn.runId,
                     sequence,
                     content: activeTurn.text,
@@ -810,7 +854,7 @@ export class CodexRuntimeManager {
             .runFailed({
                 userId: activeTurn.userId,
                 conversationLocalId: runtime.conversationId,
-                assistantMessageLocalId: activeTurn.assistantMessageId,
+                assistantMessageLocalId: activeTurn.currentMessageId,
                 externalRunId: activeTurn.runId,
                 sequence,
                 content: activeTurn.text,
@@ -836,6 +880,90 @@ export class CodexRuntimeManager {
         runtime.activeTurn = null;
         this.scheduleIdleExpiration(runtime);
         activeTurn.reject(new Error(errorMessage));
+    }
+
+    private splitActiveTurnIfNeeded(
+        runtime: ConversationRuntime,
+        activeTurn: ActiveTurn,
+    ): void {
+        if (activeTurn.hasSplitTranscript) {
+            return;
+        }
+
+        const boundaryIndex = detectTranscriptSplitBoundary(activeTurn.text);
+        if (boundaryIndex === null) {
+            return;
+        }
+
+        const previousContent =
+            trimTrailingMessageContent(
+                activeTurn.text.slice(0, boundaryIndex),
+            ) ?? "";
+        const nextContent =
+            trimLeadingMessageContent(activeTurn.text.slice(boundaryIndex)) ??
+            "";
+
+        if (!previousContent || !nextContent) {
+            return;
+        }
+
+        this.cancelPendingMessageDelta(activeTurn);
+        activeTurn.hasSplitTranscript = true;
+        activeTurn.text = nextContent;
+        activeTurn.lastPersistedContent = nextContent;
+
+        const previousMessageId = activeTurn.currentMessageId;
+        const nextMessageId = crypto.randomUUID();
+        const previousCompletedSequence = activeTurn.nextSequence++;
+        const messageStartedSequence = activeTurn.nextSequence++;
+        const createdAt = Date.now();
+
+        this.emitToSubscribers(
+            runtime,
+            createServerEvent("message.completed", {
+                conversationId: runtime.conversationId,
+                messageId: previousMessageId,
+                content: previousContent,
+            }),
+        );
+
+        activeTurn.currentMessageId = nextMessageId;
+        activeTurn.currentMessageKind = "assistant_message";
+        activeTurn.currentMessageIndex += 1;
+
+        this.emitToSubscribers(
+            runtime,
+            createServerEvent("message.started", {
+                conversationId: runtime.conversationId,
+                runId: activeTurn.runId,
+                messageId: activeTurn.currentMessageId,
+                messageIndex: activeTurn.currentMessageIndex,
+                kind: activeTurn.currentMessageKind,
+                content: activeTurn.text,
+            }),
+        );
+
+        void this.persistence
+            .messageStarted({
+                userId: activeTurn.userId,
+                conversationLocalId: runtime.conversationId,
+                previousAssistantMessageLocalId: previousMessageId,
+                previousCompletedSequence,
+                assistantMessageLocalId: nextMessageId,
+                messageStartedSequence,
+                externalRunId: activeTurn.runId,
+                kind: "assistant_message",
+                runMessageIndex: activeTurn.currentMessageIndex,
+                previousContent,
+                content: nextContent,
+                createdAt,
+            })
+            .catch((error) => {
+                console.error(
+                    "[agentchat-server] failed to persist split output message",
+                    error,
+                );
+            });
     }
 
     private scheduleIdleExpiration(runtime: ConversationRuntime): void {
@@ -914,7 +1042,7 @@ export class CodexRuntimeManager {
         await this.persistence.messageDelta({
             userId: activeTurn.userId,
             conversationLocalId: runtime.conversationId,
-            assistantMessageLocalId: activeTurn.assistantMessageId,
+            assistantMessageLocalId: activeTurn.currentMessageId,
             externalRunId: activeTurn.runId,
             sequence: activeTurn.nextSequence++,
             content: activeTurn.text,
@@ -922,6 +1050,16 @@ export class CodexRuntimeManager {
             createdAt: Date.now(),
         });
     }
+}
+
+function trimLeadingMessageContent(value: string): string | undefined {
+    const trimmed = value.replace(/^\s+/, "");
+    return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function trimTrailingMessageContent(value: string): string | undefined {
+    const trimmed = value.replace(/\s+$/, "");
+    return trimmed.length > 0 ? trimmed : undefined;
 }
 
 function resolveRuntimeResources(

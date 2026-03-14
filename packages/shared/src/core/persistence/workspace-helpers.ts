@@ -59,11 +59,13 @@ export interface ConvexMessageLike {
     _id: string;
     localId?: string | null;
     role: Message["role"];
+    kind?: Message["kind"] | null;
     content: string;
     contextContent: string;
     thinking?: string | null;
     status?: Message["status"] | null;
     runId?: string | null;
+    runMessageIndex?: number | null;
     modelId?: string | null;
     variantId?: string | null;
     thinkingLevel?: string | null;
@@ -93,11 +95,13 @@ export function mapConvexMessageToMessage(
         id: msg.localId ?? msg._id,
         sessionId: chatLocalId,
         role: msg.role,
+        kind: msg.kind ?? undefined,
         content: msg.content,
         contextContent: msg.contextContent,
         status: msg.status ?? undefined,
         thinking: msg.thinking ?? undefined,
         runId: msg.runId ?? null,
+        runMessageIndex: msg.runMessageIndex ?? null,
         modelId: msg.modelId ?? undefined,
         variantId: msg.variantId ?? null,
         thinkingLevel: toThinkingLevel(msg.thinkingLevel),

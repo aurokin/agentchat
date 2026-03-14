@@ -170,6 +170,7 @@ function createPersistence(
         }>,
         runtimeBindingCalls: [] as Array<Record<string, unknown>>,
         runStartedCalls: [] as Array<Record<string, unknown>>,
+        messageStartedCalls: [] as Array<Record<string, unknown>>,
         runCompletedCalls: [] as Array<Record<string, unknown>>,
         runFailedCalls: [] as Array<Record<string, unknown>>,
         runInterruptedCalls: [] as Array<Record<string, unknown>>,
@@ -199,6 +200,9 @@ function createPersistence(
         },
         async runStarted(payload: Record<string, unknown>) {
             this.runStartedCalls.push(payload);
+        },
+        async messageStarted(payload: Record<string, unknown>) {
+            this.messageStartedCalls.push(payload);
         },
         async messageDelta() {
             return undefined;
@@ -343,6 +347,7 @@ describe("CodexRuntimeManager", () => {
         ]);
         expect(events.map((event) => event.type)).toEqual([
             "run.started",
+            "message.started",
             "message.completed",
             "run.completed",
         ]);
@@ -512,6 +517,17 @@ describe("CodexRuntimeManager", () => {
                 },
             },
             {
+                type: "message.started",
+                payload: {
+                    conversationId: "chat-1",
+                    runId: expect.any(String),
+                    messageId: "assistant-1",
+                    messageIndex: 0,
+                    kind: "assistant_message",
+                    content: "Working on it",
+                },
+            },
+            {
                 type: "message.delta",
                 payload: {
                     conversationId: "chat-1",
@@ -531,6 +547,68 @@ describe("CodexRuntimeManager", () => {
             },
         });
         await sendPromise;
+    });
+
+    test("splits report-style Codex output into a second assistant transcript message", async () => {
+        const config = createConfig();
+        const persistence = createPersistence(null);
+        const fakeClient = new FakeCodexClient({
+            startedThreadId: "thread-fresh",
+            autoComplete: false,
+        });
+        const events: Array<{
+            type: string;
+            payload: Record<string, unknown>;
+        }> = [];
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: () => fakeClient,
+        });
+
+        const sendPromise = manager.sendMessage({
+            userSub: "sub-1",
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: (event) => {
+                events.push(event);
+            },
+        });
+
+        await Bun.sleep(0);
+        fakeClient.emit({
+            method: "item/agentMessage/delta",
+            params: {
+                delta: "I’m surveying the workspace first.\n\nReport\n- Done",
+            },
+        });
+        await Bun.sleep(300);
+        fakeClient.emit({
+            method: "turn/completed",
+            params: {
+                turn: {
+                    status: "completed",
+                },
+            },
+        });
+        await sendPromise;
+
+        expect(events.map((event) => event.type)).toEqual([
+            "run.started",
+            "message.started",
+            "message.completed",
+            "message.started",
+            "message.delta",
+            "message.completed",
+            "run.completed",
+        ]);
+        expect(persistence.messageStartedCalls).toHaveLength(1);
+        expect(persistence.messageStartedCalls[0]).toMatchObject({
+            previousAssistantMessageLocalId: "assistant-1",
+            kind: "assistant_message",
+            runMessageIndex: 1,
+        });
     });
 
     test("treats turn/aborted as a terminal interrupted run", async () => {
@@ -578,6 +656,7 @@ describe("CodexRuntimeManager", () => {
 
         expect(events.map((event) => event.type)).toEqual([
             "run.started",
+            "message.started",
             "message.delta",
             "message.completed",
             "run.interrupted",
@@ -614,6 +693,7 @@ describe("CodexRuntimeManager", () => {
 
         expect(events.map((event) => event.type)).toEqual([
             "run.started",
+            "message.started",
             "run.failed",
         ]);
         expect(persistence.runFailedCalls).toHaveLength(1);
@@ -671,6 +751,7 @@ describe("CodexRuntimeManager", () => {
 
         expect(events.map((event) => event.type)).toEqual([
             "run.started",
+            "message.started",
             "message.delta",
             "message.completed",
             "run.failed",

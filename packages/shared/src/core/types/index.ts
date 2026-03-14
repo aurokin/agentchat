@@ -10,11 +10,13 @@ export interface Message {
     id: string;
     sessionId: string;
     role: "user" | "assistant" | "system";
+    kind?: "user" | "assistant_message" | "assistant_status" | "system";
     content: string;
     contextContent: string;
     status?: "draft" | "streaming" | "completed" | "interrupted" | "errored";
     thinking?: string;
     runId?: string | null;
+    runMessageIndex?: number | null;
     modelId?: string;
     variantId?: string | null;
     thinkingLevel?: ThinkingLevel;

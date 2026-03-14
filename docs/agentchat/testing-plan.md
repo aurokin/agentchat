@@ -99,6 +99,7 @@ Coverage targets:
 - Codex thread start/resume fallback behavior
 - Codex turn-start failure persistence and errored binding repair
 - Codex mid-stream runtime exit handling with partial-output failure persistence
+- multi-message assistant output boundaries, including `message.started`
 - disabled provider / disabled agent handling
 - operator diagnostics for invalid paths and fallback defaults
 

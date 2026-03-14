@@ -54,7 +54,15 @@ interface ChatContextValue {
     addMessage: (
         message: Omit<Message, "createdAt" | "id"> & { id?: string },
     ) => Promise<Message>;
+    insertMessage: (message: Message) => void;
     updateMessage: (message: Message) => Promise<void>;
+    patchMessage: (
+        id: string,
+        chatId: string,
+        updates: Partial<
+            Pick<Message, "content" | "contextContent" | "thinking" | "status">
+        >,
+    ) => void;
     setDefaultModel: (modelId: string) => void;
 }
 
@@ -488,6 +496,45 @@ export function ChatProvider({
         [adapter, currentChat],
     );
 
+    const insertMessage = useCallback((message: Message) => {
+        setMessages((prev) => {
+            const chatMessages = prev[message.sessionId] || [];
+            if (chatMessages.some((existing) => existing.id === message.id)) {
+                return prev;
+            }
+            return {
+                ...prev,
+                [message.sessionId]: [...chatMessages, message],
+            };
+        });
+    }, []);
+
+    const patchMessage = useCallback(
+        (
+            id: string,
+            chatId: string,
+            updates: Partial<
+                Pick<
+                    Message,
+                    "content" | "contextContent" | "thinking" | "status"
+                >
+            >,
+        ) => {
+            setMessages((prev) => {
+                const chatMessages = prev[chatId] || [];
+                return {
+                    ...prev,
+                    [chatId]: chatMessages.map((message) =>
+                        message.id === id
+                            ? { ...message, ...updates }
+                            : message,
+                    ),
+                };
+            });
+        },
+        [],
+    );
+
     const setDefaultModel = useCallback(
         (modelId: string) => {
             void selectModel(modelId);
@@ -523,7 +570,9 @@ export function ChatProvider({
                 loadMessages,
                 hasMessagesInChats,
                 addMessage,
+                insertMessage,
                 updateMessage,
+                patchMessage,
                 setDefaultModel,
             }}
         >

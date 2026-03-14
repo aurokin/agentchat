@@ -289,9 +289,21 @@ export type SocketEventResolution =
           streamingMessage: StreamingMessageState | null;
       }
     | {
+          type: "message.started";
+          activeRun: ActiveRunState;
+          message: Message;
+          streamingMessage: StreamingMessageState;
+      }
+    | {
           type: "message.updated";
           activeRun: ActiveRunState;
           streamingMessage: StreamingMessageState;
+      }
+    | {
+          type: "message.completed";
+          activeRun: ActiveRunState;
+          messageId: string;
+          finalContent: string;
       }
     | {
           type: "run.completed" | "run.interrupted";
@@ -356,6 +368,51 @@ export function resolveConversationSocketEvent(params: {
         };
     }
 
+    if (params.event.type === "message.started") {
+        const event = params.event as Extract<
+            AgentchatSocketEvent,
+            { type: "message.started" }
+        >;
+        const existingMessage =
+            params.messages.find(
+                (message) => message.id === event.payload.messageId,
+            ) ?? null;
+        const nextMessage: Message = existingMessage ?? {
+            id: event.payload.messageId,
+            sessionId: event.payload.conversationId,
+            role: "assistant",
+            kind: event.payload.kind,
+            content: event.payload.content,
+            contextContent: event.payload.content,
+            status: "streaming",
+            runId: event.payload.runId,
+            runMessageIndex: event.payload.messageIndex,
+            createdAt: Date.now(),
+        };
+        const nextActiveRun: ActiveRunState = {
+            conversationId: event.payload.conversationId,
+            assistantMessageId: event.payload.messageId,
+            userContent:
+                params.activeRun?.userContent ??
+                findLatestUserContentBeforeMessage(
+                    params.messages,
+                    event.payload.messageId,
+                ),
+            content: event.payload.content,
+            runId: event.payload.runId,
+        };
+
+        return {
+            type: "message.started",
+            activeRun: nextActiveRun,
+            message: nextMessage,
+            streamingMessage: {
+                id: nextMessage.id,
+                content: nextMessage.content,
+            },
+        };
+    }
+
     if (!params.activeRun) {
         return { type: "ignore" };
     }
@@ -368,10 +425,7 @@ export function resolveConversationSocketEvent(params: {
         return { type: "ignore" };
     }
 
-    if (
-        params.event.type === "message.delta" ||
-        params.event.type === "message.completed"
-    ) {
+    if (params.event.type === "message.delta") {
         const nextActiveRun = {
             ...params.activeRun,
             content: params.event.payload.content,
@@ -384,6 +438,22 @@ export function resolveConversationSocketEvent(params: {
                 id: nextActiveRun.assistantMessageId,
                 content: params.event.payload.content,
             },
+        };
+    }
+
+    if (params.event.type === "message.completed") {
+        return {
+            type: "message.completed",
+            activeRun:
+                params.event.payload.messageId ===
+                params.activeRun.assistantMessageId
+                    ? {
+                          ...params.activeRun,
+                          content: params.event.payload.content,
+                      }
+                    : params.activeRun,
+            messageId: params.event.payload.messageId,
+            finalContent: params.event.payload.content,
         };
     }
 

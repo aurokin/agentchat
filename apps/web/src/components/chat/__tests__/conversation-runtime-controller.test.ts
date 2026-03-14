@@ -480,6 +480,60 @@ describe("conversation runtime controller", () => {
         });
     });
 
+    test("starts a second assistant transcript message within an active run", () => {
+        const event: AgentchatSocketEvent = {
+            type: "message.started",
+            payload: {
+                conversationId: "chat-1",
+                runId: "run-1",
+                messageId: "assistant-2",
+                messageIndex: 1,
+                kind: "assistant_message",
+                content: "Report\n- Done",
+            },
+        };
+
+        expect(
+            resolveConversationSocketEvent({
+                currentChatId: "chat-1",
+                event,
+                activeRun: {
+                    conversationId: "chat-1",
+                    assistantMessageId: "assistant-1",
+                    userContent: "Recover this",
+                    content: "Status update",
+                    runId: "run-1",
+                },
+                messages: createMessages(),
+            }),
+        ).toEqual({
+            type: "message.started",
+            activeRun: {
+                conversationId: "chat-1",
+                assistantMessageId: "assistant-2",
+                userContent: "Recover this",
+                content: "Report\n- Done",
+                runId: "run-1",
+            },
+            message: {
+                id: "assistant-2",
+                sessionId: "chat-1",
+                role: "assistant",
+                kind: "assistant_message",
+                content: "Report\n- Done",
+                contextContent: "Report\n- Done",
+                status: "streaming",
+                runId: "run-1",
+                runMessageIndex: 1,
+                createdAt: expect.any(Number),
+            },
+            streamingMessage: {
+                id: "assistant-2",
+                content: "Report\n- Done",
+            },
+        });
+    });
+
     test("produces retry metadata for failed runs", () => {
         const event: AgentchatSocketEvent = {
             type: "run.failed",

@@ -63,12 +63,19 @@ interface ChatContextType {
         thinkingLevel?: Message["thinkingLevel"];
         chatId?: string;
     }) => Promise<Message>;
+    insertMessage: (message: Message) => void;
     updateMessage: (
         id: string,
         updates: Partial<
             Pick<Message, "content" | "contextContent" | "thinking">
         >,
     ) => Promise<void>;
+    patchMessage: (
+        id: string,
+        updates: Partial<
+            Pick<Message, "content" | "contextContent" | "thinking" | "status">
+        >,
+    ) => void;
     clearCurrentChat: () => void;
 }
 
@@ -522,6 +529,41 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         [currentChat, persistenceAdapter],
     );
 
+    const insertMessage = useCallback(
+        (message: Message) => {
+            if (currentChat?.id !== message.sessionId) {
+                return;
+            }
+
+            setMessages((prev) => {
+                if (prev.some((existing) => existing.id === message.id)) {
+                    return prev;
+                }
+                return [...prev, message];
+            });
+        },
+        [currentChat],
+    );
+
+    const patchMessage = useCallback(
+        (
+            id: string,
+            updates: Partial<
+                Pick<
+                    Message,
+                    "content" | "contextContent" | "thinking" | "status"
+                >
+            >,
+        ) => {
+            setMessages((prev) =>
+                prev.map((message) =>
+                    message.id === id ? { ...message, ...updates } : message,
+                ),
+            );
+        },
+        [],
+    );
+
     const clearCurrentChat = useCallback(() => {
         setCurrentChat(null);
         setMessages([]);
@@ -546,7 +588,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 deleteChat,
                 updateChat,
                 addMessage,
+                insertMessage,
                 updateMessage,
+                patchMessage,
                 clearCurrentChat,
             }}
         >

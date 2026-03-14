@@ -45,6 +45,10 @@ export class RuntimePersistenceClient {
         await this.post("/runtime/run-started", payload);
     }
 
+    async messageStarted(payload: RuntimeEventPayload): Promise<void> {
+        await this.post("/runtime/message-started", payload);
+    }
+
     async messageDelta(payload: RuntimeEventPayload): Promise<void> {
         await this.post("/runtime/message-delta", payload);
     }

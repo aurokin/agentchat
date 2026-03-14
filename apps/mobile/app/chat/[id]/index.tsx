@@ -71,7 +71,9 @@ export default function ChatScreen(): ReactElement {
         defaultModel,
         selectChat,
         addMessage,
+        insertMessage,
         updateMessage,
+        patchMessage,
         createChat,
         deleteChat,
         updateChat,
@@ -411,6 +413,37 @@ export default function ChatScreen(): ReactElement {
                 return;
             }
 
+            if (resolution.type === "message.started") {
+                insertMessage(resolution.message);
+                setActiveRun(resolution.activeRun);
+                setStreamingMessage(resolution.streamingMessage);
+                return;
+            }
+
+            if (resolution.type === "message.completed") {
+                patchMessage(
+                    resolution.messageId,
+                    currentChatRef.current?.id ??
+                        resolution.activeRun.conversationId,
+                    {
+                        content: resolution.finalContent,
+                        contextContent: resolution.finalContent,
+                        status: "completed",
+                    },
+                );
+                setActiveRun(resolution.activeRun);
+                if (
+                    resolution.messageId ===
+                    resolution.activeRun.assistantMessageId
+                ) {
+                    setStreamingMessage({
+                        id: resolution.messageId,
+                        content: resolution.finalContent,
+                    });
+                }
+                return;
+            }
+
             if (resolution.type === "run.completed") {
                 void persistAssistantMessage({
                     messageId: resolution.activeRun.assistantMessageId,
@@ -459,7 +492,7 @@ export default function ChatScreen(): ReactElement {
         });
 
         return unsubscribe;
-    }, [persistAssistantMessage, socketClient]);
+    }, [insertMessage, patchMessage, persistAssistantMessage, socketClient]);
 
     useEffect(() => {
         if (!currentChat) {

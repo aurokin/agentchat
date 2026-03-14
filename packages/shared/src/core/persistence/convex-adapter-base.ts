@@ -38,10 +38,12 @@ export interface ConvexMessageLike {
     localId?: string;
     chatId: string;
     role: Message["role"];
+    kind?: Message["kind"];
     content: string;
     contextContent: string;
     thinking?: string;
     modelId?: string;
+    runMessageIndex?: number | null;
     variantId?: string | null;
     thinkingLevel?: Message["thinkingLevel"];
     createdAt: number;
@@ -275,10 +277,12 @@ export abstract class ConvexAdapterBase implements PersistenceAdapter {
             id: localId,
             sessionId: chatLocalId,
             role: msg.role,
+            kind: msg.kind,
             content: msg.content,
             contextContent: msg.contextContent,
             thinking: msg.thinking,
             modelId: msg.modelId,
+            runMessageIndex: msg.runMessageIndex ?? null,
             variantId: msg.variantId ?? null,
             thinkingLevel: msg.thinkingLevel,
             createdAt: msg.createdAt,

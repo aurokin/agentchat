@@ -83,11 +83,13 @@ export interface ConvexMessage {
     chatId: ConvexId<"chats">;
     localId: string;
     role: Message["role"];
+    kind?: Message["kind"];
     content: string;
     contextContent: string;
     status: NonNullable<Message["status"]>;
     runId: string | null;
     thinking?: string;
+    runMessageIndex?: number | null;
     modelId?: string;
     variantId?: string | null;
     thinkingLevel?: Message["thinkingLevel"];
@@ -172,11 +174,13 @@ export interface ConvexAPI {
                 chatId: ConvexId<"chats">;
                 localId: string;
                 role: Message["role"];
+                kind?: Message["kind"];
                 content: string;
                 contextContent: string;
                 status?: Message["status"];
                 runId?: string | null;
                 thinking?: string;
+                runMessageIndex?: number | null;
                 modelId?: string;
                 variantId?: string | null;
                 thinkingLevel?: Message["thinkingLevel"];
@@ -208,6 +212,7 @@ export interface ConvexAPI {
                 content: string;
                 contextContent: string;
                 thinking?: string;
+                runMessageIndex?: number | null;
                 variantId?: string | null;
             },
             void

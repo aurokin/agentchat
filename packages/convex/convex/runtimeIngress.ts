@@ -23,6 +23,7 @@ type MessageStatus =
     | "errored";
 type RunEventKind =
     | "run_started"
+    | "message_started"
     | "message_delta"
     | "message_completed"
     | "run_completed"
@@ -187,9 +188,11 @@ async function updateAssistantMessage(
     args: {
         userId: Id<"users">;
         localId: string;
+        kind?: "assistant_message" | "assistant_status";
         content: string;
         status: MessageStatus;
         runId: string;
+        runMessageIndex?: number;
         updatedAt: number;
         completedAt: number | null;
     },
@@ -203,23 +206,99 @@ async function updateAssistantMessage(
     }
 
     await ctx.db.patch(message._id, {
+        kind: args.kind ?? message.kind,
         content: args.content,
         contextContent: args.content,
         status: args.status,
         runId: args.runId,
+        runMessageIndex:
+            args.runMessageIndex ?? message.runMessageIndex ?? null,
         updatedAt: args.updatedAt,
         completedAt: args.completedAt,
     });
 
     return {
         ...message,
+        kind: args.kind ?? message.kind,
         content: args.content,
         contextContent: args.content,
         status: args.status,
         runId: args.runId,
+        runMessageIndex:
+            args.runMessageIndex ?? message.runMessageIndex ?? null,
         updatedAt: args.updatedAt,
         completedAt: args.completedAt,
     };
+}
+
+async function createAssistantMessage(
+    ctx: RuntimeMutationCtx,
+    args: {
+        userId: Id<"users">;
+        chatId: Id<"chats">;
+        localId: string;
+        kind: "assistant_message" | "assistant_status";
+        content: string;
+        runId: string;
+        runMessageIndex: number;
+        createdAt: number;
+    },
+): Promise<Doc<"messages">> {
+    const existing = await getMessageByLocalId(ctx, {
+        userId: args.userId,
+        localId: args.localId,
+    });
+    if (existing) {
+        await ctx.db.patch(existing._id, {
+            role: "assistant",
+            kind: args.kind,
+            content: args.content,
+            contextContent: args.content,
+            status: "streaming",
+            runId: args.runId,
+            runMessageIndex: args.runMessageIndex,
+            updatedAt: args.createdAt,
+            completedAt: null,
+        });
+        return {
+            ...existing,
+            role: "assistant",
+            kind: args.kind,
+            content: args.content,
+            contextContent: args.content,
+            status: "streaming",
+            runId: args.runId,
+            runMessageIndex: args.runMessageIndex,
+            updatedAt: args.createdAt,
+            completedAt: null,
+        };
+    }
+
+    const messageId = await ctx.db.insert("messages", {
+        userId: args.userId,
+        chatId: args.chatId,
+        localId: args.localId,
+        role: "assistant",
+        kind: args.kind,
+        content: args.content,
+        contextContent: args.content,
+        status: "streaming",
+        runId: args.runId,
+        thinking: undefined,
+        runMessageIndex: args.runMessageIndex,
+        modelId: undefined,
+        variantId: null,
+        thinkingLevel: undefined,
+        createdAt: args.createdAt,
+        updatedAt: args.createdAt,
+        completedAt: null,
+    });
+
+    const message = await ctx.db.get(messageId);
+    if (!message) {
+        throw new Error("Failed to create assistant message");
+    }
+    return message;
 }
 
 export const runStarted = internalMutation({
@@ -246,9 +325,11 @@ export const runStarted = internalMutation({
         const assistantMessage = await updateAssistantMessage(ctx, {
             userId: args.userId,
             localId: args.assistantMessageLocalId,
+            kind: "assistant_message",
             content: "",
             status: "streaming",
             runId: args.externalRunId,
+            runMessageIndex: 0,
             updatedAt: args.startedAt,
             completedAt: null,
         });
@@ -305,6 +386,19 @@ export const runStarted = internalMutation({
             messageId: assistantMessage._id,
             createdAt: args.startedAt,
         });
+        await appendRunEvent(ctx, {
+            runId,
+            chatId: chat._id,
+            userId: args.userId,
+            sequence: 2,
+            kind: "message_started",
+            messageId: assistantMessage._id,
+            data: JSON.stringify({
+                kind: "assistant_message",
+                runMessageIndex: 0,
+            }),
+            createdAt: args.startedAt,
+        });
 
         await upsertRuntimeBinding(ctx, {
             chatId: chat._id,
@@ -321,6 +415,99 @@ export const runStarted = internalMutation({
         });
 
         return { runId };
+    },
+});
+
+export const messageStarted = internalMutation({
+    args: {
+        userId: v.id("users"),
+        conversationLocalId: v.string(),
+        previousAssistantMessageLocalId: v.string(),
+        previousCompletedSequence: v.number(),
+        assistantMessageLocalId: v.string(),
+        messageStartedSequence: v.number(),
+        externalRunId: v.string(),
+        kind: v.union(
+            v.literal("assistant_message"),
+            v.literal("assistant_status"),
+        ),
+        runMessageIndex: v.number(),
+        previousContent: v.string(),
+        content: v.string(),
+        createdAt: v.number(),
+    },
+    handler: async (ctx, args) => {
+        const chat = await getChatByLocalId(ctx, {
+            userId: args.userId,
+            localId: args.conversationLocalId,
+        });
+        const run = await getRunByExternalId(ctx, args.externalRunId);
+        if (!run) {
+            throw new Error("Run not found");
+        }
+
+        const previousMessage = await updateAssistantMessage(ctx, {
+            userId: args.userId,
+            localId: args.previousAssistantMessageLocalId,
+            content: args.previousContent,
+            status: "completed",
+            runId: args.externalRunId,
+            runMessageIndex: args.runMessageIndex - 1,
+            updatedAt: args.createdAt,
+            completedAt: args.createdAt,
+        });
+
+        const assistantMessage = await createAssistantMessage(ctx, {
+            userId: args.userId,
+            chatId: chat._id,
+            localId: args.assistantMessageLocalId,
+            kind: args.kind,
+            content: args.content,
+            runId: args.externalRunId,
+            runMessageIndex: args.runMessageIndex,
+            createdAt: args.createdAt,
+        });
+
+        await ctx.db.patch(run._id, {
+            outputMessageId: assistantMessage._id,
+        });
+
+        await appendRunEvent(ctx, {
+            runId: run._id,
+            chatId: chat._id,
+            userId: args.userId,
+            sequence: args.previousCompletedSequence,
+            kind: "message_completed",
+            messageId: previousMessage._id,
+            createdAt: args.createdAt,
+        });
+        await appendRunEvent(ctx, {
+            runId: run._id,
+            chatId: chat._id,
+            userId: args.userId,
+            sequence: args.messageStartedSequence,
+            kind: "message_started",
+            messageId: assistantMessage._id,
+            data: JSON.stringify({
+                kind: args.kind,
+                runMessageIndex: args.runMessageIndex,
+            }),
+            createdAt: args.createdAt,
+        });
+
+        await upsertRuntimeBinding(ctx, {
+            chatId: chat._id,
+            userId: args.userId,
+            provider: run.provider,
+            status: "active",
+            providerThreadId: run.providerThreadId,
+            providerResumeToken: null,
+            activeRunId: args.externalRunId,
+            lastError: null,
+            lastEventAt: args.createdAt,
+            expiresAt: null,
+            updatedAt: args.createdAt,
+        });
     },
 });
 

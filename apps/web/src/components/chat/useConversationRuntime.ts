@@ -45,12 +45,19 @@ type UseConversationRuntimeParams = {
         thinkingLevel?: Message["thinkingLevel"];
         chatId?: string;
     }) => Promise<Message>;
+    insertMessage: (message: Message) => void;
     updateMessage: (
         id: string,
         updates: Partial<
             Pick<Message, "content" | "contextContent" | "thinking">
         >,
     ) => Promise<void>;
+    patchMessage: (
+        id: string,
+        updates: Partial<
+            Pick<Message, "content" | "contextContent" | "thinking" | "status">
+        >,
+    ) => void;
     updateChat: (chat: ChatSession) => Promise<void>;
     setDefaultModel: (modelId: string) => void;
 };
@@ -75,7 +82,9 @@ export function useConversationRuntime({
     socketClient,
     getBackendSessionToken,
     addMessage,
+    insertMessage,
     updateMessage,
+    patchMessage,
     updateChat,
     setDefaultModel,
 }: UseConversationRuntimeParams): UseConversationRuntimeResult {
@@ -217,6 +226,32 @@ export function useConversationRuntime({
                 return;
             }
 
+            if (resolution.type === "message.started") {
+                activeRunRef.current = resolution.activeRun;
+                insertMessage(resolution.message);
+                queueStreamingMessageUpdate(resolution.streamingMessage);
+                return;
+            }
+
+            if (resolution.type === "message.completed") {
+                activeRunRef.current = resolution.activeRun;
+                patchMessage(resolution.messageId, {
+                    content: resolution.finalContent,
+                    contextContent: resolution.finalContent,
+                    status: "completed",
+                });
+                if (
+                    resolution.messageId ===
+                    resolution.activeRun.assistantMessageId
+                ) {
+                    queueStreamingMessageUpdate({
+                        id: resolution.messageId,
+                        content: resolution.finalContent,
+                    });
+                }
+                return;
+            }
+
             if (
                 resolution.type === "run.completed" ||
                 resolution.type === "run.interrupted"
@@ -248,6 +283,8 @@ export function useConversationRuntime({
         },
         [
             clearActiveRun,
+            insertMessage,
+            patchMessage,
             persistActiveAssistantMessage,
             queueStreamingMessageUpdate,
             socketClient,

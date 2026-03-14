@@ -75,6 +75,17 @@ export type AgentchatSocketEvent =
           };
       }
     | {
+          type: "message.started";
+          payload: {
+              conversationId: string;
+              runId: string;
+              messageId: string;
+              messageIndex: number;
+              kind: "assistant_message" | "assistant_status";
+              content: string;
+          };
+      }
+    | {
           type: "run.completed" | "run.interrupted";
           payload: {
               conversationId: string;

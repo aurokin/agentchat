@@ -54,6 +54,14 @@ export default defineSchema({
             v.literal("assistant"),
             v.literal("system"),
         ),
+        kind: v.optional(
+            v.union(
+                v.literal("user"),
+                v.literal("assistant_message"),
+                v.literal("assistant_status"),
+                v.literal("system"),
+            ),
+        ),
         content: v.string(),
         contextContent: v.string(),
         status: v.union(
@@ -65,6 +73,7 @@ export default defineSchema({
         ),
         runId: v.union(v.string(), v.null()),
         thinking: v.optional(v.string()),
+        runMessageIndex: v.union(v.number(), v.null()),
         modelId: v.optional(v.string()),
         variantId: v.union(v.string(), v.null()),
         thinkingLevel: v.optional(v.string()),
@@ -109,6 +118,7 @@ export default defineSchema({
         sequence: v.number(),
         kind: v.union(
             v.literal("run_started"),
+            v.literal("message_started"),
             v.literal("message_delta"),
             v.literal("message_completed"),
             v.literal("run_completed"),

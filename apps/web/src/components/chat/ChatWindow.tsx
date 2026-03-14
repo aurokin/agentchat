@@ -96,7 +96,9 @@ export function ChatWindow() {
         runtimeState,
         isMessagesLoading,
         addMessage,
+        insertMessage,
         updateMessage,
+        patchMessage,
         updateChat,
         createChat,
     } = useChat();
@@ -207,7 +209,9 @@ export function ChatWindow() {
         socketClient,
         getBackendSessionToken,
         addMessage,
+        insertMessage,
         updateMessage,
+        patchMessage,
         updateChat,
         setDefaultModel,
     });

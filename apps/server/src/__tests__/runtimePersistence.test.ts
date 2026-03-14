@@ -30,6 +30,7 @@ describe("RuntimePersistenceClient", () => {
     });
 
     test.each([
+        ["/runtime/message-started", "messageStarted"],
         ["/runtime/message-delta", "messageDelta"],
         ["/runtime/run-completed", "runCompleted"],
         ["/runtime/run-interrupted", "runInterrupted"],

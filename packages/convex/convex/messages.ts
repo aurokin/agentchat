@@ -125,10 +125,19 @@ export const create = mutation({
             v.literal("assistant"),
             v.literal("system"),
         ),
+        kind: v.optional(
+            v.union(
+                v.literal("user"),
+                v.literal("assistant_message"),
+                v.literal("assistant_status"),
+                v.literal("system"),
+            ),
+        ),
         content: v.string(),
         contextContent: v.string(),
         thinking: v.optional(v.string()),
         modelId: v.optional(v.string()),
+        runMessageIndex: v.optional(v.union(v.number(), v.null())),
         variantId: v.union(v.string(), v.null()),
         thinkingLevel: v.optional(v.string()),
         createdAt: v.optional(v.number()),
@@ -167,6 +176,7 @@ export const create = mutation({
             chatId: args.chatId,
             localId: args.localId,
             role: args.role,
+            kind: args.kind,
             content: args.content,
             contextContent: args.contextContent,
             status:
@@ -175,6 +185,7 @@ export const create = mutation({
                     : "completed",
             runId: null,
             thinking: args.thinking,
+            runMessageIndex: args.runMessageIndex ?? null,
             modelId: args.modelId,
             variantId: args.variantId,
             thinkingLevel: args.thinkingLevel,
@@ -206,6 +217,7 @@ export const update = mutation({
         content: v.optional(v.string()),
         contextContent: v.optional(v.string()),
         thinking: v.optional(v.string()),
+        runMessageIndex: v.optional(v.union(v.number(), v.null())),
         variantId: v.optional(v.union(v.string(), v.null())),
     },
     handler: async (ctx, args) => {

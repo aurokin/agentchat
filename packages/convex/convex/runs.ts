@@ -22,6 +22,7 @@ type RunSummary = {
     outputMessageLocalId: string | null;
     latestEventKind:
         | "run_started"
+        | "message_started"
         | "message_delta"
         | "message_completed"
         | "run_completed"
@@ -40,6 +41,7 @@ type RunEventSummary = {
     sequence: number;
     kind:
         | "run_started"
+        | "message_started"
         | "message_delta"
         | "message_completed"
         | "run_completed"

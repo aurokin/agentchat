@@ -10,6 +10,7 @@ auth.addHttpRoutes(http);
 const runtimeInternal = internal as unknown as {
     runtimeIngress: {
         runStarted: any;
+        messageStarted: any;
         messageDelta: any;
         runCompleted: any;
         runInterrupted: any;
@@ -93,6 +94,10 @@ function runtimeQueryRoute(params: { path: string; query: any }) {
 runtimeRoute({
     path: "/runtime/run-started",
     mutation: runtimeInternal.runtimeIngress.runStarted,
+});
+runtimeRoute({
+    path: "/runtime/message-started",
+    mutation: runtimeInternal.runtimeIngress.messageStarted,
 });
 runtimeRoute({
     path: "/runtime/message-delta",

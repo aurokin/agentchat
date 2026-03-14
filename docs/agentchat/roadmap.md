@@ -9,6 +9,7 @@ This roadmap describes the current implementation state and the next major steps
 - Server-config-driven providers and agents
 - Convex-backed conversations, messages, runs, run events, and runtime bindings
 - Backend token auth, websocket transport, streaming, interruption, and recovery
+- Multi-message assistant run output with `message.started` support through server, Convex, web, and mobile
 - Codex as the first working provider
 - Manual live runtime smoke and interrupt commands for the real local Codex plus Convex path
 - Manual repeated live runtime smoke for intentionally probing transient runtime flakes
@@ -28,14 +29,13 @@ This roadmap describes the current implementation state and the next major steps
 - Remove the remaining legacy thinking-toggle assumptions so Codex model and variant selection stays direct
 - Verify whether Codex Spark is functioning correctly in the current integration
 - Make mobile theme default honor the device system theme correctly, especially iOS dark mode
-- Improve assistant output segmentation so streamed progress and final report content do not collapse into one bulk message shape
+- Refine assistant output segmentation heuristics now that one run can emit multiple assistant transcript messages
 - Improve operator-facing diagnostics and health reporting
 - Build a practical testing stack around the dedicated local fixtures in `/home/auro/agents/agentchat_test`
 - Keep the active roadmap narrowly focused on Codex confidence rather than adding more providers
 - Use the live Convex deployment for real codegen, runtime persistence validation, and end-to-end confidence passes
 - Use disabled-auth mode aggressively for integration and browser confidence work that does not need Google sign-in coverage
-- Design the runtime event model so one assistant run can emit multiple assistant messages cleanly instead of forcing every stream into a single persisted message
-- Use [Run Output Model Proposal](./run-output-model-proposal.md) as the source doc for the future multi-message run migration
+- Use [Run Output Model Proposal](./run-output-model-proposal.md) as the source doc for further refinement of the multi-message run model
 - Keep targeted regression coverage for browser-visible runtime state so manual catches like stale stop buttons and false reconnect banners stay scriptable checks
 - Add regression fixtures for long streamed assistant prose formatting and LAN browser access during local development
 - Keep mobile integration testing explicitly gated by host-platform support instead of implying universal simulator/device coverage

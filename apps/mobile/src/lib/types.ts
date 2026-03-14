@@ -14,6 +14,7 @@ export interface ChatRunSummary {
     outputMessageLocalId: string | null;
     latestEventKind:
         | "run_started"
+        | "message_started"
         | "message_delta"
         | "message_completed"
         | "run_completed"
