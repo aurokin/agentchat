@@ -25,7 +25,7 @@ This roadmap describes the current implementation state and the next major steps
 - Close the remaining mobile parity gaps
 - Keep Codex-backed model and variant discovery well-tested and operator-friendly
 - Investigate Codex model and variant mapping in the live product path
-- Verify that thinking variants map correctly to Codex behavior
+- Remove the remaining legacy thinking-toggle assumptions so Codex model and variant selection stays direct
 - Verify whether Codex Spark is functioning correctly in the current integration
 - Make mobile theme default honor the device system theme correctly, especially iOS dark mode
 - Improve assistant output segmentation so streamed progress and final report content do not collapse into one bulk message shape

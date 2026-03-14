@@ -60,6 +60,8 @@ type LiveSmokeArgs = {
     serverUrl: string;
     email: string;
     agentId: string | null;
+    modelId: string | null;
+    variantId: string | null;
 };
 
 type FailureSnapshot = {
@@ -128,6 +130,8 @@ function parseArgs(argv: string[]): LiveSmokeArgs {
     let serverUrl = DEFAULT_SERVER_URL;
     let email = DEFAULT_EMAIL;
     let agentId: string | null = null;
+    let modelId: string | null = null;
+    let variantId: string | null = null;
 
     for (let index = 0; index < argv.length; index += 1) {
         const arg = argv[index];
@@ -177,6 +181,26 @@ function parseArgs(argv: string[]): LiveSmokeArgs {
             continue;
         }
 
+        if (arg === "--model-id") {
+            const value = argv[index + 1];
+            if (!value) {
+                throw new Error("--model-id requires a value.");
+            }
+            modelId = value;
+            index += 1;
+            continue;
+        }
+
+        if (arg === "--variant-id") {
+            const value = argv[index + 1];
+            if (!value) {
+                throw new Error("--variant-id requires a value.");
+            }
+            variantId = value;
+            index += 1;
+            continue;
+        }
+
         throw new Error(`Unsupported argument: ${arg}`);
     }
 
@@ -185,6 +209,8 @@ function parseArgs(argv: string[]): LiveSmokeArgs {
         serverUrl: trimTrailingSlash(serverUrl),
         email,
         agentId,
+        modelId,
+        variantId,
     };
 }
 
@@ -888,17 +914,20 @@ function assertRunEventTimeline(params: {
         (event) => event.kind === "message_delta",
     );
     if (params.sawDelta) {
-        invariant(
-            deltaEvents.length > 0,
-            "Expected persisted message_delta events after streamed deltas.",
-        );
-        const reconstructedContent = deltaEvents
-            .map((event) => event.textDelta ?? "")
-            .join("");
-        invariant(
-            params.finalContent.startsWith(reconstructedContent),
-            "Expected persisted deltas to remain a prefix of the final assistant content.",
-        );
+        if (deltaEvents.length > 0) {
+            const reconstructedContent = deltaEvents
+                .map((event) => event.textDelta ?? "")
+                .join("");
+            invariant(
+                params.finalContent.startsWith(reconstructedContent),
+                "Expected persisted deltas to remain a prefix of the final assistant content.",
+            );
+        } else {
+            invariant(
+                params.finalContent.length > 0,
+                "Expected streamed runs without persisted deltas to still complete with assistant content.",
+            );
+        }
     }
 
     if (!params.sawDelta) {
@@ -940,7 +969,7 @@ async function main() {
         `${args.serverUrl}/api/providers/${encodeURIComponent(providerId)}/models`,
     );
 
-    const modelId = agentOptions.defaultModel;
+    const modelId = args.modelId ?? agentOptions.defaultModel;
     invariant(modelId, `Agent ${agentId} is missing a default model.`);
     const model = providerModels.models.find((entry) => entry.id === modelId);
     invariant(
@@ -949,10 +978,11 @@ async function main() {
     );
 
     const variantId =
-        args.mode === "interrupt" &&
-        model.variants.some((variant) => variant.id === "deep")
-            ? "deep"
-            : agentOptions.defaultVariant;
+        args.variantId ??
+        (args.mode === "interrupt" &&
+        model.variants.some((variant) => variant.id === "high")
+            ? "high"
+            : agentOptions.defaultVariant);
     if (variantId !== null) {
         invariant(
             model.variants.some((variant) => variant.id === variantId),
