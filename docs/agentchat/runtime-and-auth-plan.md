@@ -46,7 +46,7 @@ The runtime is partway to the target model:
 
 Remaining gaps are mostly about:
 
-- global workspace-level activity state
+- richer workspace-level activity state and navigation
 - cross-client consistency
 - making every client behavior match the documented execution model
 
@@ -256,8 +256,9 @@ Current implementation note:
 ## Immediate Follow-Up Work
 
 1. Add workspace-level active-run state surfaces for both clients.
+   - Completed for thread-level visibility: web and mobile now surface per-conversation `Working`, `New reply`, and `Needs attention` state from runtime bindings.
 2. Make websocket/runtime recovery behavior fully user-centric rather than current-chat-centric.
-3. Design the Convex local user provider and seed tooling.
+3. Keep improving higher-level workspace activity/navigation above individual conversation lists.
 4. Move smoke coverage from shared default-user assumptions to `smoke_1` and `smoke_2`.
 
 ## Success Criteria

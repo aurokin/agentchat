@@ -18,6 +18,7 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { resolveConversationActivityState } from "@shared/core/conversation-activity";
 import { useChatContext } from "@/contexts/ChatContext";
 import { useAppContext } from "@/contexts/AppContext";
 import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
@@ -25,6 +26,7 @@ import { useAgent } from "@/contexts/AgentContext";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AgentSwitcher } from "@/components/chat/AgentSwitcher";
 import { getPreferredHomeChatId } from "@/lib/home-chat-route";
+import { getChatLastViewedAt } from "@/lib/storage";
 
 export default function HomeScreen(): React.ReactElement {
     const router = useRouter();
@@ -47,6 +49,9 @@ export default function HomeScreen(): React.ReactElement {
     const [selectedChatIds, setSelectedChatIds] = useState<Set<string>>(
         new Set(),
     );
+    const [chatLastViewedAt, setChatLastViewedAt] = useState<
+        Record<string, number>
+    >({});
     const longPressTriggeredRef = useRef(false);
     const [headerHeight, setHeaderHeight] = useState<number | null>(null);
     const { width: windowWidth, height: windowHeight } = useWindowDimensions();
@@ -57,6 +62,40 @@ export default function HomeScreen(): React.ReactElement {
             loadChats();
         }
     }, [isInitialized, loadChats]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const loadViewedState = async () => {
+            const entries = await Promise.all(
+                chats.map(async (chat) => {
+                    const viewedAt = await getChatLastViewedAt(chat.id);
+                    return viewedAt === null
+                        ? null
+                        : ([chat.id, viewedAt] as const);
+                }),
+            );
+
+            if (cancelled) {
+                return;
+            }
+
+            setChatLastViewedAt(
+                Object.fromEntries(
+                    entries.filter(
+                        (entry): entry is readonly [string, number] =>
+                            entry !== null,
+                    ),
+                ),
+            );
+        };
+
+        void loadViewedState();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [chats]);
 
     useEffect(() => {
         if (!isInitialized || !isTwoPaneLayout) return;
@@ -320,10 +359,12 @@ export default function HomeScreen(): React.ReactElement {
                     keyExtractor={(item) => item.id}
                     renderItem={({ item }) => {
                         const isSelected = selectedChatIds.has(item.id);
-                        const runtimeBinding =
-                            conversationRuntimeBindings[item.id] ?? null;
-                        const isRunning = runtimeBinding?.status === "active";
-                        const isErrored = runtimeBinding?.status === "errored";
+                        const activityState = resolveConversationActivityState({
+                            isActiveConversation: currentChat?.id === item.id,
+                            runtimeBinding:
+                                conversationRuntimeBindings[item.id] ?? null,
+                            lastViewedAt: chatLastViewedAt[item.id] ?? null,
+                        });
                         return (
                             <TouchableOpacity
                                 style={[
@@ -355,16 +396,24 @@ export default function HomeScreen(): React.ReactElement {
                                         </View>
                                     )}
                                     <View style={styles.runtimeIndicator}>
-                                        {isRunning ? (
+                                        {activityState?.tone === "working" ? (
                                             <ActivityIndicator
                                                 size="small"
                                                 color={colors.accent}
                                             />
-                                        ) : isErrored ? (
+                                        ) : activityState?.tone ===
+                                          "errored" ? (
                                             <Feather
                                                 name="alert-circle"
                                                 size={18}
                                                 color={colors.danger}
+                                            />
+                                        ) : activityState?.tone ===
+                                          "completed" ? (
+                                            <Feather
+                                                name="corner-down-left"
+                                                size={16}
+                                                color={colors.accent}
                                             />
                                         ) : null}
                                     </View>
@@ -375,13 +424,39 @@ export default function HomeScreen(): React.ReactElement {
                                         >
                                             {item.title}
                                         </Text>
-                                        <Text style={styles.chatDate}>
-                                            {isRunning
-                                                ? "Running"
-                                                : isErrored
-                                                  ? "Needs attention"
-                                                  : formatDate(item.updatedAt)}
-                                        </Text>
+                                        <View style={styles.chatMetaRow}>
+                                            <Text
+                                                style={[
+                                                    styles.chatDate,
+                                                    activityState?.tone ===
+                                                        "working" &&
+                                                        styles.chatStateWorking,
+                                                    activityState?.tone ===
+                                                        "completed" &&
+                                                        styles.chatStateCompleted,
+                                                    activityState?.tone ===
+                                                        "errored" &&
+                                                        styles.chatStateErrored,
+                                                ]}
+                                            >
+                                                {activityState?.label ??
+                                                    formatDate(item.updatedAt)}
+                                            </Text>
+                                            {activityState?.label ? (
+                                                <Text
+                                                    style={
+                                                        styles.chatMetaSeparator
+                                                    }
+                                                >
+                                                    •
+                                                </Text>
+                                            ) : null}
+                                            {activityState?.label ? (
+                                                <Text style={styles.chatDate}>
+                                                    {formatDate(item.updatedAt)}
+                                                </Text>
+                                            ) : null}
+                                        </View>
                                     </View>
                                 </View>
                             </TouchableOpacity>
@@ -540,9 +615,30 @@ const createStyles = (colors: ThemeColors) =>
             marginBottom: 4,
             color: colors.text,
         },
+        chatMetaRow: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 6,
+        },
         chatDate: {
             fontSize: 12,
             color: colors.textSubtle,
+        },
+        chatMetaSeparator: {
+            fontSize: 12,
+            color: colors.textSubtle,
+        },
+        chatStateWorking: {
+            color: colors.accent,
+            fontWeight: "600",
+        },
+        chatStateCompleted: {
+            color: colors.accent,
+            fontWeight: "600",
+        },
+        chatStateErrored: {
+            color: colors.danger,
+            fontWeight: "600",
         },
         fab: {
             position: "absolute",

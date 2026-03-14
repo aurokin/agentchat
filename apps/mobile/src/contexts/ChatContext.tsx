@@ -33,6 +33,7 @@ import {
     getSelectedChatId,
     setSelectedChatId,
     clearSelectedChatId,
+    setChatLastViewedAt,
 } from "@/lib/storage";
 import { useModelContext } from "@/contexts/ModelContext";
 import { deriveConversationRuntimeState } from "@/contexts/runtime-helpers";
@@ -300,6 +301,21 @@ export function ChatProvider({
         workspaceCurrentChat,
         workspaceMessages,
     ]);
+
+    useEffect(() => {
+        if (!currentChat) return;
+
+        const lastMessageAt = messages[currentChat.id]?.at(-1)?.createdAt ?? 0;
+        const lastRuntimeEventAt =
+            conversationRuntimeBindings[currentChat.id]?.lastEventAt ?? 0;
+        const visibleAt = Math.max(
+            Date.now(),
+            lastMessageAt,
+            lastRuntimeEventAt,
+        );
+
+        void setChatLastViewedAt(currentChat.id, visibleAt);
+    }, [conversationRuntimeBindings, currentChat, messages]);
 
     const createChat = useCallback(
         async (title?: string, modelId?: string): Promise<ChatSession> => {

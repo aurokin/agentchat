@@ -66,6 +66,15 @@ describe("user-settings-storage", () => {
         expect(await storage.getSelectedAgentId()).toBeNull();
     });
 
+    it("stores chat last-viewed timestamps by chat id", async () => {
+        await storage.setChatLastViewedAt("chat-1", 123);
+        await storage.setChatLastViewedAt("chat-2", 456);
+
+        expect(await storage.getChatLastViewedAt("chat-1")).toBe(123);
+        expect(await storage.getChatLastViewedAt("chat-2")).toBe(456);
+        expect(await storage.getChatLastViewedAt("chat-3")).toBeNull();
+    });
+
     it("filters favorite model list entries", async () => {
         store.set(
             "agentchat-favorite-models",

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { resolveConversationActivityState } from "@shared/core/conversation-activity";
+import { resolveConversationActivityState } from "../conversation-activity";
 
 describe("resolveConversationActivityState", () => {
     test("marks active runs as working", () => {

@@ -7,6 +7,7 @@ const DEFAULT_VARIANT_BY_AGENT_KEY = "agentchat-default-variant-by-agent";
 const FAVORITE_MODELS_KEY = "agentchat-favorite-models";
 const SELECTED_AGENT_KEY = "agentchat-selected-agent";
 const SELECTED_CHAT_BY_AGENT_KEY = "agentchat-selected-chat-by-agent";
+const CHAT_LAST_VIEWED_AT_KEY = "agentchat-chat-last-viewed-at";
 
 async function getStringMap(key: string): Promise<Record<string, string>> {
     try {
@@ -34,6 +35,40 @@ async function getStringMap(key: string): Promise<Record<string, string>> {
 async function setStringMap(
     key: string,
     value: Record<string, string>,
+): Promise<void> {
+    try {
+        await SecureStore.setItemAsync(key, JSON.stringify(value));
+    } catch (error) {
+        console.error(`Failed to save ${key}:`, error);
+    }
+}
+
+async function getNumberMap(key: string): Promise<Record<string, number>> {
+    try {
+        const stored = await SecureStore.getItemAsync(key);
+        if (!stored) return {};
+        const parsed = JSON.parse(stored) as unknown;
+        if (!parsed || typeof parsed !== "object") {
+            return {};
+        }
+
+        return Object.fromEntries(
+            Object.entries(parsed).filter(
+                (entry): entry is [string, number] =>
+                    typeof entry[0] === "string" &&
+                    entry[0].length > 0 &&
+                    typeof entry[1] === "number" &&
+                    Number.isFinite(entry[1]),
+            ),
+        );
+    } catch {
+        return {};
+    }
+}
+
+async function setNumberMap(
+    key: string,
+    value: Record<string, number>,
 ): Promise<void> {
     try {
         await SecureStore.setItemAsync(key, JSON.stringify(value));
@@ -236,4 +271,28 @@ export async function clearSelectedChatId(agentId: string): Promise<void> {
     const selectedChats = await getStringMap(SELECTED_CHAT_BY_AGENT_KEY);
     delete selectedChats[agentId];
     await setStringMap(SELECTED_CHAT_BY_AGENT_KEY, selectedChats);
+}
+
+export async function getChatLastViewedAt(
+    chatId: string,
+): Promise<number | null> {
+    if (!chatId) {
+        return null;
+    }
+
+    const viewedAt = await getNumberMap(CHAT_LAST_VIEWED_AT_KEY);
+    return viewedAt[chatId] ?? null;
+}
+
+export async function setChatLastViewedAt(
+    chatId: string,
+    timestamp: number,
+): Promise<void> {
+    if (!chatId || !Number.isFinite(timestamp)) {
+        return;
+    }
+
+    const viewedAt = await getNumberMap(CHAT_LAST_VIEWED_AT_KEY);
+    viewedAt[chatId] = timestamp;
+    await setNumberMap(CHAT_LAST_VIEWED_AT_KEY, viewedAt);
 }

@@ -22,6 +22,7 @@ import {
 import { useChat } from "@/contexts/ChatContext";
 import { useAgent } from "@/contexts/AgentContext";
 import { usePersistenceAdapter } from "@/contexts/WorkspaceContext";
+import { resolveConversationActivityState } from "@shared/core/conversation-activity";
 import { cn } from "@/lib/utils";
 import * as storage from "@/lib/storage";
 
@@ -39,21 +40,6 @@ interface SidebarProps {
     onClose?: () => void;
 }
 
-type SidebarConversationState =
-    | {
-          label: "Working";
-          tone: "working";
-      }
-    | {
-          label: "New reply";
-          tone: "completed";
-      }
-    | {
-          label: "Needs attention";
-          tone: "errored";
-      }
-    | null;
-
 export function resolveSidebarConversationState({
     isActiveConversation,
     runtimeBinding,
@@ -65,37 +51,12 @@ export function resolveSidebarConversationState({
         lastEventAt: number | null;
     } | null;
     lastViewedAt: number | null;
-}): SidebarConversationState {
-    if (runtimeBinding?.status === "active") {
-        return {
-            label: "Working",
-            tone: "working",
-        };
-    }
-
-    if (runtimeBinding?.status === "errored") {
-        return {
-            label: "Needs attention",
-            tone: "errored",
-        };
-    }
-
-    if (
-        !runtimeBinding ||
-        isActiveConversation ||
-        runtimeBinding.lastEventAt === null
-    ) {
-        return null;
-    }
-
-    if (lastViewedAt === null || runtimeBinding.lastEventAt > lastViewedAt) {
-        return {
-            label: "New reply",
-            tone: "completed",
-        };
-    }
-
-    return null;
+}) {
+    return resolveConversationActivityState({
+        isActiveConversation,
+        runtimeBinding,
+        lastViewedAt,
+    });
 }
 
 export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {

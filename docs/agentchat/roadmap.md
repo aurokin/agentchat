@@ -33,6 +33,7 @@ This roadmap describes the current implementation state and the next major steps
   - runs continue with zero active clients and recover cleanly later
   - multiple clients can observe the same run concurrently without duplicating execution
   - clients keep background subscriptions to all active conversations instead of only the visible thread
+  - web and mobile both surface per-thread runtime activity (`Working`, `New reply`, `Needs attention`) from backend-owned runtime state
   - multiple users can use the same instance at the same time without crossing runtime state
   - every accepted request resolves to a concrete Convex user
   - local seeded users such as `smoke_1` and `smoke_2` are the standard local multi-user runtime fixtures
