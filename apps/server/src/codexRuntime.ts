@@ -44,7 +44,13 @@ type ConversationRuntime = {
     threadId: string;
     activeTurn: ActiveTurn | null;
     idleTimer: ReturnType<typeof setTimeout> | null;
-    subscribers: Map<string, (event: ServerEvent) => void>;
+    subscribers: Map<string, RuntimeSubscriber>;
+};
+
+type RuntimeSubscriber = {
+    sendEvent: (event: ServerEvent) => void;
+    subscriptionCount: number;
+    retainDuringActiveTurn: boolean;
 };
 
 type ResolvedRuntimeResources = {
@@ -189,7 +195,11 @@ export class CodexRuntimeManager {
         sendEvent: (event: ServerEvent) => void;
     }): Promise<void> {
         const { runtime, isNew } = await this.ensureRuntime(params);
-        this.attachSubscriber(runtime, params.subscriberId, params.sendEvent);
+        this.retainSubscriberForActiveTurn(
+            runtime,
+            params.subscriberId,
+            params.sendEvent,
+        );
         if (runtime.activeTurn) {
             throw new Error("Conversation already has an active run.");
         }
@@ -413,7 +423,11 @@ export class CodexRuntimeManager {
             });
         }
 
-        this.attachSubscriber(runtime, params.subscriberId, params.sendEvent);
+        this.addConversationSubscription(
+            runtime,
+            params.subscriberId,
+            params.sendEvent,
+        );
         if (!runtime.activeTurn) {
             return;
         }
@@ -459,7 +473,21 @@ export class CodexRuntimeManager {
             ) {
                 continue;
             }
-            runtime.subscribers.delete(params.subscriberId);
+            if (!params.conversationId) {
+                runtime.subscribers.delete(params.subscriberId);
+                continue;
+            }
+
+            const subscriber = runtime.subscribers.get(params.subscriberId);
+            if (!subscriber) {
+                continue;
+            }
+
+            subscriber.subscriptionCount = Math.max(
+                0,
+                subscriber.subscriptionCount - 1,
+            );
+            this.cleanupSubscriber(runtime, params.subscriberId);
         }
     }
 
@@ -531,12 +559,54 @@ export class CodexRuntimeManager {
         return { runtime, isNew };
     }
 
-    private attachSubscriber(
+    private addConversationSubscription(
         runtime: ConversationRuntime,
         subscriberId: string,
         sendEvent: (event: ServerEvent) => void,
     ): void {
-        runtime.subscribers.set(subscriberId, sendEvent);
+        const existing = runtime.subscribers.get(subscriberId);
+        runtime.subscribers.set(subscriberId, {
+            sendEvent,
+            subscriptionCount: (existing?.subscriptionCount ?? 0) + 1,
+            retainDuringActiveTurn: existing?.retainDuringActiveTurn ?? false,
+        });
+    }
+
+    private retainSubscriberForActiveTurn(
+        runtime: ConversationRuntime,
+        subscriberId: string,
+        sendEvent: (event: ServerEvent) => void,
+    ): void {
+        const existing = runtime.subscribers.get(subscriberId);
+        runtime.subscribers.set(subscriberId, {
+            sendEvent,
+            subscriptionCount: existing?.subscriptionCount ?? 0,
+            retainDuringActiveTurn: true,
+        });
+    }
+
+    private releaseActiveTurnSubscribers(runtime: ConversationRuntime): void {
+        for (const [subscriberId, subscriber] of runtime.subscribers) {
+            subscriber.retainDuringActiveTurn = false;
+            this.cleanupSubscriber(runtime, subscriberId);
+        }
+    }
+
+    private cleanupSubscriber(
+        runtime: ConversationRuntime,
+        subscriberId: string,
+    ): void {
+        const subscriber = runtime.subscribers.get(subscriberId);
+        if (!subscriber) {
+            return;
+        }
+
+        if (
+            subscriber.subscriptionCount === 0 &&
+            !subscriber.retainDuringActiveTurn
+        ) {
+            runtime.subscribers.delete(subscriberId);
+        }
     }
 
     private async recoverOrphanedActiveRun(params: {
@@ -569,8 +639,8 @@ export class CodexRuntimeManager {
         runtime: ConversationRuntime,
         event: ServerEvent,
     ): void {
-        for (const sendEvent of runtime.subscribers.values()) {
-            sendEvent(event);
+        for (const subscriber of runtime.subscribers.values()) {
+            subscriber.sendEvent(event);
         }
     }
 
@@ -863,6 +933,7 @@ export class CodexRuntimeManager {
                 }),
             );
             runtime.activeTurn = null;
+            this.releaseActiveTurnSubscribers(runtime);
             this.scheduleIdleExpiration(runtime);
             activeTurn.resolve();
             return;
@@ -919,6 +990,7 @@ export class CodexRuntimeManager {
                 }),
             );
             runtime.activeTurn = null;
+            this.releaseActiveTurnSubscribers(runtime);
             this.scheduleIdleExpiration(runtime);
             activeTurn.resolve();
             return;
@@ -951,6 +1023,7 @@ export class CodexRuntimeManager {
                 }),
             );
             runtime.activeTurn = null;
+            this.releaseActiveTurnSubscribers(runtime);
             this.scheduleIdleExpiration(runtime);
             activeTurn.resolve();
             return;
@@ -986,6 +1059,7 @@ export class CodexRuntimeManager {
             }),
         );
         runtime.activeTurn = null;
+        this.releaseActiveTurnSubscribers(runtime);
         this.scheduleIdleExpiration(runtime);
         activeTurn.reject(new Error(errorMessage));
     }
