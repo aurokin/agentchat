@@ -193,6 +193,8 @@ These commands cover:
 If bootstrap fails in the web app:
 
 - verify `NEXT_PUBLIC_AGENTCHAT_SERVER_URL`
+  - loopback values like `http://localhost:3030` or `http://127.0.0.1:3030` are valid for local development
+  - when opening the web app from another device on your LAN, the web client will automatically swap the loopback hostname for the browser's current hostname and keep the configured port
 - verify `apps/server` is running
 - verify `agentchat.config.json` is valid
 

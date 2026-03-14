@@ -120,7 +120,7 @@ Agentchat uses a small set of local/runtime environment surfaces:
 Set these in `apps/web/.env.local` for local use. A template lives at `apps/web/.env.example`.
 
 - `NEXT_PUBLIC_CONVEX_URL` - Convex client URL (`*.convex.cloud`).
-- `NEXT_PUBLIC_AGENTCHAT_SERVER_URL` - Base URL for the self-hosted Agentchat backend server used for provider/agent metadata. Example: `http://localhost:8787` in local dev.
+- `NEXT_PUBLIC_AGENTCHAT_SERVER_URL` - Base URL for the self-hosted Agentchat backend server used for provider/agent metadata. Example: `http://localhost:8787` in local dev. If you open the web app from another device on your LAN, Agentchat will automatically rewrite loopback hosts like `localhost` or `127.0.0.1` to the browser's current hostname while keeping the configured port.
 
 **Mobile app runtime (`apps/mobile`)**
 

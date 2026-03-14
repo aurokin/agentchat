@@ -62,10 +62,44 @@ function trimTrailingSlash(value: string): string {
     return value.replace(/\/+$/, "");
 }
 
+function isLoopbackHostname(hostname: string): boolean {
+    return (
+        hostname === "localhost" ||
+        hostname === "127.0.0.1" ||
+        hostname === "::1"
+    );
+}
+
+function resolveBrowserReachableUrl(configuredUrl: string): string {
+    if (typeof window === "undefined") {
+        return configuredUrl;
+    }
+
+    const browserHostname = window.location.hostname;
+    if (!browserHostname || isLoopbackHostname(browserHostname)) {
+        return configuredUrl;
+    }
+
+    let parsedUrl: URL;
+
+    try {
+        parsedUrl = new URL(configuredUrl);
+    } catch {
+        return configuredUrl;
+    }
+
+    if (!isLoopbackHostname(parsedUrl.hostname)) {
+        return configuredUrl;
+    }
+
+    parsedUrl.hostname = browserHostname;
+    return trimTrailingSlash(parsedUrl.toString());
+}
+
 export function getAgentchatServerUrl(): string | null {
     const value = process.env.NEXT_PUBLIC_AGENTCHAT_SERVER_URL?.trim();
     if (!value) return null;
-    return trimTrailingSlash(value);
+    return resolveBrowserReachableUrl(trimTrailingSlash(value));
 }
 
 async function fetchJson<T>(path: string): Promise<T> {

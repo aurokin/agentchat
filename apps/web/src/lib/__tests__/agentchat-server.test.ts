@@ -10,6 +10,7 @@ import {
 
 describe("agentchat-server", () => {
     const originalUrl = process.env.NEXT_PUBLIC_AGENTCHAT_SERVER_URL;
+    const originalWindow = globalThis.window;
     const fetchMock = mock(globalThis.fetch);
 
     beforeEach(() => {
@@ -18,6 +19,12 @@ describe("agentchat-server", () => {
     });
 
     afterEach(() => {
+        if (originalWindow === undefined) {
+            Reflect.deleteProperty(globalThis, "window");
+        } else {
+            globalThis.window = originalWindow;
+        }
+
         if (originalUrl === undefined) {
             delete process.env.NEXT_PUBLIC_AGENTCHAT_SERVER_URL;
         } else {
@@ -29,6 +36,29 @@ describe("agentchat-server", () => {
         process.env.NEXT_PUBLIC_AGENTCHAT_SERVER_URL =
             "http://localhost:8787///";
         expect(getAgentchatServerUrl()).toBe("http://localhost:8787");
+    });
+
+    test("rewrites loopback server urls to the browser host on lan clients", () => {
+        process.env.NEXT_PUBLIC_AGENTCHAT_SERVER_URL =
+            "http://127.0.0.1:3030///";
+        globalThis.window = {
+            location: {
+                hostname: "192.168.1.20",
+            },
+        } as Window & typeof globalThis;
+
+        expect(getAgentchatServerUrl()).toBe("http://192.168.1.20:3030");
+    });
+
+    test("keeps loopback server urls unchanged for local browsers", () => {
+        process.env.NEXT_PUBLIC_AGENTCHAT_SERVER_URL = "http://localhost:3030";
+        globalThis.window = {
+            location: {
+                hostname: "localhost",
+            },
+        } as Window & typeof globalThis;
+
+        expect(getAgentchatServerUrl()).toBe("http://localhost:3030");
     });
 
     test("fetches bootstrap payload", async () => {
