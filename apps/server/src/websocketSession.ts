@@ -11,10 +11,11 @@ export type BackendSession = {
 export type RuntimeManagerLike = {
     subscribe(params: {
         userSub: string;
+        userId: string;
         conversationId: string;
         subscriberId: string;
         sendEvent: (event: ServerEvent) => void;
-    }): void;
+    }): Promise<void> | void;
     unsubscribe(params: {
         subscriberId: string;
         conversationId?: string;
@@ -98,8 +99,9 @@ export async function handleConnectedSocketMessage(params: {
         };
 
         if (command.type === "conversation.subscribe") {
-            params.runtimeManager.subscribe({
+            await params.runtimeManager.subscribe({
                 userSub: params.session.sub,
+                userId: params.session.userId,
                 conversationId: command.payload.conversationId,
                 subscriberId: params.connectionId,
                 sendEvent,

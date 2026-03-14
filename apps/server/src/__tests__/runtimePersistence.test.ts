@@ -35,6 +35,7 @@ describe("RuntimePersistenceClient", () => {
         ["/runtime/run-completed", "runCompleted"],
         ["/runtime/run-interrupted", "runInterrupted"],
         ["/runtime/run-failed", "runFailed"],
+        ["/runtime/run-stale", "recoverStaleRun"],
         ["/runtime/runtime-binding", "runtimeBinding"],
     ] as const)("posts %s for %s writes", async (expectedPath, methodName) => {
         const fetchMock = mock(async () => new Response(null, { status: 200 }));

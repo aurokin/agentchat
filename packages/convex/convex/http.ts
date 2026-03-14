@@ -15,6 +15,7 @@ const runtimeInternal = internal as unknown as {
         runCompleted: any;
         runInterrupted: any;
         runFailed: any;
+        recoverStaleRun: any;
         runtimeBinding: any;
         readRuntimeBinding: any;
     };
@@ -114,6 +115,10 @@ runtimeRoute({
 runtimeRoute({
     path: "/runtime/run-failed",
     mutation: runtimeInternal.runtimeIngress.runFailed,
+});
+runtimeRoute({
+    path: "/runtime/run-stale",
+    mutation: runtimeInternal.runtimeIngress.recoverStaleRun,
 });
 runtimeRoute({
     path: "/runtime/runtime-binding",

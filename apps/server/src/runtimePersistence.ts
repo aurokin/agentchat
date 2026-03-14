@@ -65,6 +65,10 @@ export class RuntimePersistenceClient {
         await this.post("/runtime/run-failed", payload);
     }
 
+    async recoverStaleRun(payload: RuntimeEventPayload): Promise<void> {
+        await this.post("/runtime/run-stale", payload);
+    }
+
     async runtimeBinding(payload: RuntimeEventPayload): Promise<void> {
         await this.post("/runtime/runtime-binding", payload);
     }

@@ -161,6 +161,8 @@ function createPersistence(
     binding: {
         provider: string;
         providerThreadId: string | null;
+        status?: "idle" | "active" | "expired" | "errored";
+        activeRunId?: string | null;
     } | null,
 ) {
     return {
@@ -174,6 +176,7 @@ function createPersistence(
         runCompletedCalls: [] as Array<Record<string, unknown>>,
         runFailedCalls: [] as Array<Record<string, unknown>>,
         runInterruptedCalls: [] as Array<Record<string, unknown>>,
+        recoverStaleRunCalls: [] as Array<Record<string, unknown>>,
         async readRuntimeBinding(payload: {
             userId: string;
             conversationLocalId: string;
@@ -185,10 +188,10 @@ function createPersistence(
 
             return {
                 provider: binding.provider,
-                status: "expired" as const,
+                status: binding.status ?? ("expired" as const),
                 providerThreadId: binding.providerThreadId,
                 providerResumeToken: null,
-                activeRunId: null,
+                activeRunId: binding.activeRunId ?? null,
                 lastError: null,
                 lastEventAt: null,
                 expiresAt: null,
@@ -215,6 +218,9 @@ function createPersistence(
         },
         async runFailed(payload: Record<string, unknown>) {
             this.runFailedCalls.push(payload);
+        },
+        async recoverStaleRun(payload: Record<string, unknown>) {
+            this.recoverStaleRunCalls.push(payload);
         },
     };
 }
@@ -498,6 +504,7 @@ describe("CodexRuntimeManager", () => {
 
         manager.subscribe({
             userSub: "sub-1",
+            userId: "user-1",
             conversationId: "chat-1",
             subscriberId: "socket-2",
             sendEvent: (event) => {
@@ -545,6 +552,44 @@ describe("CodexRuntimeManager", () => {
             },
         });
         await sendPromise;
+    });
+
+    test("reconciles orphaned active runs when a client subscribes after runtime loss", async () => {
+        const config = createConfig();
+        const persistence = createPersistence({
+            provider: "codex-default",
+            providerThreadId: "thread-orphaned",
+            status: "active",
+            activeRunId: "run-orphaned",
+        });
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: () => new FakeCodexClient(),
+        });
+
+        await manager.subscribe({
+            userSub: "sub-1",
+            userId: "user-1",
+            conversationId: "chat-1",
+            subscriberId: "socket-2",
+            sendEvent: () => undefined,
+        });
+
+        expect(persistence.readRuntimeBindingCalls).toEqual([
+            {
+                userId: "user-1",
+                conversationLocalId: "chat-1",
+            },
+        ]);
+        expect(persistence.recoverStaleRunCalls).toHaveLength(1);
+        expect(persistence.recoverStaleRunCalls[0]).toMatchObject({
+            userId: "user-1",
+            conversationLocalId: "chat-1",
+            externalRunId: "run-orphaned",
+            errorMessage:
+                "This run was orphaned after the runtime disconnected before completion.",
+        });
     });
 
     test("splits report-style Codex output into a second assistant transcript message", async () => {

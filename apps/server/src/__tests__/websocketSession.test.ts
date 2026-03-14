@@ -52,6 +52,7 @@ describe("websocketSession", () => {
         expect(runtimeManager.subscribe).toHaveBeenCalledWith(
             expect.objectContaining({
                 userSub: "sub-1",
+                userId: "user-1",
                 conversationId: "chat-1",
                 subscriberId: "socket-1",
                 sendEvent: expect.any(Function),

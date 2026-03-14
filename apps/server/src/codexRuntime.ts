@@ -424,15 +424,19 @@ export class CodexRuntimeManager {
 
     subscribe(params: {
         userSub: string;
+        userId: string;
         conversationId: string;
         subscriberId: string;
         sendEvent: (event: ServerEvent) => void;
-    }): void {
+    }): Promise<void> | void {
         const runtime = this.runtimes.get(
             getRuntimeKey(params.userSub, params.conversationId),
         );
         if (!runtime) {
-            return;
+            return this.recoverOrphanedActiveRun({
+                userId: params.userId,
+                conversationId: params.conversationId,
+            });
         }
 
         this.attachSubscriber(runtime, params.subscriberId, params.sendEvent);
@@ -559,6 +563,32 @@ export class CodexRuntimeManager {
         sendEvent: (event: ServerEvent) => void,
     ): void {
         runtime.subscribers.set(subscriberId, sendEvent);
+    }
+
+    private async recoverOrphanedActiveRun(params: {
+        userId: string;
+        conversationId: string;
+    }): Promise<void> {
+        const persistedBinding = await this.persistence.readRuntimeBinding({
+            userId: params.userId,
+            conversationLocalId: params.conversationId,
+        });
+        if (
+            !persistedBinding ||
+            persistedBinding.status !== "active" ||
+            !persistedBinding.activeRunId
+        ) {
+            return;
+        }
+
+        await this.persistence.recoverStaleRun({
+            userId: params.userId,
+            conversationLocalId: params.conversationId,
+            externalRunId: persistedBinding.activeRunId,
+            completedAt: Date.now(),
+            errorMessage:
+                "This run was orphaned after the runtime disconnected before completion.",
+        });
     }
 
     private emitToSubscribers(

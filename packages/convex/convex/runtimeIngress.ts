@@ -695,6 +695,22 @@ async function finalizeRun(
     });
 }
 
+async function getNextRunSequence(
+    ctx: RuntimeMutationCtx,
+    runId: Id<"runs">,
+): Promise<number> {
+    const latestEvent =
+        (
+            await ctx.db
+                .query("run_events")
+                .withIndex("by_runId_and_sequence", (q) => q.eq("runId", runId))
+                .order("desc")
+                .take(1)
+        )[0] ?? null;
+
+    return (latestEvent?.sequence ?? 0) + 1;
+}
+
 export const runCompleted = internalMutation({
     args: terminalRunArgs,
     handler: async (ctx, args) => {
@@ -729,6 +745,59 @@ export const runFailed = internalMutation({
     handler: async (ctx, args) => {
         await finalizeRun(ctx, {
             ...args,
+            runStatus: "errored",
+            messageStatus: "errored",
+            eventKind: "run_failed",
+            errorMessage: args.errorMessage,
+        });
+    },
+});
+
+export const recoverStaleRun = internalMutation({
+    args: {
+        userId: v.id("users"),
+        conversationLocalId: v.string(),
+        externalRunId: v.string(),
+        completedAt: v.number(),
+        errorMessage: v.string(),
+    },
+    handler: async (ctx, args) => {
+        const chat = await getChatByLocalId(ctx, {
+            userId: args.userId,
+            localId: args.conversationLocalId,
+        });
+        const run = await getRunByExternalId(ctx, args.externalRunId);
+        if (!run) {
+            throw new Error("Run not found");
+        }
+        if (run.chatId !== chat._id) {
+            throw new Error("Run does not belong to conversation");
+        }
+        if (
+            run.status !== "queued" &&
+            run.status !== "starting" &&
+            run.status !== "running"
+        ) {
+            return;
+        }
+
+        const assistantMessage = run.outputMessageId
+            ? await ctx.db.get(run.outputMessageId)
+            : null;
+        if (!assistantMessage) {
+            throw new Error("Assistant message not found");
+        }
+
+        const sequence = await getNextRunSequence(ctx, run._id);
+        await finalizeRun(ctx, {
+            userId: args.userId,
+            conversationLocalId: args.conversationLocalId,
+            assistantMessageLocalId:
+                assistantMessage.localId ?? assistantMessage._id,
+            externalRunId: args.externalRunId,
+            sequence,
+            content: assistantMessage.content,
+            completedAt: args.completedAt,
             runStatus: "errored",
             messageStatus: "errored",
             eventKind: "run_failed",
