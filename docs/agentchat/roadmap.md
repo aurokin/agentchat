@@ -28,6 +28,7 @@ This roadmap describes the current implementation state and the next major steps
 - Use the live Convex deployment for real codegen, runtime persistence validation, and end-to-end confidence passes
 - Use disabled-auth mode aggressively for integration and browser confidence work that does not need Google sign-in coverage
 - Design the runtime event model so one assistant run can emit multiple assistant messages cleanly instead of forcing every stream into a single persisted message
+- Use [Run Output Model Proposal](./run-output-model-proposal.md) as the source doc for the future multi-message run migration
 - Keep targeted regression coverage for browser-visible runtime state so manual catches like stale stop buttons and false reconnect banners stay scriptable checks
 - Add regression fixtures for long streamed assistant prose formatting and LAN browser access during local development
 

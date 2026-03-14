@@ -29,6 +29,31 @@ describe("RuntimePersistenceClient", () => {
         }
     });
 
+    test.each([
+        ["/runtime/message-delta", "messageDelta"],
+        ["/runtime/run-completed", "runCompleted"],
+        ["/runtime/run-interrupted", "runInterrupted"],
+        ["/runtime/run-failed", "runFailed"],
+        ["/runtime/runtime-binding", "runtimeBinding"],
+    ] as const)("posts %s for %s writes", async (expectedPath, methodName) => {
+        const fetchMock = mock(async () => new Response(null, { status: 200 }));
+        globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+        const client = new RuntimePersistenceClient();
+        await client[methodName]({
+            conversationLocalId: "chat-1",
+            userId: "user-1",
+        });
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        const fetchCalls = fetchMock.mock.calls as unknown as Array<
+            [string | URL, RequestInit?]
+        >;
+        expect(fetchCalls[0]?.[0]).toBe(
+            `https://agentchat.convex.site${expectedPath}`,
+        );
+    });
+
     test("posts runtime updates with the expected headers and trimmed base url", async () => {
         const fetchMock = mock(
             async (url: string | URL, init?: RequestInit) => {
@@ -44,7 +69,10 @@ describe("RuntimePersistenceClient", () => {
         });
 
         expect(fetchMock).toHaveBeenCalledTimes(1);
-        const [url, init] = fetchMock.mock.calls[0] ?? [];
+        const fetchCalls = fetchMock.mock.calls as unknown as Array<
+            [string | URL, RequestInit?]
+        >;
+        const [url, init] = fetchCalls[0] ?? [];
         expect(url).toBe("https://agentchat.convex.site/runtime/run-started");
         expect(init).toMatchObject({
             method: "POST",
@@ -90,6 +118,19 @@ describe("RuntimePersistenceClient", () => {
         expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 
+    test("returns null runtime binding payloads without throwing", async () => {
+        const fetchMock = mock(async () => Response.json(null));
+        globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+        const client = new RuntimePersistenceClient();
+        const result = await client.readRuntimeBinding({
+            userId: "user-1",
+            conversationLocalId: "chat-1",
+        });
+
+        expect(result).toBeNull();
+    });
+
     test("surfaces non-200 ingress responses", async () => {
         const fetchMock = mock(async () => {
             return new Response("bad request", { status: 400 });
@@ -105,6 +146,14 @@ describe("RuntimePersistenceClient", () => {
             }),
         ).rejects.toThrow(
             "Runtime persistence request failed (400) for /runtime/run-completed: bad request",
+        );
+    });
+
+    test("fails fast when runtime env is missing", async () => {
+        delete process.env.AGENTCHAT_CONVEX_SITE_URL;
+
+        expect(() => new RuntimePersistenceClient()).toThrow(
+            "AGENTCHAT_CONVEX_SITE_URL is not configured.",
         );
     });
 });
