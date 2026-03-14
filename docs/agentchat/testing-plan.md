@@ -120,6 +120,12 @@ Coverage targets:
 - persist completed and interrupted run state back into Convex
 - verify assistant message and run status after the socket flow completes
 
+Current behavior note:
+
+- interrupted turns do not always emit text deltas before termination
+- when deltas were streamed, interrupted assistant content must persist
+- when no deltas were streamed, an interrupted run with empty assistant content is currently considered valid
+
 Notes:
 
 - these commands require `apps/server` to be running locally

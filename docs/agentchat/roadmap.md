@@ -10,6 +10,7 @@ This roadmap describes the current implementation state and the next major steps
 - Convex-backed conversations, messages, runs, run events, and runtime bindings
 - Backend token auth, websocket transport, streaming, interruption, and recovery
 - Codex as the first working provider
+- Manual live runtime smoke and interrupt commands for the real local Codex plus Convex path
 - Removal of billing, analytics, attachments, browser-local product modes, and hosted deployment assumptions
 
 ## Active Work

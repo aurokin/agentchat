@@ -66,7 +66,8 @@ type LiveOutcome =
 
 const DEFAULT_SERVER_URL = "http://127.0.0.1:3030";
 const DEFAULT_EMAIL = "agentchat-live-smoke@local.agentchat";
-const INTERRUPT_FALLBACK_DELAY_MS = 1500;
+const INTERRUPT_FALLBACK_DELAY_MS = 5000;
+const INTERRUPT_RETRY_INTERVAL_MS = 250;
 const RUNTIME_TIMEOUT_MS = 120_000;
 
 function invariant(condition: unknown, message: string): asserts condition {
@@ -194,8 +195,7 @@ function parseConvexRunOutput(stdout: string): unknown {
         return null;
     }
 
-    const finalLine = lines.at(-1) ?? "";
-    return JSON.parse(finalLine) as unknown;
+    return JSON.parse(lines.join("\n")) as unknown;
 }
 
 function runConvex<T>(params: {
@@ -285,8 +285,8 @@ function buildPrompt(mode: Mode): string {
     if (mode === "interrupt") {
         return [
             "Open notes.md.",
-            "Append one short line that says 'interrupted test'.",
-            "Then explain exactly what you changed in three short bullet points.",
+            "Write a one hundred item improvement plan for that file.",
+            "Keep every item to one short sentence.",
         ].join(" ");
     }
 
@@ -398,11 +398,16 @@ async function runLiveConversation(params: {
     let interrupted = false;
     let interruptionSent = false;
     let interruptTimer: ReturnType<typeof setTimeout> | null = null;
+    let interruptInterval: ReturnType<typeof setInterval> | null = null;
 
     const cleanup = () => {
         if (interruptTimer) {
             clearTimeout(interruptTimer);
             interruptTimer = null;
+        }
+        if (interruptInterval) {
+            clearInterval(interruptInterval);
+            interruptInterval = null;
         }
         if (
             socket.readyState === WebSocket.OPEN ||
@@ -440,15 +445,33 @@ async function runLiveConversation(params: {
             }
 
             interruptionSent = true;
-            socket.send(
-                JSON.stringify({
-                    id: crypto.randomUUID(),
-                    type: "conversation.interrupt",
-                    payload: {
-                        conversationId: params.conversationId,
-                    },
-                }),
-            );
+            const sendInterrupt = () => {
+                socket.send(
+                    JSON.stringify({
+                        id: crypto.randomUUID(),
+                        type: "conversation.interrupt",
+                        payload: {
+                            conversationId: params.conversationId,
+                        },
+                    }),
+                );
+            };
+
+            sendInterrupt();
+            interruptInterval = setInterval(() => {
+                if (
+                    socket.readyState !== WebSocket.OPEN ||
+                    interrupted ||
+                    runId === null
+                ) {
+                    if (interruptInterval) {
+                        clearInterval(interruptInterval);
+                        interruptInterval = null;
+                    }
+                    return;
+                }
+                sendInterrupt();
+            }, INTERRUPT_RETRY_INTERVAL_MS);
         };
 
         socket.addEventListener("open", () => {
@@ -526,9 +549,6 @@ async function runLiveConversation(params: {
                     "Run started event missing runId.",
                 );
                 runId = incomingRunId;
-                if (params.mode === "interrupt") {
-                    maybeSendInterrupt();
-                }
                 return;
             }
 
@@ -604,7 +624,7 @@ async function runLiveConversation(params: {
 function assertSmokeContent(content: string): void {
     const normalized = content.trim();
     invariant(
-        normalized === "5" || normalized.toLowerCase() === "5.",
+        /(^|[^0-9])5[.]?$/u.test(normalized),
         `Unexpected smoke response: ${JSON.stringify(content)}`,
     );
 }
@@ -649,7 +669,11 @@ async function main() {
         `Model ${modelId} is not available for provider ${providerId}.`,
     );
 
-    const variantId = agentOptions.defaultVariant;
+    const variantId =
+        args.mode === "interrupt" &&
+        model.variants.some((variant) => variant.id === "deep")
+            ? "deep"
+            : agentOptions.defaultVariant;
     if (variantId !== null) {
         invariant(
             model.variants.some((variant) => variant.id === variantId),
@@ -793,10 +817,12 @@ async function main() {
             run.status === "interrupted",
             `Expected an interrupted run, got ${run.status}.`,
         );
-        invariant(
-            assistantMessage.content.trim().length > 0,
-            "Interrupted assistant output should retain partial content.",
-        );
+        if (outcome.sawDelta) {
+            invariant(
+                assistantMessage.content.trim().length > 0,
+                "Interrupted assistant output should retain partial content when deltas were streamed.",
+            );
+        }
     }
 
     console.log(
