@@ -55,6 +55,12 @@ export type AgentchatSocketEvent =
           };
       }
     | {
+          type: "connection.reconnected";
+          payload: {
+              transport: "websocket";
+          };
+      }
+    | {
           type: "connection.error";
           payload: {
               message: string;
@@ -140,6 +146,7 @@ export class AgentchatSocketClient {
     private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     private reconnectDelayMs = 500;
     private explicitlyClosed = false;
+    private pendingReconnectEvent = false;
 
     constructor(private readonly options: AgentchatSocketClientOptions) {}
 
@@ -240,7 +247,18 @@ export class AgentchatSocketClient {
                     return;
                 }
 
+                let reconnectEvent: AgentchatSocketEvent | null = null;
+
                 if (parsed.type === "connection.ready") {
+                    if (this.pendingReconnectEvent) {
+                        reconnectEvent = {
+                            type: "connection.reconnected",
+                            payload: {
+                                transport: "websocket",
+                            },
+                        };
+                        this.pendingReconnectEvent = false;
+                    }
                     this.ready = true;
                     this.reconnectDelayMs = 500;
                     this.replayConversationSubscriptions();
@@ -254,6 +272,12 @@ export class AgentchatSocketClient {
                 for (const listener of this.listeners) {
                     listener(parsed);
                 }
+
+                if (reconnectEvent) {
+                    for (const listener of this.listeners) {
+                        listener(reconnectEvent);
+                    }
+                }
             };
 
             socket.onerror = () => {
@@ -263,9 +287,14 @@ export class AgentchatSocketClient {
             };
 
             socket.onclose = () => {
+                const wasReady = this.ready;
                 if (this.socket === socket) {
                     this.socket = null;
                     this.ready = false;
+                }
+
+                if (wasReady && !this.explicitlyClosed) {
+                    this.pendingReconnectEvent = true;
                 }
 
                 if (!settled) {

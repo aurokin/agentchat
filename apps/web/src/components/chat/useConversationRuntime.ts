@@ -94,6 +94,7 @@ export function useConversationRuntime({
     const streamingFrameRef = useRef<number | null>(null);
     const activeRunRef = useRef<ActiveRunState | null>(null);
     const pendingInterruptRef = useRef(false);
+    const pendingReconnectNoticeRef = useRef(false);
     const currentChatRef = useRef<ChatSession | null>(null);
     const messagesRef = useRef<Message[]>([]);
 
@@ -171,6 +172,11 @@ export function useConversationRuntime({
 
     const handleSocketEvent = useCallback(
         (event: AgentchatSocketEvent) => {
+            if (event.type === "connection.reconnected") {
+                pendingReconnectNoticeRef.current = true;
+                return;
+            }
+
             const resolution = resolveConversationSocketEvent({
                 currentChatId: currentChatRef.current?.id ?? null,
                 event,
@@ -197,7 +203,8 @@ export function useConversationRuntime({
                 }
                 if (resolution.recovered) {
                     setSending(true);
-                    setRecoveredRunNotice(true);
+                    setRecoveredRunNotice(pendingReconnectNoticeRef.current);
+                    pendingReconnectNoticeRef.current = false;
                     if (resolution.streamingMessage) {
                         queueStreamingMessageUpdate(
                             resolution.streamingMessage,
@@ -299,6 +306,12 @@ export function useConversationRuntime({
         }
 
         if (!syncResolution.recoveredRun) {
+            if (
+                runtimeState.phase !== "active" &&
+                runtimeState.phase !== "recovering"
+            ) {
+                pendingReconnectNoticeRef.current = false;
+            }
             return;
         }
 
@@ -306,7 +319,8 @@ export function useConversationRuntime({
         activeRunRef.current = recoveredRun;
         queueMicrotask(() => {
             setSending(true);
-            setRecoveredRunNotice(true);
+            setRecoveredRunNotice(pendingReconnectNoticeRef.current);
+            pendingReconnectNoticeRef.current = false;
             queueStreamingMessageUpdate({
                 id: recoveredRun.assistantMessageId,
                 content: recoveredRun.content,
