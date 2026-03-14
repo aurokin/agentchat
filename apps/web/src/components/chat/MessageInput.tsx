@@ -4,9 +4,7 @@ import React, { useState, useRef, useEffect, forwardRef } from "react";
 import { Send, Square } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ModelSelector } from "./ModelSelector";
-import { ThinkingToggle } from "./ThinkingToggle";
 import { KeybindingsHelp } from "@/components/keybindings/KeybindingsHelp";
-import type { ThinkingLevel } from "@/lib/types";
 
 interface MessageInputProps {
     onSend: (content: string) => void;
@@ -17,9 +15,6 @@ interface MessageInputProps {
     settingsLocked?: boolean;
     selectedModel: string;
     onModelChange: (modelId: string) => void;
-    thinkingLevel: ThinkingLevel;
-    onThinkingChange: (value: ThinkingLevel) => void;
-    reasoningSupported?: boolean;
 }
 
 export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
@@ -33,9 +28,6 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
             settingsLocked = false,
             selectedModel,
             onModelChange,
-            thinkingLevel,
-            onThinkingChange,
-            reasoningSupported = true,
         } = props;
 
         const [content, setContent] = useState("");
@@ -105,13 +97,6 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
                             disabled={settingsLocked || disabled}
                         />
                         <div className="flex-1" />
-                        {reasoningSupported && (
-                            <ThinkingToggle
-                                value={thinkingLevel}
-                                onChange={onThinkingChange}
-                                disabled={settingsLocked || disabled}
-                            />
-                        )}
                     </div>
                     <div className="relative">
                         <textarea

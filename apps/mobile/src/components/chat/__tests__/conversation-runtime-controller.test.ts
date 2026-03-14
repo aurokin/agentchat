@@ -14,7 +14,6 @@ function createChat(overrides: Partial<ChatSession> = {}): ChatSession {
         title: "New Chat",
         modelId: "provider/model-1",
         variantId: "deep",
-        thinking: "high",
         settingsLockedAt: null,
         createdAt: 1,
         updatedAt: 1,

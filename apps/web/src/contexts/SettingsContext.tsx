@@ -9,7 +9,7 @@ import React, {
     useCallback,
     useRef,
 } from "react";
-import type { UserSettings, ProviderModel, ThinkingLevel } from "@/lib/types";
+import type { UserSettings, ProviderModel } from "@/lib/types";
 import * as storage from "@/lib/storage";
 import { fetchAvailableModels } from "@/lib/agentchat-server";
 import {
@@ -24,7 +24,6 @@ import {
 
 interface SettingsContextType extends UserSettings {
     setDefaultModel: (modelId: string) => void;
-    setDefaultThinking: (value: ThinkingLevel) => void;
     setTheme: (theme: UserSettings["theme"]) => void;
     toggleFavoriteModel: (modelId: string) => void;
     models: ProviderModel[];
@@ -35,7 +34,6 @@ interface SettingsContextType extends UserSettings {
 
 const defaultSettings: UserSettings = {
     defaultModel: "",
-    defaultThinking: "low",
     theme: "system",
     favoriteModels: [],
 };
@@ -107,7 +105,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         setSettings((prev) => ({
             ...prev,
             defaultModel: storage.getDefaultModel(),
-            defaultThinking: storage.getDefaultThinking(),
             theme: storage.getTheme(),
             favoriteModels: storage.getFavoriteModels(),
         }));
@@ -136,20 +133,15 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
             return;
         }
 
-        const selectedThinking = storage.getDefaultThinking(selectedAgentId);
         storage.setDefaultModel(selectedModelId, selectedAgentId);
         setSettings((prev) => {
-            if (
-                prev.defaultModel === selectedModelId &&
-                prev.defaultThinking === selectedThinking
-            ) {
+            if (prev.defaultModel === selectedModelId) {
                 return prev;
             }
 
             return {
                 ...prev,
                 defaultModel: selectedModelId,
-                defaultThinking: selectedThinking,
             };
         });
     }, [
@@ -163,11 +155,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     const setDefaultModel = (modelId: string) => {
         storage.setDefaultModel(modelId, selectedAgentId);
         setSettings((prev) => ({ ...prev, defaultModel: modelId }));
-    };
-
-    const setDefaultThinking = (value: ThinkingLevel) => {
-        storage.setDefaultThinking(value, selectedAgentId);
-        setSettings((prev) => ({ ...prev, defaultThinking: value }));
     };
 
     const setTheme = (theme: UserSettings["theme"]) => {
@@ -213,7 +200,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
             value={{
                 ...settings,
                 setDefaultModel,
-                setDefaultThinking,
                 setTheme,
                 toggleFavoriteModel,
                 models,

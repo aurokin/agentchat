@@ -2,8 +2,6 @@ const STORAGE_KEYS = {
     THEME: "agentchat-theme",
     DEFAULT_MODEL: "agentchat-default-model",
     DEFAULT_MODEL_BY_AGENT: "agentchat-default-model-by-agent",
-    DEFAULT_THINKING: "agentchat-default-thinking",
-    DEFAULT_THINKING_BY_AGENT: "agentchat-default-thinking-by-agent",
     FAVORITE_MODELS: "agentchat-favorite-models",
     SELECTED_AGENT: "agentchat-selected-agent",
     SELECTED_CHAT_BY_AGENT: "agentchat-selected-chat-by-agent",
@@ -170,52 +168,4 @@ export function clearSelectedChatId(agentId: string): void {
     const next = getSelectedChatMap();
     delete next[agentId];
     setSelectedChatMap(next);
-}
-
-export function getDefaultThinking(
-    agentId?: string | null,
-): "xhigh" | "high" | "medium" | "low" | "minimal" | "none" {
-    if (typeof window === "undefined") return "low";
-    if (agentId) {
-        const scopedThinking = getStringMap(
-            STORAGE_KEYS.DEFAULT_THINKING_BY_AGENT,
-        )[agentId];
-        if (
-            scopedThinking === "xhigh" ||
-            scopedThinking === "high" ||
-            scopedThinking === "medium" ||
-            scopedThinking === "low" ||
-            scopedThinking === "minimal" ||
-            scopedThinking === "none"
-        ) {
-            return scopedThinking;
-        }
-    }
-
-    return (
-        (localStorage.getItem(STORAGE_KEYS.DEFAULT_THINKING) as
-            | "xhigh"
-            | "high"
-            | "medium"
-            | "low"
-            | "minimal"
-            | "none") || "low"
-    );
-}
-
-export function setDefaultThinking(
-    value: "xhigh" | "high" | "medium" | "low" | "minimal" | "none",
-    agentId?: string | null,
-): void {
-    if (typeof window === "undefined") return;
-    if (agentId) {
-        const scopedThinking = getStringMap(
-            STORAGE_KEYS.DEFAULT_THINKING_BY_AGENT,
-        );
-        scopedThinking[agentId] = value;
-        setStringMap(STORAGE_KEYS.DEFAULT_THINKING_BY_AGENT, scopedThinking);
-        return;
-    }
-
-    localStorage.setItem(STORAGE_KEYS.DEFAULT_THINKING, value);
 }

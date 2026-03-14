@@ -26,7 +26,7 @@ function createChat(overrides: Partial<ChatSession> = {}): ChatSession {
         agentId: "agent-1",
         title: "New Chat",
         modelId: "gpt-5.3-codex",
-        thinking: "high",
+        variantId: "high",
         createdAt: 1,
         updatedAt: 1,
         ...overrides,
@@ -83,7 +83,6 @@ describe("conversation runtime controller", () => {
         });
 
         expect(sendPlan.effectiveThinking).toBe("high");
-        expect(sendPlan.shouldPersistDefaultThinking).toBe(true);
         expect(sendPlan.titleUpdate?.title).toBe("New prompt");
         expect(sendPlan.userMessage).toMatchObject({
             id: "user-1",
@@ -110,7 +109,7 @@ describe("conversation runtime controller", () => {
                 conversationId: "chat-1",
                 agentId: "agent-1",
                 modelId: "gpt-5.3-codex",
-                variantId: null,
+                variantId: "high",
                 thinking: "high",
                 content: "New prompt",
                 userMessageId: "user-1",
@@ -140,7 +139,6 @@ describe("conversation runtime controller", () => {
         });
 
         expect(sendPlan.effectiveThinking).toBe("none");
-        expect(sendPlan.shouldPersistDefaultThinking).toBe(false);
         expect(sendPlan.userMessage.thinkingLevel).toBe("none");
         expect(sendPlan.command.payload.thinking).toBe("none");
     });
@@ -269,9 +267,6 @@ describe("conversation runtime controller", () => {
                 setDefaultModel: (modelId) => {
                     calls.push(`defaultModel:${modelId}`);
                 },
-                setDefaultThinking: (thinking) => {
-                    calls.push(`defaultThinking:${thinking}`);
-                },
                 queueStreamingMessageUpdate: (update) => {
                     calls.push(`stream:${update?.id ?? "none"}`);
                 },
@@ -296,7 +291,6 @@ describe("conversation runtime controller", () => {
         expect(calls).toEqual([
             expect.stringMatching(/^add:user:/),
             "defaultModel:gpt-5.3-codex",
-            "defaultThinking:high",
             "updateChat:Ship it",
             expect.stringMatching(/^add:assistant:/),
             expect.stringMatching(/^stream:/),
@@ -333,7 +327,6 @@ describe("conversation runtime controller", () => {
                     });
                 },
                 setDefaultModel: () => {},
-                setDefaultThinking: () => {},
                 queueStreamingMessageUpdate: () => {},
                 ensureConnected: async () => {
                     throw new Error("socket unavailable");

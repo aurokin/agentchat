@@ -29,7 +29,6 @@ export interface ChatSession {
     title: string;
     modelId: string;
     variantId?: string | null;
-    thinking: ThinkingLevel;
     settingsLockedAt?: number | null;
     createdAt: number;
     updatedAt: number;
@@ -37,7 +36,6 @@ export interface ChatSession {
 
 export interface UserSettings {
     defaultModel: string;
-    defaultThinking: ThinkingLevel;
     theme: "light" | "dark" | "system";
     favoriteModels: string[];
 }

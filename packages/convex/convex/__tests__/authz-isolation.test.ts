@@ -160,7 +160,6 @@ describe("cross-user auth isolation", () => {
                 agentId: "agent-a",
                 title: "Chat",
                 modelId: "openrouter/model",
-                thinking: "none",
             }),
         ).rejects.toThrow("Unauthorized");
     });

@@ -8,7 +8,7 @@ import {
     resolveThinkingLevelForVariant,
     type ProviderModel,
 } from "./models";
-import type { ChatSession, Message } from "./types";
+import type { ChatSession, Message, ThinkingLevel } from "./types";
 
 export interface RuntimeErrorState {
     message: string;
@@ -47,7 +47,7 @@ export interface ConversationMessageDraft {
     contextContent: string;
     modelId: string;
     variantId?: string | null;
-    thinkingLevel: ChatSession["thinking"];
+    thinkingLevel: ThinkingLevel;
     chatId: string;
 }
 
@@ -56,8 +56,7 @@ export interface PreparedConversationSend {
     assistantMessage: ConversationMessageDraft;
     command: ConversationSendCommand;
     titleUpdate: ChatSession | null;
-    effectiveThinking: ChatSession["thinking"];
-    shouldPersistDefaultThinking: boolean;
+    effectiveThinking: ThinkingLevel;
     activeRun: ActiveRunState;
 }
 
@@ -129,10 +128,7 @@ export function prepareConversationSend(params: {
     );
     const supportsReasoning = modelSupportsReasoning(currentModel);
     const effectiveThinking = supportsReasoning
-        ? resolveThinkingLevelForVariant(
-              params.chat.variantId,
-              params.chat.thinking,
-          )
+        ? resolveThinkingLevelForVariant(params.chat.variantId)
         : "none";
     const userMessageId = createId();
     const assistantMessageId = createId();
@@ -182,7 +178,6 @@ export function prepareConversationSend(params: {
             params.messages.length,
         ),
         effectiveThinking,
-        shouldPersistDefaultThinking: supportsReasoning,
         activeRun: {
             conversationId: params.chat.id,
             assistantMessageId,

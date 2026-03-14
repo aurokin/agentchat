@@ -10,7 +10,6 @@ import {
     type ConversationRuntimeState,
     type Message,
     type ProviderModel,
-    type ThinkingLevel,
 } from "@/lib/types";
 import { trimTrailingEmptyLines } from "@shared/core/text";
 import {
@@ -43,7 +42,7 @@ type UseConversationRuntimeParams = {
         content: string;
         contextContent: string;
         modelId?: string;
-        thinkingLevel?: ThinkingLevel;
+        thinkingLevel?: Message["thinkingLevel"];
         chatId?: string;
     }) => Promise<Message>;
     updateMessage: (
@@ -54,7 +53,6 @@ type UseConversationRuntimeParams = {
     ) => Promise<void>;
     updateChat: (chat: ChatSession) => Promise<void>;
     setDefaultModel: (modelId: string) => void;
-    setDefaultThinking: (value: ThinkingLevel) => void;
 };
 
 type UseConversationRuntimeResult = {
@@ -80,7 +78,6 @@ export function useConversationRuntime({
     updateMessage,
     updateChat,
     setDefaultModel,
-    setDefaultThinking,
 }: UseConversationRuntimeParams): UseConversationRuntimeResult {
     const [sending, setSending] = useState(false);
     const [error, setError] = useState<RuntimeErrorState | null>(null);
@@ -363,7 +360,6 @@ export function useConversationRuntime({
                     updateChat,
                     updateMessage,
                     setDefaultModel,
-                    setDefaultThinking,
                     queueStreamingMessageUpdate,
                     ensureConnected: () =>
                         socketClient.ensureConnected(getBackendSessionToken),
@@ -392,7 +388,6 @@ export function useConversationRuntime({
             models,
             queueStreamingMessageUpdate,
             setDefaultModel,
-            setDefaultThinking,
             socketClient,
             updateChat,
             updateMessage,

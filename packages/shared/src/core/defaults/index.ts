@@ -3,13 +3,11 @@ import type { Message, ThinkingLevel } from "../types";
 export interface ChatDefaults {
     modelId: string;
     variantId?: string | null;
-    thinking: ThinkingLevel;
 }
 
 export interface LastUserSettings {
     modelId?: string;
     variantId?: string | null;
-    thinking?: ThinkingLevel;
 }
 
 export function getLastUserSettings(
@@ -23,7 +21,6 @@ export function getLastUserSettings(
         return {
             modelId: message.modelId,
             variantId: message.variantId ?? null,
-            thinking: message.thinkingLevel,
         };
     }
 
@@ -43,7 +40,6 @@ export function resolveInitialChatSettings({
         return {
             modelId: lastUser.modelId ?? defaults.modelId,
             variantId: lastUser.variantId ?? defaults.variantId ?? null,
-            thinking: lastUser.thinking ?? defaults.thinking,
         };
     }
 
@@ -56,6 +52,8 @@ export function applyModelCapabilities(
 ): ChatDefaults {
     return {
         ...settings,
-        thinking: supports.supportsReasoning ? settings.thinking : "none",
+        variantId: supports.supportsReasoning
+            ? (settings.variantId ?? null)
+            : null,
     };
 }

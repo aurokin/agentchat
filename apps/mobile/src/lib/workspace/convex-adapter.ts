@@ -52,7 +52,6 @@ function createServices(client: ConvexClientInterface): ConvexAdapterServices {
                     title: chat.title,
                     modelId: chat.modelId,
                     variantId: chat.variantId ?? null,
-                    thinking: chat.thinking,
                     createdAt: chat.createdAt,
                     updatedAt: chat.updatedAt,
                 })) as string,
@@ -84,7 +83,6 @@ function createServices(client: ConvexClientInterface): ConvexAdapterServices {
                     title: chat.title,
                     modelId: chat.modelId,
                     variantId: chat.variantId ?? null,
-                    thinking: chat.thinking,
                 });
             },
             remove: async ({ id }) => {

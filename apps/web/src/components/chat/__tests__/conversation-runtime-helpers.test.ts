@@ -17,7 +17,6 @@ function createChat(overrides: Partial<ChatSession> = {}): ChatSession {
         agentId: "agent-1",
         title: "Chat",
         modelId: "gpt-5.3-codex",
-        thinking: "none",
         createdAt: 1,
         updatedAt: 1,
         ...overrides,

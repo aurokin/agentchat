@@ -4,7 +4,6 @@ import type { ReactNode } from "react";
 import {
     ArrowDown,
     ArrowUp,
-    Brain,
     Cpu,
     History,
     Keyboard,
@@ -79,21 +78,9 @@ const CHAT_KEYBINDINGS: KeybindingItem[] = [
         keys: ["Cmd/Ctrl", "Alt", "M"],
         icon: Cpu,
     },
-    {
-        id: "thinkingLevel",
-        label: "Thinking level",
-        keys: ["Cmd/Ctrl", "Alt", "1-5"],
-        icon: Brain,
-    },
-    {
-        id: "thinkingOff",
-        label: "Thinking off",
-        keys: ["Cmd/Ctrl", "Alt", "Backspace"],
-        icon: Brain,
-    },
 ];
 
-const HIGHLIGHT_IDS = new Set(["cycleFavoriteModels", "thinkingLevel"]);
+const HIGHLIGHT_IDS = new Set(["cycleFavoriteModels"]);
 
 export const KEYBINDING_HIGHLIGHTS = CHAT_KEYBINDINGS.filter((item) =>
     HIGHLIGHT_IDS.has(item.id),

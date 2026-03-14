@@ -4,11 +4,9 @@ import {
     clearSelectedChatId,
     clearSelectedAgentId,
     getDefaultModel,
-    getDefaultThinking,
     getSelectedAgentId,
     getSelectedChatId,
     setDefaultModel,
-    setDefaultThinking,
     setSelectedAgentId,
     setSelectedChatId,
     setTheme,
@@ -74,45 +72,16 @@ describe("storage scoped defaults", () => {
         expect(getDefaultModel()).toBe("global-model");
     });
 
-    test("falls back to the global default thinking when an agent-specific value is missing", () => {
-        setDefaultThinking("medium");
-
-        expect(getDefaultThinking("agent-a")).toBe("medium");
-        expect(getDefaultThinking()).toBe("medium");
-    });
-
-    test("defaults to low thinking when no preference is stored yet", () => {
-        expect(getDefaultThinking()).toBe("low");
-        expect(getDefaultThinking("agent-a")).toBe("low");
-    });
-
-    test("stores agent-specific thinking overrides independently", () => {
-        setDefaultThinking("low");
-        setDefaultThinking("high", "agent-a");
-        setDefaultThinking("minimal", "agent-b");
-
-        expect(getDefaultThinking("agent-a")).toBe("high");
-        expect(getDefaultThinking("agent-b")).toBe("minimal");
-        expect(getDefaultThinking()).toBe("low");
-    });
-
     test("ignores malformed scoped storage values and falls back safely", () => {
         localStorage.setItem("agentchat-default-model-by-agent", "not-json");
-        localStorage.setItem(
-            "agentchat-default-thinking-by-agent",
-            JSON.stringify({ "agent-a": "invalid" }),
-        );
         setDefaultModel("global-model");
-        setDefaultThinking("none");
 
         expect(getDefaultModel("agent-a")).toBe("global-model");
-        expect(getDefaultThinking("agent-a")).toBe("none");
     });
 
     test("uses the agentchat namespace for top-level web storage keys", () => {
         setTheme("dark");
         setDefaultModel("global-model");
-        setDefaultThinking("high");
         setSelectedAgentId("agent-a");
         setSelectedChatId("agent-a", "chat-1");
 
@@ -120,7 +89,6 @@ describe("storage scoped defaults", () => {
         expect(localStorage.getItem("agentchat-default-model")).toBe(
             "global-model",
         );
-        expect(localStorage.getItem("agentchat-default-thinking")).toBe("high");
         expect(localStorage.getItem("agentchat-selected-agent")).toBe(
             "agent-a",
         );

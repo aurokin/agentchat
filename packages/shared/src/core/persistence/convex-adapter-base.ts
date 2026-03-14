@@ -29,7 +29,6 @@ export interface ConvexChatLike {
     title: string;
     modelId: string;
     variantId?: string | null;
-    thinking: ChatSession["thinking"];
     createdAt: number;
     updatedAt: number;
 }
@@ -260,7 +259,6 @@ export abstract class ConvexAdapterBase implements PersistenceAdapter {
             title: chat.title,
             modelId: chat.modelId,
             variantId: chat.variantId ?? null,
-            thinking: chat.thinking,
             createdAt: chat.createdAt,
             updatedAt: chat.updatedAt,
         };

@@ -33,7 +33,6 @@ export default defineSchema({
         title: v.string(),
         modelId: v.string(),
         variantId: v.union(v.string(), v.null()),
-        thinking: v.string(),
         settingsLockedAt: v.union(v.number(), v.null()),
         createdAt: v.number(),
         updatedAt: v.number(),

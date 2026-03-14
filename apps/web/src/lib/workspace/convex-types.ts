@@ -72,7 +72,6 @@ export interface ConvexChat {
     title: string;
     modelId: string;
     variantId?: string | null;
-    thinking: ChatSession["thinking"];
     settingsLockedAt: number | null;
     createdAt: number;
     updatedAt: number;
@@ -111,7 +110,6 @@ export interface ConvexAPI {
                 title: string;
                 modelId: string;
                 variantId?: string | null;
-                thinking: ChatSession["thinking"];
                 settingsLockedAt?: number | null;
                 createdAt: number;
                 updatedAt: number;
@@ -157,7 +155,6 @@ export interface ConvexAPI {
                 title: string;
                 modelId: string;
                 variantId?: string | null;
-                thinking: ChatSession["thinking"];
             },
             void
         >;

@@ -49,13 +49,12 @@ export type ConversationSendRuntimeDependencies = {
         content: string;
         contextContent: string;
         modelId: string;
-        thinkingLevel: ChatSession["thinking"];
+        thinkingLevel?: Message["thinkingLevel"];
         chatId: string;
     }) => Promise<Message>;
     updateChat: (chat: ChatSession) => Promise<void>;
     updateMessage: (id: string, updates: MessageUpdate) => Promise<void>;
     setDefaultModel: (modelId: string) => void;
-    setDefaultThinking: (thinking: ChatSession["thinking"]) => void;
     queueStreamingMessageUpdate: (
         update: StreamingMessageState | null,
     ) => void | Promise<void>;
@@ -119,9 +118,6 @@ export async function runConversationSend(params: {
 
         await params.dependencies.addMessage(sendPlan.userMessage);
         params.dependencies.setDefaultModel(params.chat.modelId);
-        if (sendPlan.shouldPersistDefaultThinking) {
-            params.dependencies.setDefaultThinking(sendPlan.effectiveThinking);
-        }
 
         if (sendPlan.titleUpdate) {
             await params.dependencies.updateChat(sendPlan.titleUpdate);

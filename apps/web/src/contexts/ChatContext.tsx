@@ -17,7 +17,6 @@ import type {
     ConversationRuntimeState,
     ChatSession,
     Message,
-    ThinkingLevel,
 } from "@/lib/types";
 import { APP_DEFAULT_MODEL } from "@shared/core/models";
 import {
@@ -61,7 +60,7 @@ interface ChatContextType {
         contextContent: string;
         thinking?: string;
         modelId?: string;
-        thinkingLevel?: ThinkingLevel;
+        thinkingLevel?: Message["thinkingLevel"];
         chatId?: string;
     }) => Promise<Message>;
     updateMessage: (
@@ -333,13 +332,12 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                     storage.getDefaultModel(selectedAgentId) ||
                     APP_DEFAULT_MODEL,
             });
-            const defaultThinking = storage.getDefaultThinking(selectedAgentId);
             const chat: ChatSession = {
                 id: uuid(),
                 agentId: selectedAgentId,
                 title: title || "New Chat",
                 modelId: modelId || defaultModel,
-                thinking: defaultThinking,
+                variantId: selectedAgent?.defaultVariant ?? null,
                 settingsLockedAt: null,
                 createdAt: Date.now(),
                 updatedAt: Date.now(),
@@ -433,7 +431,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             contextContent: string;
             thinking?: string;
             modelId?: string;
-            thinkingLevel?: ThinkingLevel;
+            thinkingLevel?: Message["thinkingLevel"];
             chatId?: string;
         }): Promise<Message> => {
             const targetChatId = message.chatId ?? currentChat?.id;

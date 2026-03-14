@@ -17,10 +17,7 @@ import {
 } from "@/contexts/WorkspaceContext";
 import type { ChatSession, Message } from "@shared/core/types";
 import type { ChatRunSummary, ConversationRuntimeState } from "@/lib/types";
-import {
-    APP_DEFAULT_MODEL,
-    resolveThinkingLevelForVariant,
-} from "@shared/core/models";
+import { APP_DEFAULT_MODEL } from "@shared/core/models";
 import {
     mapConvexChatToSession,
     mapConvexMessageToMessage,
@@ -267,7 +264,6 @@ export function ChatProvider({
                 title: title || "New Chat",
                 modelId: modelId || defaultModelId,
                 variantId: selectedVariantId,
-                thinking: resolveThinkingLevelForVariant(selectedVariantId),
                 settingsLockedAt: null,
                 createdAt: now,
                 updatedAt: now,

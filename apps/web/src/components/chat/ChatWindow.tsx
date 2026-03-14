@@ -18,11 +18,7 @@ import { useActionSafe } from "@/hooks/useConvexSafe";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import { useConversationRuntime } from "./useConversationRuntime";
-import {
-    modelSupportsReasoning,
-    type ChatRunSummary,
-    type ThinkingLevel,
-} from "@/lib/types";
+import { modelSupportsReasoning, type ChatRunSummary } from "@/lib/types";
 import { APP_DEFAULT_MODEL } from "@shared/core/models";
 import {
     applyModelCapabilities,
@@ -105,14 +101,8 @@ export function ChatWindow() {
         createChat,
     } = useChat();
     const { agents, selectedAgent } = useAgent();
-    const {
-        defaultModel,
-        defaultThinking,
-        setDefaultModel,
-        setDefaultThinking,
-        models,
-        favoriteModels,
-    } = useSettings();
+    const { defaultModel, setDefaultModel, models, favoriteModels } =
+        useSettings();
     const issueBackendSessionToken = useActionSafe(
         convexApi.backendTokens.issue,
     );
@@ -160,7 +150,8 @@ export function ChatWindow() {
             defaultModel || currentChat.modelId || APP_DEFAULT_MODEL;
         const defaults = {
             modelId: fallbackModelId,
-            thinking: defaultThinking,
+            variantId:
+                currentChat.variantId ?? selectedAgent?.defaultVariant ?? null,
         };
         const lastUserSettings = getLastUserSettings(messages);
         const resolvedSettings = resolveInitialChatSettings({
@@ -179,22 +170,23 @@ export function ChatWindow() {
 
         if (
             constrainedSettings.modelId !== currentChat.modelId ||
-            constrainedSettings.thinking !== currentChat.thinking
+            (constrainedSettings.variantId ?? null) !==
+                (currentChat.variantId ?? null)
         ) {
             void updateChat({
                 ...currentChat,
                 modelId: constrainedSettings.modelId,
-                thinking: constrainedSettings.thinking,
+                variantId: constrainedSettings.variantId ?? null,
             });
         }
         lastInitializedChatIdRef.current = currentChat.id;
     }, [
         currentChat,
         defaultModel,
-        defaultThinking,
         isMessagesLoading,
         messages,
         models,
+        selectedAgent?.defaultVariant,
         updateChat,
     ]);
 
@@ -218,7 +210,6 @@ export function ChatWindow() {
         updateMessage,
         updateChat,
         setDefaultModel,
-        setDefaultThinking,
     });
 
     const effectiveRuntimeState = useMemo(
@@ -297,64 +288,19 @@ export function ChatWindow() {
                     const nextModel = models.find(
                         (model) => model.id === nextModelId,
                     );
-                    const supportsReasoning = nextModel
-                        ? modelSupportsReasoning(nextModel)
-                        : true;
-                    const nextThinking = supportsReasoning
-                        ? currentChat.thinking
-                        : "none";
+                    const nextVariantId = nextModel?.variants?.some(
+                        (variant) => variant.id === currentChat.variantId,
+                    )
+                        ? (currentChat.variantId ?? null)
+                        : (nextModel?.variants?.[0]?.id ?? null);
                     void updateChat({
                         ...currentChat,
                         modelId: nextModelId,
-                        thinking: nextThinking,
+                        variantId: nextVariantId,
                     });
                     setDefaultModel(nextModelId);
                 }
                 return;
-            }
-
-            if (
-                !settingsLocked &&
-                hasModifier &&
-                hasAlt &&
-                !event.shiftKey &&
-                event.key === "Backspace"
-            ) {
-                const currentModel = models.find(
-                    (model) => model.id === currentChat.modelId,
-                );
-                if (!modelSupportsReasoning(currentModel)) return;
-                event.preventDefault();
-                void updateChat({ ...currentChat, thinking: "none" });
-                setDefaultThinking("none");
-                return;
-            }
-
-            if (!settingsLocked && hasModifier && hasAlt && !event.shiftKey) {
-                const level = getDigitFromEvent(event);
-                if (level !== null && level >= 1 && level <= 5) {
-                    const currentModel = models.find(
-                        (model) => model.id === currentChat.modelId,
-                    );
-                    if (!modelSupportsReasoning(currentModel)) return;
-
-                    const levels: ThinkingLevel[] = [
-                        "minimal",
-                        "low",
-                        "medium",
-                        "high",
-                        "xhigh",
-                    ];
-                    const nextLevel = levels[level - 1];
-                    if (nextLevel) {
-                        event.preventDefault();
-                        void updateChat({
-                            ...currentChat,
-                            thinking: nextLevel,
-                        });
-                        setDefaultThinking(nextLevel);
-                    }
-                }
             }
         };
 
@@ -366,7 +312,6 @@ export function ChatWindow() {
         models,
         router,
         setDefaultModel,
-        setDefaultThinking,
         updateChat,
     ]);
 
@@ -375,24 +320,17 @@ export function ChatWindow() {
         if (currentChat.settingsLockedAt != null) return;
 
         const nextModel = models.find((model) => model.id === modelId);
-        const supportsReasoning = nextModel
-            ? modelSupportsReasoning(nextModel)
-            : true;
-        const nextThinking = supportsReasoning ? currentChat.thinking : "none";
+        const nextVariantId = nextModel?.variants?.some(
+            (variant) => variant.id === currentChat.variantId,
+        )
+            ? (currentChat.variantId ?? null)
+            : (nextModel?.variants?.[0]?.id ?? null);
         await updateChat({
             ...currentChat,
             modelId,
-            thinking: nextThinking,
+            variantId: nextVariantId,
         });
         setDefaultModel(modelId);
-    };
-
-    const handleThinkingChange = async (value: ThinkingLevel) => {
-        if (!currentChat) return;
-        if (currentChat.settingsLockedAt != null) return;
-
-        await updateChat({ ...currentChat, thinking: value });
-        setDefaultThinking(value);
     };
 
     if (!currentChat) {
@@ -558,13 +496,6 @@ export function ChatWindow() {
                     settingsLocked={currentChat.settingsLockedAt != null}
                     selectedModel={currentChat.modelId}
                     onModelChange={handleModelChange}
-                    thinkingLevel={currentChat.thinking}
-                    onThinkingChange={handleThinkingChange}
-                    reasoningSupported={modelSupportsReasoning(
-                        models.find(
-                            (model) => model.id === currentChat.modelId,
-                        ),
-                    )}
                 />
             </div>
         </div>

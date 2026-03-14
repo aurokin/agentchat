@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { Message, ThinkingLevel } from "../types";
+import type { Message } from "../types";
 import {
     getLastUserSettings,
     resolveInitialChatSettings,
@@ -29,7 +29,6 @@ describe("defaults", () => {
         expect(getLastUserSettings(messages)).toEqual({
             modelId: "m2",
             variantId: "high",
-            thinking: "high",
         });
     });
 
@@ -52,12 +51,10 @@ describe("defaults", () => {
         const defaults: ChatDefaults = {
             modelId: "default-model",
             variantId: "medium",
-            thinking: "medium",
         };
         const lastUser = {
             modelId: "user-model",
             variantId: "high",
-            thinking: "high" as ThinkingLevel,
         };
 
         expect(
@@ -69,7 +66,6 @@ describe("defaults", () => {
         ).toEqual({
             modelId: "user-model",
             variantId: "high",
-            thinking: "high",
         });
     });
 
@@ -77,7 +73,6 @@ describe("defaults", () => {
         const defaults: ChatDefaults = {
             modelId: "default-model",
             variantId: "medium",
-            thinking: "medium",
         };
 
         expect(
@@ -93,7 +88,6 @@ describe("defaults", () => {
         const settings: ChatDefaults = {
             modelId: "model",
             variantId: "medium",
-            thinking: "high",
         };
 
         expect(
@@ -102,8 +96,7 @@ describe("defaults", () => {
             }),
         ).toEqual({
             modelId: "model",
-            variantId: "medium",
-            thinking: "none",
+            variantId: null,
         });
     });
 });

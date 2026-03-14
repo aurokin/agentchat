@@ -30,7 +30,6 @@ describe("chat settings lock", () => {
                             userId: AUTH_USER_ID,
                             title: "Locked",
                             modelId: "gpt-5.3-codex",
-                            thinking: "medium",
                             settingsLockedAt: 123,
                             updatedAt: 123,
                         };
@@ -73,7 +72,6 @@ describe("chat settings lock", () => {
                             userId: AUTH_USER_ID,
                             title: "Locked",
                             modelId: "gpt-5.3-codex",
-                            thinking: "medium",
                             settingsLockedAt: 123,
                             updatedAt: 123,
                         };
