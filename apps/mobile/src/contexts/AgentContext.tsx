@@ -81,6 +81,7 @@ export function AgentProvider({
                         kind: "google",
                         enabled: true,
                         allowlistMode: "email",
+                        allowSignup: null,
                     },
                     providers: [
                         {
@@ -88,6 +89,7 @@ export function AgentProvider({
                             kind: "google",
                             enabled: true,
                             allowlistMode: "email",
+                            allowSignup: null,
                         },
                     ],
                 },

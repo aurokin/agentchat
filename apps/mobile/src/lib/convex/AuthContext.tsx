@@ -32,12 +32,15 @@ interface AuthContextValue {
     user: User | null;
     userId: string | null;
     authProviderId: string | null;
-    authProviderKind: "google" | "disabled" | null;
+    authProviderKind: "google" | "local" | "disabled" | null;
     usesAutomaticAccessUser: boolean;
     isAuthenticated: boolean;
     isLoading: boolean;
     isConvexAvailable: boolean;
-    signIn: () => Promise<void>;
+    signIn: (options?: {
+        username?: string;
+        password?: string;
+    }) => Promise<void>;
     signOut: () => Promise<void>;
     getBackendSessionToken: () => Promise<string>;
     configureConvex: (url: string) => Promise<void>;
@@ -140,89 +143,117 @@ export function AuthProvider({
         };
     }, [effectiveUserId, user]);
 
-    const signIn = useCallback(async () => {
-        if (usesAutomaticAccessUser) {
-            return;
-        }
-        if (!authActions?.signIn) {
-            throw new Error("Convex auth is not configured");
-        }
-        if (!isConvexAvailable || !isConvexConfigured()) {
-            throw new Error("Convex is not configured");
-        }
-
-        const redirectUri = makeRedirectUri({
-            scheme: "agentchat",
-            path: "convex-auth",
-        });
-        const retryDelaysMs = [500, 1000, 2000, 4000, 8000];
-        const isRetryableAuthError = (message: string) => {
-            const normalized = message.toLowerCase();
-            return (
-                normalized.includes(
-                    "connection lost while action was in flight",
-                ) ||
-                normalized.includes("stream end encountered") ||
-                normalized.includes("websocket") ||
-                normalized.includes("connection lost")
-            );
-        };
-        const runWithRetry = async <T,>(operation: () => Promise<T>) => {
-            for (
-                let attempt = 0;
-                attempt <= retryDelaysMs.length;
-                attempt += 1
-            ) {
-                try {
-                    return await operation();
-                } catch (error) {
-                    const message =
-                        error instanceof Error ? error.message : String(error);
-                    if (!isRetryableAuthError(message)) {
-                        throw error;
-                    }
-                    const delayMs = retryDelaysMs[attempt];
-                    if (delayMs === undefined) {
-                        throw error;
-                    }
-                    await new Promise((resolve) =>
-                        setTimeout(resolve, delayMs),
-                    );
-                }
+    const signIn = useCallback(
+        async (options?: { username?: string; password?: string }) => {
+            if (usesAutomaticAccessUser) {
+                return;
             }
-            throw new Error("Sign in failed");
-        };
+            if (!authActions?.signIn) {
+                throw new Error("Convex auth is not configured");
+            }
+            if (!isConvexAvailable || !isConvexConfigured()) {
+                throw new Error("Convex is not configured");
+            }
 
-        const result = await runWithRetry(() =>
-            authActions.signIn("google", {
-                redirectTo: redirectUri,
-                calledBy: "mobile",
-            } as any),
-        );
+            const redirectUri = makeRedirectUri({
+                scheme: "agentchat",
+                path: "convex-auth",
+            });
+            const retryDelaysMs = [500, 1000, 2000, 4000, 8000];
+            const isRetryableAuthError = (message: string) => {
+                const normalized = message.toLowerCase();
+                return (
+                    normalized.includes(
+                        "connection lost while action was in flight",
+                    ) ||
+                    normalized.includes("stream end encountered") ||
+                    normalized.includes("websocket") ||
+                    normalized.includes("connection lost")
+                );
+            };
+            const runWithRetry = async <T,>(operation: () => Promise<T>) => {
+                for (
+                    let attempt = 0;
+                    attempt <= retryDelaysMs.length;
+                    attempt += 1
+                ) {
+                    try {
+                        return await operation();
+                    } catch (error) {
+                        const message =
+                            error instanceof Error
+                                ? error.message
+                                : String(error);
+                        if (!isRetryableAuthError(message)) {
+                            throw error;
+                        }
+                        const delayMs = retryDelaysMs[attempt];
+                        if (delayMs === undefined) {
+                            throw error;
+                        }
+                        await new Promise((resolve) =>
+                            setTimeout(resolve, delayMs),
+                        );
+                    }
+                }
+                throw new Error("Sign in failed");
+            };
 
-        if (!result?.redirect) {
-            throw new Error("Sign in could not be started.");
-        }
+            if (authProviderKind === "local") {
+                const username = options?.username?.trim();
+                const password = options?.password ?? "";
+                if (!username || !password) {
+                    throw new Error("Username and password are required.");
+                }
 
-        const authSession = await WebBrowser.openAuthSessionAsync(
-            result.redirect.toString(),
-            redirectUri,
-        );
+                await runWithRetry(() =>
+                    authActions.signIn("password", {
+                        flow: "signIn",
+                        username,
+                        password,
+                        calledBy: "mobile",
+                    } as any),
+                );
+                return;
+            }
 
-        if (authSession.type !== "success" || !authSession.url) {
-            throw new Error("Sign in was cancelled or failed");
-        }
+            const result = await runWithRetry(() =>
+                authActions.signIn("google", {
+                    redirectTo: redirectUri,
+                    calledBy: "mobile",
+                } as any),
+            );
 
-        const url = new URL(authSession.url);
-        const code = url.searchParams.get("code");
-        if (!code) {
-            throw new Error("Missing auth code");
-        }
+            if (!result?.redirect) {
+                throw new Error("Sign in could not be started.");
+            }
 
-        await runWithRetry(() =>
-            authActions.signIn(undefined as any, { code } as any),
-        );
-    }, [authActions, isConvexAvailable, usesAutomaticAccessUser]);
+            const authSession = await WebBrowser.openAuthSessionAsync(
+                result.redirect.toString(),
+                redirectUri,
+            );
+
+            if (authSession.type !== "success" || !authSession.url) {
+                throw new Error("Sign in was cancelled or failed");
+            }
+
+            const url = new URL(authSession.url);
+            const code = url.searchParams.get("code");
+            if (!code) {
+                throw new Error("Missing auth code");
+            }
+
+            await runWithRetry(() =>
+                authActions.signIn(undefined as any, { code } as any),
+            );
+        },
+        [
+            authActions,
+            authProviderKind,
+            isConvexAvailable,
+            usesAutomaticAccessUser,
+        ],
+    );
 
     const signOut = useCallback(async () => {
         if (usesAutomaticAccessUser) {

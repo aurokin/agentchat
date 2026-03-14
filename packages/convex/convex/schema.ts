@@ -14,6 +14,9 @@ export default defineSchema({
         name: v.optional(v.string()),
         image: v.optional(v.string()),
         email: v.optional(v.string()),
+        username: v.optional(v.string()),
+        authProvider: v.optional(v.string()),
+        localAuthEnabled: v.optional(v.boolean()),
         emailVerificationTime: v.optional(v.number()),
         phone: v.optional(v.string()),
         phoneVerificationTime: v.optional(v.number()),
@@ -25,6 +28,7 @@ export default defineSchema({
         updatedAt: v.optional(v.number()),
     })
         .index("email", ["email"])
+        .index("username", ["username"])
         .index("phone", ["phone"]),
     chats: defineTable({
         userId: v.id("users"),

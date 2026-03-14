@@ -20,8 +20,16 @@ const DisabledAuthProviderSchema = z.object({
     enabled: z.boolean(),
 });
 
+const LocalAuthProviderSchema = z.object({
+    id: z.string().min(1),
+    kind: z.literal("local"),
+    enabled: z.boolean(),
+    allowSignup: z.boolean(),
+});
+
 const AuthProviderSchema = z.discriminatedUnion("kind", [
     GoogleAuthProviderSchema,
+    LocalAuthProviderSchema,
     DisabledAuthProviderSchema,
 ]);
 

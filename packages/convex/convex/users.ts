@@ -18,6 +18,7 @@ import {
     isAgentchatAuthDisabled,
 } from "./lib/auth_mode";
 import { drainBatches } from "./lib/batch";
+import { normalizeLocalUsername } from "./lib/localAuth";
 import {
     computeWorkspaceChatCount,
     computeWorkspaceMessageCount,
@@ -69,6 +70,17 @@ export const getByEmailInternal = internalQuery({
     },
 });
 
+export const getByUsernameInternal = internalQuery({
+    args: { username: v.string() },
+    handler: async (ctx, args) => {
+        const username = normalizeLocalUsername(args.username);
+        return await ctx.db
+            .query("users")
+            .withIndex("username", (q) => q.eq("username", username))
+            .unique();
+    },
+});
+
 export const getCurrentUserId = query({
     args: {},
     handler: async (ctx) => {
@@ -108,11 +120,17 @@ export const getStorageUsage = query({
 export const create = internalMutation({
     args: {
         email: v.optional(v.string()),
+        username: v.optional(v.string()),
+        authProvider: v.optional(v.string()),
+        localAuthEnabled: v.optional(v.boolean()),
     },
     handler: async (ctx, args) => {
         const now = Date.now();
         return await ctx.db.insert("users", {
             email: args.email ?? undefined,
+            username: args.username ?? undefined,
+            authProvider: args.authProvider ?? undefined,
+            localAuthEnabled: args.localAuthEnabled ?? undefined,
             workspaceChatCount: 0,
             workspaceMessageCount: 0,
             createdAt: now,
@@ -140,6 +158,7 @@ async function ensureDefaultUser(ctx: MutationCtx): Promise<Id<"users">> {
         await ctx.db.patch(existing._id, {
             name: profile.name,
             email: profile.email,
+            authProvider: "disabled",
             updatedAt: now,
         });
         return existing._id;
@@ -148,6 +167,7 @@ async function ensureDefaultUser(ctx: MutationCtx): Promise<Id<"users">> {
     return await ctx.db.insert("users", {
         name: profile.name,
         email: profile.email,
+        authProvider: "disabled",
         workspaceChatCount: 0,
         workspaceMessageCount: 0,
         createdAt: now,

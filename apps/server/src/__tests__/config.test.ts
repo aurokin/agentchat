@@ -39,15 +39,17 @@ describe("server config", () => {
                 requiresLogin: boolean;
                 activeProvider: {
                     id: string;
-                    kind: "google" | "disabled";
+                    kind: "google" | "local" | "disabled";
                     enabled: boolean;
                     allowlistMode: "email" | null;
+                    allowSignup: boolean | null;
                 } | null;
                 providers: Array<{
                     id: string;
-                    kind: "google" | "disabled";
+                    kind: "google" | "local" | "disabled";
                     enabled: boolean;
                     allowlistMode: "email" | null;
+                    allowSignup: boolean | null;
                 }>;
             };
             agents: Array<{ id: string }>;
@@ -61,6 +63,7 @@ describe("server config", () => {
                 kind: "google",
                 enabled: true,
                 allowlistMode: "email",
+                allowSignup: null,
             },
             providers: [
                 {
@@ -68,6 +71,7 @@ describe("server config", () => {
                     kind: "google",
                     enabled: true,
                     allowlistMode: "email",
+                    allowSignup: null,
                 },
             ],
         });
@@ -159,6 +163,37 @@ describe("server config", () => {
                     allowedEmails: ["operator@example.com"],
                     allowedDomains: [],
                     googleHostedDomain: null,
+                },
+            ],
+        });
+    });
+
+    test("parses local auth config", () => {
+        const config = parseConfig({
+            version: 1,
+            auth: {
+                defaultProviderId: "local-main",
+                providers: [
+                    {
+                        id: "local-main",
+                        kind: "local",
+                        enabled: true,
+                        allowSignup: false,
+                    },
+                ],
+            },
+            providers: exampleConfig.providers,
+            agents: exampleConfig.agents,
+        });
+
+        expect(config.auth).toEqual({
+            defaultProviderId: "local-main",
+            providers: [
+                {
+                    id: "local-main",
+                    kind: "local",
+                    enabled: true,
+                    allowSignup: false,
                 },
             ],
         });

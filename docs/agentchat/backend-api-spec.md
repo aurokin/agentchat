@@ -29,7 +29,7 @@ Important rule:
 ### Client To Convex
 
 - the client authenticates with Convex as a concrete user
-- today that user may come from Google auth or the transitional automatic-access path
+- today that user may come from Google auth, local auth, or the transitional automatic-access path
 - the target direction is provider-oriented Google plus local-user auth, not a permanent shared default-user mode
 
 ### Client To Backend

@@ -16,6 +16,7 @@ import type * as lib_auth_mode from "../lib/auth_mode.js";
 import type * as lib_authz from "../lib/authz.js";
 import type * as lib_batch from "../lib/batch.js";
 import type * as lib_limits from "../lib/limits.js";
+import type * as lib_localAuth from "../lib/localAuth.js";
 import type * as lib_pagination from "../lib/pagination.js";
 import type * as lib_subscription from "../lib/subscription.js";
 import type * as lib_workspace_usage from "../lib/workspace_usage.js";
@@ -40,6 +41,7 @@ declare const fullApi: ApiFromModules<{
   "lib/authz": typeof lib_authz;
   "lib/batch": typeof lib_batch;
   "lib/limits": typeof lib_limits;
+  "lib/localAuth": typeof lib_localAuth;
   "lib/pagination": typeof lib_pagination;
   "lib/subscription": typeof lib_subscription;
   "lib/workspace_usage": typeof lib_workspace_usage;

@@ -22,7 +22,7 @@ cd apps/web && bun dev
 
 - `http://localhost:4040`
 
-1D) If the local workspace uses `AGENTCHAT_AUTH_MODE=google`, sign in with an allowed Google account. If it uses `disabled`, the app will initialize the default workspace user automatically.
+1D) If the local workspace uses `AGENTCHAT_AUTH_MODE=google`, sign in with an allowed Google account. If it uses `local`, sign in with a seeded local user such as `smoke_1`. If it uses `disabled`, the app will initialize the default workspace user automatically.
 
 ## 2) Optional: Local Dev With Convex
 
@@ -91,7 +91,14 @@ This writes `apps/server/agentchat.config.json` pointing at:
 - `~/agents/agentchat_test`
 - `~/agents/agentchat_test/workspace`
 
-By default, this generated config uses `auth.mode = "disabled"` so local integration and manual runtime checks do not require Google sign-in.
+By default, this generated config uses a disabled auth provider as a transitional local path so integration and manual runtime checks do not require sign-in.
+
+If you want the local seeded-user path instead:
+
+```bash
+bun run setup:test-agent-config -- --auth-mode=local --force
+bun run setup:local-smoke-users
+```
 
 Re-run with `--force` only if you want to replace an existing local config:
 

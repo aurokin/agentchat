@@ -21,7 +21,7 @@ function resolveGitUserEmail(repoRoot: string): string | null {
     }
 }
 
-type AuthMode = "google" | "disabled";
+type AuthMode = "google" | "local" | "disabled";
 
 function resolveAuthMode(): AuthMode {
     const flag = process.argv.find((arg) => arg.startsWith("--auth-mode="));
@@ -30,12 +30,12 @@ function resolveAuthMode(): AuthMode {
         process.env.AGENTCHAT_TEST_AUTH_MODE?.trim() ||
         "disabled";
 
-    if (value === "google" || value === "disabled") {
+    if (value === "google" || value === "local" || value === "disabled") {
         return value;
     }
 
     throw new Error(
-        `Unsupported auth mode '${value}'. Expected 'google' or 'disabled'.`,
+        `Unsupported auth mode '${value}'. Expected 'google', 'local', or 'disabled'.`,
     );
 }
 
@@ -48,6 +48,20 @@ function buildAuthConfig(authMode: AuthMode, allowedEmail: string) {
                     id: "disabled-default",
                     kind: "disabled" as const,
                     enabled: true,
+                },
+            ],
+        };
+    }
+
+    if (authMode === "local") {
+        return {
+            defaultProviderId: "local-main",
+            providers: [
+                {
+                    id: "local-main",
+                    kind: "local" as const,
+                    enabled: true,
+                    allowSignup: false,
                 },
             ],
         };

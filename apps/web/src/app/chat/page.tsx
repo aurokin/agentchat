@@ -17,6 +17,7 @@ export default function ChatPage() {
     const { chats, loading, selectChat, currentChat } = useChat();
     const {
         loadingAgents,
+        authProviderKind,
         authRequiresLogin,
         usesAutomaticAccessUser,
         bootstrapIssue,
@@ -29,9 +30,47 @@ export default function ChatPage() {
     const { isAuthenticated, isLoading: isAuthLoading } = useConvexAuth();
     const { signIn } = useAuthActions() ?? {};
     const [initialized, setInitialized] = useState(false);
+    const [localUsername, setLocalUsername] = useState("");
+    const [localPassword, setLocalPassword] = useState("");
+    const [localSignInError, setLocalSignInError] = useState<string | null>(
+        null,
+    );
+    const [isLocalSigningIn, setIsLocalSigningIn] = useState(false);
     const hasAccess =
         isConvexAvailable &&
         (usesAutomaticAccessUser ? isWorkspaceReady : isAuthenticated);
+
+    const handleLocalSignIn = async () => {
+        if (!signIn) {
+            setLocalSignInError("Convex auth is not configured.");
+            return;
+        }
+
+        const username = localUsername.trim();
+        if (!username || !localPassword) {
+            setLocalSignInError("Username and password are required.");
+            return;
+        }
+
+        setIsLocalSigningIn(true);
+        setLocalSignInError(null);
+        try {
+            await signIn("password", {
+                flow: "signIn",
+                username,
+                password: localPassword,
+                calledBy: "web",
+            } as any);
+        } catch (error) {
+            const message =
+                error instanceof Error ? error.message : String(error);
+            setLocalSignInError(
+                message || "Could not sign in with the local user.",
+            );
+        } finally {
+            setIsLocalSigningIn(false);
+        }
+    };
 
     // Select a chat on first load for the active agent.
     useEffect(() => {
@@ -119,7 +158,46 @@ export default function ChatPage() {
                             ? "This instance has authentication disabled, but the default workspace user could not be initialized."
                             : "Agentchat runs against your Convex workspace only. Sign in to access chats and the agents exposed by this instance."}
                     </p>
-                    {!authRequiresLogin ? null : (
+                    {!authRequiresLogin ? null : authProviderKind ===
+                      "local" ? (
+                        <div className="mt-6 space-y-3 text-left">
+                            <input
+                                type="text"
+                                value={localUsername}
+                                onChange={(event) =>
+                                    setLocalUsername(event.target.value)
+                                }
+                                autoCapitalize="none"
+                                autoCorrect="off"
+                                placeholder="Username"
+                                className="w-full border border-border bg-background px-3 py-2 text-sm text-foreground outline-none"
+                            />
+                            <input
+                                type="password"
+                                value={localPassword}
+                                onChange={(event) =>
+                                    setLocalPassword(event.target.value)
+                                }
+                                placeholder="Password"
+                                className="w-full border border-border bg-background px-3 py-2 text-sm text-foreground outline-none"
+                            />
+                            {localSignInError ? (
+                                <p className="text-sm text-destructive">
+                                    {localSignInError}
+                                </p>
+                            ) : null}
+                            <button
+                                type="button"
+                                className="btn-deco btn-deco-primary w-full"
+                                onClick={() => void handleLocalSignIn()}
+                                disabled={isLocalSigningIn}
+                            >
+                                {isLocalSigningIn
+                                    ? "Signing in..."
+                                    : "Sign in with local user"}
+                            </button>
+                        </div>
+                    ) : (
                         <button
                             type="button"
                             className="btn-deco btn-deco-primary mt-6 w-full"

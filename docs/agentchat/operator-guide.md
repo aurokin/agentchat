@@ -70,7 +70,19 @@ If you already have a local config and want to replace it:
 bun run setup:test-agent-config -- --force
 ```
 
-By default this helper writes a disabled auth provider so local runtime and integration checks can skip Google sign-in. If you want the generated config to require Google auth instead:
+By default this helper writes a disabled auth provider so local runtime and integration checks can skip sign-in while the local-user rollout is still in progress. If you want the generated config to use local seeded users or require Google auth instead:
+
+```bash
+bun run setup:test-agent-config -- --auth-mode=local --force
+```
+
+Then seed the standard local smoke users:
+
+```bash
+bun run setup:local-smoke-users
+```
+
+Or switch to Google auth:
 
 ```bash
 bun run setup:test-agent-config -- --auth-mode=google --force

@@ -9,6 +9,7 @@ import {
     Alert,
     Image,
     Platform,
+    TextInput,
     useWindowDimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -42,6 +43,8 @@ export default function SettingsScreen(): ReactElement {
     const styles = useMemo(() => createStyles(colors), [colors]);
 
     const [isSigningIn, setIsSigningIn] = useState(false);
+    const [localUsername, setLocalUsername] = useState("");
+    const [localPassword, setLocalPassword] = useState("");
 
     const convexUnavailableMessage = "Convex isn't configured for this build.";
     const authSummaryLabel = usesAutomaticAccessUser
@@ -71,13 +74,16 @@ export default function SettingsScreen(): ReactElement {
         );
     };
 
-    const performSignIn = async () => {
+    const performSignIn = async (options?: {
+        username?: string;
+        password?: string;
+    }) => {
         if (usesAutomaticAccessUser) {
             return;
         }
         setIsSigningIn(true);
         try {
-            await signIn();
+            await signIn(options);
         } catch (error) {
             const rawMessage =
                 error instanceof Error ? error.message : String(error);
@@ -111,6 +117,23 @@ export default function SettingsScreen(): ReactElement {
         }
 
         await performSignIn();
+    };
+
+    const handleLocalSignIn = async () => {
+        if (usesAutomaticAccessUser) {
+            return;
+        }
+        if (!isConvexAvailable) {
+            Alert.alert("Convex Not Configured", convexUnavailableMessage, [
+                { text: "OK" },
+            ]);
+            return;
+        }
+
+        await performSignIn({
+            username: localUsername,
+            password: localPassword,
+        });
     };
 
     const handleThemeChange = async (theme: UserTheme) => {
@@ -285,64 +308,110 @@ export default function SettingsScreen(): ReactElement {
                                     )}
 
                                     {isConvexAvailable && (
-                                        <TouchableOpacity
-                                            style={[
-                                                styles.googleButton,
-                                                isGoogleButtonBusy &&
-                                                    styles.googleButtonDisabled,
-                                                usesAutomaticAccessUser &&
-                                                    styles.googleButtonDisabled,
-                                            ]}
-                                            onPress={
-                                                usesAutomaticAccessUser
-                                                    ? undefined
-                                                    : isAuthenticated
-                                                      ? handleSignOut
-                                                      : handleGoogleSignIn
-                                            }
-                                            disabled={
-                                                isGoogleButtonBusy ||
-                                                usesAutomaticAccessUser
-                                            }
-                                        >
-                                            {isGoogleButtonBusy ? (
+                                        <>
+                                            {!isAuthenticated &&
+                                            authProviderKind === "local" ? (
                                                 <View
-                                                    style={
-                                                        styles.googleButtonContent
-                                                    }
+                                                    style={styles.localAuthForm}
                                                 >
-                                                    <ActivityIndicator
-                                                        color={
-                                                            colors.textOnAccent
+                                                    <TextInput
+                                                        value={localUsername}
+                                                        onChangeText={
+                                                            setLocalUsername
+                                                        }
+                                                        autoCapitalize="none"
+                                                        autoCorrect={false}
+                                                        placeholder="Username"
+                                                        placeholderTextColor={
+                                                            colors.textMuted
                                                         }
                                                         style={
-                                                            styles.googleButtonSpinner
+                                                            styles.localAuthInput
                                                         }
                                                     />
+                                                    <TextInput
+                                                        value={localPassword}
+                                                        onChangeText={
+                                                            setLocalPassword
+                                                        }
+                                                        secureTextEntry
+                                                        autoCapitalize="none"
+                                                        autoCorrect={false}
+                                                        placeholder="Password"
+                                                        placeholderTextColor={
+                                                            colors.textMuted
+                                                        }
+                                                        style={
+                                                            styles.localAuthInput
+                                                        }
+                                                    />
+                                                </View>
+                                            ) : null}
+                                            <TouchableOpacity
+                                                style={[
+                                                    styles.googleButton,
+                                                    isGoogleButtonBusy &&
+                                                        styles.googleButtonDisabled,
+                                                    usesAutomaticAccessUser &&
+                                                        styles.googleButtonDisabled,
+                                                ]}
+                                                onPress={
+                                                    usesAutomaticAccessUser
+                                                        ? undefined
+                                                        : isAuthenticated
+                                                          ? handleSignOut
+                                                          : authProviderKind ===
+                                                              "local"
+                                                            ? handleLocalSignIn
+                                                            : handleGoogleSignIn
+                                                }
+                                                disabled={
+                                                    isGoogleButtonBusy ||
+                                                    usesAutomaticAccessUser
+                                                }
+                                            >
+                                                {isGoogleButtonBusy ? (
+                                                    <View
+                                                        style={
+                                                            styles.googleButtonContent
+                                                        }
+                                                    >
+                                                        <ActivityIndicator
+                                                            color={
+                                                                colors.textOnAccent
+                                                            }
+                                                            style={
+                                                                styles.googleButtonSpinner
+                                                            }
+                                                        />
+                                                        <Text
+                                                            style={
+                                                                styles.googleButtonText
+                                                            }
+                                                        >
+                                                            {isSigningIn
+                                                                ? "Signing in..."
+                                                                : "Loading..."}
+                                                        </Text>
+                                                    </View>
+                                                ) : (
                                                     <Text
                                                         style={
                                                             styles.googleButtonText
                                                         }
                                                     >
-                                                        {isSigningIn
-                                                            ? "Signing in..."
-                                                            : "Loading..."}
+                                                        {usesAutomaticAccessUser
+                                                            ? "Authentication Disabled"
+                                                            : isAuthenticated
+                                                              ? "Sign Out"
+                                                              : authProviderKind ===
+                                                                  "local"
+                                                                ? "Sign in with local user"
+                                                                : "Sign in with Google"}
                                                     </Text>
-                                                </View>
-                                            ) : (
-                                                <Text
-                                                    style={
-                                                        styles.googleButtonText
-                                                    }
-                                                >
-                                                    {usesAutomaticAccessUser
-                                                        ? "Authentication Disabled"
-                                                        : isAuthenticated
-                                                          ? "Sign Out"
-                                                          : "Sign in with Google"}
-                                                </Text>
-                                            )}
-                                        </TouchableOpacity>
+                                                )}
+                                            </TouchableOpacity>
+                                        </>
                                     )}
 
                                     {usesAutomaticAccessUser && (
@@ -806,6 +875,20 @@ const createStyles = (colors: ThemeColors) =>
             fontSize: 14,
             color: colors.textMuted,
             marginBottom: 16,
+        },
+        localAuthForm: {
+            gap: 10,
+            marginBottom: 16,
+        },
+        localAuthInput: {
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.surfaceMuted,
+            color: colors.text,
+            borderRadius: 8,
+            paddingHorizontal: 12,
+            paddingVertical: 10,
+            fontSize: 15,
         },
         googleButton: {
             backgroundColor: colors.accent,

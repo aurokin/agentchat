@@ -32,8 +32,9 @@ type AgentOptions = {
 
 type BootstrapPayload = {
     auth: {
-        mode: "google" | "disabled";
-        allowlistMode: "email" | null;
+        activeProvider: {
+            kind: "google" | "local" | "disabled";
+        } | null;
     };
 };
 
@@ -59,6 +60,8 @@ type LiveSmokeArgs = {
     mode: ExtendedMode;
     serverUrl: string;
     email: string;
+    username: string | null;
+    password: string | null;
     agentId: string | null;
     modelId: string | null;
     variantId: string | null;
@@ -108,6 +111,8 @@ type PersistedRunEvent = {
 
 const DEFAULT_SERVER_URL = "http://127.0.0.1:3030";
 const DEFAULT_EMAIL = "agentchat-live-smoke@local.agentchat";
+const DEFAULT_LOCAL_USERNAME = "smoke_1";
+const DEFAULT_LOCAL_PASSWORD = "smoke_1_password";
 const INTERRUPT_FALLBACK_DELAY_MS = 5000;
 const INTERRUPT_RETRY_INTERVAL_MS = 250;
 const RUNTIME_TIMEOUT_MS = 120_000;
@@ -129,6 +134,8 @@ function parseArgs(argv: string[]): LiveSmokeArgs {
     let mode: ExtendedMode = "smoke";
     let serverUrl = DEFAULT_SERVER_URL;
     let email = DEFAULT_EMAIL;
+    let username: string | null = null;
+    let password: string | null = null;
     let agentId: string | null = null;
     let modelId: string | null = null;
     let variantId: string | null = null;
@@ -172,6 +179,26 @@ function parseArgs(argv: string[]): LiveSmokeArgs {
             continue;
         }
 
+        if (arg === "--username") {
+            const value = argv[index + 1];
+            if (!value) {
+                throw new Error("--username requires a value.");
+            }
+            username = value;
+            index += 1;
+            continue;
+        }
+
+        if (arg === "--password") {
+            const value = argv[index + 1];
+            if (!value) {
+                throw new Error("--password requires a value.");
+            }
+            password = value;
+            index += 1;
+            continue;
+        }
+
         if (arg === "--agent-id") {
             const value = argv[index + 1];
             if (!value) {
@@ -209,6 +236,8 @@ function parseArgs(argv: string[]): LiveSmokeArgs {
         mode,
         serverUrl: trimTrailingSlash(serverUrl),
         email,
+        username,
+        password,
         agentId,
         modelId,
         variantId,
@@ -364,15 +393,107 @@ async function ensureTestUser(params: {
     });
 }
 
+function runConvexRaw(params: {
+    repoRoot: string;
+    functionName: string;
+    args: Record<string, unknown>;
+}): { status: number; stdout: string; stderr: string } {
+    const result = spawnSync(
+        "bunx",
+        ["convex", "run", params.functionName, JSON.stringify(params.args)],
+        {
+            cwd: getConvexCwd(params.repoRoot),
+            encoding: "utf8",
+        },
+    );
+
+    return {
+        status: result.status ?? 1,
+        stdout: result.stdout ?? "",
+        stderr: `${result.stdout ?? ""}\n${result.stderr ?? ""}`.trim(),
+    };
+}
+
+async function ensureLocalTestUser(params: {
+    repoRoot: string;
+    username: string;
+    password: string;
+}): Promise<{
+    userId: string;
+    email: string;
+}> {
+    const existingSignIn = runConvexRaw({
+        repoRoot: params.repoRoot,
+        functionName: "auth:signIn",
+        args: {
+            provider: "password",
+            params: {
+                flow: "signIn",
+                username: params.username,
+                password: params.password,
+            },
+            calledBy: "live-runtime-smoke",
+        },
+    });
+
+    if (
+        existingSignIn.status !== 0 &&
+        !existingSignIn.stderr.includes("Invalid credentials")
+    ) {
+        throw new Error(
+            `Failed to verify local user ${params.username}: ${existingSignIn.stderr}`,
+        );
+    }
+
+    if (existingSignIn.status !== 0) {
+        const signUp = runConvexRaw({
+            repoRoot: params.repoRoot,
+            functionName: "auth:signIn",
+            args: {
+                provider: "password",
+                params: {
+                    flow: "signUp",
+                    username: params.username,
+                    displayName: params.username,
+                    password: params.password,
+                },
+                calledBy: "live-runtime-smoke",
+            },
+        });
+
+        if (signUp.status !== 0) {
+            throw new Error(
+                `Failed to create local user ${params.username}: ${signUp.stderr}`,
+            );
+        }
+    }
+
+    const user = runConvex<{ _id: string; email?: string | null } | null>({
+        repoRoot: params.repoRoot,
+        functionName: "users:getByUsernameInternal",
+        args: { username: params.username },
+        push: true,
+    });
+
+    invariant(user?._id, `Expected local user ${params.username} to exist.`);
+
+    return {
+        userId: user._id,
+        email: user.email ?? `${params.username}@local.agentchat`,
+    };
+}
+
 async function resolveAccessUser(params: {
     repoRoot: string;
     email: string;
-    authMode: "google" | "disabled";
+    username: string | null;
+    password: string | null;
+    authProviderKind: "google" | "local" | "disabled";
 }): Promise<{
     userId: string;
     identity: Identity | null;
 }> {
-    if (params.authMode === "disabled") {
+    if (params.authProviderKind === "disabled") {
         const userId = runConvex<string>({
             repoRoot: params.repoRoot,
             functionName: "users:ensureAccessUser",
@@ -383,6 +504,24 @@ async function resolveAccessUser(params: {
         return {
             userId,
             identity: null,
+        };
+    }
+
+    if (params.authProviderKind === "local") {
+        const username = params.username ?? DEFAULT_LOCAL_USERNAME;
+        const password = params.password ?? DEFAULT_LOCAL_PASSWORD;
+        const localUser = await ensureLocalTestUser({
+            repoRoot: params.repoRoot,
+            username,
+            password,
+        });
+        return {
+            userId: localUser.userId,
+            identity: {
+                subject: localUser.userId,
+                email: localUser.email,
+                name: username,
+            },
         };
     }
 
@@ -971,7 +1110,9 @@ async function main() {
     const { userId, identity } = await resolveAccessUser({
         repoRoot,
         email: args.email,
-        authMode: bootstrap.auth.mode,
+        username: args.username,
+        password: args.password,
+        authProviderKind: bootstrap.auth.activeProvider?.kind ?? "google",
     });
 
     runConvex<void>({

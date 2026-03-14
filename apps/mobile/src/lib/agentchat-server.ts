@@ -13,9 +13,10 @@ type BootstrapProvider = {
 
 export type BootstrapAuthProvider = {
     id: string;
-    kind: "google" | "disabled";
+    kind: "google" | "local" | "disabled";
     enabled: boolean;
     allowlistMode: "email" | null;
+    allowSignup: boolean | null;
 };
 
 export type BootstrapAgent = {

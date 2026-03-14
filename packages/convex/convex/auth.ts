@@ -1,6 +1,12 @@
 import { convexAuth } from "@convex-dev/auth/server";
 import Google, { type GoogleProfile } from "@auth/core/providers/google";
-import { isAgentchatAuthDisabled } from "./lib/auth_mode";
+import { Password } from "@convex-dev/auth/providers/Password";
+import { isAgentchatAuthDisabled, isAgentchatLocalAuth } from "./lib/auth_mode";
+import {
+    localUsernameToEmail,
+    normalizeLocalDisplayName,
+    normalizeLocalUsername,
+} from "./lib/localAuth";
 
 const getProfileUpdates = (
     profile: Record<string, unknown> & {
@@ -10,6 +16,9 @@ const getProfileUpdates = (
         phoneVerified?: boolean;
         name?: string;
         image?: string;
+        username?: string;
+        authProvider?: string;
+        localAuthEnabled?: boolean;
     },
     now: number,
 ) => {
@@ -23,6 +32,15 @@ const getProfileUpdates = (
     }
     if (typeof profile.email === "string") {
         updates.email = profile.email;
+    }
+    if (typeof profile.username === "string") {
+        updates.username = profile.username;
+    }
+    if (typeof profile.authProvider === "string") {
+        updates.authProvider = profile.authProvider;
+    }
+    if (typeof profile.localAuthEnabled === "boolean") {
+        updates.localAuthEnabled = profile.localAuthEnabled;
     }
     if (typeof profile.phone === "string") {
         updates.phone = profile.phone;
@@ -69,23 +87,49 @@ const resolveRedirectTo = (redirectTo: string) => {
 
 const providers = isAgentchatAuthDisabled()
     ? []
-    : [
-          Google({
-              profile(profile: GoogleProfile) {
-                  const fallbackName = [profile.given_name, profile.family_name]
-                      .filter(Boolean)
-                      .join(" ");
-                  const name = profile.name ?? (fallbackName || undefined);
-                  return {
-                      id: profile.sub,
-                      name,
-                      email: profile.email,
-                      image: profile.picture,
-                      emailVerified: profile.email_verified,
-                  };
-              },
-          }),
-      ];
+    : isAgentchatLocalAuth()
+      ? [
+            Password({
+                profile(params) {
+                    const username = normalizeLocalUsername(
+                        String(params.username ?? ""),
+                    );
+                    return {
+                        email: localUsernameToEmail(username),
+                        username,
+                        name: normalizeLocalDisplayName(
+                            typeof params.displayName === "string"
+                                ? params.displayName
+                                : undefined,
+                            username,
+                        ),
+                        authProvider: "local",
+                        localAuthEnabled: true,
+                    };
+                },
+            }),
+        ]
+      : [
+            Google({
+                profile(profile: GoogleProfile) {
+                    const fallbackName = [
+                        profile.given_name,
+                        profile.family_name,
+                    ]
+                        .filter(Boolean)
+                        .join(" ");
+                    const name = profile.name ?? (fallbackName || undefined);
+                    return {
+                        id: profile.sub,
+                        name,
+                        email: profile.email,
+                        image: profile.picture,
+                        emailVerified: profile.email_verified,
+                        authProvider: "google",
+                    };
+                },
+            }),
+        ];
 
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
     providers,

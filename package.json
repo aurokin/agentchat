@@ -27,6 +27,7 @@
         "env:validate": "bun scripts/env/validate.ts",
         "env:check": "bun scripts/check-env-docs.ts",
         "setup:test-agent-config": "bun scripts/testing/write-test-agent-config.ts",
+        "setup:local-smoke-users": "bun scripts/testing/seed-local-users.ts",
         "test:manual:live-runtime-smoke": "bun scripts/testing/live-runtime-smoke.ts --mode smoke",
         "test:manual:live-runtime-status": "bun scripts/testing/live-runtime-smoke.ts --mode status",
         "test:manual:live-runtime-repeat": "bun scripts/testing/runtime-repeat-smoke.ts",

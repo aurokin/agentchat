@@ -15,7 +15,7 @@ import { unavailablePersistenceAdapter } from "@/lib/workspace/unavailable-adapt
 
 interface WorkspaceContextValue {
     authProviderId: string | null;
-    authProviderKind: "google" | "disabled" | null;
+    authProviderKind: "google" | "local" | "disabled" | null;
     isAuthRequired: boolean;
     workspaceStatus: WorkspaceStatus;
     isWorkspaceReady: boolean;

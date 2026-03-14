@@ -178,15 +178,17 @@ describe("createFetchHandler", () => {
                 requiresLogin: boolean;
                 activeProvider: {
                     id: string;
-                    kind: "google" | "disabled";
+                    kind: "google" | "local" | "disabled";
                     enabled: boolean;
                     allowlistMode: "email" | null;
+                    allowSignup: boolean | null;
                 } | null;
                 providers: Array<{
                     id: string;
-                    kind: "google" | "disabled";
+                    kind: "google" | "local" | "disabled";
                     enabled: boolean;
                     allowlistMode: "email" | null;
+                    allowSignup: boolean | null;
                 }>;
             };
         };
@@ -200,6 +202,7 @@ describe("createFetchHandler", () => {
                 kind: "disabled",
                 enabled: true,
                 allowlistMode: null,
+                allowSignup: null,
             },
             providers: [
                 {
@@ -207,6 +210,72 @@ describe("createFetchHandler", () => {
                     kind: "disabled",
                     enabled: true,
                     allowlistMode: null,
+                    allowSignup: null,
+                },
+            ],
+        });
+    });
+
+    test("reports local auth provider metadata in bootstrap", async () => {
+        const fetchHandler = createFetchHandler({
+            getConfig: () => ({
+                ...createConfig(),
+                auth: {
+                    defaultProviderId: "local-main",
+                    providers: [
+                        {
+                            id: "local-main",
+                            kind: "local",
+                            enabled: true,
+                            allowSignup: false,
+                        },
+                    ],
+                },
+            }),
+        });
+
+        const response = await fetchHandler(
+            new Request("http://localhost:3030/api/bootstrap"),
+        );
+        const body = (await response.json()) as {
+            auth: {
+                defaultProviderId: string;
+                requiresLogin: boolean;
+                activeProvider: {
+                    id: string;
+                    kind: "google" | "local" | "disabled";
+                    enabled: boolean;
+                    allowlistMode: "email" | null;
+                    allowSignup: boolean | null;
+                } | null;
+                providers: Array<{
+                    id: string;
+                    kind: "google" | "local" | "disabled";
+                    enabled: boolean;
+                    allowlistMode: "email" | null;
+                    allowSignup: boolean | null;
+                }>;
+            };
+        };
+
+        expect(response.status).toBe(200);
+        expect(body.auth).toEqual({
+            defaultProviderId: "local-main",
+            requiresLogin: true,
+            activeProvider: {
+                id: "local-main",
+                kind: "local",
+                enabled: true,
+                allowlistMode: null,
+                allowSignup: false,
+            },
+            providers: [
+                {
+                    id: "local-main",
+                    kind: "local",
+                    enabled: true,
+                    allowlistMode: null,
+                    allowSignup: false,
                 },
             ],
         });

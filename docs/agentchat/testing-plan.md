@@ -42,7 +42,9 @@ Examples:
 - run `bun run --cwd packages/convex codegen`
 - run `bun run doctor:server`
     - confirm it reports live Codex model access for each enabled provider
-- sign in if auth mode is `google`, or let the default workspace user initialize if auth mode is `disabled`
+- sign in with Google if auth provider kind is `google`
+- sign in with a seeded user like `smoke_1` if auth provider kind is `local`
+- let the default workspace user initialize only if the transitional disabled provider is still in use
 - select the smoke agent
 - send a greeting
 - confirm a fast concise response arrives

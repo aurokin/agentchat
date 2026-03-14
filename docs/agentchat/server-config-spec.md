@@ -60,6 +60,22 @@ Preferred auth shape:
 
 ```json
 {
+  "defaultProviderId": "local-main",
+  "providers": [
+    {
+      "id": "local-main",
+      "kind": "local",
+      "enabled": true,
+      "allowSignup": false
+    }
+  ]
+}
+```
+
+Google provider shape:
+
+```json
+{
   "defaultProviderId": "google-main",
   "providers": [
     {
@@ -101,9 +117,13 @@ Fields:
 - `providers[].id`
   - stable auth provider id
 - `providers[].kind`
-  - current values: `"google"` or `"disabled"`
+  - current values: `"google"`, `"local"`, or `"disabled"`
 - `providers[].enabled`
   - boolean
+- `providers[].allowSignup`
+  - required only for local providers
+  - boolean
+  - first slice should normally keep this `false` and rely on operator-seeded users
 - `providers[].allowlistMode`
   - required only for Google providers
   - current allowed value: `"email"`
@@ -118,6 +138,7 @@ Fields:
 V1 decision:
 
 - in Google mode, instance access is granted only if the signed-in email is present in `allowedEmails`
+- in local mode, Convex Auth owns password verification and every successful login maps to one concrete `users` row
 - disabled is still supported as a transitional provider shape, but it is not the desired long-term product model
 
 Legacy note:

@@ -44,9 +44,10 @@ await clearAllCredentials();
 
 ## Convex Access Modes
 
-The mobile app supports two current access modes:
+The mobile app supports three current access modes:
 
 - `google`: Expo Auth Session with Convex Auth for Google sign-in
+- `local`: username/password sign-in through Convex Auth
 - `disabled`: no external sign-in, the app initializes the default workspace user from Convex
 
 ### Required Packages
@@ -83,9 +84,16 @@ Google mode:
 4. Auth context updates user state.
 5. The Convex-backed workspace becomes available.
 
+Local mode:
+
+1. User enters a username and password in settings.
+2. The mobile app calls Convex Auth with the `password` provider.
+3. Convex resolves the login to a concrete `users` row.
+4. The Convex-backed workspace becomes available.
+
 Disabled mode:
 
-1. The app detects `auth.mode = "disabled"` from the Agentchat server bootstrap.
+1. The app detects a disabled auth provider from the Agentchat server bootstrap.
 2. The auth context calls `users.ensureAccessUser`.
 3. Convex returns or creates the default workspace user.
 4. The Convex-backed workspace becomes available without external sign-in.

@@ -93,6 +93,7 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
                         kind: "google",
                         enabled: true,
                         allowlistMode: "email",
+                        allowSignup: null,
                     },
                     providers: [
                         {
@@ -100,6 +101,7 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
                             kind: "google",
                             enabled: true,
                             allowlistMode: "email",
+                            allowSignup: null,
                         },
                     ],
                 },

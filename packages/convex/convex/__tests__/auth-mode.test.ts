@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 
-import { getAgentchatAuthMode, getDisabledUserProfile } from "../lib/auth_mode";
+import {
+    getAgentchatAuthMode,
+    getDisabledUserProfile,
+    isAgentchatLocalAuth,
+} from "../lib/auth_mode";
 import { ensureAccessUser, resetWorkspaceData } from "../users";
 
 type HandlerExport = {
@@ -33,6 +37,13 @@ describe("auth mode", () => {
         delete process.env.AGENTCHAT_AUTH_MODE;
 
         expect(getAgentchatAuthMode()).toBe("google");
+    });
+
+    test("reads local auth mode", () => {
+        process.env.AGENTCHAT_AUTH_MODE = "local";
+
+        expect(getAgentchatAuthMode()).toBe("local");
+        expect(isAgentchatLocalAuth()).toBe(true);
     });
 
     test("reads disabled default user profile overrides", () => {
@@ -77,14 +88,16 @@ describe("auth mode", () => {
 
         expect(userId).toBe("users:default");
         expect(insert).toHaveBeenCalledTimes(1);
-        expect(insert).toHaveBeenCalledWith("users", {
-            name: "Default User",
-            email: "default@local.agentchat",
-            workspaceChatCount: 0,
-            workspaceMessageCount: 0,
-            createdAt: expect.any(Number),
-            updatedAt: expect.any(Number),
-        });
+        expect(insert).toHaveBeenCalledWith(
+            "users",
+            expect.objectContaining({
+                name: "Default User",
+                email: "default@local.agentchat",
+                authProvider: "disabled",
+                workspaceChatCount: 0,
+                workspaceMessageCount: 0,
+            }),
+        );
         expect(patch).not.toHaveBeenCalled();
     });
 

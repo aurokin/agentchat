@@ -49,7 +49,8 @@ Run those browser commands sequentially. The operator smoke command intentionall
 - `apps/server` is running
 - the web app is running
 - if auth mode is `google`, the selected Google account is allowlisted
-- if auth mode is `disabled`, the default workspace user can be initialized successfully
+- if auth provider kind is `disabled`, the default workspace user can be initialized successfully
+- if auth provider kind is `local`, a seeded user such as `smoke_1` can sign in successfully
 - `bun run doctor:server` reports the configured Codex provider and target agents as ready, and shows live Codex model access for each enabled provider
 
 For the fullest backend-auth coverage:

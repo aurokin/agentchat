@@ -66,6 +66,7 @@ function toAuthProviderSummary(provider: AuthProviderConfig) {
         enabled: provider.enabled,
         allowlistMode:
             provider.kind === "google" ? provider.allowlistMode : null,
+        allowSignup: provider.kind === "local" ? provider.allowSignup : null,
     };
 }
 

@@ -45,7 +45,11 @@ export const issue = action({
                 );
             }
 
-            const resolvedEmail = identity.email?.trim();
+            const user = await ctx.runQuery(api.users.get, {
+                id: resolvedUserId as any,
+            });
+            const resolvedEmail =
+                identity.email?.trim() || user?.email?.trim() || "";
             if (!resolvedEmail) {
                 throw new Error(
                     "Authenticated user is missing an email address.",
