@@ -35,7 +35,7 @@ interface SettingsContextType extends UserSettings {
 
 const defaultSettings: UserSettings = {
     defaultModel: "",
-    defaultThinking: "none",
+    defaultThinking: "low",
     theme: "system",
     favoriteModels: [],
 };

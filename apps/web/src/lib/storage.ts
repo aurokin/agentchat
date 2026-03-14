@@ -175,7 +175,7 @@ export function clearSelectedChatId(agentId: string): void {
 export function getDefaultThinking(
     agentId?: string | null,
 ): "xhigh" | "high" | "medium" | "low" | "minimal" | "none" {
-    if (typeof window === "undefined") return "none";
+    if (typeof window === "undefined") return "low";
     if (agentId) {
         const scopedThinking = getStringMap(
             STORAGE_KEYS.DEFAULT_THINKING_BY_AGENT,
@@ -199,7 +199,7 @@ export function getDefaultThinking(
             | "medium"
             | "low"
             | "minimal"
-            | "none") || "none"
+            | "none") || "low"
     );
 }
 

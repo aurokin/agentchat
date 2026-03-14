@@ -1,6 +1,7 @@
 "use client";
 
 import { getAgentchatServerUrl } from "@/lib/agentchat-server";
+import { generateUUID } from "@/lib/utils";
 import {
     AgentchatSocketClient as SharedAgentchatSocketClient,
     toAgentchatWebSocketUrl,
@@ -34,7 +35,7 @@ export class AgentchatSocketClient extends SharedAgentchatSocketClient {
     constructor() {
         super({
             getWebSocketUrl: getAgentchatWebSocketUrl,
-            createId: () => crypto.randomUUID(),
+            createId: generateUUID,
             notConfiguredMessage:
                 "NEXT_PUBLIC_AGENTCHAT_SERVER_URL is not configured for the web app.",
         });

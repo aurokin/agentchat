@@ -21,7 +21,7 @@ describe("server config", () => {
         expect(exampleConfig.providers).toHaveLength(1);
         expect(exampleConfig.agents).toHaveLength(1);
         expect(exampleConfig.agents[0]?.defaultProviderId).toBe("codex-main");
-        expect(exampleConfig.providers[0]?.models[0]?.id).toBe("gpt-5.3-codex");
+        expect(exampleConfig.providers[0]?.models[0]?.id).toBe("gpt-5.4");
     });
 
     test("serves bootstrap, provider models, and agent options routes", async () => {
@@ -61,7 +61,7 @@ describe("server config", () => {
             }>;
         };
         expect(modelsPayload.providerId).toBe("codex-main");
-        expect(modelsPayload.models[0]?.id).toBe("gpt-5.3-codex");
+        expect(modelsPayload.models[0]?.id).toBe("gpt-5.4");
         expect(modelsPayload.models[0]?.supportsReasoning).toBe(true);
         expect(
             modelsPayload.models[0]?.variants.map((item) => item.id),

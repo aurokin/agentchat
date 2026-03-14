@@ -81,6 +81,11 @@ describe("storage scoped defaults", () => {
         expect(getDefaultThinking()).toBe("medium");
     });
 
+    test("defaults to low thinking when no preference is stored yet", () => {
+        expect(getDefaultThinking()).toBe("low");
+        expect(getDefaultThinking("agent-a")).toBe("low");
+    });
+
     test("stores agent-specific thinking overrides independently", () => {
         setDefaultThinking("low");
         setDefaultThinking("high", "agent-a");

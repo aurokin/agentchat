@@ -1,6 +1,6 @@
 import type { ThinkingLevel } from "../types";
 
-export const APP_DEFAULT_MODEL = "moonshotai/kimi-k2.5";
+export const APP_DEFAULT_MODEL = "gpt-5.4";
 
 export interface ProviderVariant {
     id: string;

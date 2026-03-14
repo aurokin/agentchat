@@ -71,8 +71,8 @@ function buildConfig(homeDir: string, authMode: AuthMode, allowedEmail: string) 
                 modelCacheTtlSeconds: 300,
                 models: [
                     {
-                        id: "gpt-5.3-codex",
-                        label: "GPT-5.3 Codex",
+                        id: "gpt-5.4",
+                        label: "GPT-5.4",
                         enabled: true,
                         supportsReasoning: true,
                         variants: [
@@ -127,8 +127,8 @@ function buildConfig(homeDir: string, authMode: AuthMode, allowedEmail: string) 
                 rootPath: fixturesRoot,
                 providerIds: ["codex-main"],
                 defaultProviderId: "codex-main",
-                defaultModel: "gpt-5.3-codex",
-                defaultVariant: "balanced",
+                defaultModel: "gpt-5.4",
+                defaultVariant: "fast",
                 modelAllowlist: [],
                 variantAllowlist: [],
                 tags: ["manual"],
@@ -144,8 +144,8 @@ function buildConfig(homeDir: string, authMode: AuthMode, allowedEmail: string) 
                 rootPath: path.join(fixturesRoot, "workspace"),
                 providerIds: ["codex-main"],
                 defaultProviderId: "codex-main",
-                defaultModel: "gpt-5.3-codex",
-                defaultVariant: "balanced",
+                defaultModel: "gpt-5.4",
+                defaultVariant: "fast",
                 modelAllowlist: [],
                 variantAllowlist: [],
                 tags: ["workspace"],
