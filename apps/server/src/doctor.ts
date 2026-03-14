@@ -43,6 +43,11 @@ if (configStore.status.lastReloadError) {
 console.log(
     `[agentchat-server] runtime env: ${runtimeEnv.ok ? "ready" : "missing required values"}`,
 );
+console.log(
+    `[agentchat-server] auth: ${
+        diagnostics.auth.activeProviderKind ?? "unconfigured"
+    } - ${formatIssues(diagnostics.auth.issues)}`,
+);
 for (const diagnostic of runtimeEnv.diagnostics) {
     console.log(
         `[env:${diagnostic.key}] ${diagnostic.configured ? "configured" : "missing"} - ${diagnostic.description}`,

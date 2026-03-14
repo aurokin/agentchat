@@ -24,6 +24,12 @@ export type AgentDiagnostics = {
 
 export type ConfigDiagnostics = {
     ok: boolean;
+    auth: {
+        activeProviderKind:
+            | AgentchatConfig["auth"]["providers"][number]["kind"]
+            | null;
+        issues: string[];
+    };
     summary: {
         enabledProviderCount: number;
         readyProviderCount: number;
@@ -247,12 +253,30 @@ export function getConfigDiagnostics(
     const agents = config.agents.map((agent) =>
         getAgentDiagnostics(config, agent),
     );
+    const activeAuthProvider =
+        config.auth.providers.find(
+            (provider) =>
+                provider.id === config.auth.defaultProviderId &&
+                provider.enabled,
+        ) ??
+        config.auth.providers.find((provider) => provider.enabled) ??
+        null;
+    const authIssues =
+        activeAuthProvider?.kind === "disabled"
+            ? [
+                  "Disabled auth is deprecated; switch this instance to local or Google auth.",
+              ]
+            : [];
 
     return {
         ok:
             providers.every(
                 (provider) => !provider.enabled || provider.ready,
             ) && agents.every((agent) => !agent.enabled || agent.ready),
+        auth: {
+            activeProviderKind: activeAuthProvider?.kind ?? null,
+            issues: authIssues,
+        },
         summary: {
             enabledProviderCount: providers.filter(
                 (provider) => provider.enabled,

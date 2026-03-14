@@ -194,4 +194,27 @@ describe("configDiagnostics", () => {
             readyAgentCount: 1,
         });
     });
+
+    test("flags disabled auth as a deprecated compatibility mode", () => {
+        const config = createConfig();
+        config.auth = {
+            defaultProviderId: "disabled-default",
+            providers: [
+                {
+                    id: "disabled-default",
+                    kind: "disabled",
+                    enabled: true,
+                },
+            ],
+        };
+
+        const diagnostics = getConfigDiagnostics(config);
+
+        expect(diagnostics.auth).toEqual({
+            activeProviderKind: "disabled",
+            issues: [
+                "Disabled auth is deprecated; switch this instance to local or Google auth.",
+            ],
+        });
+    });
 });
