@@ -233,6 +233,10 @@ export default function ChatScreen(): ReactElement {
     useEffect(() => {
         if (!currentChat || !hasLoadedMessages) return;
         if (lastInitializedChatIdRef.current === currentChat.id) return;
+        if (chatMessages.length > 0) {
+            lastInitializedChatIdRef.current = currentChat.id;
+            return;
+        }
         if (currentChat.settingsLockedAt != null) {
             lastInitializedChatIdRef.current = currentChat.id;
             return;
@@ -280,6 +284,7 @@ export default function ChatScreen(): ReactElement {
 
     useEffect(() => {
         if (!currentChat || !currentModel) return;
+        if (chatMessages.length > 0) return;
         if (currentChat.settingsLockedAt != null) return;
         const currentVariantIsValid =
             !currentChat.variantId ||
@@ -296,7 +301,13 @@ export default function ChatScreen(): ReactElement {
                 variantId: nextVariantId,
             });
         }
-    }, [currentChat, currentModel, reasoningSupported, updateChat]);
+    }, [
+        chatMessages.length,
+        currentChat,
+        currentModel,
+        reasoningSupported,
+        updateChat,
+    ]);
 
     const handleModelChange = async (modelId: string) => {
         if (!currentChat) return;
