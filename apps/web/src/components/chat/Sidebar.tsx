@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 import {
     AlertCircle,
+    CheckCircle2,
     Hexagon,
     LoaderCircle,
     Plus,
@@ -22,6 +23,7 @@ import { useChat } from "@/contexts/ChatContext";
 import { useAgent } from "@/contexts/AgentContext";
 import { usePersistenceAdapter } from "@/contexts/WorkspaceContext";
 import { cn } from "@/lib/utils";
+import * as storage from "@/lib/storage";
 
 import { ChatListSkeleton } from "./ChatListSkeleton";
 import { WorkspaceStatusBadge } from "@/components/workspace/WorkspaceStatusBadge";
@@ -35,6 +37,65 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 interface SidebarProps {
     isOpen?: boolean;
     onClose?: () => void;
+}
+
+type SidebarConversationState =
+    | {
+          label: "Working";
+          tone: "working";
+      }
+    | {
+          label: "New reply";
+          tone: "completed";
+      }
+    | {
+          label: "Needs attention";
+          tone: "errored";
+      }
+    | null;
+
+export function resolveSidebarConversationState({
+    isActiveConversation,
+    runtimeBinding,
+    lastViewedAt,
+}: {
+    isActiveConversation: boolean;
+    runtimeBinding: {
+        status: "idle" | "active" | "expired" | "errored";
+        lastEventAt: number | null;
+    } | null;
+    lastViewedAt: number | null;
+}): SidebarConversationState {
+    if (runtimeBinding?.status === "active") {
+        return {
+            label: "Working",
+            tone: "working",
+        };
+    }
+
+    if (runtimeBinding?.status === "errored") {
+        return {
+            label: "Needs attention",
+            tone: "errored",
+        };
+    }
+
+    if (
+        !runtimeBinding ||
+        isActiveConversation ||
+        runtimeBinding.lastEventAt === null
+    ) {
+        return null;
+    }
+
+    if (lastViewedAt === null || runtimeBinding.lastEventAt > lastViewedAt) {
+        return {
+            label: "New reply",
+            tone: "completed",
+        };
+    }
+
+    return null;
 }
 
 export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
@@ -80,14 +141,11 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
         }
         return counts;
     }, [conversationRuntimeBindings]);
-    const activeChats = useMemo(
-        () =>
-            chats.filter(
-                (chat) =>
-                    conversationRuntimeBindings[chat.id]?.status === "active",
-            ),
-        [chats, conversationRuntimeBindings],
-    );
+    const chatLastViewedAt = Object.fromEntries(
+        chats
+            .map((chat) => [chat.id, storage.getChatLastViewedAt(chat.id)])
+            .filter((entry): entry is [string, number] => entry[1] !== null),
+    ) as Record<string, number>;
 
     const isMobileActionMode = isMobile || isTablet || isTouchDevice;
 
@@ -197,6 +255,21 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
         await deleteChatAndSelectNext(pendingDeleteChatId);
         setPendingDeleteChatId(null);
     };
+
+    useEffect(() => {
+        if (!currentChat) return;
+
+        const lastMessageAt = messages.at(-1)?.createdAt ?? 0;
+        const lastRuntimeEventAt =
+            conversationRuntimeBindings[currentChat.id]?.lastEventAt ?? 0;
+        const visibleAt = Math.max(
+            Date.now(),
+            lastMessageAt,
+            lastRuntimeEventAt,
+        );
+
+        storage.setChatLastViewedAt(currentChat.id, visibleAt);
+    }, [conversationRuntimeBindings, currentChat, messages]);
 
     useEffect(() => {
         /* eslint-disable react-hooks/set-state-in-effect */
@@ -363,48 +436,6 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                     ref={scrollContainerRef}
                     className="flex-1 overflow-y-auto"
                 >
-                    {activeChats.length > 0 && (
-                        <div className="border-b border-border px-3 py-3">
-                            <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                                Active Runs
-                            </p>
-                            <ul className="space-y-1 list-none">
-                                {activeChats.map((chat) => (
-                                    <li key={`active-${chat.id}`}>
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                handleSelectChat(chat.id)
-                                            }
-                                            className={cn(
-                                                "flex w-full items-center gap-2 border border-border px-3 py-2 text-left transition-colors hover:border-primary/30 hover:bg-muted/50",
-                                                currentChat?.id === chat.id &&
-                                                    "border-primary/30 bg-primary/10",
-                                            )}
-                                        >
-                                            <LoaderCircle
-                                                size={14}
-                                                className="shrink-0 animate-spin text-primary"
-                                            />
-                                            <div className="min-w-0 flex-1">
-                                                <p className="truncate text-sm font-medium text-foreground">
-                                                    {chat.title}
-                                                </p>
-                                                <p className="text-xs text-muted-foreground">
-                                                    {agents.find(
-                                                        (agent) =>
-                                                            agent.id ===
-                                                            chat.agentId,
-                                                    )?.name ?? "Active agent"}
-                                                </p>
-                                            </div>
-                                        </button>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    )}
-
                     {loading ? (
                         <ChatListSkeleton />
                     ) : chats.length === 0 ? (
@@ -427,10 +458,13 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                                 const runtimeBinding =
                                     conversationRuntimeBindings[chat.id] ??
                                     null;
-                                const isRunning =
-                                    runtimeBinding?.status === "active";
-                                const isErrored =
-                                    runtimeBinding?.status === "errored";
+                                const sidebarState =
+                                    resolveSidebarConversationState({
+                                        isActiveConversation: isActive,
+                                        runtimeBinding,
+                                        lastViewedAt:
+                                            chatLastViewedAt[chat.id] ?? null,
+                                    });
 
                                 return (
                                     <li key={chat.id}>
@@ -457,12 +491,20 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                                                 data-testid={`chat-item-${chat.id}`}
                                             >
                                                 <div className="mt-0.5 flex h-5 w-5 items-center justify-center text-muted-foreground">
-                                                    {isRunning ? (
+                                                    {sidebarState?.tone ===
+                                                    "working" ? (
                                                         <LoaderCircle
                                                             size={14}
                                                             className="animate-spin text-primary"
                                                         />
-                                                    ) : isErrored ? (
+                                                    ) : sidebarState?.tone ===
+                                                      "completed" ? (
+                                                        <CheckCircle2
+                                                            size={14}
+                                                            className="text-primary"
+                                                        />
+                                                    ) : sidebarState?.tone ===
+                                                      "errored" ? (
                                                         <AlertCircle
                                                             size={14}
                                                             className="text-error"
@@ -479,17 +521,22 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                                                     <p className="font-medium truncate text-sm text-foreground">
                                                         {chat.title}
                                                     </p>
-                                                    <p className="mono text-xs text-muted-foreground mt-0.5">
-                                                        {isRunning
-                                                            ? "Running"
-                                                            : isErrored
-                                                              ? "Needs attention"
-                                                              : formatDistanceToNow(
-                                                                    chat.updatedAt,
-                                                                    {
-                                                                        addSuffix: true,
-                                                                    },
-                                                                )}
+                                                    <p
+                                                        className={cn(
+                                                            "mono mt-0.5 text-xs",
+                                                            sidebarState?.tone ===
+                                                                "completed"
+                                                                ? "text-primary"
+                                                                : "text-muted-foreground",
+                                                        )}
+                                                    >
+                                                        {sidebarState?.label ??
+                                                            formatDistanceToNow(
+                                                                chat.updatedAt,
+                                                                {
+                                                                    addSuffix: true,
+                                                                },
+                                                            )}
                                                     </p>
                                                 </div>
                                                 <button

@@ -5,6 +5,7 @@ const STORAGE_KEYS = {
     FAVORITE_MODELS: "agentchat-favorite-models",
     SELECTED_AGENT: "agentchat-selected-agent",
     SELECTED_CHAT_BY_AGENT: "agentchat-selected-chat-by-agent",
+    CHAT_LAST_VIEWED_AT: "agentchat-chat-last-viewed-at",
 } as const;
 
 export function getTheme(): "light" | "dark" | "system" {
@@ -168,4 +169,55 @@ export function clearSelectedChatId(agentId: string): void {
     const next = getSelectedChatMap();
     delete next[agentId];
     setSelectedChatMap(next);
+}
+
+function getNumberMap(storageKey: string): Record<string, number> {
+    if (typeof window === "undefined") return {};
+    try {
+        const raw = localStorage.getItem(storageKey);
+        if (!raw) {
+            return {};
+        }
+
+        const parsed = JSON.parse(raw) as unknown;
+        if (!parsed || typeof parsed !== "object") {
+            return {};
+        }
+
+        return Object.fromEntries(
+            Object.entries(parsed).filter(
+                (entry): entry is [string, number] =>
+                    typeof entry[0] === "string" &&
+                    entry[0].length > 0 &&
+                    typeof entry[1] === "number" &&
+                    Number.isFinite(entry[1]),
+            ),
+        );
+    } catch {
+        return {};
+    }
+}
+
+function setNumberMap(storageKey: string, value: Record<string, number>): void {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(storageKey, JSON.stringify(value));
+}
+
+export function getChatLastViewedAt(chatId: string): number | null {
+    if (!chatId) return null;
+    return getNumberMap(STORAGE_KEYS.CHAT_LAST_VIEWED_AT)[chatId] ?? null;
+}
+
+export function setChatLastViewedAt(chatId: string, timestamp: number): void {
+    if (
+        typeof window === "undefined" ||
+        !chatId ||
+        !Number.isFinite(timestamp)
+    ) {
+        return;
+    }
+
+    const next = getNumberMap(STORAGE_KEYS.CHAT_LAST_VIEWED_AT);
+    next[chatId] = timestamp;
+    setNumberMap(STORAGE_KEYS.CHAT_LAST_VIEWED_AT, next);
 }
