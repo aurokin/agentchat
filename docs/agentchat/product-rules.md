@@ -20,6 +20,8 @@ This document records user-facing rules and product decisions that should remain
 
 - Every conversation belongs to exactly one agent.
 - Users can have multiple concurrent conversations with the same agent.
+- Users can have active runs in multiple conversations at the same time.
+- Users can have active runs under multiple agents at the same time.
 - Selecting an agent can open or create an empty conversation shell, but it must not start a provider runtime session by itself.
 - A provider runtime session is created or resumed only when the user sends the first message in that conversation.
 
@@ -43,6 +45,13 @@ This document records user-facing rules and product decisions that should remain
 
 - Realtime streaming is required.
 - WebSocket is the realtime transport between clients and the backend server.
+- The backend owns runtime lifecycle after a message is accepted.
+- A client is an observer and input surface, not the owner of a run.
+- Runs must continue safely if the user navigates away, switches agents, switches conversations, closes all clients, or reconnects from another client later.
+- Users must be able to switch conversations while a send is in flight.
+- Users must be able to switch agents while runs continue in other conversations.
+- Multiple clients for the same user must be able to observe the same run concurrently.
+- Web and mobile must be treated as equivalent subscribers to backend-owned runtime state.
 - The application assumes automatic approval mode for provider actions in v1.
 - Auto-approve is a project requirement for the current scope, not a temporary UI default.
 

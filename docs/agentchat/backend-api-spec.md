@@ -20,6 +20,10 @@ Use a hybrid transport:
 - HTTP for bootstrap and provider metadata
 - one WebSocket connection per active access user for live runtime actions and events
 
+Important rule:
+
+- WebSocket connections are client subscriptions into backend-owned runtime state, not the execution container for a run
+
 ## Authentication Model
 
 ### Client To Convex
@@ -102,6 +106,8 @@ One connection per active access user.
 
 The socket must support multiplexing multiple subscribed conversations.
 
+Runs must continue even when zero sockets are currently subscribed.
+
 ## WebSocket Command Envelope
 
 Every client command uses:
@@ -141,6 +147,12 @@ Payload:
 
 - `conversationId`
 
+Notes:
+
+- subscribing must be idempotent
+- subscribing must not itself start a run
+- subscribing to a conversation with an active run should replay enough state for the client to render current progress safely
+
 ### `conversation.unsubscribe`
 
 Purpose:
@@ -169,6 +181,8 @@ Rules:
 - only text input in v1
 - provider, model, and variant must already be chosen on the conversation
 - if settings are not locked yet, the backend must treat this as the locking message
+- a successful send hands execution ownership to the backend
+- the sending client does not need to remain subscribed for the run to finish
 
 ### `conversation.interrupt`
 
@@ -249,6 +263,8 @@ Notes:
 - events must be normalized product events, not raw provider payloads
 - payloads may include optional `providerMetadata` for debugging
 - the client should not need to know Codex method names
+- multiple clients subscribed to the same conversation should receive the same normalized event stream
+- a reconnecting client should recover active run state without creating a duplicate run
 
 Example `message.delta` payload:
 
@@ -272,6 +288,8 @@ Example `message.delta` payload:
 6. persist run and message state into Convex
 7. emit WebSocket events to subscribed clients
 
+Once step 4 succeeds, the backend owns execution for that run until it reaches a terminal state.
+
 ## Conversation Ownership
 
 - the backend must validate conversation ownership using authenticated identity
@@ -293,3 +311,11 @@ Normalized failures should include:
 
 - multiple simultaneous active runs in one conversation
 - raw provider event passthrough
+
+## Behavioral Guarantees
+
+- the backend owns execution after a send is accepted
+- clients are allowed to switch conversations and agents while runs are active elsewhere
+- the same user may have active runs in multiple conversations at once
+- the same user may observe one run from multiple clients at once
+- a run may outlive all currently connected clients as long as the backend runtime is healthy

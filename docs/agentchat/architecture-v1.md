@@ -23,6 +23,8 @@ Responsibilities:
 - Let the user select provider, model, and variant before the first message
 - Open a backend WebSocket connection using a short-lived backend token derived from Convex auth
 - Render streamed run events and persisted conversation history
+- Subscribe and unsubscribe from conversations without owning runtime lifecycle
+- Accept user input while other conversations or agents still have active runs
 
 ### Convex
 
@@ -49,6 +51,8 @@ Responsibilities:
 - Stream runtime events over WebSocket
 - Persist normalized run and message state into Convex
 - Keep transient runtime process state in memory
+- Continue runs even when no client is currently subscribed
+- Fan out the same run stream to multiple clients for the same user
 
 ### Provider Layer
 
@@ -80,6 +84,15 @@ Responsibilities:
 6. The backend sends the message as a provider turn.
 7. The backend streams normalized events to the client over WebSocket.
 8. The backend persists messages, runs, and run events into Convex.
+
+### While The Run Is Active
+
+1. The backend keeps the runtime alive for the conversation until the run completes, is interrupted, or expires.
+2. The user may switch to a different conversation or agent without cancelling the run.
+3. The user may submit messages in other conversations while earlier runs continue.
+4. Another client for the same user may subscribe and observe the same active run.
+5. If all clients disconnect, the run still continues in the backend and persists state through Convex.
+6. A later subscriber recovers the current run state from backend memory and Convex summaries rather than restarting the run.
 
 ### Later Messages
 
@@ -114,6 +127,7 @@ Agentchat should use a hybrid model:
 
 - Persist recoverable runtime metadata in Convex.
 - Keep transient runtime process state in backend memory.
+- Treat clients as subscribers to runtime state, not as the execution owner.
 
 This avoids treating the backend as the source of truth while still allowing reconnect and recovery after process restarts.
 
@@ -194,6 +208,9 @@ Agents should reference provider ids instead of embedding provider definitions i
 
 - Conversations adopt the latest server config for their agent
 - Users cannot change provider, model, or variant after the first message
+- One active run per conversation is acceptable in v1, but many conversations may have active runs at the same time
+- The same user may observe one run from multiple clients simultaneously
+- A run must not depend on an active foreground client to complete
 - Attachments are out of scope for v1
 - Branching is out of scope for v1
 - Auto-approve is assumed for v1

@@ -26,6 +26,11 @@ This roadmap describes the current implementation state and the next major steps
 - Close the remaining mobile parity gaps
 - Keep Codex-backed model and variant discovery well-tested and operator-friendly
 - Plan and implement local multi-user auth in a provider-oriented way so Agentchat is not limited to Google or disabled-auth forever
+- Bring the runtime fully in line with backend-owned execution semantics across web, mobile, server, and Convex
+  - users can switch conversations or agents during submission
+  - users can have active runs in multiple conversations and agents at the same time
+  - runs continue with zero active clients and recover cleanly later
+  - multiple clients can observe the same run concurrently without duplicating execution
 - Investigate Codex model and variant mapping in the live product path
 - Verify whether Codex Spark is functioning correctly in the current integration
 - Expand provider-native runtime item mapping so multi-message output follows real Codex events instead of transcript inference

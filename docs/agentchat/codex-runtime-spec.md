@@ -16,6 +16,7 @@ This is the chosen v1 behavior.
 - interruption maps cleanly to one active run
 - recovery is simpler
 - process cleanup is predictable
+- concurrent runs across many conversations remain possible without coupling them to one visible client
 
 One global Codex process for all conversations is explicitly not the v1 design.
 
@@ -59,6 +60,8 @@ Each live conversation runtime should keep:
 
 This state lives only in backend memory.
 
+Multiple runtime records may be active for the same user at once.
+
 ## Persisted Runtime Binding
 
 The backend must persist enough data to recover a conversation:
@@ -98,6 +101,8 @@ When the user sends a message:
 7. persist selected event history into Convex
 8. complete or fail the run
 
+After step 4 succeeds, the run is backend-owned. The sending client may disconnect, switch conversations, or switch agents without cancelling the turn.
+
 ## Interrupt Flow
 
 When the user interrupts a run:
@@ -119,6 +124,8 @@ When a runtime passes its idle TTL:
 4. remove the in-memory runtime record
 
 The next send recreates the process and resumes from the binding.
+
+An idle runtime may have zero subscribers for part or all of its lifetime.
 
 ## Model And Variant Handling
 
@@ -196,6 +203,7 @@ The implementation should support:
 - per-provider idle TTL
 - per-provider model cache TTL
 - one active run per conversation
+- multiple active conversation runtimes per user
 - bounded reconnect and retry behavior
 
 ## Logging
