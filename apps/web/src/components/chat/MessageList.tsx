@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { cn, externalLinkProps } from "@/lib/utils";
 import { MessageListSkeleton } from "./MessageListSkeleton";
+import { normalizeAssistantDisplayText } from "@shared/core/text";
 
 interface MessageListProps {
     messages: Message[];
@@ -196,6 +197,9 @@ function MessageItem({
         const parts = modelId.split("/");
         return parts.length > 1 ? parts[1] : modelId;
     };
+    const displayContent = isUser
+        ? message.content
+        : (normalizeAssistantDisplayText(message.content) ?? message.content);
 
     return (
         <div
@@ -240,13 +244,13 @@ function MessageItem({
                                         Generating...
                                     </span>
                                 </div>
-                            ) : message.content ? (
+                            ) : displayContent ? (
                                 <ReactMarkdown
                                     remarkPlugins={[remarkGfm]}
                                     rehypePlugins={[rehypeHighlight]}
                                     components={markdownComponents}
                                 >
-                                    {message.content}
+                                    {displayContent}
                                 </ReactMarkdown>
                             ) : (
                                 <span className="text-muted-foreground italic">

@@ -268,7 +268,9 @@ export function resolveConversationRuntimeSync(params: {
 
     const shouldReset =
         !!params.activeRun &&
-        params.activeRun.conversationId !== params.currentChat.id;
+        (params.activeRun.conversationId !== params.currentChat.id ||
+            (params.runtimeState.phase !== "active" &&
+                params.runtimeState.phase !== "recovering"));
 
     if (params.activeRun && !shouldReset) {
         return {

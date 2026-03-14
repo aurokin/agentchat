@@ -629,6 +629,49 @@ export class CodexRuntimeManager {
             return;
         }
 
+        if (notification.method === "turn/aborted") {
+            this.emitToSubscribers(
+                runtime,
+                createServerEvent("message.completed", {
+                    conversationId: runtime.conversationId,
+                    messageId: activeTurn.assistantMessageId,
+                    content: activeTurn.text,
+                }),
+            );
+
+            this.cancelPendingMessageDelta(activeTurn);
+
+            const sequence = activeTurn.nextSequence;
+            activeTurn.nextSequence += 2;
+            void this.persistence
+                .runInterrupted({
+                    userId: activeTurn.userId,
+                    conversationLocalId: runtime.conversationId,
+                    assistantMessageLocalId: activeTurn.assistantMessageId,
+                    externalRunId: activeTurn.runId,
+                    sequence,
+                    content: activeTurn.text,
+                    completedAt: Date.now(),
+                })
+                .catch((error) => {
+                    console.error(
+                        "[agentchat-server] failed to persist aborted run",
+                        error,
+                    );
+                });
+            this.emitToSubscribers(
+                runtime,
+                createServerEvent("run.interrupted", {
+                    conversationId: runtime.conversationId,
+                    runId: activeTurn.runId,
+                }),
+            );
+            runtime.activeTurn = null;
+            this.scheduleIdleExpiration(runtime);
+            activeTurn.resolve();
+            return;
+        }
+
         if (notification.method !== "turn/completed") {
             return;
         }

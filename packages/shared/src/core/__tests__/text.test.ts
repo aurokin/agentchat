@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { trimTrailingEmptyLines } from "../text";
+import { normalizeAssistantDisplayText, trimTrailingEmptyLines } from "../text";
 
 describe("trimTrailingEmptyLines", () => {
     it("returns undefined for undefined input", () => {
@@ -24,5 +24,37 @@ describe("trimTrailingEmptyLines", () => {
     it("trims whitespace-only trailing lines", () => {
         const value = "first\n \n\t\n";
         expect(trimTrailingEmptyLines(value)).toBe("first");
+    });
+});
+
+describe("normalizeAssistantDisplayText", () => {
+    it("adds a missing space between adjacent sentences", () => {
+        expect(
+            normalizeAssistantDisplayText(
+                "I am checking the repo.The layout is clear.",
+            ),
+        ).toBe("I am checking the repo. The layout is clear.");
+    });
+
+    it("adds paragraph breaks before report-style headings", () => {
+        expect(
+            normalizeAssistantDisplayText(
+                "The structure is clear now. Report\n\nDetails follow.",
+            ),
+        ).toBe("The structure is clear now.\n\nReport\n\nDetails follow.");
+    });
+
+    it("adds a blank line before markdown list items", () => {
+        expect(normalizeAssistantDisplayText("Summary\n- one\n- two")).toBe(
+            "Summary\n\n- one\n- two",
+        );
+    });
+
+    it("leaves fenced code blocks untouched", () => {
+        expect(
+            normalizeAssistantDisplayText(
+                "Intro.The code:\n```ts\nconst value = 1;\n```\n- item",
+            ),
+        ).toBe("Intro. The code:\n```ts\nconst value = 1;\n```\n\n- item");
     });
 });

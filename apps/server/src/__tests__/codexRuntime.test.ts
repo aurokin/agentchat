@@ -522,6 +522,58 @@ describe("CodexRuntimeManager", () => {
         await sendPromise;
     });
 
+    test("treats turn/aborted as a terminal interrupted run", async () => {
+        const config = createConfig();
+        const persistence = createPersistence(null);
+        const fakeClient = new FakeCodexClient({
+            startedThreadId: "thread-fresh",
+            autoComplete: false,
+        });
+        const events: Array<{
+            type: string;
+            payload: Record<string, unknown>;
+        }> = [];
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: () => fakeClient,
+        });
+
+        const sendPromise = manager.sendMessage({
+            userSub: "sub-1",
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: (event) => {
+                events.push(event);
+            },
+        });
+
+        await Bun.sleep(0);
+        fakeClient.emit({
+            method: "item/agentMessage/delta",
+            params: {
+                delta: "Done enough",
+            },
+        });
+        fakeClient.emit({
+            method: "turn/aborted",
+            params: {
+                reason: "replaced",
+            },
+        });
+
+        await sendPromise;
+
+        expect(events.map((event) => event.type)).toEqual([
+            "run.started",
+            "message.delta",
+            "message.completed",
+            "run.interrupted",
+        ]);
+        expect(persistence.runCompletedCalls).toHaveLength(0);
+    });
+
     test("interrupt is a no-op when no active run exists", async () => {
         const manager = new CodexRuntimeManager({
             getConfig: () => createConfig(),

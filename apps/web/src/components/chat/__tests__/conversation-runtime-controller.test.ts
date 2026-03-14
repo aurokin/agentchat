@@ -646,6 +646,36 @@ describe("conversation runtime controller", () => {
         });
     });
 
+    test("resets a stale local active run when persisted runtime state is no longer active", () => {
+        expect(
+            resolveConversationRuntimeSync({
+                currentChat: createChat(),
+                isMessagesLoading: false,
+                messages: createMessages(),
+                runtimeState: {
+                    phase: "idle",
+                    runId: null,
+                    assistantMessageId: null,
+                    provider: null,
+                    errorMessage: null,
+                    startedAt: null,
+                    completedAt: Date.now(),
+                    lastEventAt: Date.now(),
+                },
+                activeRun: {
+                    conversationId: "chat-1",
+                    assistantMessageId: "assistant-1",
+                    userContent: "Old prompt",
+                    content: "Old output",
+                    runId: "run-1",
+                },
+            }),
+        ).toEqual({
+            shouldReset: true,
+            recoveredRun: null,
+        });
+    });
+
     test("can reset and recover in the same sync pass after a conversation switch", () => {
         const messages: Message[] = [
             {

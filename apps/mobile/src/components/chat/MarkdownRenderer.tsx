@@ -2,6 +2,7 @@ import React, { useMemo } from "react";
 import { Linking, Text, View } from "react-native";
 import Markdown from "react-native-markdown-display";
 import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
+import { normalizeAssistantDisplayText } from "@shared/core/text";
 
 interface MarkdownRendererProps {
     content: string;
@@ -41,6 +42,13 @@ export function MarkdownRenderer({
     const markdownStyles = useMemo(
         () => createMarkdownStyles(colors, isUser),
         [colors, isUser],
+    );
+    const displayContent = useMemo(
+        () =>
+            isUser
+                ? content
+                : (normalizeAssistantDisplayText(content) ?? content),
+        [content, isUser],
     );
     const codeBackground = isUser
         ? colors.codeBackgroundOnAccent
@@ -104,7 +112,7 @@ export function MarkdownRenderer({
                 return false;
             }}
         >
-            {content}
+            {displayContent}
         </Markdown>
     );
 }
