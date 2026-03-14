@@ -76,6 +76,26 @@ type LiveOutcome =
           sawDelta: boolean;
       };
 
+type PersistedRunEvent = {
+    sequence: number;
+    kind:
+        | "run_started"
+        | "message_delta"
+        | "message_completed"
+        | "run_completed"
+        | "run_interrupted"
+        | "run_failed"
+        | "approval_requested"
+        | "approval_resolved"
+        | "user_input_requested"
+        | "user_input_resolved"
+        | "provider_status";
+    textDelta: string | null;
+    errorMessage: string | null;
+    messageLocalId: string | null;
+    createdAt: number;
+};
+
 const DEFAULT_SERVER_URL = "http://127.0.0.1:3030";
 const DEFAULT_EMAIL = "agentchat-live-smoke@local.agentchat";
 const INTERRUPT_FALLBACK_DELAY_MS = 5000;
@@ -682,6 +702,125 @@ function assertSmokeContent(content: string): void {
     );
 }
 
+function assertTerminalBinding(params: {
+    binding: {
+        provider: string;
+        status: string;
+        providerThreadId: string | null;
+        activeRunId: string | null;
+        lastError: string | null;
+        lastEventAt: number | null;
+        expiresAt: number | null;
+    } | null;
+    expectedProvider: string;
+    expectedThreadId?: string | null;
+    expectedStatus: "idle" | "errored" | "expired" | "active";
+}): void {
+    invariant(params.binding, "Expected a persisted runtime binding.");
+    invariant(
+        params.binding.provider === params.expectedProvider,
+        `Expected runtime binding provider ${params.expectedProvider}, got ${params.binding.provider}.`,
+    );
+    invariant(
+        params.binding.status === params.expectedStatus,
+        `Expected runtime binding status ${params.expectedStatus}, got ${params.binding.status}.`,
+    );
+    invariant(
+        params.binding.activeRunId === null,
+        "Expected runtime binding activeRunId to be cleared after terminal persistence.",
+    );
+    invariant(
+        params.binding.lastError === null,
+        `Expected no runtime binding error, got ${params.binding.lastError}.`,
+    );
+    invariant(
+        typeof params.binding.lastEventAt === "number",
+        "Expected runtime binding lastEventAt to be persisted.",
+    );
+    invariant(
+        params.binding.expiresAt === null,
+        "Expected runtime binding expiresAt to remain null until idle eviction.",
+    );
+    invariant(
+        typeof params.binding.providerThreadId === "string" &&
+            params.binding.providerThreadId.length > 0,
+        "Expected runtime binding providerThreadId to be persisted.",
+    );
+    if (params.expectedThreadId) {
+        invariant(
+            params.binding.providerThreadId === params.expectedThreadId,
+            "Expected runtime binding thread id to match the completed run thread.",
+        );
+    }
+}
+
+function assertRunEventTimeline(params: {
+    events: PersistedRunEvent[];
+    assistantMessageId: string;
+    finalStatus: "completed" | "interrupted";
+    finalContent: string;
+    sawDelta: boolean;
+}): void {
+    invariant(params.events.length >= 3, "Expected persisted run events.");
+
+    const sequences = params.events.map((event) => event.sequence);
+    const sortedSequences = [...sequences].sort((left, right) => left - right);
+    invariant(
+        JSON.stringify(sequences) === JSON.stringify(sortedSequences),
+        "Expected run events to be stored in ascending sequence order.",
+    );
+
+    const [firstEvent] = params.events;
+    invariant(
+        firstEvent.kind === "run_started",
+        `Expected first run event to be run_started, got ${firstEvent.kind}.`,
+    );
+    invariant(
+        firstEvent.messageLocalId === params.assistantMessageId,
+        "Expected run_started event to point at the assistant message.",
+    );
+
+    const secondToLastEvent = params.events.at(-2);
+    const lastEvent = params.events.at(-1);
+    invariant(secondToLastEvent, "Expected a message_completed event.");
+    invariant(lastEvent, "Expected a terminal run event.");
+    invariant(
+        secondToLastEvent.kind === "message_completed",
+        `Expected second-to-last run event to be message_completed, got ${secondToLastEvent.kind}.`,
+    );
+    invariant(
+        lastEvent.kind ===
+            (params.finalStatus === "completed"
+                ? "run_completed"
+                : "run_interrupted"),
+        `Expected final run event to match ${params.finalStatus}, got ${lastEvent.kind}.`,
+    );
+
+    const deltaEvents = params.events.filter(
+        (event) => event.kind === "message_delta",
+    );
+    if (params.sawDelta) {
+        invariant(
+            deltaEvents.length > 0,
+            "Expected persisted message_delta events after streamed deltas.",
+        );
+        const reconstructedContent = deltaEvents
+            .map((event) => event.textDelta ?? "")
+            .join("");
+        invariant(
+            params.finalContent.startsWith(reconstructedContent),
+            "Expected persisted deltas to remain a prefix of the final assistant content.",
+        );
+    }
+
+    if (!params.sawDelta) {
+        invariant(
+            deltaEvents.length === 0 || params.finalContent.length > 0,
+            "Expected empty-delta runs to avoid phantom persisted content.",
+        );
+    }
+}
+
 async function main() {
     const args = parseArgs(process.argv.slice(2));
     const repoRoot = getRepoRoot();
@@ -861,6 +1000,7 @@ async function main() {
             externalId: string;
             status: string;
             outputMessageLocalId: string | null;
+            latestEventKind: string | null;
         }>
     >({
         repoRoot,
@@ -875,6 +1015,32 @@ async function main() {
         "Persisted run output message did not match the seeded assistant message.",
     );
 
+    const runEvents = runConvex<PersistedRunEvent[]>({
+        repoRoot,
+        functionName: "runs:listEventsByExternalId",
+        args: {
+            externalId: outcome.runId,
+        },
+        identity: identity ?? undefined,
+    });
+
+    const binding = await postRuntimeIngress<{
+        provider: string;
+        status: string;
+        providerThreadId: string | null;
+        activeRunId: string | null;
+        lastError: string | null;
+        lastEventAt: number | null;
+        expiresAt: number | null;
+    } | null>({
+        repoRoot,
+        path: "/runtime/runtime-binding/read",
+        payload: {
+            userId,
+            conversationLocalId: ids.conversationId,
+        },
+    });
+
     if (args.mode === "smoke" || args.mode === "stale-resume") {
         invariant(
             assistantMessage.status === "completed",
@@ -884,20 +1050,25 @@ async function main() {
             run.status === "completed",
             `Expected a completed run, got ${run.status}.`,
         );
+        invariant(
+            run.latestEventKind === "run_completed",
+            `Expected latest run event kind run_completed, got ${run.latestEventKind}.`,
+        );
         assertSmokeContent(assistantMessage.content);
+        assertRunEventTimeline({
+            events: runEvents,
+            assistantMessageId: ids.assistantMessageId,
+            finalStatus: "completed",
+            finalContent: assistantMessage.content,
+            sawDelta: outcome.sawDelta,
+        });
+        assertTerminalBinding({
+            binding,
+            expectedProvider: providerId,
+            expectedStatus: "idle",
+        });
 
         if (args.mode === "stale-resume") {
-            const binding = await postRuntimeIngress<{
-                providerThreadId: string | null;
-                status: string;
-            } | null>({
-                repoRoot,
-                path: "/runtime/runtime-binding/read",
-                payload: {
-                    userId,
-                    conversationLocalId: ids.conversationId,
-                },
-            });
             invariant(
                 binding !== null,
                 "Expected a runtime binding after stale resume recovery.",
@@ -921,6 +1092,22 @@ async function main() {
             run.status === "interrupted",
             `Expected an interrupted run, got ${run.status}.`,
         );
+        invariant(
+            run.latestEventKind === "run_interrupted",
+            `Expected latest run event kind run_interrupted, got ${run.latestEventKind}.`,
+        );
+        assertRunEventTimeline({
+            events: runEvents,
+            assistantMessageId: ids.assistantMessageId,
+            finalStatus: "interrupted",
+            finalContent: assistantMessage.content,
+            sawDelta: outcome.sawDelta,
+        });
+        assertTerminalBinding({
+            binding,
+            expectedProvider: providerId,
+            expectedStatus: "idle",
+        });
         if (outcome.sawDelta) {
             invariant(
                 assistantMessage.content.trim().length > 0,

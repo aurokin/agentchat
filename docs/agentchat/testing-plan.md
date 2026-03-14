@@ -128,6 +128,8 @@ Coverage targets:
 - send a live Codex turn
 - persist completed and interrupted run state back into Convex
 - verify assistant message and run status after the socket flow completes
+- verify terminal runtime bindings settle to the expected persisted idle state
+- verify persisted run-event timelines stay ordered and end with the expected terminal events
 - verify a stale persisted runtime binding falls back to a fresh thread start and is replaced in Convex
 
 Current behavior note:
@@ -135,6 +137,7 @@ Current behavior note:
 - interrupted turns do not always emit text deltas before termination
 - when deltas were streamed, interrupted assistant content must persist
 - when no deltas were streamed, an interrupted run with empty assistant content is currently considered valid
+- persisted `message_delta` chunks are expected to remain a prefix of the final assistant content, but the final completed content can legitimately include an unflushed tail that first lands in `message_completed`
 
 Notes:
 

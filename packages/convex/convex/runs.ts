@@ -4,6 +4,7 @@ import { isOwner } from "./lib/authz";
 import { requireWorkspaceUser } from "./lib/subscription";
 
 const MAX_RUNS_PER_CHAT = 10;
+const MAX_RUN_EVENTS_PER_RUN = 200;
 
 type RunSummary = {
     externalId: string;
@@ -33,6 +34,26 @@ type RunSummary = {
         | "provider_status"
         | null;
     latestEventAt: number | null;
+};
+
+type RunEventSummary = {
+    sequence: number;
+    kind:
+        | "run_started"
+        | "message_delta"
+        | "message_completed"
+        | "run_completed"
+        | "run_interrupted"
+        | "run_failed"
+        | "approval_requested"
+        | "approval_resolved"
+        | "user_input_requested"
+        | "user_input_resolved"
+        | "provider_status";
+    textDelta: string | null;
+    errorMessage: string | null;
+    messageLocalId: string | null;
+    createdAt: number;
 };
 
 export const listByChat = query({
@@ -82,6 +103,52 @@ export const listByChat = query({
                     outputMessage?.localId ?? outputMessage?._id ?? null,
                 latestEventKind: latestEvent?.kind ?? null,
                 latestEventAt: latestEvent?.createdAt ?? null,
+            });
+        }
+
+        return summaries;
+    },
+});
+
+export const listEventsByExternalId = query({
+    args: {
+        externalId: v.string(),
+    },
+    handler: async (ctx, args) => {
+        const authenticatedUserId = await requireWorkspaceUser(ctx);
+        const run = await ctx.db
+            .query("runs")
+            .withIndex("by_externalId", (q) =>
+                q.eq("externalId", args.externalId),
+            )
+            .unique();
+        if (!run) {
+            return [];
+        }
+
+        const chat = await ctx.db.get(run.chatId);
+        if (!isOwner(chat, authenticatedUserId)) {
+            return [];
+        }
+
+        const events = await ctx.db
+            .query("run_events")
+            .withIndex("by_runId_and_sequence", (q) => q.eq("runId", run._id))
+            .order("asc")
+            .take(MAX_RUN_EVENTS_PER_RUN);
+
+        const summaries: RunEventSummary[] = [];
+        for (const event of events) {
+            const message = event.messageId
+                ? await ctx.db.get(event.messageId)
+                : null;
+            summaries.push({
+                sequence: event.sequence,
+                kind: event.kind,
+                textDelta: event.textDelta,
+                errorMessage: event.errorMessage,
+                messageLocalId: message?.localId ?? null,
+                createdAt: event.createdAt,
             });
         }
 

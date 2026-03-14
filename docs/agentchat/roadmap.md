@@ -15,7 +15,7 @@ This roadmap describes the current implementation state and the next major steps
 - Manual operator browser smoke for config hot-reload and disabled agent/provider handling
 - Manual operator failure smoke for invalid config reloads, missing paths, and env diagnostics
 - Manual stale-runtime-resume smoke for recoverable runtime-binding fallback
-- Server coverage for websocket command routing, persistence client endpoints, start-failure persistence, and mid-stream runtime crash handling
+- Server coverage for websocket command routing, persistence client endpoints, start-failure persistence, mid-stream runtime crash handling, and live terminal binding and run-event persistence checks
 - Removal of billing, analytics, attachments, browser-local product modes, and hosted deployment assumptions
 
 ## Active Work
@@ -45,6 +45,7 @@ This roadmap describes the current implementation state and the next major steps
 - Keep generated Convex bindings in sync with the live deployment before manual confidence passes
 - Run `bun run test:manual:live-runtime-smoke` against a real local `apps/server` instance to verify the full Codex plus Convex persistence path
 - Run `bun run test:manual:live-runtime-interrupt` to verify partial-output retention and interrupted run persistence
+- Keep live runtime smoke assertions on terminal runtime bindings and persisted run-event timelines, not just final transcript rows
 - Run `bun run test:manual:config-reload-smoke` to verify watched config changes disable or fallback safely without restarting the server
 - Keep `bun run test:manual:runtime-confidence` as the single manual operator command for the local runtime stack
 - Prefer Convex-issued backend session tokens for these live passes; allow the local signing fallback only while the deployment is still missing `BACKEND_TOKEN_SECRET`
