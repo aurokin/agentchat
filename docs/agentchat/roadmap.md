@@ -31,6 +31,9 @@ This roadmap describes the current implementation state and the next major steps
 - Verify whether Codex Spark is functioning correctly in the current integration
 - Make mobile theme default honor the device system theme correctly, especially iOS dark mode
 - Refine assistant output segmentation heuristics now that one run can emit multiple assistant transcript messages
+- Evolve multi-message output from heuristic-only splitting toward provider-native runtime item types
+  - emit first-class progress/status items when the provider gives us typed runtime events
+  - keep sentence/list/report splitting as a fallback only for raw text streams
 - Improve operator-facing diagnostics and health reporting
 - Build a practical testing stack around the dedicated local fixtures in `/home/auro/agents/agentchat_test`
 - Keep the active roadmap narrowly focused on Codex confidence rather than adding more providers
