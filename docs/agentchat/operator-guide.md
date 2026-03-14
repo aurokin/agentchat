@@ -154,6 +154,7 @@ For direct local runtime verification with a running `apps/server`, also use:
 ```bash
 bun run test:manual:live-runtime-smoke
 bun run test:manual:live-runtime-interrupt
+bun run test:manual:stale-runtime-resume
 bun run test:manual:config-reload-smoke
 ```
 
@@ -171,6 +172,21 @@ bun run test:manual:web-operator-smoke
 ```
 
 Run those browser commands sequentially. The operator smoke command intentionally mutates `apps/server/agentchat.config.json` to validate hot reload behavior.
+
+For operator failure-path validation, also run:
+
+```bash
+bun run test:manual:operator-failure-smoke
+bun run test:manual:doctor-env-smoke
+```
+
+These commands cover:
+
+- invalid config reloads while keeping the last known good config live
+- missing agent `rootPath`
+- missing provider `codex.cwd`
+- missing runtime env diagnostics
+- stale persisted runtime bindings that should fall back safely on the next turn
 
 ## 7. Common Failure Modes
 

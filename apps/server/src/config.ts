@@ -134,6 +134,11 @@ const AgentchatConfigSchema = z
 export type AgentchatConfig = z.infer<typeof AgentchatConfigSchema>;
 export type AgentConfig = AgentchatConfig["agents"][number];
 export type ProviderConfig = AgentchatConfig["providers"][number];
+export type ConfigStoreStatus = {
+    loadedAt: number;
+    lastReloadAttemptAt: number | null;
+    lastReloadError: string | null;
+};
 
 const srcDir = path.dirname(fileURLToPath(import.meta.url));
 const appDir = path.resolve(srcDir, "..");
@@ -161,10 +166,16 @@ export function loadConfigFile(
 export class ConfigStore {
     #configPath: string;
     #config: AgentchatConfig;
+    #status: ConfigStoreStatus;
 
     constructor(configPath = resolveDefaultConfigPath()) {
         this.#configPath = configPath;
         this.#config = loadConfigFile(configPath);
+        this.#status = {
+            loadedAt: Date.now(),
+            lastReloadAttemptAt: null,
+            lastReloadError: null,
+        };
     }
 
     get path(): string {
@@ -175,14 +186,30 @@ export class ConfigStore {
         return this.#config;
     }
 
+    get status(): ConfigStoreStatus {
+        return this.#status;
+    }
+
     watch(): void {
         watch(this.#configPath, { persistent: false }, () => {
+            const attemptedAt = Date.now();
             try {
                 this.#config = loadConfigFile(this.#configPath);
+                this.#status = {
+                    loadedAt: attemptedAt,
+                    lastReloadAttemptAt: attemptedAt,
+                    lastReloadError: null,
+                };
                 console.log(
                     `[agentchat-server] reloaded config from ${this.#configPath}`,
                 );
             } catch (error) {
+                this.#status = {
+                    ...this.#status,
+                    lastReloadAttemptAt: attemptedAt,
+                    lastReloadError:
+                        error instanceof Error ? error.message : String(error),
+                };
                 console.error(
                     `[agentchat-server] failed to reload config from ${this.#configPath}; keeping last known good config`,
                     error,

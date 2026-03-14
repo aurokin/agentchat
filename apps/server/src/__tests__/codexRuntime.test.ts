@@ -265,6 +265,13 @@ describe("codex runtime helpers", () => {
                 new Error("thread/resume failed: thread not found"),
             ),
         ).toBe(true);
+        expect(
+            isRecoverableThreadResumeError(
+                new Error(
+                    "thread/resume failed: no rollout found for thread id 00000000-0000-4000-8000-000000000bad",
+                ),
+            ),
+        ).toBe(true);
     });
 
     test("does not treat generic resume failures as recoverable", () => {

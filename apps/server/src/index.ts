@@ -31,6 +31,7 @@ type WebSocketData = {
 
 const httpFetch = createFetchHandler({
     getConfig: () => configStore.snapshot,
+    getConfigStatus: () => configStore.status,
     modelCatalog,
 });
 

@@ -304,6 +304,11 @@ describe("createFetchHandler", () => {
                 new Request("http://localhost:3030/api/diagnostics"),
             );
             const body = (await response.json()) as {
+                config: {
+                    loadedAt: number;
+                    lastReloadAttemptAt: number | null;
+                    lastReloadError: string | null;
+                };
                 runtimeEnv: {
                     ok: boolean;
                     diagnostics: Array<{
@@ -314,6 +319,11 @@ describe("createFetchHandler", () => {
             };
 
             expect(response.status).toBe(200);
+            expect(body.config).toEqual({
+                loadedAt: expect.any(Number),
+                lastReloadAttemptAt: null,
+                lastReloadError: null,
+            });
             expect(body.runtimeEnv.ok).toBe(false);
             expect(body.runtimeEnv.diagnostics).toEqual([
                 expect.objectContaining({
@@ -389,11 +399,21 @@ describe("createFetchHandler", () => {
             new Request("http://localhost:3030/api/diagnostics"),
         );
         const diagnosticsBody = (await diagnosticsResponse.json()) as {
+            config: {
+                loadedAt: number;
+                lastReloadAttemptAt: number | null;
+                lastReloadError: string | null;
+            };
             ok: boolean;
             agents: Array<{ id: string; issues: string[] }>;
         };
 
         expect(diagnosticsResponse.status).toBe(200);
+        expect(diagnosticsBody.config).toEqual({
+            loadedAt: expect.any(Number),
+            lastReloadAttemptAt: null,
+            lastReloadError: null,
+        });
         expect(diagnosticsBody.ok).toBe(false);
         expect(diagnosticsBody.agents).toContainEqual(
             expect.objectContaining({
@@ -446,5 +466,34 @@ describe("createFetchHandler", () => {
         expect(response.headers.get("access-control-allow-origin")).toBe(
             "http://127.0.0.1:4040",
         );
+    });
+
+    test("surfaces config reload status in diagnostics", async () => {
+        const fetchHandler = createFetchHandler({
+            getConfig: () => createConfig(),
+            getConfigStatus: () => ({
+                loadedAt: 100,
+                lastReloadAttemptAt: 200,
+                lastReloadError: "Unexpected end of JSON input",
+            }),
+        });
+
+        const response = await fetchHandler(
+            new Request("http://localhost:3030/api/diagnostics"),
+        );
+        const body = (await response.json()) as {
+            config: {
+                loadedAt: number;
+                lastReloadAttemptAt: number | null;
+                lastReloadError: string | null;
+            };
+        };
+
+        expect(response.status).toBe(200);
+        expect(body.config).toEqual({
+            loadedAt: 100,
+            lastReloadAttemptAt: 200,
+            lastReloadError: "Unexpected end of JSON input",
+        });
     });
 });

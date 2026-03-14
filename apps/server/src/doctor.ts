@@ -20,6 +20,27 @@ const modelCatalog = new CodexModelCatalog({
 
 console.log(`[agentchat-server] config: ${configStore.path}`);
 console.log(
+    `[agentchat-server] config loaded at: ${new Date(configStore.status.loadedAt).toISOString()}`,
+);
+console.log(
+    `[agentchat-server] config last reload attempt: ${
+        configStore.status.lastReloadAttemptAt === null
+            ? "none"
+            : new Date(configStore.status.lastReloadAttemptAt).toISOString()
+    }`,
+);
+console.log(
+    `[agentchat-server] config reload status: ${
+        configStore.status.lastReloadError ? "error" : "ok"
+    }`,
+);
+if (configStore.status.lastReloadError) {
+    console.log(
+        `[agentchat-server] config reload error: ${configStore.status.lastReloadError}`,
+    );
+    process.exitCode = 1;
+}
+console.log(
     `[agentchat-server] runtime env: ${runtimeEnv.ok ? "ready" : "missing required values"}`,
 );
 for (const diagnostic of runtimeEnv.diagnostics) {

@@ -110,8 +110,11 @@ Invocation:
 
 - `bun run test:manual:live-runtime-smoke`
 - `bun run test:manual:live-runtime-interrupt`
+- `bun run test:manual:stale-runtime-resume`
 - `bun run test:manual:config-reload-smoke`
 - `bun run test:manual:runtime-confidence`
+- `bun run test:manual:operator-failure-smoke`
+- `bun run test:manual:doctor-env-smoke`
 
 Coverage targets:
 
@@ -121,6 +124,7 @@ Coverage targets:
 - send a live Codex turn
 - persist completed and interrupted run state back into Convex
 - verify assistant message and run status after the socket flow completes
+- verify a stale persisted runtime binding falls back to a fresh thread start and is replaced in Convex
 
 Current behavior note:
 
@@ -161,6 +165,25 @@ Current local browser path:
 - run those commands sequentially because the operator smoke mutates `apps/server/agentchat.config.json`
 - Google-auth browser coverage still remains a separate manual/operator concern
 
+### 6. Operator Failure Smoke
+
+Purpose:
+
+- verify that broken operator states are surfaced explicitly instead of failing silently
+
+Invocation:
+
+- `bun run test:manual:operator-failure-smoke`
+- `bun run test:manual:doctor-env-smoke`
+
+Coverage targets:
+
+- invalid `agentchat.config.json` reload keeps the last known good config serving
+- diagnostics surface the last config reload error
+- missing agent `rootPath` is surfaced in diagnostics
+- missing provider `codex.cwd` is surfaced in diagnostics
+- missing required runtime env values are surfaced by the runtime env diagnostics
+
 ## Manual QA Checklist
 
 Use [manual-qa-checklist.md](./manual-qa-checklist.md) for the explicit Codex confidence pass tied to these fixtures.
@@ -176,8 +199,11 @@ Current manual confidence command:
 - `bun run test:manual:codex-confidence`
 - `bun run test:manual:live-runtime-smoke`
 - `bun run test:manual:live-runtime-interrupt`
+- `bun run test:manual:stale-runtime-resume`
 - `bun run test:manual:config-reload-smoke`
 - `bun run test:manual:runtime-confidence`
+- `bun run test:manual:operator-failure-smoke`
+- `bun run test:manual:doctor-env-smoke`
 - `bun run test:manual:web-browser-confidence`
 - `bun run test:manual:web-operator-smoke`
 

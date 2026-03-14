@@ -13,6 +13,8 @@ This roadmap describes the current implementation state and the next major steps
 - Manual live runtime smoke and interrupt commands for the real local Codex plus Convex path
 - Manual browser confidence coverage for the disabled-auth web flow
 - Manual operator browser smoke for config hot-reload and disabled agent/provider handling
+- Manual operator failure smoke for invalid config reloads, missing paths, and env diagnostics
+- Manual stale-runtime-resume smoke for recoverable runtime-binding fallback
 - Removal of billing, analytics, attachments, browser-local product modes, and hosted deployment assumptions
 
 ## Active Work
@@ -52,9 +54,11 @@ This roadmap describes the current implementation state and the next major steps
 ### 2. Operator Hardening
 
 - Better error reporting for disabled agents, disabled providers, and bad server config
+- Surface last config reload failures while continuing to serve the last known good config
 - Clear operator docs for custom agent setup
 - Stronger runtime and recovery observability
 - Low-token operator smoke checks using the dedicated test fixtures
+- Verify stale runtime bindings fall back safely to a fresh Codex thread
 
 ### 3. Mobile Parity
 

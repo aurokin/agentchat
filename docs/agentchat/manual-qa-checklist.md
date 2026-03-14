@@ -14,7 +14,10 @@ For live runtime persistence validation with a running local server, also run:
 ```bash
 bun run test:manual:live-runtime-smoke
 bun run test:manual:live-runtime-interrupt
+bun run test:manual:stale-runtime-resume
 bun run test:manual:config-reload-smoke
+bun run test:manual:operator-failure-smoke
+bun run test:manual:doctor-env-smoke
 ```
 
 Or use the bundled command:
@@ -118,8 +121,18 @@ Use `/home/auro/agents/agentchat_test/workspace`.
 - Confirm broken or removed resources do not produce silent failures
 - `bun run test:manual:config-reload-smoke` covers the hot-reload path automatically against the local server
 - `bun run test:manual:web-operator-smoke` covers the browser-visible hot-reload path against the local web app
+- `bun run test:manual:operator-failure-smoke` covers invalid config reloads and missing path diagnostics
+- `bun run test:manual:doctor-env-smoke` covers missing runtime env diagnostics
 
-## 8. Mobile Parity Pass
+## 8. Stale Runtime Binding Recovery
+
+Use the primary fixture.
+
+- Run `bun run test:manual:stale-runtime-resume`
+- Confirm a deliberately stale persisted runtime binding falls back to a fresh Codex thread
+- Confirm the runtime binding is replaced rather than left stale
+
+## 9. Mobile Parity Pass
 
 Run the same smoke and deterministic checks on mobile.
 

@@ -85,17 +85,23 @@ const RECOVERABLE_THREAD_RESUME_ERROR_SNIPPETS = [
     "no such thread",
     "unknown thread",
     "does not exist",
+    "no rollout found",
     "is closing",
 ];
+
+function isRecoverablePersistenceMissingResource(error: unknown): boolean {
+    const message =
+        error instanceof Error ? error.message : String(error ?? "");
+    return (
+        message.includes("Conversation not found") ||
+        message.includes("Assistant message not found")
+    );
+}
 
 export function isRecoverableThreadResumeError(error: unknown): boolean {
     const message = (
         error instanceof Error ? error.message : String(error)
     ).toLowerCase();
-    if (!message.includes("thread/resume")) {
-        return false;
-    }
-
     return RECOVERABLE_THREAD_RESUME_ERROR_SNIPPETS.some((snippet) =>
         message.includes(snippet),
     );
@@ -582,6 +588,9 @@ export class CodexRuntimeManager {
                 updatedAt: Date.now(),
             })
             .catch((persistError) => {
+                if (isRecoverablePersistenceMissingResource(persistError)) {
+                    return;
+                }
                 console.error(
                     "[agentchat-server] failed to persist errored runtime binding",
                     persistError,
@@ -763,6 +772,9 @@ export class CodexRuntimeManager {
                     updatedAt: Date.now(),
                 })
                 .catch((error) => {
+                    if (isRecoverablePersistenceMissingResource(error)) {
+                        return;
+                    }
                     console.error(
                         "[agentchat-server] failed to persist expired runtime binding",
                         error,

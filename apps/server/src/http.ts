@@ -1,4 +1,9 @@
-import type { AgentchatConfig, AgentConfig, ProviderConfig } from "./config.ts";
+import type {
+    AgentchatConfig,
+    AgentConfig,
+    ConfigStoreStatus,
+    ProviderConfig,
+} from "./config.ts";
 import type { CodexModelCatalog } from "./codexModelCatalog.ts";
 import {
     getConfigDiagnostics,
@@ -9,6 +14,7 @@ import { getRuntimeEnvDiagnostics } from "./envDiagnostics.ts";
 
 type HandlerDependencies = {
     getConfig(): AgentchatConfig;
+    getConfigStatus?(): ConfigStoreStatus;
     modelCatalog?: Pick<CodexModelCatalog, "getProviderModels">;
 };
 
@@ -152,6 +158,11 @@ function getProviderModelsFallback(
 export function createFetchHandler(deps: HandlerDependencies) {
     return async function fetch(request: Request): Promise<Response> {
         const config = deps.getConfig();
+        const configStatus = deps.getConfigStatus?.() ?? {
+            loadedAt: Date.now(),
+            lastReloadAttemptAt: null,
+            lastReloadError: null,
+        };
         const url = new URL(request.url);
         const pathname = url.pathname;
 
@@ -168,11 +179,13 @@ export function createFetchHandler(deps: HandlerDependencies) {
                 ok: diagnostics.ok,
                 configVersion: config.version,
                 summary: diagnostics.summary,
+                config: configStatus,
             });
         }
 
         if (request.method === "GET" && pathname === "/api/diagnostics") {
             return jsonResponse(request, {
+                config: configStatus,
                 ...getConfigDiagnostics(config),
                 runtimeEnv: getRuntimeEnvDiagnostics(),
             });

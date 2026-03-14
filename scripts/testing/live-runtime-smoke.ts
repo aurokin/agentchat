@@ -16,6 +16,7 @@ type Identity = {
 };
 
 type Mode = "smoke" | "interrupt";
+type ExtendedMode = Mode | "stale-resume";
 
 type AgentOptions = {
     agentId: string;
@@ -55,7 +56,7 @@ type ServerEvent = {
 };
 
 type LiveSmokeArgs = {
-    mode: Mode;
+    mode: ExtendedMode;
     serverUrl: string;
     email: string;
     agentId: string | null;
@@ -95,7 +96,7 @@ function getRepoRoot(): string {
 }
 
 function parseArgs(argv: string[]): LiveSmokeArgs {
-    let mode: Mode = "smoke";
+    let mode: ExtendedMode = "smoke";
     let serverUrl = DEFAULT_SERVER_URL;
     let email = DEFAULT_EMAIL;
     let agentId: string | null = null;
@@ -104,9 +105,13 @@ function parseArgs(argv: string[]): LiveSmokeArgs {
         const arg = argv[index];
         if (arg === "--mode") {
             const value = argv[index + 1];
-            if (value !== "smoke" && value !== "interrupt") {
+            if (
+                value !== "smoke" &&
+                value !== "interrupt" &&
+                value !== "stale-resume"
+            ) {
                 throw new Error(
-                    "--mode must be either 'smoke' or 'interrupt'.",
+                    "--mode must be smoke, interrupt, or stale-resume.",
                 );
             }
             mode = value;
@@ -229,7 +234,7 @@ async function assertServerReady(serverUrl: string): Promise<void> {
     invariant(health.ok, "Agentchat server health check failed.");
 }
 
-function getDefaultAgentId(mode: Mode): string {
+function getDefaultAgentId(mode: ExtendedMode): string {
     return mode === "interrupt" ? "agentchat-workspace" : "agentchat-test";
 }
 
@@ -246,7 +251,7 @@ function resolveThinking(variantId: string | null): string {
     }
 }
 
-function buildPrompt(mode: Mode): string {
+function buildPrompt(mode: ExtendedMode): string {
     if (mode === "interrupt") {
         return [
             "Open notes.md.",
@@ -258,7 +263,7 @@ function buildPrompt(mode: Mode): string {
     return "Read src/math.ts and reply with only the result of add(2, 3).";
 }
 
-function createIds(mode: Mode, now: number) {
+function createIds(mode: ExtendedMode, now: number) {
     return {
         conversationId: `live-${mode}-conversation-${now}`,
         userMessageId: `live-${mode}-user-${now}`,
@@ -622,6 +627,53 @@ async function runLiveConversation(params: {
     });
 }
 
+function getConvexSiteUrl(repoRoot: string): string {
+    const value =
+        process.env.AGENTCHAT_CONVEX_SITE_URL?.trim() ||
+        tryReadEnvValue(getServerEnvPath(repoRoot), "AGENTCHAT_CONVEX_SITE_URL");
+    if (!value) {
+        throw new Error("AGENTCHAT_CONVEX_SITE_URL is not configured.");
+    }
+    return trimTrailingSlash(value);
+}
+
+function getRuntimeIngressSecret(repoRoot: string): string {
+    const value =
+        process.env.RUNTIME_INGRESS_SECRET?.trim() ||
+        tryReadEnvValue(getServerEnvPath(repoRoot), "RUNTIME_INGRESS_SECRET");
+    if (!value) {
+        throw new Error("RUNTIME_INGRESS_SECRET is not configured.");
+    }
+    return value;
+}
+
+async function postRuntimeIngress<T>(params: {
+    repoRoot: string;
+    path: string;
+    payload: Record<string, unknown>;
+}): Promise<T> {
+    const response = await fetch(
+        `${getConvexSiteUrl(params.repoRoot)}${params.path}`,
+        {
+            method: "POST",
+            headers: {
+                "content-type": "application/json",
+                "x-agentchat-runtime-secret":
+                    getRuntimeIngressSecret(params.repoRoot),
+            },
+            body: JSON.stringify(params.payload),
+        },
+    );
+
+    if (!response.ok) {
+        throw new Error(
+            `Runtime ingress request failed (${response.status}) for ${params.path}: ${await response.text()}`,
+        );
+    }
+
+    return (await response.json()) as T;
+}
+
 function assertSmokeContent(content: string): void {
     const normalized = content.trim();
     invariant(
@@ -723,6 +775,26 @@ async function main() {
         identity: identity ?? undefined,
     });
 
+    if (args.mode === "stale-resume") {
+        await postRuntimeIngress<{ ok: true }>({
+            repoRoot,
+            path: "/runtime/runtime-binding",
+            payload: {
+                userId,
+                conversationLocalId: ids.conversationId,
+                provider: providerId,
+                status: "expired",
+                providerThreadId: "00000000-0000-4000-8000-000000000bad",
+                providerResumeToken: null,
+                activeRunId: null,
+                lastError: null,
+                lastEventAt: now + 3,
+                expiresAt: now + 3,
+                updatedAt: now + 3,
+            },
+        });
+    }
+
     runConvex<string>({
         repoRoot,
         functionName: "messages:create",
@@ -766,7 +838,7 @@ async function main() {
         content: buildPrompt(args.mode),
         userMessageId: ids.userMessageId,
         assistantMessageId: ids.assistantMessageId,
-        mode: args.mode,
+        mode: args.mode === "interrupt" ? "interrupt" : "smoke",
     });
 
     const assistantMessage = runConvex<{
@@ -803,7 +875,7 @@ async function main() {
         "Persisted run output message did not match the seeded assistant message.",
     );
 
-    if (args.mode === "smoke") {
+    if (args.mode === "smoke" || args.mode === "stale-resume") {
         invariant(
             assistantMessage.status === "completed",
             `Expected a completed assistant message, got ${assistantMessage.status}.`,
@@ -813,6 +885,29 @@ async function main() {
             `Expected a completed run, got ${run.status}.`,
         );
         assertSmokeContent(assistantMessage.content);
+
+        if (args.mode === "stale-resume") {
+            const binding = await postRuntimeIngress<{
+                providerThreadId: string | null;
+                status: string;
+            } | null>({
+                repoRoot,
+                path: "/runtime/runtime-binding/read",
+                payload: {
+                    userId,
+                    conversationLocalId: ids.conversationId,
+                },
+            });
+            invariant(
+                binding !== null,
+                "Expected a runtime binding after stale resume recovery.",
+            );
+            invariant(
+                binding.providerThreadId !==
+                    "00000000-0000-4000-8000-000000000bad",
+                "Expected stale runtime binding to be replaced with a fresh thread id.",
+            );
+        }
     } else {
         invariant(
             outcome.status === "interrupted",
