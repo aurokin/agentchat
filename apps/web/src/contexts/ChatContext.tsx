@@ -14,6 +14,7 @@ import { api } from "@convex/_generated/api";
 import type { FunctionReference } from "convex/server";
 import type {
     ChatRunSummary,
+    ConversationRuntimeBindingSummary,
     ConversationRuntimeState,
     ChatSession,
     Message,
@@ -45,6 +46,10 @@ interface ChatContextType {
     messages: Message[];
     runSummaries: ChatRunSummary[];
     runtimeState: ConversationRuntimeState;
+    conversationRuntimeBindings: Record<
+        string,
+        ConversationRuntimeBindingSummary
+    >;
     loading: boolean;
     isMessagesLoading: boolean;
     canLoadMoreChats: boolean;
@@ -93,6 +98,7 @@ const convexApi = api as typeof api & {
     };
     runtimeBindings: {
         getByChat: FunctionReference<"query">;
+        listByUser: FunctionReference<"query">;
     };
 };
 
@@ -147,6 +153,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             ? { chatId: workspaceCurrentChat._id }
             : "skip",
     );
+    const workspaceConversationRuntimeBindings = useQuery(
+        convexApi.runtimeBindings.listByUser,
+        isWorkspaceActive && workspaceUserId ? {} : "skip",
+    ) as ConversationRuntimeBindingSummary[] | undefined;
     const runSummaries = useMemo(
         () => workspaceRunSummaries ?? [],
         [workspaceRunSummaries],
@@ -163,6 +173,16 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 runtimeBinding,
             }),
         [messages, runSummaries, runtimeBinding],
+    );
+    const conversationRuntimeBindings = useMemo(
+        () =>
+            Object.fromEntries(
+                (workspaceConversationRuntimeBindings ?? []).map((binding) => [
+                    binding.conversationId,
+                    binding,
+                ]),
+            ) as Record<string, ConversationRuntimeBindingSummary>,
+        [workspaceConversationRuntimeBindings],
     );
 
     useEffect(() => {
@@ -600,6 +620,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 messages,
                 runSummaries,
                 runtimeState,
+                conversationRuntimeBindings,
                 loading,
                 isMessagesLoading,
                 canLoadMoreChats,

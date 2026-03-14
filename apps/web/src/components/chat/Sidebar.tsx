@@ -10,7 +10,14 @@ import React, {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
-import { Hexagon, Plus, Settings, Trash2 } from "lucide-react";
+import {
+    AlertCircle,
+    Hexagon,
+    LoaderCircle,
+    Plus,
+    Settings,
+    Trash2,
+} from "lucide-react";
 import { useChat } from "@/contexts/ChatContext";
 import { useAgent } from "@/contexts/AgentContext";
 import { usePersistenceAdapter } from "@/contexts/WorkspaceContext";
@@ -45,6 +52,7 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
         selectChat,
         currentChat,
         messages,
+        conversationRuntimeBindings,
     } = useChat();
     const isMobile = useIsMobile();
     const isTablet = useIsTablet();
@@ -356,6 +364,13 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                         <ul className="p-3 space-y-1 list-none">
                             {chats.map((chat) => {
                                 const isActive = currentChat?.id === chat.id;
+                                const runtimeBinding =
+                                    conversationRuntimeBindings[chat.id] ??
+                                    null;
+                                const isRunning =
+                                    runtimeBinding?.status === "active";
+                                const isErrored =
+                                    runtimeBinding?.status === "errored";
 
                                 return (
                                     <li key={chat.id}>
@@ -381,6 +396,19 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                                                 )}
                                                 data-testid={`chat-item-${chat.id}`}
                                             >
+                                                <div className="mt-0.5 flex h-5 w-5 items-center justify-center text-muted-foreground">
+                                                    {isRunning ? (
+                                                        <LoaderCircle
+                                                            size={14}
+                                                            className="animate-spin text-primary"
+                                                        />
+                                                    ) : isErrored ? (
+                                                        <AlertCircle
+                                                            size={14}
+                                                            className="text-error"
+                                                        />
+                                                    ) : null}
+                                                </div>
                                                 <div
                                                     className={cn(
                                                         "min-w-0 flex-1",
@@ -392,12 +420,16 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                                                         {chat.title}
                                                     </p>
                                                     <p className="mono text-xs text-muted-foreground mt-0.5">
-                                                        {formatDistanceToNow(
-                                                            chat.updatedAt,
-                                                            {
-                                                                addSuffix: true,
-                                                            },
-                                                        )}
+                                                        {isRunning
+                                                            ? "Running"
+                                                            : isErrored
+                                                              ? "Needs attention"
+                                                              : formatDistanceToNow(
+                                                                    chat.updatedAt,
+                                                                    {
+                                                                        addSuffix: true,
+                                                                    },
+                                                                )}
                                                     </p>
                                                 </div>
                                                 <button

@@ -55,6 +55,16 @@ export interface RuntimeBindingSummary {
     updatedAt: number;
 }
 
+export interface ConversationRuntimeBindingSummary {
+    conversationId: string;
+    agentId: string;
+    status: "idle" | "active" | "expired" | "errored";
+    activeRunId: string | null;
+    lastError: string | null;
+    lastEventAt: number | null;
+    updatedAt: number;
+}
+
 export type ConversationRuntimePhase =
     | "idle"
     | "active"

@@ -31,6 +31,7 @@ export default function HomeScreen(): React.ReactElement {
     const {
         chats,
         currentChat,
+        conversationRuntimeBindings,
         isLoading,
         error,
         loadChats,
@@ -319,6 +320,10 @@ export default function HomeScreen(): React.ReactElement {
                     keyExtractor={(item) => item.id}
                     renderItem={({ item }) => {
                         const isSelected = selectedChatIds.has(item.id);
+                        const runtimeBinding =
+                            conversationRuntimeBindings[item.id] ?? null;
+                        const isRunning = runtimeBinding?.status === "active";
+                        const isErrored = runtimeBinding?.status === "errored";
                         return (
                             <TouchableOpacity
                                 style={[
@@ -349,6 +354,20 @@ export default function HomeScreen(): React.ReactElement {
                                             />
                                         </View>
                                     )}
+                                    <View style={styles.runtimeIndicator}>
+                                        {isRunning ? (
+                                            <ActivityIndicator
+                                                size="small"
+                                                color={colors.accent}
+                                            />
+                                        ) : isErrored ? (
+                                            <Feather
+                                                name="alert-circle"
+                                                size={18}
+                                                color={colors.danger}
+                                            />
+                                        ) : null}
+                                    </View>
                                     <View style={styles.chatItemContent}>
                                         <Text
                                             style={styles.chatTitle}
@@ -357,7 +376,11 @@ export default function HomeScreen(): React.ReactElement {
                                             {item.title}
                                         </Text>
                                         <Text style={styles.chatDate}>
-                                            {formatDate(item.updatedAt)}
+                                            {isRunning
+                                                ? "Running"
+                                                : isErrored
+                                                  ? "Needs attention"
+                                                  : formatDate(item.updatedAt)}
                                         </Text>
                                     </View>
                                 </View>
@@ -495,6 +518,12 @@ const createStyles = (colors: ThemeColors) =>
         chatItemRow: {
             flexDirection: "row",
             alignItems: "center",
+        },
+        runtimeIndicator: {
+            width: 24,
+            alignItems: "center",
+            justifyContent: "center",
+            marginRight: 12,
         },
         selectionIndicator: {
             width: 24,

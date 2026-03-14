@@ -32,6 +32,7 @@ This roadmap describes the current implementation state and the next major steps
   - runs continue with zero active clients and recover cleanly later
   - multiple clients can observe the same run concurrently without duplicating execution
   - clients keep background subscriptions to all active conversations instead of only the visible thread
+  - multiple users can use the same instance at the same time without crossing runtime state
 - Investigate Codex model and variant mapping in the live product path
 - Verify whether Codex Spark is functioning correctly in the current integration
 - Expand provider-native runtime item mapping so multi-message output follows real Codex events instead of transcript inference

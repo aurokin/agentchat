@@ -34,6 +34,7 @@ Responsibilities:
 - Google-based auth or disabled-auth default-user mode
 - Instance allowlist enforcement
 - User identity
+- Multi-user isolation for conversations, runs, runtime bindings, and subscriptions
 - Conversations
 - Messages
 - Runs

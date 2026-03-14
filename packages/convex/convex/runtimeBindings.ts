@@ -60,3 +60,39 @@ export const listActiveConversationIds = query({
             }));
     },
 });
+
+export const listByUser = query({
+    args: {},
+    handler: async (ctx) => {
+        const authenticatedUserId = await requireWorkspaceUser(ctx);
+        const bindings = await ctx.db
+            .query("runtime_bindings")
+            .withIndex("by_userId_and_updatedAt", (q) =>
+                q.eq("userId", authenticatedUserId),
+            )
+            .collect();
+
+        const chats = await Promise.all(
+            bindings.map((binding) => ctx.db.get(binding.chatId)),
+        );
+
+        return bindings.flatMap((binding, index) => {
+            const chat = chats[index];
+            if (!chat) {
+                return [];
+            }
+
+            return [
+                {
+                    conversationId: chat.localId ?? chat._id,
+                    agentId: chat.agentId,
+                    status: binding.status,
+                    activeRunId: binding.activeRunId,
+                    lastError: binding.lastError,
+                    lastEventAt: binding.lastEventAt,
+                    updatedAt: binding.updatedAt,
+                },
+            ];
+        });
+    },
+});

@@ -18,6 +18,7 @@ import {
 import type { ChatSession, Message } from "@shared/core/types";
 import type {
     ChatRunSummary,
+    ConversationRuntimeBindingSummary,
     ConversationRuntimeState,
     RuntimeBindingSummary,
 } from "@/lib/types";
@@ -43,6 +44,10 @@ interface ChatContextValue {
     messages: Record<string, Message[]>;
     runSummaries: ChatRunSummary[];
     runtimeState: ConversationRuntimeState;
+    conversationRuntimeBindings: Record<
+        string,
+        ConversationRuntimeBindingSummary
+    >;
     isLoading: boolean;
     isMessagesLoading: boolean;
     error: string | null;
@@ -81,6 +86,7 @@ const convexApi = api as typeof api & {
     };
     runtimeBindings: {
         getByChat: FunctionReference<"query">;
+        listByUser: FunctionReference<"query">;
     };
 };
 
@@ -164,6 +170,10 @@ export function ChatProvider({
             ? { chatId: workspaceCurrentChat._id }
             : "skip",
     );
+    const workspaceConversationRuntimeBindings = useQuery(
+        convexApi.runtimeBindings.listByUser,
+        isWorkspaceActive && workspaceUserId ? {} : "skip",
+    ) as ConversationRuntimeBindingSummary[] | undefined;
     const runSummaries = useMemo(
         () => workspaceRunSummaries ?? [],
         [workspaceRunSummaries],
@@ -187,6 +197,16 @@ export function ChatProvider({
                 runtimeBinding,
             }),
         [currentMessages, runSummaries, runtimeBinding],
+    );
+    const conversationRuntimeBindings = useMemo(
+        () =>
+            Object.fromEntries(
+                (workspaceConversationRuntimeBindings ?? []).map((binding) => [
+                    binding.conversationId,
+                    binding,
+                ]),
+            ) as Record<string, ConversationRuntimeBindingSummary>,
+        [workspaceConversationRuntimeBindings],
     );
 
     useEffect(() => {
@@ -578,6 +598,7 @@ export function ChatProvider({
                 messages,
                 runSummaries,
                 runtimeState,
+                conversationRuntimeBindings,
                 isLoading,
                 isMessagesLoading,
                 error,

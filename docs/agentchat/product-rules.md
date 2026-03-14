@@ -8,6 +8,7 @@ This document records user-facing rules and product decisions that should remain
 - The supported access modes are allowlisted Google auth and disabled-auth default-user mode.
 - Convex is the primary authority for whether a user is allowed into the app.
 - The backend must enforce the same identity on every request as defense in depth.
+- Multiple users must be able to use the same Agentchat instance at the same time without leaking conversations, runs, or runtime events across users.
 
 ## Agent Selection
 
@@ -52,6 +53,7 @@ This document records user-facing rules and product decisions that should remain
 - Users must be able to switch agents while runs continue in other conversations.
 - Multiple clients for the same user must be able to observe the same run concurrently.
 - Web and mobile must be treated as equivalent subscribers to backend-owned runtime state.
+- Concurrent activity from one user must not block or interfere with another user on the same instance.
 - The application assumes automatic approval mode for provider actions in v1.
 - Auto-approve is a project requirement for the current scope, not a temporary UI default.
 
