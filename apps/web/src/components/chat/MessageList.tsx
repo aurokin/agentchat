@@ -16,6 +16,7 @@ import {
     Copy,
 } from "lucide-react";
 import { cn, externalLinkProps } from "@/lib/utils";
+import { copyTextToClipboard } from "@/lib/clipboard";
 import { MessageListSkeleton } from "./MessageListSkeleton";
 import {
     exportConversationAsMarkdown,
@@ -90,6 +91,7 @@ export function MessageList({
     const [copiedLatestMessageId, setCopiedLatestMessageId] = useState<
         string | null
     >(null);
+    const [exportToast, setExportToast] = useState<string | null>(null);
 
     useEffect(() => {
         bottomRef.current?.scrollIntoView({
@@ -110,6 +112,20 @@ export function MessageList({
             window.clearTimeout(timeoutId);
         };
     }, [copiedLatestMessageId]);
+
+    useEffect(() => {
+        if (!exportToast) {
+            return;
+        }
+
+        const timeoutId = window.setTimeout(() => {
+            setExportToast(null);
+        }, 3000);
+
+        return () => {
+            window.clearTimeout(timeoutId);
+        };
+    }, [exportToast]);
 
     if (loading) {
         return <MessageListSkeleton count={3} />;
@@ -148,22 +164,16 @@ export function MessageList({
                     canExportConversation={index === messages.length - 1}
                     exportCopied={copiedLatestMessageId === message.id}
                     onExportConversation={async () => {
-                        if (!navigator.clipboard?.writeText) {
-                            console.error(
-                                "Clipboard export is not available in this browser.",
-                            );
-                            return;
-                        }
-
                         try {
-                            await navigator.clipboard.writeText(
-                                conversationMarkdown,
-                            );
+                            await copyTextToClipboard(conversationMarkdown);
                             setCopiedLatestMessageId(message.id);
                         } catch (error) {
                             console.error(
                                 "Failed to copy conversation markdown:",
                                 error,
+                            );
+                            setExportToast(
+                                "Could not copy the conversation. Clipboard access is unavailable.",
                             );
                         }
                     }}
@@ -171,6 +181,12 @@ export function MessageList({
             ))}
 
             <div ref={bottomRef} />
+
+            {exportToast ? (
+                <div className="fixed bottom-6 right-6 z-50 max-w-sm border border-error/30 bg-background-elevated px-4 py-3 text-sm text-foreground shadow-lg">
+                    {exportToast}
+                </div>
+            ) : null}
         </div>
     );
 }
