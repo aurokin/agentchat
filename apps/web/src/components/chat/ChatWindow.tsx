@@ -337,6 +337,22 @@ export function ChatWindow() {
         setDefaultModel(modelId);
     };
 
+    const handleVariantChange = async (variantId: string) => {
+        if (!currentChat) return;
+        if (currentChat.settingsLockedAt != null) return;
+        if (currentChat.variantId === variantId) return;
+
+        await updateChat({
+            ...currentChat,
+            variantId,
+        });
+    };
+
+    const selectedModelDefinition = useMemo(
+        () => models.find((model) => model.id === currentChat?.modelId) ?? null,
+        [currentChat?.modelId, models],
+    );
+
     if (!currentChat) {
         return (
             <div className="flex-1 flex flex-col h-full bg-background relative overflow-hidden">
@@ -500,6 +516,9 @@ export function ChatWindow() {
                     settingsLocked={currentChat.settingsLockedAt != null}
                     selectedModel={currentChat.modelId}
                     onModelChange={handleModelChange}
+                    variants={selectedModelDefinition?.variants ?? []}
+                    selectedVariantId={currentChat.variantId ?? null}
+                    onVariantChange={handleVariantChange}
                 />
             </div>
         </div>

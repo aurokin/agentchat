@@ -4,7 +4,9 @@ import React, { useState, useRef, useEffect, forwardRef } from "react";
 import { Send, Square } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ModelSelector } from "./ModelSelector";
+import { VariantSelector } from "./VariantSelector";
 import { KeybindingsHelp } from "@/components/keybindings/KeybindingsHelp";
+import type { ProviderVariant } from "@shared/core/models";
 
 interface MessageInputProps {
     onSend: (content: string) => void;
@@ -15,6 +17,9 @@ interface MessageInputProps {
     settingsLocked?: boolean;
     selectedModel: string;
     onModelChange: (modelId: string) => void;
+    variants?: ProviderVariant[];
+    selectedVariantId: string | null;
+    onVariantChange: (variantId: string) => void;
 }
 
 export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
@@ -28,6 +33,9 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
             settingsLocked = false,
             selectedModel,
             onModelChange,
+            variants = [],
+            selectedVariantId,
+            onVariantChange,
         } = props;
 
         const [content, setContent] = useState("");
@@ -94,6 +102,12 @@ export const MessageInput = forwardRef<HTMLTextAreaElement, MessageInputProps>(
                         <ModelSelector
                             selectedModel={selectedModel}
                             onModelChange={onModelChange}
+                            disabled={settingsLocked || disabled}
+                        />
+                        <VariantSelector
+                            variants={variants}
+                            selectedVariantId={selectedVariantId}
+                            onVariantChange={onVariantChange}
                             disabled={settingsLocked || disabled}
                         />
                         <div className="flex-1" />
