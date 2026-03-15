@@ -54,6 +54,7 @@ import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { consumePendingSharePayload } from "@/lib/share-intent/pending-share";
 import {
     interruptMobileConversationRun,
+    resolveMobileConversationRuntimeSync,
     runMobileConversationSend,
 } from "@/components/chat/conversation-runtime-controller";
 
@@ -526,11 +527,24 @@ export default function ChatScreen(): ReactElement {
             return;
         }
 
-        const recoveredRun = createRecoveredActiveRunFromRuntimeState({
-            conversationId: currentChat.id,
+        const syncResolution = resolveMobileConversationRuntimeSync({
+            currentChat,
+            isMessagesLoading: !hasLoadedMessages,
             messages: chatMessages,
             runtimeState,
+            activeRun: activeRunRef.current,
         });
+
+        if (syncResolution.shouldReset) {
+            startTransition(() => {
+                setActiveRun(null);
+                setStreamingMessage(null);
+                setRecoveredRunNotice(false);
+                setIsLoading(false);
+            });
+        }
+
+        const recoveredRun = syncResolution.recoveredRun;
 
         if (!recoveredRun) {
             if (
@@ -538,14 +552,6 @@ export default function ChatScreen(): ReactElement {
                 runtimeState.phase !== "recovering"
             ) {
                 pendingReconnectNoticeRef.current = false;
-            }
-            if (activeRunRef.current?.conversationId !== currentChat.id) {
-                startTransition(() => {
-                    setActiveRun(null);
-                    setStreamingMessage(null);
-                    setRecoveredRunNotice(false);
-                    setIsLoading(false);
-                });
             }
             return;
         }
@@ -560,7 +566,7 @@ export default function ChatScreen(): ReactElement {
             pendingReconnectNoticeRef.current = false;
             setIsLoading(true);
         });
-    }, [chatMessages, currentChat, runtimeState]);
+    }, [chatMessages, currentChat, hasLoadedMessages, runtimeState]);
 
     const handleSendMessage = async (content: string): Promise<boolean> => {
         if (!currentChat) {
@@ -1179,6 +1185,31 @@ export default function ChatScreen(): ReactElement {
                     </Text>
                 </View>
             )}
+            {!error && runtimeState.phase === "failed" && (
+                <View style={styles.errorBanner}>
+                    <Feather
+                        name="alert-circle"
+                        size={16}
+                        color={colors.danger}
+                    />
+                    <Text style={styles.errorBannerText}>
+                        {runtimeState.errorMessage ??
+                            "The last run for this conversation failed."}
+                    </Text>
+                </View>
+            )}
+            {!error && runtimeState.phase === "interrupted" && (
+                <View style={styles.warningBanner}>
+                    <Feather
+                        name="alert-circle"
+                        size={16}
+                        color={colors.warning}
+                    />
+                    <Text style={styles.warningBannerText}>
+                        The last run for this conversation was interrupted.
+                    </Text>
+                </View>
+            )}
             {!error && !isConfigured && (
                 <View style={styles.errorBanner}>
                     <Feather
@@ -1434,6 +1465,21 @@ const createStyles = (colors: ThemeColors) =>
             flex: 1,
             fontSize: 13,
             color: colors.text,
+        },
+        warningBanner: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            paddingHorizontal: 16,
+            paddingVertical: 10,
+            backgroundColor: colors.warningSoft,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.warning,
+        },
+        warningBannerText: {
+            flex: 1,
+            fontSize: 13,
+            color: colors.warning,
         },
         retryButton: {
             flexDirection: "row",

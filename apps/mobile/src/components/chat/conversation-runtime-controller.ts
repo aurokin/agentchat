@@ -1,5 +1,6 @@
 import {
     buildInterruptCommand,
+    createRecoveredActiveRunFromRuntimeState,
     prepareConversationSend,
     type ActiveRunState,
     type RetryChatState,
@@ -9,6 +10,7 @@ import {
 import type { ProviderModel } from "@shared/core/models";
 import type { ChatSession, Message } from "@shared/core/types";
 import type { ConversationSendCommand } from "@/lib/agentchat-socket";
+import type { ConversationRuntimeState } from "@/lib/types";
 import { v4 as uuidv4 } from "uuid";
 
 type MobileMessageUpdate = Message;
@@ -142,6 +144,48 @@ export async function runMobileConversationSend(params: {
             },
         };
     }
+}
+
+export type MobileRuntimeSyncResolution = {
+    shouldReset: boolean;
+    recoveredRun: ActiveRunState | null;
+};
+
+export function resolveMobileConversationRuntimeSync(params: {
+    currentChat: ChatSession | null;
+    isMessagesLoading: boolean;
+    messages: Message[];
+    runtimeState: ConversationRuntimeState;
+    activeRun: ActiveRunState | null;
+}): MobileRuntimeSyncResolution {
+    if (!params.currentChat || params.isMessagesLoading) {
+        return {
+            shouldReset: false,
+            recoveredRun: null,
+        };
+    }
+
+    const shouldReset =
+        !!params.activeRun &&
+        (params.activeRun.conversationId !== params.currentChat.id ||
+            (params.runtimeState.phase !== "active" &&
+                params.runtimeState.phase !== "recovering"));
+
+    if (params.activeRun && !shouldReset) {
+        return {
+            shouldReset: false,
+            recoveredRun: null,
+        };
+    }
+
+    return {
+        shouldReset,
+        recoveredRun: createRecoveredActiveRunFromRuntimeState({
+            conversationId: params.currentChat.id,
+            messages: params.messages,
+            runtimeState: params.runtimeState,
+        }),
+    };
 }
 
 export function interruptMobileConversationRun(params: {

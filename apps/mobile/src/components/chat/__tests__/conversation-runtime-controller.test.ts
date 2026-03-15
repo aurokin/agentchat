@@ -4,8 +4,10 @@ import type { ChatSession, Message } from "@shared/core/types";
 import { SupportedParameter, type ProviderModel } from "@shared/core/models";
 import {
     interruptMobileConversationRun,
+    resolveMobileConversationRuntimeSync,
     runMobileConversationSend,
 } from "../conversation-runtime-controller";
+import type { ConversationRuntimeState } from "@/lib/types";
 
 function createChat(overrides: Partial<ChatSession> = {}): ChatSession {
     return {
@@ -42,6 +44,22 @@ const models: ProviderModel[] = [
         supportedParameters: [SupportedParameter.Reasoning],
     },
 ];
+
+function createRuntimeState(
+    overrides: Partial<ConversationRuntimeState> = {},
+): ConversationRuntimeState {
+    return {
+        phase: "idle",
+        runId: null,
+        assistantMessageId: null,
+        provider: null,
+        errorMessage: null,
+        startedAt: null,
+        completedAt: null,
+        lastEventAt: null,
+        ...overrides,
+    };
+}
 
 describe("mobile conversation runtime controller", () => {
     test("runs a successful send flow and locks settings", async () => {
@@ -125,6 +143,29 @@ describe("mobile conversation runtime controller", () => {
         expect(error).toEqual({
             message: "cannot interrupt",
             isRetryable: true,
+        });
+    });
+
+    test("resets a stale local active run when persisted runtime is terminal", () => {
+        const resolution = resolveMobileConversationRuntimeSync({
+            currentChat: createChat(),
+            isMessagesLoading: false,
+            messages: [],
+            runtimeState: createRuntimeState({
+                phase: "interrupted",
+            }),
+            activeRun: {
+                conversationId: "chat-1",
+                assistantMessageId: "assistant-1",
+                userContent: "hello",
+                content: "",
+                runId: "run-1",
+            },
+        });
+
+        expect(resolution).toEqual({
+            shouldReset: true,
+            recoveredRun: null,
         });
     });
 });
