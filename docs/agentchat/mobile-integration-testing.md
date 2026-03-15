@@ -152,6 +152,19 @@ Manual options:
 - physical Android device via `adb`
 - Android emulator when available
 
+Preflight the Linux Android path with:
+
+```bash
+bun run doctor:android
+```
+
+That command verifies:
+
+- `adb` is installed
+- at least one Android device is connected
+- `apps/mobile/.env` points at a LAN-reachable backend URL instead of loopback
+- the active mobile env still includes a Convex URL
+
 For parity work, prefer the same runtime stack used by iPhone development builds:
 
 - one LAN Metro dev-client session from `bun run --cwd apps/mobile dev-client`

@@ -25,6 +25,7 @@ This document tracks the remaining mobile work needed to match the current Agent
 - Keep aligning mobile state helpers with the web runtime model as the architecture settles.
 - Rework the mobile top app bar on home and chat screens; it currently feels awkward and should be revisited as a distinct UI polish pass.
 - Validate Android physical-device behavior against the same LAN `dev-client` plus `apps/server` backend flow used for iPhone development builds.
+- Keep `bun run doctor:android` green as the operator preflight for Android device parity on Linux.
 - Keep Android and iOS on the same backend/session/runtime path whenever possible so platform parity checks exercise the same product behavior.
 
 ## Documentation Rule
