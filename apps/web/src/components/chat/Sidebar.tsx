@@ -24,7 +24,6 @@ import { useAgent } from "@/contexts/AgentContext";
 import { usePersistenceAdapter } from "@/contexts/WorkspaceContext";
 import { resolveConversationActivityState } from "@shared/core/conversation-activity";
 import { cn } from "@/lib/utils";
-import * as storage from "@/lib/storage";
 
 import { ChatListSkeleton } from "./ChatListSkeleton";
 import { WorkspaceStatusBadge } from "@/components/workspace/WorkspaceStatusBadge";
@@ -79,8 +78,8 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
     const isMobile = useIsMobile();
     const isTablet = useIsTablet();
     const isTouchDevice = useTouchDevice();
-
     const persistenceAdapter = usePersistenceAdapter();
+
     const [isMac, setIsMac] = useState(false);
     const [pendingDeleteChatId, setPendingDeleteChatId] = useState<
         string | null
@@ -102,12 +101,6 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
         }
         return counts;
     }, [conversationRuntimeBindings]);
-    const chatLastViewedAt = Object.fromEntries(
-        chats
-            .map((chat) => [chat.id, storage.getChatLastViewedAt(chat.id)])
-            .filter((entry): entry is [string, number] => entry[1] !== null),
-    ) as Record<string, number>;
-
     const isMobileActionMode = isMobile || isTablet || isTouchDevice;
 
     const handleNewChat = useCallback(async () => {
@@ -216,21 +209,6 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
         await deleteChatAndSelectNext(pendingDeleteChatId);
         setPendingDeleteChatId(null);
     };
-
-    useEffect(() => {
-        if (!currentChat) return;
-
-        const lastMessageAt = messages.at(-1)?.createdAt ?? 0;
-        const lastRuntimeEventAt =
-            conversationRuntimeBindings[currentChat.id]?.lastEventAt ?? 0;
-        const visibleAt = Math.max(
-            Date.now(),
-            lastMessageAt,
-            lastRuntimeEventAt,
-        );
-
-        storage.setChatLastViewedAt(currentChat.id, visibleAt);
-    }, [conversationRuntimeBindings, currentChat, messages]);
 
     useEffect(() => {
         /* eslint-disable react-hooks/set-state-in-effect */
@@ -423,8 +401,7 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                                     resolveSidebarConversationState({
                                         isActiveConversation: isActive,
                                         runtimeBinding,
-                                        lastViewedAt:
-                                            chatLastViewedAt[chat.id] ?? null,
+                                        lastViewedAt: chat.lastViewedAt ?? null,
                                     });
 
                                 return (

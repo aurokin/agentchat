@@ -31,6 +31,4 @@ export {
     getSelectedChatId,
     setSelectedChatId,
     clearSelectedChatId,
-    getChatLastViewedAt,
-    setChatLastViewedAt,
 } from "@/lib/storage/user-settings-storage";

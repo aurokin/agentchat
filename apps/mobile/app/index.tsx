@@ -26,7 +26,6 @@ import { useAgent } from "@/contexts/AgentContext";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AgentSwitcher } from "@/components/chat/AgentSwitcher";
 import { getPreferredHomeChatId } from "@/lib/home-chat-route";
-import { getChatLastViewedAt } from "@/lib/storage";
 
 export default function HomeScreen(): React.ReactElement {
     const router = useRouter();
@@ -49,9 +48,6 @@ export default function HomeScreen(): React.ReactElement {
     const [selectedChatIds, setSelectedChatIds] = useState<Set<string>>(
         new Set(),
     );
-    const [chatLastViewedAt, setChatLastViewedAt] = useState<
-        Record<string, number>
-    >({});
     const longPressTriggeredRef = useRef(false);
     const [headerHeight, setHeaderHeight] = useState<number | null>(null);
     const { width: windowWidth, height: windowHeight } = useWindowDimensions();
@@ -62,40 +58,6 @@ export default function HomeScreen(): React.ReactElement {
             loadChats();
         }
     }, [isInitialized, loadChats]);
-
-    useEffect(() => {
-        let cancelled = false;
-
-        const loadViewedState = async () => {
-            const entries = await Promise.all(
-                chats.map(async (chat) => {
-                    const viewedAt = await getChatLastViewedAt(chat.id);
-                    return viewedAt === null
-                        ? null
-                        : ([chat.id, viewedAt] as const);
-                }),
-            );
-
-            if (cancelled) {
-                return;
-            }
-
-            setChatLastViewedAt(
-                Object.fromEntries(
-                    entries.filter(
-                        (entry): entry is readonly [string, number] =>
-                            entry !== null,
-                    ),
-                ),
-            );
-        };
-
-        void loadViewedState();
-
-        return () => {
-            cancelled = true;
-        };
-    }, [chats]);
 
     useEffect(() => {
         if (!isInitialized || !isTwoPaneLayout) return;
@@ -363,7 +325,7 @@ export default function HomeScreen(): React.ReactElement {
                             isActiveConversation: currentChat?.id === item.id,
                             runtimeBinding:
                                 conversationRuntimeBindings[item.id] ?? null,
-                            lastViewedAt: chatLastViewedAt[item.id] ?? null,
+                            lastViewedAt: item.lastViewedAt ?? null,
                         });
                         return (
                             <TouchableOpacity

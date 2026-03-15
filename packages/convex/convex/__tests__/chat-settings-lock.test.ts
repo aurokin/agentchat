@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from "bun:test";
 
-import { update as updateChat } from "../chats";
+import { markViewed, update as updateChat } from "../chats";
 
 const AUTH_USER_ID = "users:auth";
 const CHAT_ID = "chats:1";
@@ -93,5 +93,47 @@ describe("chat settings lock", () => {
         });
 
         expect(patch).toHaveBeenCalledTimes(1);
+    });
+
+    test("marks chats viewed without mutating updatedAt", async () => {
+        const patch = mock(async () => undefined);
+        const ctx = {
+            auth: {
+                getUserIdentity: async () => ({
+                    subject: `${AUTH_USER_ID}|session:auth`,
+                }),
+            },
+            db: {
+                get: async (id: string) => {
+                    if (id === CHAT_ID) {
+                        return {
+                            _id: CHAT_ID,
+                            userId: AUTH_USER_ID,
+                            title: "Viewed",
+                            modelId: "gpt-5.3-codex",
+                            settingsLockedAt: null,
+                            lastViewedAt: 50,
+                            updatedAt: 100,
+                        };
+                    }
+
+                    if (id === AUTH_USER_ID) {
+                        return { _id: AUTH_USER_ID };
+                    }
+
+                    return null;
+                },
+                patch,
+            },
+        };
+
+        await runHandler(markViewed as unknown as HandlerExport, ctx, {
+            id: CHAT_ID,
+            timestamp: 75,
+        });
+
+        expect(patch).toHaveBeenCalledWith(CHAT_ID, {
+            lastViewedAt: 75,
+        });
     });
 });

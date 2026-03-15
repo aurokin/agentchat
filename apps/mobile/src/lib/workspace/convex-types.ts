@@ -50,6 +50,7 @@ export interface ConvexChat {
     modelId: string;
     variantId?: string | null;
     settingsLockedAt?: number | null;
+    lastViewedAt?: number | null;
     createdAt: number;
     updatedAt: number;
 }
@@ -122,6 +123,11 @@ export interface ConvexAPI {
                 modelId: string;
                 variantId?: string | null;
             },
+            void
+        >;
+        markViewed: ConvexFunctionReference<
+            "mutation",
+            { id: ConvexId<"chats">; timestamp: number },
             void
         >;
         remove: ConvexFunctionReference<

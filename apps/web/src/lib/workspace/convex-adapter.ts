@@ -92,6 +92,12 @@ function createServices(client: ConvexClientInterface): ConvexAdapterServices {
                     variantId: chat.variantId ?? null,
                 });
             },
+            markViewed: async ({ id, timestamp }) => {
+                await client.mutation(convexApi.chats.markViewed, {
+                    id: id as ConvexId<"chats">,
+                    timestamp,
+                });
+            },
             remove: async ({ id }) => {
                 await client.mutation(convexApi.chats.remove, {
                     id: id as ConvexId<"chats">,

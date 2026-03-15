@@ -33,7 +33,6 @@ import {
     getSelectedChatId,
     setSelectedChatId,
     clearSelectedChatId,
-    setChatLastViewedAt,
 } from "@/lib/storage";
 import { useModelContext } from "@/contexts/ModelContext";
 import { deriveConversationRuntimeState } from "@/contexts/runtime-helpers";
@@ -138,6 +137,14 @@ export function ChatProvider({
     const pendingChatIdsRef = React.useRef<Set<string>>(new Set());
     const pendingMessageIdsRef = React.useRef<Set<string>>(new Set());
     const currentChatIdRef = useRef<string | null>(null);
+    const latestViewedAtRef = useRef<Record<string, number>>({});
+    const markViewedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+        null,
+    );
+    const pendingViewedChatRef = useRef<{
+        chatId: string;
+        timestamp: number;
+    } | null>(null);
 
     const isWorkspaceActive = isConvexAvailable && isWorkspaceReady;
     const currentChatId = currentChat?.id ?? null;
@@ -213,6 +220,36 @@ export function ChatProvider({
     useEffect(() => {
         currentChatIdRef.current = currentChat?.id ?? null;
     }, [currentChat?.id]);
+
+    const applyChatLastViewedAt = useCallback(
+        (chatId: string, timestamp: number) => {
+            setChats((prev) =>
+                prev.map((chat) =>
+                    chat.id === chatId
+                        ? {
+                              ...chat,
+                              lastViewedAt: Math.max(
+                                  chat.lastViewedAt ?? 0,
+                                  timestamp,
+                              ),
+                          }
+                        : chat,
+                ),
+            );
+            setCurrentChat((prev) =>
+                prev?.id === chatId
+                    ? {
+                          ...prev,
+                          lastViewedAt: Math.max(
+                              prev.lastViewedAt ?? 0,
+                              timestamp,
+                          ),
+                      }
+                    : prev,
+            );
+        },
+        [],
+    );
 
     const loadChats = useCallback(async () => {
         if (!selectedAgentId) {
@@ -303,7 +340,9 @@ export function ChatProvider({
     ]);
 
     useEffect(() => {
-        if (!currentChat) return;
+        if (!currentChat) {
+            return;
+        }
 
         const lastMessageAt = messages[currentChat.id]?.at(-1)?.createdAt ?? 0;
         const lastRuntimeEventAt =
@@ -313,9 +352,56 @@ export function ChatProvider({
             lastMessageAt,
             lastRuntimeEventAt,
         );
+        const alreadyViewedAt = Math.max(
+            currentChat.lastViewedAt ?? 0,
+            latestViewedAtRef.current[currentChat.id] ?? 0,
+        );
 
-        void setChatLastViewedAt(currentChat.id, visibleAt);
-    }, [conversationRuntimeBindings, currentChat, messages]);
+        if (visibleAt <= alreadyViewedAt) {
+            return;
+        }
+
+        latestViewedAtRef.current[currentChat.id] = visibleAt;
+        applyChatLastViewedAt(currentChat.id, visibleAt);
+
+        const pendingViewed = pendingViewedChatRef.current;
+        if (
+            pendingViewed &&
+            pendingViewed.chatId !== currentChat.id &&
+            markViewedTimeoutRef.current
+        ) {
+            clearTimeout(markViewedTimeoutRef.current);
+            void adapter.markChatViewed(
+                pendingViewed.chatId,
+                pendingViewed.timestamp,
+            );
+            markViewedTimeoutRef.current = null;
+            pendingViewedChatRef.current = null;
+        } else if (markViewedTimeoutRef.current) {
+            clearTimeout(markViewedTimeoutRef.current);
+        }
+
+        pendingViewedChatRef.current = {
+            chatId: currentChat.id,
+            timestamp: visibleAt,
+        };
+        markViewedTimeoutRef.current = setTimeout(() => {
+            const pending = pendingViewedChatRef.current;
+            if (!pending) {
+                return;
+            }
+            const { chatId, timestamp } = pending;
+            void adapter.markChatViewed(chatId, timestamp);
+            pendingViewedChatRef.current = null;
+            markViewedTimeoutRef.current = null;
+        }, 300);
+    }, [
+        adapter,
+        applyChatLastViewedAt,
+        conversationRuntimeBindings,
+        currentChat,
+        messages,
+    ]);
 
     const createChat = useCallback(
         async (title?: string, modelId?: string): Promise<ChatSession> => {

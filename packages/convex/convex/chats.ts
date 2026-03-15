@@ -229,6 +229,33 @@ export const update = mutation({
     },
 });
 
+export const markViewed = mutation({
+    args: {
+        id: v.id("chats"),
+        timestamp: v.number(),
+    },
+    handler: async (ctx, args) => {
+        const authenticatedUserId = await requireWorkspaceUser(ctx);
+        const chat = await ctx.db.get(args.id);
+        if (!chat || !isOwner(chat, authenticatedUserId)) {
+            throw new Error("Not found");
+        }
+
+        const nextLastViewedAt = Math.max(
+            chat.lastViewedAt ?? 0,
+            args.timestamp,
+        );
+
+        if (nextLastViewedAt === (chat.lastViewedAt ?? null)) {
+            return;
+        }
+
+        await ctx.db.patch(args.id, {
+            lastViewedAt: nextLastViewedAt,
+        });
+    },
+});
+
 export const lockSettingsIfNeeded = internalMutation({
     args: {
         userId: v.id("users"),

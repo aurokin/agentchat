@@ -24,6 +24,10 @@ export class UnavailablePersistenceAdapter implements PersistenceAdapter {
         this.fail();
     }
 
+    async markChatViewed(): Promise<void> {
+        this.fail();
+    }
+
     async deleteChat(): Promise<void> {
         this.fail();
     }

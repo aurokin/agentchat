@@ -32,6 +32,7 @@ export interface ChatSession {
     modelId: string;
     variantId?: string | null;
     settingsLockedAt?: number | null;
+    lastViewedAt?: number | null;
     createdAt: number;
     updatedAt: number;
 }

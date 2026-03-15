@@ -14,6 +14,7 @@ export interface PersistenceAdapter {
     getChat(id: string): Promise<ChatSession | undefined>;
     getAllChats(): Promise<ChatSession[]>;
     updateChat(chat: ChatSession): Promise<void>;
+    markChatViewed(chatId: string, timestamp: number): Promise<void>;
     deleteChat(id: string): Promise<void>;
     createMessage(message: Message): Promise<string>;
     updateMessage(message: Message): Promise<void>;

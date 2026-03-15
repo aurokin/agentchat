@@ -29,6 +29,7 @@ export interface ConvexChatLike {
     title: string;
     modelId: string;
     variantId?: string | null;
+    lastViewedAt?: number | null;
     createdAt: number;
     updatedAt: number;
 }
@@ -59,6 +60,7 @@ export interface ConvexAdapterServices {
         }): Promise<ConvexChatLike | null>;
         listByUser(args: { userId: string }): Promise<ConvexChatLike[]>;
         update(args: { id: string; chat: ChatSession }): Promise<void>;
+        markViewed(args: { id: string; timestamp: number }): Promise<void>;
         remove(args: { id: string }): Promise<void>;
     };
     messages: {
@@ -151,6 +153,19 @@ export abstract class ConvexAdapterBase implements PersistenceAdapter {
         }
 
         await this.services.chats.update({ id: convexId, chat });
+    }
+
+    async markChatViewed(chatId: string, timestamp: number): Promise<void> {
+        if (!Number.isFinite(timestamp)) {
+            return;
+        }
+
+        const convexId = await this.getOrLookupChatId(chatId);
+        if (!convexId) {
+            throw new Error(`Chat not found: ${chatId}`);
+        }
+
+        await this.services.chats.markViewed({ id: convexId, timestamp });
     }
 
     async deleteChat(id: string): Promise<void> {
@@ -261,6 +276,7 @@ export abstract class ConvexAdapterBase implements PersistenceAdapter {
             title: chat.title,
             modelId: chat.modelId,
             variantId: chat.variantId ?? null,
+            lastViewedAt: chat.lastViewedAt ?? null,
             createdAt: chat.createdAt,
             updatedAt: chat.updatedAt,
         };

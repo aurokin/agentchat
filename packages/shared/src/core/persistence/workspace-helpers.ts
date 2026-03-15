@@ -51,6 +51,7 @@ export interface ConvexChatLike {
     modelId: string;
     variantId?: string | null;
     settingsLockedAt?: number | null;
+    lastViewedAt?: number | null;
     createdAt: number;
     updatedAt: number;
 }
@@ -82,6 +83,7 @@ export function mapConvexChatToSession(chat: ConvexChatLike): ChatSession {
         modelId: chat.modelId,
         variantId: chat.variantId ?? null,
         settingsLockedAt: chat.settingsLockedAt ?? null,
+        lastViewedAt: chat.lastViewedAt ?? null,
         createdAt: chat.createdAt,
         updatedAt: chat.updatedAt,
     };

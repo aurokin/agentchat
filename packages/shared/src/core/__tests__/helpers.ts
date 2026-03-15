@@ -32,6 +32,15 @@ export function createMemoryAdapter(
                 chats[index] = chat;
             }
         },
+        async markChatViewed(chatId, timestamp) {
+            const index = findIndexById(chats, chatId);
+            if (index >= 0) {
+                chats[index] = {
+                    ...chats[index],
+                    lastViewedAt: timestamp,
+                };
+            }
+        },
         async deleteChat(id) {
             const index = findIndexById(chats, id);
             if (index >= 0) {

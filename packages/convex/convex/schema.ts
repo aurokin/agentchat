@@ -38,6 +38,7 @@ export default defineSchema({
         modelId: v.string(),
         variantId: v.union(v.string(), v.null()),
         settingsLockedAt: v.union(v.number(), v.null()),
+        lastViewedAt: v.optional(v.number()),
         createdAt: v.number(),
         updatedAt: v.number(),
     })

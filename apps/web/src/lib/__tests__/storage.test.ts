@@ -1,13 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 
 import {
-    getChatLastViewedAt,
     clearSelectedChatId,
     clearSelectedAgentId,
     getDefaultModel,
     getSelectedAgentId,
     getSelectedChatId,
-    setChatLastViewedAt,
     setDefaultModel,
     setSelectedAgentId,
     setSelectedChatId,
@@ -105,14 +103,6 @@ describe("storage scoped defaults", () => {
 
         expect(getSelectedChatId("agent-a")).toBe("chat-1");
         expect(getSelectedChatId("agent-b")).toBe("chat-2");
-    });
-
-    test("stores chat last-viewed timestamps independently by chat id", () => {
-        setChatLastViewedAt("chat-1", 111);
-        setChatLastViewedAt("chat-2", 222);
-
-        expect(getChatLastViewedAt("chat-1")).toBe(111);
-        expect(getChatLastViewedAt("chat-2")).toBe(222);
     });
 
     test("can clear selected agent and selected chat state", () => {

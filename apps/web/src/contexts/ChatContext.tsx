@@ -113,6 +113,12 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     const [loading, setLoading] = useState(true);
     const [isMessagesLoading, setIsMessagesLoading] = useState(false);
     const currentChatIdRef = useRef<string | null>(null);
+    const latestViewedAtRef = useRef<Record<string, number>>({});
+    const markViewedTimeoutRef = useRef<number | null>(null);
+    const pendingViewedChatRef = useRef<{
+        chatId: string;
+        timestamp: number;
+    } | null>(null);
     const pendingChatIdsRef = useRef<Set<string>>(new Set());
     const pendingMessageIdsRef = useRef<Set<string>>(new Set());
 
@@ -189,6 +195,36 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         currentChatIdRef.current = currentChat?.id ?? null;
     }, [currentChat?.id]);
 
+    const applyChatLastViewedAt = useCallback(
+        (chatId: string, timestamp: number) => {
+            setChats((prev) =>
+                prev.map((chat) =>
+                    chat.id === chatId
+                        ? {
+                              ...chat,
+                              lastViewedAt: Math.max(
+                                  chat.lastViewedAt ?? 0,
+                                  timestamp,
+                              ),
+                          }
+                        : chat,
+                ),
+            );
+            setCurrentChat((prev) =>
+                prev?.id === chatId
+                    ? {
+                          ...prev,
+                          lastViewedAt: Math.max(
+                              prev.lastViewedAt ?? 0,
+                              timestamp,
+                          ),
+                      }
+                    : prev,
+            );
+        },
+        [],
+    );
+
     useEffect(() => {
         if (!isWorkspaceActive) return;
 
@@ -257,6 +293,70 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         isWorkspaceActive,
         workspaceCurrentChat,
         workspaceMessages,
+    ]);
+
+    useEffect(() => {
+        if (!currentChat) {
+            return;
+        }
+
+        const lastMessageAt = messages.at(-1)?.createdAt ?? 0;
+        const lastRuntimeEventAt =
+            conversationRuntimeBindings[currentChat.id]?.lastEventAt ?? 0;
+        const visibleAt = Math.max(
+            Date.now(),
+            lastMessageAt,
+            lastRuntimeEventAt,
+        );
+        const alreadyViewedAt = Math.max(
+            currentChat.lastViewedAt ?? 0,
+            latestViewedAtRef.current[currentChat.id] ?? 0,
+        );
+
+        if (visibleAt <= alreadyViewedAt) {
+            return;
+        }
+
+        latestViewedAtRef.current[currentChat.id] = visibleAt;
+        applyChatLastViewedAt(currentChat.id, visibleAt);
+
+        const pendingViewed = pendingViewedChatRef.current;
+        if (
+            pendingViewed &&
+            pendingViewed.chatId !== currentChat.id &&
+            markViewedTimeoutRef.current !== null
+        ) {
+            window.clearTimeout(markViewedTimeoutRef.current);
+            void persistenceAdapter.markChatViewed(
+                pendingViewed.chatId,
+                pendingViewed.timestamp,
+            );
+            markViewedTimeoutRef.current = null;
+            pendingViewedChatRef.current = null;
+        } else if (markViewedTimeoutRef.current !== null) {
+            window.clearTimeout(markViewedTimeoutRef.current);
+        }
+
+        pendingViewedChatRef.current = {
+            chatId: currentChat.id,
+            timestamp: visibleAt,
+        };
+        markViewedTimeoutRef.current = window.setTimeout(() => {
+            const pending = pendingViewedChatRef.current;
+            if (!pending) {
+                return;
+            }
+            const { chatId, timestamp } = pending;
+            void persistenceAdapter.markChatViewed(chatId, timestamp);
+            pendingViewedChatRef.current = null;
+            markViewedTimeoutRef.current = null;
+        }, 300);
+    }, [
+        applyChatLastViewedAt,
+        conversationRuntimeBindings,
+        currentChat,
+        messages,
+        persistenceAdapter,
     ]);
 
     const loadChats = useCallback(async () => {
