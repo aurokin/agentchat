@@ -66,6 +66,7 @@ This roadmap describes the current implementation state and the next major steps
 - Keep generated Convex bindings in sync with the live deployment before manual confidence passes
 - Run `bun run test:manual:live-runtime-smoke` against a real local `apps/server` instance to verify the full Codex plus Convex persistence path
 - Run `bun run test:manual:live-runtime-multi-client` to verify one same-user run stays live across two clients and survives an initiating-client disconnect after `run.started`
+- Run `bun run test:manual:live-runtime-multi-conversation` to verify one user can run two conversations concurrently without runtime-state crossover
 - Run `bun run test:manual:local-auth-separation` after `bun run setup:local-auth-smoke` to verify `smoke_1` and `smoke_2` stay isolated
 - Run `bun run test:manual:live-runtime-status` to verify a real Codex turn persists both `assistant_status` and `assistant_message` transcript items
 - Use `bun run test:manual:live-runtime-repeat` when you need a small manually-invoked flake probe across repeated smoke turns

@@ -15,7 +15,12 @@ type Identity = {
     name: string;
 };
 
-type Mode = "smoke" | "interrupt" | "status" | "multi-client";
+type Mode =
+    | "smoke"
+    | "interrupt"
+    | "status"
+    | "multi-client"
+    | "multi-conversation";
 type ExtendedMode = Mode | "stale-resume";
 
 type AgentOptions = {
@@ -99,6 +104,15 @@ type MultiClientOutcome = {
     observerSawEventsAfterSenderClosed: boolean;
 };
 
+type SeededConversation = {
+    chatId: string;
+    ids: {
+        conversationId: string;
+        userMessageId: string;
+        assistantMessageId: string;
+    };
+};
+
 type PersistedRunEvent = {
     sequence: number;
     kind:
@@ -166,10 +180,11 @@ function parseArgs(argv: string[]): LiveSmokeArgs {
                 value !== "interrupt" &&
                 value !== "status" &&
                 value !== "multi-client" &&
+                value !== "multi-conversation" &&
                 value !== "stale-resume"
             ) {
                 throw new Error(
-                    "--mode must be smoke, interrupt, status, multi-client, or stale-resume.",
+                    "--mode must be smoke, interrupt, status, multi-client, multi-conversation, or stale-resume.",
                 );
             }
             mode = value;
@@ -382,11 +397,11 @@ function buildPrompt(mode: ExtendedMode): string {
     return "Read src/math.ts and reply with only the result of add(2, 3).";
 }
 
-function createIds(mode: ExtendedMode, now: number) {
+function createIds(label: string, now: number) {
     return {
-        conversationId: `live-${mode}-conversation-${now}`,
-        userMessageId: `live-${mode}-user-${now}`,
-        assistantMessageId: `live-${mode}-assistant-${now}`,
+        conversationId: `live-${label}-conversation-${now}`,
+        userMessageId: `live-${label}-user-${now}`,
+        assistantMessageId: `live-${label}-assistant-${now}`,
     };
 }
 
@@ -1423,6 +1438,79 @@ function assertRunEventTimeline(params: {
     }
 }
 
+function seedConversationAndDraft(params: {
+    repoRoot: string;
+    identity: Identity;
+    userId: string;
+    label: string;
+    now: number;
+    agentId: string;
+    modelId: string;
+    variantId: string | null;
+    title: string;
+    prompt: string;
+}): SeededConversation {
+    const ids = createIds(params.label, params.now);
+    const reasoningEffort = resolveReasoningEffort(params.variantId);
+
+    const chatId = runConvex<string>({
+        repoRoot: params.repoRoot,
+        functionName: "chats:create",
+        args: {
+            userId: params.userId,
+            localId: ids.conversationId,
+            agentId: params.agentId,
+            title: params.title,
+            modelId: params.modelId,
+            variantId: params.variantId,
+            createdAt: params.now,
+            updatedAt: params.now,
+        },
+        identity: params.identity,
+    });
+
+    runConvex<string>({
+        repoRoot: params.repoRoot,
+        functionName: "messages:create",
+        args: {
+            userId: params.userId,
+            chatId,
+            localId: ids.userMessageId,
+            role: "user",
+            content: params.prompt,
+            contextContent: params.prompt,
+            modelId: params.modelId,
+            variantId: params.variantId,
+            reasoningEffort,
+            createdAt: params.now + 1,
+        },
+        identity: params.identity,
+    });
+
+    runConvex<string>({
+        repoRoot: params.repoRoot,
+        functionName: "messages:create",
+        args: {
+            userId: params.userId,
+            chatId,
+            localId: ids.assistantMessageId,
+            role: "assistant",
+            content: "",
+            contextContent: "",
+            modelId: params.modelId,
+            variantId: params.variantId,
+            reasoningEffort,
+            createdAt: params.now + 2,
+        },
+        identity: params.identity,
+    });
+
+    return {
+        chatId,
+        ids,
+    };
+}
+
 async function main() {
     const args = parseArgs(process.argv.slice(2));
     const repoRoot = getRepoRoot();
@@ -1484,45 +1572,25 @@ async function main() {
     }
 
     const now = Date.now();
-    const ids = createIds(args.mode, now);
-    const reasoningEffort = resolveReasoningEffort(variantId);
-
-    const chatId = runConvex<string>({
+    const prompt = buildPrompt(args.mode);
+    const seededConversation = seedConversationAndDraft({
         repoRoot,
-        functionName: "chats:create",
-        args: {
-            userId,
-            localId: ids.conversationId,
-            agentId,
-            title:
-                args.mode === "interrupt"
-                    ? "Live interrupt smoke"
-                    : "Live runtime smoke",
-            modelId,
-            variantId,
-            createdAt: now,
-            updatedAt: now,
-        },
-        identity: identity ?? undefined,
+        identity,
+        userId,
+        label: args.mode,
+        now,
+        agentId,
+        modelId,
+        variantId,
+        title:
+            args.mode === "interrupt"
+                ? "Live interrupt smoke"
+                : args.mode === "multi-conversation"
+                  ? "Live runtime smoke A"
+                  : "Live runtime smoke",
+        prompt,
     });
-
-    runConvex<string>({
-        repoRoot,
-        functionName: "messages:create",
-        args: {
-            userId,
-            chatId,
-            localId: ids.userMessageId,
-            role: "user",
-            content: buildPrompt(args.mode),
-            contextContent: buildPrompt(args.mode),
-            modelId,
-            variantId,
-            reasoningEffort,
-            createdAt: now + 1,
-        },
-        identity: identity ?? undefined,
-    });
+    const { chatId, ids } = seededConversation;
 
     if (args.mode === "stale-resume") {
         await postRuntimeIngress<{ ok: true }>({
@@ -1544,30 +1612,28 @@ async function main() {
         });
     }
 
-    runConvex<string>({
-        repoRoot,
-        functionName: "messages:create",
-        args: {
-            userId,
-            chatId,
-            localId: ids.assistantMessageId,
-            role: "assistant",
-            content: "",
-            contextContent: "",
-            modelId,
-            variantId,
-            reasoningEffort,
-            createdAt: now + 2,
-        },
-        identity,
-    });
-
     const token = await issueBackendToken({
         repoRoot,
         identity,
     });
+    const secondarySeededConversation =
+        args.mode === "multi-conversation"
+            ? seedConversationAndDraft({
+                  repoRoot,
+                  identity,
+                  userId,
+                  label: `${args.mode}-secondary`,
+                  now: now + 100,
+                  agentId,
+                  modelId,
+                  variantId,
+                  title: "Live runtime smoke B",
+                  prompt,
+              })
+            : null;
 
     let outcome: LiveOutcome | MultiClientOutcome;
+    let secondaryOutcome: LiveOutcome | null = null;
     try {
         if (args.mode === "multi-client") {
             const observerToken = await issueBackendToken({
@@ -1587,6 +1653,41 @@ async function main() {
                 userMessageId: ids.userMessageId,
                 assistantMessageId: ids.assistantMessageId,
             });
+        } else if (args.mode === "multi-conversation") {
+            invariant(
+                secondarySeededConversation !== null,
+                "Expected a secondary seeded conversation.",
+            );
+            const [primaryOutcome, secondOutcome] = await Promise.all([
+                runLiveConversation({
+                    serverUrl: args.serverUrl,
+                    token: token.token,
+                    conversationId: ids.conversationId,
+                    agentId,
+                    modelId,
+                    variantId,
+                    content: prompt,
+                    userMessageId: ids.userMessageId,
+                    assistantMessageId: ids.assistantMessageId,
+                    mode: "smoke",
+                }),
+                runLiveConversation({
+                    serverUrl: args.serverUrl,
+                    token: token.token,
+                    conversationId:
+                        secondarySeededConversation.ids.conversationId,
+                    agentId,
+                    modelId,
+                    variantId,
+                    content: prompt,
+                    userMessageId: secondarySeededConversation.ids.userMessageId,
+                    assistantMessageId:
+                        secondarySeededConversation.ids.assistantMessageId,
+                    mode: "smoke",
+                }),
+            ]);
+            outcome = primaryOutcome;
+            secondaryOutcome = secondOutcome;
         } else {
             outcome = await runLiveConversation({
                 serverUrl: args.serverUrl,
@@ -1627,6 +1728,150 @@ async function main() {
             );
         }
         throw error;
+    }
+
+    if (args.mode === "multi-conversation") {
+        invariant(
+            secondarySeededConversation !== null && secondaryOutcome !== null,
+            "Expected secondary multi-conversation outcome data.",
+        );
+        invariant(
+            outcome.runId !== secondaryOutcome.runId,
+            "Expected concurrent conversations to persist distinct run ids.",
+        );
+
+        const conversationChecks = [
+            {
+                chatId,
+                ids,
+                outcome,
+            },
+            {
+                chatId: secondarySeededConversation.chatId,
+                ids: secondarySeededConversation.ids,
+                outcome: secondaryOutcome,
+            },
+        ].map(async (entry) => {
+            const assistantMessage = runConvex<{
+                status: string;
+                content: string;
+                runId: string | null;
+            } | null>({
+                repoRoot,
+                functionName: "messages:getByLocalId",
+                args: {
+                    userId,
+                    localId: entry.ids.assistantMessageId,
+                },
+                identity,
+            });
+            invariant(assistantMessage, "Assistant message was not persisted.");
+
+            const runs = runConvex<
+                Array<{
+                    externalId: string;
+                    status: string;
+                    outputMessageLocalId: string | null;
+                    latestEventKind: string | null;
+                }>
+            >({
+                repoRoot,
+                functionName: "runs:listByChat",
+                args: { chatId: entry.chatId },
+                identity,
+            });
+            const run = runs.find(
+                (runEntry) => runEntry.externalId === entry.outcome.runId,
+            );
+            invariant(run, `Run ${entry.outcome.runId} was not persisted.`);
+
+            const runEvents = runConvex<PersistedRunEvent[]>({
+                repoRoot,
+                functionName: "runs:listEventsByExternalId",
+                args: {
+                    externalId: entry.outcome.runId,
+                },
+                identity,
+            });
+            const binding = await postRuntimeIngress<{
+                provider: string;
+                status: string;
+                providerThreadId: string | null;
+                activeRunId: string | null;
+                lastError: string | null;
+                lastEventAt: number | null;
+                expiresAt: number | null;
+            } | null>({
+                repoRoot,
+                path: "/runtime/runtime-binding/read",
+                payload: {
+                    userId,
+                    conversationLocalId: entry.ids.conversationId,
+                },
+            });
+
+            return {
+                assistantMessage,
+                run,
+                runEvents,
+                binding,
+                ids: entry.ids,
+                outcome: entry.outcome,
+            };
+        });
+
+        const resolvedChecks = await Promise.all(conversationChecks);
+        for (const entry of resolvedChecks) {
+            invariant(
+                entry.assistantMessage.status === "completed",
+                `Expected a completed assistant message, got ${entry.assistantMessage.status}.`,
+            );
+            invariant(
+                entry.run.status === "completed",
+                `Expected a completed run, got ${entry.run.status}.`,
+            );
+            invariant(
+                entry.run.latestEventKind === "run_completed",
+                `Expected latest run event kind run_completed, got ${entry.run.latestEventKind}.`,
+            );
+            assertSmokeContent(entry.assistantMessage.content);
+            assertRunEventTimeline({
+                events: entry.runEvents,
+                assistantMessageId: entry.ids.assistantMessageId,
+                finalStatus: "completed",
+                finalContent: entry.assistantMessage.content,
+                sawDelta: entry.outcome.sawDelta,
+            });
+            assertTerminalBinding({
+                binding: entry.binding,
+                expectedProvider: providerId,
+                expectedStatus: "idle",
+            });
+        }
+
+        console.log(
+            JSON.stringify(
+                {
+                    ok: true,
+                    mode: args.mode,
+                    tokenSource: token.source,
+                    agentId,
+                    modelId,
+                    variantId,
+                    userId,
+                    conversationIds: resolvedChecks.map(
+                        (entry) => entry.ids.conversationId,
+                    ),
+                    runIds: resolvedChecks.map((entry) => entry.outcome.runId),
+                    finalStatuses: resolvedChecks.map(
+                        (entry) => entry.run.status,
+                    ),
+                },
+                null,
+                2,
+            ),
+        );
+        return;
     }
 
     const assistantMessage = runConvex<{
