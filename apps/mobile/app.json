@@ -27,7 +27,6 @@
                 "foregroundImage": "./assets/adaptive-icon.png",
                 "backgroundColor": "#ffffff"
             },
-            "edgeToEdgeEnabled": true,
             "package": "com.agentchat.app"
         },
         "web": {

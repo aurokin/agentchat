@@ -2,7 +2,7 @@ const {
     createRunOncePlugin,
     withAndroidManifest,
     withMainActivity,
-} = require("@expo/config-plugins");
+} = require("expo/config-plugins");
 
 const ACTION_SEND = "android.intent.action.SEND";
 
