@@ -1,0 +1,67 @@
+{
+  "name": "socket-multi-message",
+  "events": [
+    {
+      "type": "run.started",
+      "payload": {
+        "conversationId": "chat-1",
+        "runId": "run-1",
+        "messageId": "assistant-status-1"
+      }
+    },
+    {
+      "type": "message.started",
+      "payload": {
+        "conversationId": "chat-1",
+        "runId": "run-1",
+        "messageId": "assistant-status-1",
+        "messageIndex": 0,
+        "kind": "assistant_status",
+        "content": "Thinking"
+      }
+    },
+    {
+      "type": "message.completed",
+      "payload": {
+        "conversationId": "chat-1",
+        "messageId": "assistant-status-1",
+        "content": "Thinking"
+      }
+    },
+    {
+      "type": "message.started",
+      "payload": {
+        "conversationId": "chat-1",
+        "runId": "run-1",
+        "messageId": "assistant-final-1",
+        "messageIndex": 1,
+        "kind": "assistant_message",
+        "content": ""
+      }
+    },
+    {
+      "type": "message.delta",
+      "payload": {
+        "conversationId": "chat-1",
+        "messageId": "assistant-final-1",
+        "delta": "Done",
+        "content": "Done"
+      }
+    },
+    {
+      "type": "message.completed",
+      "payload": {
+        "conversationId": "chat-1",
+        "messageId": "assistant-final-1",
+        "content": "Done"
+      }
+    },
+    {
+      "type": "run.completed",
+      "payload": {
+        "conversationId": "chat-1",
+        "runId": "run-1"
+      }
+    }
+  ]
+}

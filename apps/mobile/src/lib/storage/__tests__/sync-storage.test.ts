@@ -9,7 +9,7 @@ const setItemAsync = mock(async (key: string, value: string) => {
     store.set(key, value);
 });
 
-mock.module("expo-secure-store", () => ({
+await mock.module("expo-secure-store", () => ({
     getItemAsync,
     setItemAsync,
 }));

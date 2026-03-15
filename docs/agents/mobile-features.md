@@ -32,5 +32,5 @@ This document should reflect the current Agentchat product direction, not older 
 
 ## Source Of Truth
 
-- For pending mobile parity work, use [docs/agentchat/mobile-followup.md](/home/auro/code/agentchat/docs/agentchat/mobile-followup.md).
-- For product rules and architecture, use [docs/agentchat/README.md](/home/auro/code/agentchat/docs/agentchat/README.md).
+- For pending mobile parity work, use [docs/agentchat/mobile-followup.md](../agentchat/mobile-followup.md).
+- For product rules and architecture, use [docs/agentchat/README.md](../agentchat/README.md).

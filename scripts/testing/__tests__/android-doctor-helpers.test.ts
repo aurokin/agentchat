@@ -45,7 +45,7 @@ describe("isLoopbackUrl", () => {
     });
 
     test("does not flag lan urls", () => {
-        expect(isLoopbackUrl("http://192.168.50.11:3030")).toBe(false);
+        expect(isLoopbackUrl("http://192.168.1.20:3030")).toBe(false);
     });
 });
 

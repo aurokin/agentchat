@@ -75,8 +75,9 @@ export default function ChatPage() {
             requestAnimationFrame(() => {
                 setInitialized(true);
                 if (!currentChat) {
-                    if (chats.length > 0) {
-                        void selectChat(chats[0].id);
+                    const firstChat = chats[0];
+                    if (firstChat) {
+                        void selectChat(firstChat.id);
                     }
                 }
             });
@@ -96,8 +97,10 @@ export default function ChatPage() {
         if (!hasAccess) return;
         if (loadingAgents) return;
         if (loading || !initialized) return;
-        if (currentChat || chats.length === 0) return;
-        void selectChat(chats[0].id);
+        if (currentChat) return;
+        const firstChat = chats[0];
+        if (!firstChat) return;
+        void selectChat(firstChat.id);
     }, [
         chats,
         currentChat,

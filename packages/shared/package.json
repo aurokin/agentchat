@@ -10,11 +10,10 @@
         "typecheck": "tsc --noEmit",
         "lint": "eslint .",
         "test": "bun test",
-        "health": "bun run format && bun run typecheck && bun run lint && bun run test"
+        "health": "bun run format:check && bun run typecheck && bun run lint && bun run test"
     },
     "devDependencies": {
         "eslint": "^9.39.2",
-        "typescript": "^5.9.3",
-        "typescript-eslint": "^8.53.1"
+        "typescript": "^5.9.3"
     }
 }

@@ -361,6 +361,11 @@ describe("createFetchHandler", () => {
                         configured: boolean;
                     }>;
                 };
+                issues: Array<{
+                    code: string;
+                    severity: "error" | "warning";
+                    scope: string;
+                }>;
             };
 
             expect(response.status).toBe(200);
@@ -384,6 +389,13 @@ describe("createFetchHandler", () => {
                     configured: true,
                 }),
             ]);
+            expect(body.issues).toContainEqual(
+                expect.objectContaining({
+                    code: "runtime_env_missing_agentchat_convex_site_url",
+                    severity: "error",
+                    scope: "runtimeEnv:AGENTCHAT_CONVEX_SITE_URL",
+                }),
+            );
         } finally {
             if (originalBackendSecret === undefined) {
                 delete process.env.BACKEND_TOKEN_SECRET;
@@ -451,6 +463,7 @@ describe("createFetchHandler", () => {
             };
             ok: boolean;
             agents: Array<{ id: string; issues: string[] }>;
+            issues: Array<{ code: string; scope: string }>;
         };
 
         expect(diagnosticsResponse.status).toBe(200);
@@ -466,6 +479,12 @@ describe("createFetchHandler", () => {
                 issues: expect.arrayContaining([
                     "Agent has no enabled providers.",
                 ]),
+            }),
+        );
+        expect(diagnosticsBody.issues).toContainEqual(
+            expect.objectContaining({
+                code: "agent_no_enabled_providers",
+                scope: "agent:agent-no-provider",
             }),
         );
     });
@@ -532,6 +551,7 @@ describe("createFetchHandler", () => {
                 lastReloadAttemptAt: number | null;
                 lastReloadError: string | null;
             };
+            issues: Array<{ code: string; scope: string }>;
         };
 
         expect(response.status).toBe(200);
@@ -540,5 +560,11 @@ describe("createFetchHandler", () => {
             lastReloadAttemptAt: 200,
             lastReloadError: "Unexpected end of JSON input",
         });
+        expect(body.issues).toContainEqual(
+            expect.objectContaining({
+                code: "config_reload_failed",
+                scope: "config",
+            }),
+        );
     });
 });

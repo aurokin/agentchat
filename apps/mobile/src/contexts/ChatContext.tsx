@@ -688,7 +688,7 @@ export function ChatProvider({
         setCurrentChat(null);
         setMessages({});
         setIsMessagesLoading(false);
-        loadChats();
+        void loadChats();
     }, [adapter, loadChats]);
 
     return (

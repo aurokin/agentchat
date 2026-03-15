@@ -1,0 +1,34 @@
+{
+  "name": "persisted-failed",
+  "initialAssistantMessageId": "assistant-1",
+  "finalAssistantMessageId": "assistant-1",
+  "finalStatus": "failed",
+  "finalContent": "",
+  "sawDelta": false,
+  "events": [
+    {
+      "sequence": 1,
+      "kind": "run_started",
+      "textDelta": null,
+      "errorMessage": null,
+      "messageLocalId": "assistant-1",
+      "createdAt": 7000
+    },
+    {
+      "sequence": 2,
+      "kind": "provider_status",
+      "textDelta": null,
+      "errorMessage": null,
+      "messageLocalId": "assistant-1",
+      "createdAt": 7001
+    },
+    {
+      "sequence": 3,
+      "kind": "run_failed",
+      "textDelta": null,
+      "errorMessage": "Runtime ingress failed.",
+      "messageLocalId": "assistant-1",
+      "createdAt": 7002
+    }
+  ]
+}

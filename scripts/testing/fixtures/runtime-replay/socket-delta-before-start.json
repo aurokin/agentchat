@@ -1,0 +1,32 @@
+{
+  "name": "socket-delta-before-start",
+  "events": [
+    {
+      "type": "run.started",
+      "payload": {
+        "conversationId": "chat-1",
+        "runId": "run-1",
+        "messageId": "assistant-1"
+      }
+    },
+    {
+      "type": "message.delta",
+      "payload": {
+        "conversationId": "chat-1",
+        "messageId": "assistant-1",
+        "delta": "Broken",
+        "content": "Broken"
+      }
+    },
+    {
+      "type": "run.failed",
+      "payload": {
+        "conversationId": "chat-1",
+        "runId": "run-1",
+        "error": {
+          "message": "Runtime failed."
+        }
+      }
+    }
+  ]
+}

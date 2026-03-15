@@ -6,8 +6,11 @@ import { fileURLToPath } from "node:url";
 import { chromium, type Page } from "playwright";
 
 import {
+    buildBrowserConfidenceFailureReport,
+    buildBrowserConfidenceSuccessReport,
+    formatBrowserConfidenceText,
     parseBrowserConfidenceArgs,
-    type BrowserConfidenceMode as Mode,
+    type BrowserConfidenceArgs,
 } from "./browser-confidence-helpers";
 
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -402,63 +405,136 @@ async function runRefresh(page: Page): Promise<void> {
     await assertComposerSettled(page);
 }
 
-async function captureScreenshot(page: Page, repoRoot: string, name: string) {
+async function captureScreenshot(
+    page: Page,
+    repoRoot: string,
+    name: string,
+): Promise<string> {
     const outputDir = getOutputDir(repoRoot);
     mkdirSync(outputDir, { recursive: true });
+    const screenshotPath = path.join(outputDir, name);
     await page.screenshot({
-        path: path.join(outputDir, name),
+        path: screenshotPath,
         fullPage: true,
     });
+    return screenshotPath;
 }
 
-async function main() {
-    const { baseUrl, mode } = parseBrowserConfidenceArgs(process.argv.slice(2));
+async function runBrowserConfidence(
+    args: BrowserConfidenceArgs,
+    onFailureArtifacts: (artifactPaths: string[]) => void,
+): Promise<{
+    artifactPaths: string[];
+    authProviderKind: AuthProviderKind;
+}> {
     const repoRoot = getRepoRoot();
     const authProviderKind = readAuthProviderKind(repoRoot);
+    const artifactPaths: string[] = [];
 
-    await assertWebReady(baseUrl);
+    await assertWebReady(args.baseUrl);
     runConvexReset(repoRoot, authProviderKind);
 
     const browser = await chromium.launch({ headless: true });
     const page = await browser.newPage();
 
     try {
-        await page.goto(`${baseUrl}/chat`, { waitUntil: "domcontentloaded" });
+        await page.goto(`${args.baseUrl}/chat`, { waitUntil: "domcontentloaded" });
         await signInIfNeeded(page, authProviderKind);
         await page.getByTestId("agent-select").waitFor({
             timeout: DEFAULT_TIMEOUT_MS,
         });
 
-        if (mode === "smoke" || mode === "full") {
+        if (args.mode === "smoke" || args.mode === "full") {
             await runSmoke(page);
         }
-        if (mode === "interrupt" || mode === "full") {
+        if (args.mode === "interrupt" || args.mode === "full") {
             await runInterrupt(page);
         }
-        if (mode === "refresh" || mode === "full") {
+        if (args.mode === "refresh" || args.mode === "full") {
             await runRefresh(page);
         }
 
-        await captureScreenshot(
-            page,
-            repoRoot,
-            `browser-confidence-${mode}.png`,
-        );
-
-        console.log(
-            JSON.stringify(
-                {
-                    ok: true,
-                    mode,
-                    baseUrl,
-                },
-                null,
-                2,
+        artifactPaths.push(
+            await captureScreenshot(
+                page,
+                repoRoot,
+                `browser-confidence-${args.mode}.png`,
             ),
         );
+
+        return {
+            artifactPaths,
+            authProviderKind,
+        };
+    } catch (error) {
+        artifactPaths.push(
+            await captureScreenshot(
+                page,
+                repoRoot,
+                `browser-confidence-${args.mode}-failure.png`,
+            ).catch(() => ""),
+        );
+        onFailureArtifacts(artifactPaths.filter((artifactPath) => artifactPath.length > 0));
+        throw error;
     } finally {
         await browser.close();
     }
 }
 
-await main();
+function writeBrowserConfidenceReport(
+    args: BrowserConfidenceArgs | null,
+    report:
+        | ReturnType<typeof buildBrowserConfidenceSuccessReport>
+        | ReturnType<typeof buildBrowserConfidenceFailureReport>,
+): void {
+    if (args?.json) {
+        console.log(JSON.stringify(report, null, 2));
+        return;
+    }
+
+    console.log(formatBrowserConfidenceText(report));
+}
+
+const startedAtMs = Date.now();
+let parsedArgs: BrowserConfidenceArgs | null = null;
+let failureArtifactPaths: string[] = [];
+
+try {
+    parsedArgs = parseBrowserConfidenceArgs(process.argv.slice(2));
+    const result = await runBrowserConfidence(parsedArgs, (artifactPaths) => {
+        failureArtifactPaths = artifactPaths;
+    });
+    writeBrowserConfidenceReport(
+        parsedArgs,
+        buildBrowserConfidenceSuccessReport({
+            args: parsedArgs,
+            authProviderKind: result.authProviderKind,
+            startedAtMs,
+            completedAtMs: Date.now(),
+            artifactPaths: result.artifactPaths.filter(
+                (artifactPath) => artifactPath.length > 0,
+            ),
+        }),
+    );
+} catch (error) {
+    const report = buildBrowserConfidenceFailureReport({
+        args: parsedArgs,
+        startedAtMs,
+        completedAtMs: Date.now(),
+        issueCode:
+            parsedArgs === null
+                ? "browser_confidence_invalid_arguments"
+                : "browser_confidence_failed",
+        message:
+            error instanceof Error
+                ? error.message
+                : "Browser confidence failed.",
+        artifactPaths: failureArtifactPaths,
+    });
+    if (parsedArgs?.json) {
+        console.error(JSON.stringify(report, null, 2));
+    } else {
+        console.error(formatBrowserConfidenceText(report));
+    }
+    process.exit(1);
+}

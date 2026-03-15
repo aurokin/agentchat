@@ -1,0 +1,58 @@
+{
+  "name": "persisted-multi-message",
+  "initialAssistantMessageId": "assistant-status-1",
+  "finalAssistantMessageId": "assistant-final-1",
+  "finalStatus": "completed",
+  "finalContent": "Final answer",
+  "sawDelta": true,
+  "events": [
+    {
+      "sequence": 1,
+      "kind": "run_started",
+      "textDelta": null,
+      "errorMessage": null,
+      "messageLocalId": "assistant-status-1",
+      "createdAt": 3000
+    },
+    {
+      "sequence": 2,
+      "kind": "message_completed",
+      "textDelta": null,
+      "errorMessage": null,
+      "messageLocalId": "assistant-status-1",
+      "createdAt": 3001
+    },
+    {
+      "sequence": 3,
+      "kind": "message_delta",
+      "textDelta": "Final ",
+      "errorMessage": null,
+      "messageLocalId": "assistant-final-1",
+      "createdAt": 3002
+    },
+    {
+      "sequence": 4,
+      "kind": "message_delta",
+      "textDelta": "answer",
+      "errorMessage": null,
+      "messageLocalId": "assistant-final-1",
+      "createdAt": 3003
+    },
+    {
+      "sequence": 5,
+      "kind": "message_completed",
+      "textDelta": null,
+      "errorMessage": null,
+      "messageLocalId": "assistant-final-1",
+      "createdAt": 3004
+    },
+    {
+      "sequence": 6,
+      "kind": "run_completed",
+      "textDelta": null,
+      "errorMessage": null,
+      "messageLocalId": "assistant-final-1",
+      "createdAt": 3005
+    }
+  ]
+}

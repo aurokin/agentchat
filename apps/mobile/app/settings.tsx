@@ -60,12 +60,14 @@ export default function SettingsScreen(): ReactElement {
                 {
                     text: "Sign Out",
                     style: "destructive",
-                    onPress: async () => {
-                        await signOut();
-                        Alert.alert(
-                            "Signed Out",
-                            "You have been signed out successfully.",
-                        );
+                    onPress: () => {
+                        void (async () => {
+                            await signOut();
+                            Alert.alert(
+                                "Signed Out",
+                                "You have been signed out successfully.",
+                            );
+                        })();
                     },
                 },
             ],

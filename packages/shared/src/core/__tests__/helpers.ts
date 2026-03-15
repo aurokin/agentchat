@@ -35,8 +35,12 @@ export function createMemoryAdapter(
         async markChatViewed(chatId, timestamp) {
             const index = findIndexById(chats, chatId);
             if (index >= 0) {
+                const existingChat = chats[index];
+                if (!existingChat) {
+                    return;
+                }
                 chats[index] = {
-                    ...chats[index],
+                    ...existingChat,
                     lastViewedAt: timestamp,
                 };
             }
@@ -63,7 +67,8 @@ export function createMemoryAdapter(
         },
         async deleteMessagesByChat(chatId) {
             for (let i = messages.length - 1; i >= 0; i -= 1) {
-                if (messages[i].sessionId === chatId) {
+                const message = messages[i];
+                if (message?.sessionId === chatId) {
                     messages.splice(i, 1);
                 }
             }

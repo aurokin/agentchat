@@ -60,9 +60,9 @@ That writes a gitignored:
 
 pointing at:
 
-- `/home/auro/agents/agentchat_test/smoke`
-- `/home/auro/agents/agentchat_test`
-- `/home/auro/agents/agentchat_test/workspace`
+- `~/agents/agentchat_test/smoke`
+- `~/agents/agentchat_test`
+- `~/agents/agentchat_test/workspace`
 
 If you already have a local config and want to replace it:
 
@@ -136,6 +136,14 @@ This checks:
 - disabled default fallback situations
 - live Codex model access for each enabled provider
 
+For machine-readable output:
+
+```bash
+bun run doctor:server -- --json
+```
+
+That JSON output includes stable issue codes, severities, scopes, and remediation hints alongside the existing readiness details.
+
 If this command fails, fix server config or Codex runtime access before opening the web or mobile app.
 
 ## 5. Start The Local Stack
@@ -190,6 +198,12 @@ bun run test:manual:stale-runtime-resume
 bun run test:manual:config-reload-smoke
 ```
 
+For machine-readable live runtime output:
+
+```bash
+bun run test:manual:live-runtime-smoke -- --json
+```
+
 Or run the combined path:
 
 ```bash
@@ -201,6 +215,12 @@ For the local-auth web path, also run:
 ```bash
 bun run test:manual:web-browser-confidence
 bun run test:manual:web-operator-smoke
+```
+
+For machine-readable browser-confidence output with screenshot artifact paths:
+
+```bash
+bun run test:manual:web-browser-confidence -- --json
 ```
 
 Run those browser commands sequentially. The operator smoke command intentionally mutates `apps/server/agentchat.config.json` to validate hot reload behavior.

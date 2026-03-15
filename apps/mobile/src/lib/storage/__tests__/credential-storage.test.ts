@@ -12,7 +12,7 @@ const deleteItemAsync = mock(async (key: string) => {
     store.delete(key);
 });
 
-mock.module("expo-secure-store", () => ({
+await mock.module("expo-secure-store", () => ({
     getItemAsync,
     setItemAsync,
     deleteItemAsync,

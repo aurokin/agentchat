@@ -1,0 +1,42 @@
+{
+  "name": "persisted-duplicate-sequence",
+  "initialAssistantMessageId": "assistant-1",
+  "finalAssistantMessageId": "assistant-1",
+  "finalStatus": "completed",
+  "finalContent": "Hello world",
+  "sawDelta": true,
+  "events": [
+    {
+      "sequence": 1,
+      "kind": "run_started",
+      "textDelta": null,
+      "errorMessage": null,
+      "messageLocalId": "assistant-1",
+      "createdAt": 5000
+    },
+    {
+      "sequence": 2,
+      "kind": "message_delta",
+      "textDelta": "Hello ",
+      "errorMessage": null,
+      "messageLocalId": "assistant-1",
+      "createdAt": 5001
+    },
+    {
+      "sequence": 2,
+      "kind": "message_completed",
+      "textDelta": null,
+      "errorMessage": null,
+      "messageLocalId": "assistant-1",
+      "createdAt": 5002
+    },
+    {
+      "sequence": 3,
+      "kind": "run_completed",
+      "textDelta": null,
+      "errorMessage": null,
+      "messageLocalId": "assistant-1",
+      "createdAt": 5003
+    }
+  ]
+}

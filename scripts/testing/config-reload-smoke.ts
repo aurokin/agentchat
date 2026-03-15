@@ -79,6 +79,12 @@ type AgentOptionsPayload = {
     defaultVariant: string | null;
 };
 
+type ResolvedFallbackDefaults = {
+    defaultProviderId: string;
+    defaultModel: string | null;
+    defaultVariant: string | null;
+};
+
 const DEFAULT_SERVER_URL = "http://127.0.0.1:3030";
 const WAIT_TIMEOUT_MS = 20_000;
 const WAIT_STEP_MS = 250;
@@ -163,6 +169,48 @@ async function writeConfigAndPause(
     await new Promise((resolve) => setTimeout(resolve, 300));
 }
 
+function resolveFallbackDefaults(params: {
+    config: AgentchatConfig;
+    agentId: string;
+}): ResolvedFallbackDefaults {
+    const agent = params.config.agents.find(
+        (candidate) => candidate.id === params.agentId,
+    );
+    invariant(agent, `Missing agent ${params.agentId} in config.`);
+
+    const provider =
+        params.config.providers.find(
+            (candidate) =>
+                candidate.id === agent.defaultProviderId && candidate.enabled,
+        ) ??
+        params.config.providers.find(
+            (candidate) =>
+                candidate.enabled && agent.providerIds.includes(candidate.id),
+        ) ??
+        null;
+
+    if (!provider) {
+        return {
+            defaultProviderId: agent.defaultProviderId,
+            defaultModel: null,
+            defaultVariant: null,
+        };
+    }
+
+    const defaultModel =
+        provider.models.find((model) => model.enabled)?.id ?? null;
+    const defaultVariant =
+        provider.models
+            .find((model) => model.id === defaultModel)
+            ?.variants.find((variant) => variant.enabled)?.id ?? null;
+
+    return {
+        defaultProviderId: provider.id,
+        defaultModel,
+        defaultVariant,
+    };
+}
+
 async function main() {
     const serverUrl = trimTrailingSlash(
         process.argv[2]?.trim() || DEFAULT_SERVER_URL,
@@ -188,6 +236,14 @@ async function main() {
         invariant(
             initialBootstrap.agents.some((agent) => agent.id === agentId),
             `Expected ${agentId} in bootstrap before config reload smoke.`,
+        );
+        const fallbackDefaults = resolveFallbackDefaults({
+            config: originalConfig,
+            agentId,
+        });
+        invariant(
+            fallbackDefaults.defaultProviderId === providerId,
+            `Expected ${agentId} to resolve ${providerId} before config reload smoke.`,
         );
 
         const disableAgentConfig = structuredClone(originalConfig);
@@ -236,9 +292,11 @@ async function main() {
                     `${serverUrl}/api/agents/${encodeURIComponent(agentId)}/options`,
                 );
                 return (
-                    options.defaultProviderId === providerId &&
-                    options.defaultModel === "gpt-5.3-codex" &&
-                    options.defaultVariant === "fast"
+                    options.defaultProviderId ===
+                        fallbackDefaults.defaultProviderId &&
+                    options.defaultModel === fallbackDefaults.defaultModel &&
+                    options.defaultVariant ===
+                        fallbackDefaults.defaultVariant
                 );
             },
             async () => {

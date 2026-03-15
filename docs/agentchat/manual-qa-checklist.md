@@ -44,9 +44,9 @@ Run those browser commands sequentially. The operator smoke command intentionall
 
 ## Fixtures
 
-- smoke: `/home/auro/agents/agentchat_test/smoke`
-- primary: `/home/auro/agents/agentchat_test`
-- workspace: `/home/auro/agents/agentchat_test/workspace`
+- smoke: `~/agents/agentchat_test/smoke`
+- primary: `~/agents/agentchat_test`
+- workspace: `~/agents/agentchat_test/workspace`
 
 ## Preconditions
 
@@ -67,7 +67,7 @@ If the Convex deployment is still missing `BACKEND_TOKEN_SECRET`, the live runti
 
 ## 1. Smoke
 
-Use `/home/auro/agents/agentchat_test/smoke`.
+Use `~/agents/agentchat_test/smoke`.
 
 - Run `bun run doctor:server`
 - Sign in if auth mode is `google` or `local`
@@ -78,7 +78,7 @@ Use `/home/auro/agents/agentchat_test/smoke`.
 
 ## 2. Deterministic Read-Only Flow
 
-Use `/home/auro/agents/agentchat_test`.
+Use `~/agents/agentchat_test`.
 
 - Ask: `What is this agent?`
 - Ask: `Summarize README.md in one sentence.`
@@ -95,7 +95,7 @@ Use `/home/auro/agents/agentchat_test`.
 
 ## 4. Interruption
 
-Use `/home/auro/agents/agentchat_test/workspace`.
+Use `~/agents/agentchat_test/workspace`.
 
 - Ask for one small edit in `notes.md`
 - Interrupt the run before completion
@@ -113,7 +113,7 @@ Use the primary or workspace fixture.
 
 ## 6. Server Restart Recovery
 
-Use `/home/auro/agents/agentchat_test/workspace`.
+Use `~/agents/agentchat_test/workspace`.
 
 - Send one successful message
 - Restart `apps/server`

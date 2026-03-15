@@ -63,18 +63,22 @@ describe("agent helpers", () => {
     });
 
     test("prefers the agent default model when available", () => {
+        const firstAgent = agents[0];
+        expect(firstAgent).toBeDefined();
         expect(
             getDefaultModelForAgent({
-                agent: agents[0],
+                agent: firstAgent ?? null,
                 fallbackModel: "fallback-model",
             }),
         ).toBe("gpt-5.3-codex");
     });
 
     test("falls back when the agent does not define a default model", () => {
+        const secondAgent = agents[1];
+        expect(secondAgent).toBeDefined();
         expect(
             getDefaultModelForAgent({
-                agent: agents[1],
+                agent: secondAgent ?? null,
                 fallbackModel: "fallback-model",
             }),
         ).toBe("fallback-model");

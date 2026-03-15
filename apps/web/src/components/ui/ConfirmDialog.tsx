@@ -30,7 +30,7 @@ export function ConfirmDialog({
             }
             if (event.key === "Enter") {
                 event.preventDefault();
-                onConfirm();
+                void onConfirm();
             }
         };
 

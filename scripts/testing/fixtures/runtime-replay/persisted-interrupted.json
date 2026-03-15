@@ -1,0 +1,50 @@
+{
+  "name": "persisted-interrupted",
+  "initialAssistantMessageId": "assistant-1",
+  "finalAssistantMessageId": "assistant-1",
+  "finalStatus": "interrupted",
+  "finalContent": "Partial answer",
+  "sawDelta": true,
+  "events": [
+    {
+      "sequence": 1,
+      "kind": "run_started",
+      "textDelta": null,
+      "errorMessage": null,
+      "messageLocalId": "assistant-1",
+      "createdAt": 2000
+    },
+    {
+      "sequence": 2,
+      "kind": "message_delta",
+      "textDelta": "Partial ",
+      "errorMessage": null,
+      "messageLocalId": "assistant-1",
+      "createdAt": 2001
+    },
+    {
+      "sequence": 3,
+      "kind": "message_delta",
+      "textDelta": "answer",
+      "errorMessage": null,
+      "messageLocalId": "assistant-1",
+      "createdAt": 2002
+    },
+    {
+      "sequence": 4,
+      "kind": "message_completed",
+      "textDelta": null,
+      "errorMessage": null,
+      "messageLocalId": "assistant-1",
+      "createdAt": 2003
+    },
+    {
+      "sequence": 5,
+      "kind": "run_interrupted",
+      "textDelta": null,
+      "errorMessage": null,
+      "messageLocalId": "assistant-1",
+      "createdAt": 2004
+    }
+  ]
+}

@@ -37,7 +37,8 @@
         "plugins": [
             "expo-router",
             "expo-secure-store",
-            "./plugins/withAndroidShareIntent"
+            "./plugins/withAndroidShareIntent",
+            "expo-web-browser"
         ],
         "extra": {
             "router": {},

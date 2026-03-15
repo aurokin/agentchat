@@ -20,38 +20,37 @@
         "lint": "eslint .",
         "test": "bun test",
         "test:confidence": "bun test src/components/chat/__tests__/conversation-runtime-controller.test.ts src/components/chat/__tests__/model-selector.test.ts src/contexts/__tests__/runtime-helpers.test.ts src/contexts/__tests__/settings-helpers.test.ts src/lib/__tests__/home-chat-route.test.ts src/lib/storage/__tests__/user-settings-storage.test.ts",
-        "health": "bun run format && bun run typecheck && bun run lint && bun run test"
+        "health": "bun run format:check && bun run typecheck && bun run lint && bun run test"
     },
     "dependencies": {
         "@convex-dev/auth": "^0.0.90",
+        "@expo/config-plugins": "~55.0.5",
+        "@expo/vector-icons": "^15.0.2",
         "@pchmn/expo-material3-theme": "^1.4.0",
+        "convex": "^1.31.7",
         "expo": "~55.0.0",
         "expo-auth-session": "~55.0.6",
-        "expo-crypto": "~55.0.8",
         "expo-dev-client": "~55.0.8",
+        "expo-linking": "~55.0.7",
         "expo-navigation-bar": "~55.0.8",
         "expo-router": "~55.0.0",
         "expo-secure-store": "~55.0.8",
-        "expo-status-bar": "~55.0.4",
         "expo-system-ui": "~55.0.9",
+        "expo-updates": "~55.0.13",
+        "expo-web-browser": "~55.0.9",
         "react": "19.2.0",
         "react-native": "0.83.2",
         "react-native-get-random-values": "^1.11.0",
         "react-native-markdown-display": "^7.0.2",
         "react-native-safe-area-context": "^5.6.2",
         "react-native-screens": "~4.24.0",
-        "uuid": "^13.0.0",
-        "zustand": "^5.0.0"
+        "uuid": "^13.0.0"
     },
     "private": true,
     "devDependencies": {
         "@types/node": "^25.0.10",
         "@types/react": "~19.2.10",
-        "@types/uuid": "^10.0.0",
         "eslint": "^9.39.2",
-        "eslint-plugin-react": "^7.37.5",
-        "eslint-plugin-react-hooks": "^7.0.1",
-        "typescript": "^5.9.3",
-        "typescript-eslint": "^8.53.1"
+        "typescript": "^5.9.3"
     }
 }

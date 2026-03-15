@@ -1,0 +1,50 @@
+{
+  "name": "persisted-out-of-order",
+  "initialAssistantMessageId": "assistant-1",
+  "finalAssistantMessageId": "assistant-1",
+  "finalStatus": "completed",
+  "finalContent": "Hello world",
+  "sawDelta": true,
+  "events": [
+    {
+      "sequence": 1,
+      "kind": "run_started",
+      "textDelta": null,
+      "errorMessage": null,
+      "messageLocalId": "assistant-1",
+      "createdAt": 6000
+    },
+    {
+      "sequence": 3,
+      "kind": "message_delta",
+      "textDelta": "world",
+      "errorMessage": null,
+      "messageLocalId": "assistant-1",
+      "createdAt": 6002
+    },
+    {
+      "sequence": 2,
+      "kind": "message_delta",
+      "textDelta": "Hello ",
+      "errorMessage": null,
+      "messageLocalId": "assistant-1",
+      "createdAt": 6001
+    },
+    {
+      "sequence": 4,
+      "kind": "message_completed",
+      "textDelta": null,
+      "errorMessage": null,
+      "messageLocalId": "assistant-1",
+      "createdAt": 6003
+    },
+    {
+      "sequence": 5,
+      "kind": "run_completed",
+      "textDelta": null,
+      "errorMessage": null,
+      "messageLocalId": "assistant-1",
+      "createdAt": 6004
+    }
+  ]
+}

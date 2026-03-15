@@ -13,16 +13,22 @@ This document records the manual, integration, and end-to-end testing strategy f
 
 Agentchat uses a dedicated local test workspace outside the repo:
 
-- `/home/auro/agents/agentchat_test`
+- `~/agents/agentchat_test`
     - primary deterministic read-mostly test agent
-- `/home/auro/agents/agentchat_test/smoke`
+- `~/agents/agentchat_test/smoke`
     - ultra-cheap greeting smoke agent
-- `/home/auro/agents/agentchat_test/workspace`
+- `~/agents/agentchat_test/workspace`
     - constrained edit agent for interruption, resume, and mutation tests
 
 These fixtures should stay small, stable, and cheap to run.
 
 For local setup convenience, `bun run setup:test-agent-config` writes a gitignored `apps/server/agentchat.config.json` that points at these fixtures.
+
+Portable deterministic replay fixtures now live in:
+
+- `scripts/testing/fixtures/runtime-replay`
+
+Use those repo-owned fixtures for CI-safe replay and failure-injection coverage when you do not need a live Codex turn.
 
 ## Test Layers
 
@@ -35,7 +41,7 @@ Purpose:
 
 Primary fixture:
 
-- `/home/auro/agents/agentchat_test/smoke`
+- `~/agents/agentchat_test/smoke`
 
 Examples:
 
@@ -59,7 +65,7 @@ Purpose:
 
 Primary fixture:
 
-- `/home/auro/agents/agentchat_test`
+- `~/agents/agentchat_test`
 
 Examples:
 
@@ -76,7 +82,7 @@ Purpose:
 
 Primary fixture:
 
-- `/home/auro/agents/agentchat_test/workspace`
+- `~/agents/agentchat_test/workspace`
 
 Examples:
 
@@ -133,6 +139,13 @@ Invocation:
 - `bun run test:manual:runtime-confidence`
 - `bun run test:manual:operator-failure-smoke`
 - `bun run test:manual:doctor-env-smoke`
+
+Machine-readable output:
+
+- append `-- --json` to any live runtime smoke command when you need a structured result artifact
+- example: `bun run test:manual:live-runtime-multi-client -- --json`
+- the JSON result includes start and end timestamps, duration, the selected mode, and a mode-specific summary payload
+- failure JSON also includes a stable issue code and any collected failure snapshot
 
 Coverage targets:
 
@@ -208,6 +221,8 @@ Current local browser path:
 - Google-auth browser coverage still remains a separate manual/operator concern
 - current scripted reconnect-banner assertions focus on in-page websocket reconnect behavior; full page refresh checks still verify clean recovery and settled controls, but not a positive reconnect banner
 - when a manual pass finds a browser-visible runtime regression, add a focused scripted check or unit regression around the exact state transition before treating it as closed
+- append `-- --json` when you need machine-readable output with scenario metadata and screenshot artifact paths
+- example: `bun run test:manual:web-browser-confidence -- --json`
 
 ### 6. Operator Failure Smoke
 
@@ -250,9 +265,10 @@ Use [manual-qa-checklist.md](./manual-qa-checklist.md) for the explicit Codex co
 
 ## Invocation Rule
 
-- Do not wire these tests into automatic GitHub CI.
+- Do not wire the live/manual confidence commands in this document into automatic GitHub CI.
 - Prefer explicit scripts or checklists that an operator runs intentionally.
 - Keep smoke and manual functional checks cheap enough for frequent local use.
+- The cheap always-on CI tier should stay limited to deterministic repo verification such as `bun run verify:ci`.
 
 Current manual confidence command:
 

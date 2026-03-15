@@ -1,0 +1,48 @@
+{
+  "name": "socket-interrupted",
+  "events": [
+    {
+      "type": "run.started",
+      "payload": {
+        "conversationId": "chat-1",
+        "runId": "run-1",
+        "messageId": "assistant-1"
+      }
+    },
+    {
+      "type": "message.started",
+      "payload": {
+        "conversationId": "chat-1",
+        "runId": "run-1",
+        "messageId": "assistant-1",
+        "messageIndex": 0,
+        "kind": "assistant_message",
+        "content": ""
+      }
+    },
+    {
+      "type": "message.delta",
+      "payload": {
+        "conversationId": "chat-1",
+        "messageId": "assistant-1",
+        "delta": "Partial",
+        "content": "Partial"
+      }
+    },
+    {
+      "type": "message.completed",
+      "payload": {
+        "conversationId": "chat-1",
+        "messageId": "assistant-1",
+        "content": "Partial"
+      }
+    },
+    {
+      "type": "run.interrupted",
+      "payload": {
+        "conversationId": "chat-1",
+        "runId": "run-1"
+      }
+    }
+  ]
+}

@@ -11,6 +11,7 @@ import {
     getVisibleAgents,
     resolveAgentDefaults,
 } from "./configDiagnostics.ts";
+import { buildDoctorIssues } from "./doctorReport.ts";
 import { getRuntimeEnvDiagnostics } from "./envDiagnostics.ts";
 
 type HandlerDependencies = {
@@ -208,10 +209,18 @@ export function createFetchHandler(deps: HandlerDependencies) {
         }
 
         if (request.method === "GET" && pathname === "/api/diagnostics") {
+            const diagnostics = getConfigDiagnostics(config);
+            const runtimeEnv = getRuntimeEnvDiagnostics();
             return jsonResponse(request, {
                 config: configStatus,
-                ...getConfigDiagnostics(config),
-                runtimeEnv: getRuntimeEnvDiagnostics(),
+                ...diagnostics,
+                runtimeEnv,
+                issues: buildDoctorIssues({
+                    configStatus,
+                    diagnostics,
+                    runtimeEnv,
+                    liveProbes: new Map(),
+                }),
             });
         }
 

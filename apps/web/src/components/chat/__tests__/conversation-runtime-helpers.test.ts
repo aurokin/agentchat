@@ -93,15 +93,21 @@ describe("conversation runtime helpers", () => {
 
     test("overlays streaming content without mutating unrelated messages", () => {
         const messages = createMessages();
+        const userMessage = messages[0];
+        const assistantMessage = messages[1];
+        if (!userMessage || !assistantMessage) {
+            throw new Error("Expected seeded user and assistant messages.");
+        }
+
         expect(
             applyStreamingMessageOverlay(messages, {
                 id: "assistant-1",
                 content: "Updated answer",
             }),
         ).toEqual([
-            messages[0],
+            userMessage,
             {
-                ...messages[1],
+                ...assistantMessage,
                 content: "Updated answer",
                 contextContent: "Updated answer",
             },

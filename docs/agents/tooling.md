@@ -28,9 +28,28 @@ From the repo root, the equivalent commands are:
 - Shared: `bun run health:shared`
 - Convex: `bun run health:convex`
 
+`health` is now read-only. It should verify formatting with `format:check` and must not rewrite files.
+
+## Repo Verification
+
+- `bun run lint:architecture` checks cross-surface import boundaries.
+- `bun run docs:check` verifies documented local file links and `bun run` commands still resolve.
+- `bun run repo:knip` checks dependency and unlisted-dependency hygiene.
+- `bun run type:suppressions` enforces the checked-in suppression baseline.
+- `bun run lint:repo` runs the repo-policy verification tier.
+- `bun run verify:ci` runs the cheap always-on CI tier:
+  - repo-policy verification
+  - typecheck
+  - lint
+  - tests
+  - script tests
+- `bun run check:affected` runs the smallest reasonable verification set for the current working tree.
+  - Use `bun run check:affected -- --base origin/main` to compare against a specific ref.
+
 Env var docs:
 
 - `bun run env:check` verifies environment variables referenced in code are documented (and that `.env.example` files stay in sync).
+- `bun run docs:check` verifies docs point at real repo files and real Bun scripts.
 - `bun run health` from the repo root runs `env:check` first.
 
 The health check output may log "Encryption is not configured" from Convex tests; this is expected.

@@ -102,8 +102,8 @@ Repo support:
 
 - `apps/mobile/eas.json` contains a `development-device` profile for physical iOS devices
 - `apps/mobile/package.json` contains:
-    - `bun run ios:eas-register-device`
-    - `bun run ios:eas-device`
+    - `cd apps/mobile && bun run ios:eas-register-device`
+    - `cd apps/mobile && bun run ios:eas-device`
 
 Recommended flow:
 
@@ -121,7 +121,7 @@ bun run ios:eas-register-device
 
 For a phone on the same LAN as this Linux host, the backend URL should look like:
 
-- `http://192.168.x.x:3030`
+- `http://<reachable-lan-host>:3030`
 
 3. Start the remote build:
 

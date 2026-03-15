@@ -1,11 +1,11 @@
 import { test, expect, describe } from "bun:test";
 import {
     SupportedParameter,
-    ProviderModel,
     modelSupportsSearch,
     modelSupportsReasoning,
     modelSupportsVision,
 } from "@/lib/types";
+import type { ProviderModel } from "@/lib/types";
 
 describe("types.ts", () => {
     describe("modelSupportsSearch", () => {

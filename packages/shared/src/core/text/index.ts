@@ -6,7 +6,11 @@ export function trimTrailingEmptyLines(
     if (value === undefined) return value;
     const lines = value.split(/\r?\n/);
     let end = lines.length;
-    while (end > 0 && lines[end - 1].trim() === "") {
+    while (end > 0) {
+        const line = lines[end - 1];
+        if (line === undefined || line.trim() !== "") {
+            break;
+        }
         end -= 1;
     }
     if (end === lines.length) return value;

@@ -42,6 +42,10 @@ export function ModelSelector({
 
     // Close on click outside
     useEffect(() => {
+        if (!isOpen) {
+            return undefined;
+        }
+
         const handleClickOutside = (event: MouseEvent) => {
             if (
                 containerRef.current &&
@@ -51,18 +55,16 @@ export function ModelSelector({
             }
         };
 
-        if (isOpen) {
-            document.addEventListener("mousedown", handleClickOutside);
-            // Also close on escape key
-            const handleEscape = (e: KeyboardEvent) => {
-                if (e.key === "Escape") setIsOpen(false);
-            };
-            document.addEventListener("keydown", handleEscape);
-            return () => {
-                document.removeEventListener("mousedown", handleClickOutside);
-                document.removeEventListener("keydown", handleEscape);
-            };
-        }
+        document.addEventListener("mousedown", handleClickOutside);
+        // Also close on escape key
+        const handleEscape = (e: KeyboardEvent) => {
+            if (e.key === "Escape") setIsOpen(false);
+        };
+        document.addEventListener("keydown", handleEscape);
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+            document.removeEventListener("keydown", handleEscape);
+        };
     }, [isOpen]);
 
     const handleSelect = (modelId: string) => {

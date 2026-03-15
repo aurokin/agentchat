@@ -504,7 +504,7 @@ describe("CodexRuntimeManager", () => {
             payload: Record<string, unknown>;
         }> = [];
 
-        manager.subscribe({
+        await manager.subscribe({
             userId: "user-1",
             conversationId: "chat-1",
             subscriberId: "socket-2",

@@ -6,6 +6,7 @@ out
 dist
 *.tgz
 .next
+output/
 
 # mobile build artifacts
 apps/mobile/build/
@@ -50,6 +51,8 @@ ai_dump
 .env*.local
 .private/backups/
 apps/server/agentchat.config.json
+.last-branch
+.opencode/
 
 # billing secrets (scripts read repo-root .env.billing.<env>.local)
 billing/*.local

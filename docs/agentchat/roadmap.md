@@ -44,7 +44,7 @@ This roadmap describes the current implementation state and the next major steps
     - keep transcript formatting cleanup separate from transcript structure
 - Validate provider-native `assistant_status` items with real Codex turns and keep them covered by manual smoke commands
 - Improve operator-facing diagnostics and health reporting
-- Build a practical testing stack around the dedicated local fixtures in `/home/auro/agents/agentchat_test`
+- Build a practical testing stack around the dedicated local fixtures in `~/agents/agentchat_test`
 - Keep the active roadmap narrowly focused on Codex confidence rather than adding more providers
 - Use the live Convex deployment for real codegen, runtime persistence validation, and end-to-end confidence passes
 - Use local seeded users like `smoke_1` and `smoke_2` as the default local integration and browser-confidence path
@@ -58,10 +58,10 @@ This roadmap describes the current implementation state and the next major steps
 
 ### 1. Testing And Validation
 
-- Standardize on the dedicated local test fixtures in `/home/auro/agents/agentchat_test`
-    - `/home/auro/agents/agentchat_test/smoke` for ultra-cheap liveness checks
-    - `/home/auro/agents/agentchat_test` for deterministic read-only functional checks
-    - `/home/auro/agents/agentchat_test/workspace` for edit, interruption, and resume checks
+- Standardize on the dedicated local test fixtures in `~/agents/agentchat_test`
+    - `~/agents/agentchat_test/smoke` for ultra-cheap liveness checks
+    - `~/agents/agentchat_test` for deterministic read-only functional checks
+    - `~/agents/agentchat_test/workspace` for edit, interruption, and resume checks
 - Add integration coverage across `apps/server`, Convex ingress, and websocket runtime flow
 - Keep generated Convex bindings in sync with the live deployment before manual confidence passes
 - Run `bun run test:manual:live-runtime-smoke` against a real local `apps/server` instance to verify the full Codex plus Convex persistence path

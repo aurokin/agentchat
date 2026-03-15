@@ -13,7 +13,7 @@
         "lint": "eslint .",
         "test": "bun test",
         "test:confidence": "bun test src/__tests__/backendAuth.test.ts src/__tests__/config.test.ts src/__tests__/configDiagnostics.test.ts src/__tests__/envDiagnostics.test.ts src/__tests__/codexModelCatalog.test.ts src/__tests__/http.test.ts src/__tests__/runtimePersistence.test.ts src/__tests__/socketProtocol.test.ts src/__tests__/codexRuntime.test.ts src/__tests__/websocketSession.test.ts",
-        "health": "bun run format && bun run typecheck && bun run lint && bun test"
+        "health": "bun run format:check && bun run typecheck && bun run lint && bun test"
     },
     "dependencies": {
         "zod": "^4.3.5"
@@ -21,7 +21,6 @@
     "devDependencies": {
         "@types/bun": "latest",
         "eslint": "^9.39.2",
-        "typescript": "^5.9.3",
-        "typescript-eslint": "^8.53.1"
+        "typescript": "^5.9.3"
     }
 }

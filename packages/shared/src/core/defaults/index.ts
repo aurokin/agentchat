@@ -22,6 +22,9 @@ export function getLastUserSettings(
 ): LastUserSettings | null {
     for (let i = messages.length - 1; i >= 0; i -= 1) {
         const message = messages[i];
+        if (!message) {
+            continue;
+        }
         if (message.role !== "user") continue;
         return {
             modelId: message.modelId,

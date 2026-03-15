@@ -26,6 +26,12 @@
         "install:convex": "bun install --cwd packages/convex",
         "env:validate": "bun scripts/env/validate.ts",
         "env:check": "bun scripts/check-env-docs.ts",
+        "docs:check": "bun scripts/check-docs-integrity.ts",
+        "lint:architecture": "bun scripts/check-architecture.ts",
+        "repo:knip": "knip --config knip.jsonc --isolate-workspaces --use-tsconfig-files --include dependencies,unlisted --reporter compact --no-config-hints",
+        "type:suppressions": "bun scripts/report-type-suppressions.ts --baseline scripts/ci/type-suppressions.baseline.json",
+        "lint:repo": "bun run lint:architecture && bun run env:check && bun run docs:check && bun run repo:knip && bun run type:suppressions",
+        "check:affected": "bun scripts/ci/run-affected-checks.ts",
         "setup:test-agent-config": "bun scripts/testing/write-test-agent-config.ts",
         "setup:local-smoke-users": "bun scripts/testing/seed-local-users.ts",
         "setup:local-auth-smoke": "bun scripts/testing/setup-local-auth-smoke.ts",
@@ -65,7 +71,7 @@
         "test:mobile": "bun run --cwd apps/mobile test",
         "test:shared": "bun run --cwd packages/shared test",
         "test:convex": "bun run --cwd packages/convex test",
-        "test:scripts": "bun test scripts/testing/__tests__",
+        "test:scripts": "bun test scripts/__tests__ scripts/testing/__tests__ scripts/ci/__tests__",
         "doctor:server": "bun run --cwd apps/server doctor",
         "test:manual:codex-confidence": "bun run env:check && bun run --cwd packages/convex codegen && bun run doctor:server && bun run --cwd apps/server test:confidence && bun run --cwd apps/web test:confidence && bun run --cwd apps/mobile test:confidence",
         "typecheck": "bun run --cwd apps/web typecheck && bun run --cwd apps/server typecheck && bun run --cwd apps/mobile typecheck && bun run --cwd packages/shared typecheck && bun run --cwd packages/convex typecheck",
@@ -74,6 +80,7 @@
         "typecheck:mobile": "bun run --cwd apps/mobile typecheck",
         "typecheck:shared": "bun run --cwd packages/shared typecheck",
         "typecheck:convex": "bun run --cwd packages/convex typecheck",
+        "verify:ci": "bun run lint:repo && bun run typecheck && bun run lint && bun run test && bun run test:scripts",
         "health": "bun run env:check && bun run --cwd apps/web health && bun run --cwd apps/server health && bun run --cwd apps/mobile health && bun run --cwd packages/shared health && bun run --cwd packages/convex health",
         "health:web": "bun run env:check && bun run --cwd apps/web health",
         "health:server": "bun run env:check && bun run --cwd apps/server health",
@@ -83,12 +90,15 @@
         "prepare": "husky"
     },
     "devDependencies": {
-        "@fsouza/prettierd": "^0.26.2",
         "@types/bun": "latest",
         "concurrently": "^9.2.1",
+        "eslint-plugin-react": "^7.37.5",
+        "eslint-plugin-react-hooks": "^7.0.1",
         "husky": "^9.1.7",
+        "knip": "^5.86.0",
         "playwright": "^1.58.2",
-        "prettier": "^3.8.1"
+        "prettier": "^3.8.1",
+        "typescript-eslint": "^8.53.1"
     },
     "prettier": {
         "tabWidth": 4,

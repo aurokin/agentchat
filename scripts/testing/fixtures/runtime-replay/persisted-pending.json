@@ -1,0 +1,43 @@
+{
+  "name": "persisted-pending",
+  "initialAssistantMessageId": "assistant-1",
+  "finalAssistantMessageId": "assistant-1",
+  "finalStatus": "completed",
+  "finalContent": "Pending finalization",
+  "sawDelta": true,
+  "allowPendingTerminal": true,
+  "events": [
+    {
+      "sequence": 1,
+      "kind": "run_started",
+      "textDelta": null,
+      "errorMessage": null,
+      "messageLocalId": "assistant-1",
+      "createdAt": 4000
+    },
+    {
+      "sequence": 2,
+      "kind": "message_delta",
+      "textDelta": "Pending ",
+      "errorMessage": null,
+      "messageLocalId": "assistant-1",
+      "createdAt": 4001
+    },
+    {
+      "sequence": 3,
+      "kind": "message_delta",
+      "textDelta": "finalization",
+      "errorMessage": null,
+      "messageLocalId": "assistant-1",
+      "createdAt": 4002
+    },
+    {
+      "sequence": 4,
+      "kind": "message_completed",
+      "textDelta": null,
+      "errorMessage": null,
+      "messageLocalId": "assistant-1",
+      "createdAt": 4003
+    }
+  ]
+}

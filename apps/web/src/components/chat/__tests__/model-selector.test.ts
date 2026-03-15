@@ -62,7 +62,7 @@ describe("ModelSelector logic", () => {
                 : mockModels;
 
             expect(filtered).toHaveLength(2);
-            expect(filtered[0].id).toContain("claude");
+            expect(filtered[0]?.id).toContain("claude");
         });
 
         test("filters by name", () => {
@@ -167,8 +167,8 @@ describe("ModelSelector logic", () => {
                 .filter((model) => favoriteModels.includes(model.id))
                 .sort((a, b) => a.name.localeCompare(b.name));
 
-            expect(favorites[0].name).toBe("model-1");
-            expect(favorites[1].name).toBe("model-2");
+            expect(favorites[0]?.name).toBe("model-1");
+            expect(favorites[1]?.name).toBe("model-2");
         });
     });
 

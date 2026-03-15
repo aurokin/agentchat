@@ -1,0 +1,34 @@
+{
+  "name": "socket-active-replay",
+  "allowActiveReplay": true,
+  "events": [
+    {
+      "type": "run.started",
+      "payload": {
+        "conversationId": "chat-1",
+        "runId": "run-1",
+        "messageId": "assistant-1"
+      }
+    },
+    {
+      "type": "message.started",
+      "payload": {
+        "conversationId": "chat-1",
+        "runId": "run-1",
+        "messageId": "assistant-1",
+        "messageIndex": 0,
+        "kind": "assistant_message",
+        "content": "Working"
+      }
+    },
+    {
+      "type": "message.delta",
+      "payload": {
+        "conversationId": "chat-1",
+        "messageId": "assistant-1",
+        "delta": " on it",
+        "content": "Working on it"
+      }
+    }
+  ]
+}

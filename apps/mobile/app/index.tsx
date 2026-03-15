@@ -56,7 +56,7 @@ export default function HomeScreen(): React.ReactElement {
 
     useEffect(() => {
         if (isInitialized) {
-            loadChats();
+            void loadChats();
         }
     }, [isInitialized, loadChats]);
 

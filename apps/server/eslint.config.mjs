@@ -1,17 +1,6 @@
-import tseslint from "typescript-eslint";
+import { createTypeCheckedConfig } from "../../eslint.shared.mjs";
 
-export default tseslint.config(
-    {
-        files: ["**/*.{ts,tsx}"],
-        languageOptions: {
-            parser: tseslint.parser,
-            parserOptions: {
-                ecmaVersion: "latest",
-                sourceType: "module",
-            },
-        },
-    },
-    {
-        ignores: ["node_modules/**"],
-    },
-);
+export default createTypeCheckedConfig({
+    tsconfigRootDir: import.meta.dirname,
+    ignores: ["node_modules/**"],
+});

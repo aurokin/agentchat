@@ -57,12 +57,14 @@ export function ModelSelector({
     const searchInputRef = useRef<TextInput>(null);
 
     useEffect(() => {
-        if (isOpen && searchInputRef.current) {
-            const timeoutId = setTimeout(() => {
-                searchInputRef.current?.focus();
-            }, 50);
-            return () => clearTimeout(timeoutId);
+        if (!isOpen || !searchInputRef.current) {
+            return undefined;
         }
+
+        const timeoutId = setTimeout(() => {
+            searchInputRef.current?.focus();
+        }, 50);
+        return () => clearTimeout(timeoutId);
     }, [isOpen]);
 
     const filteredModels = useMemo(

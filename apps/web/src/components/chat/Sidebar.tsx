@@ -237,7 +237,7 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
             if (hasModifier && event.shiftKey && key === "o") {
                 event.preventDefault();
                 event.stopPropagation();
-                handleNewChat();
+                void handleNewChat();
                 return;
             }
 
@@ -252,14 +252,14 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
             if (hasModifier && !event.shiftKey && key === "arrowup") {
                 event.preventDefault();
                 event.stopPropagation();
-                focusChatByOffset(-1);
+                void focusChatByOffset(-1);
                 return;
             }
 
             if (hasModifier && !event.shiftKey && key === "arrowdown") {
                 event.preventDefault();
                 event.stopPropagation();
-                focusChatByOffset(1);
+                void focusChatByOffset(1);
                 return;
             }
 
@@ -302,8 +302,8 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
         return () => observer.disconnect();
     }, [canLoadMoreChats, isChatsLoadingMore, loadMoreChats]);
 
-    const handleSelectChat = (chatId: string) => {
-        selectChat(chatId);
+    const handleSelectChat = async (chatId: string) => {
+        await selectChat(chatId);
         router.push("/chat");
         if (isMobile) {
             onClose?.();
@@ -423,7 +423,7 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                                                 tabIndex={0}
                                                 onKeyDown={(event) => {
                                                     if (event.key === "Enter") {
-                                                        handleSelectChat(
+                                                        void handleSelectChat(
                                                             chat.id,
                                                         );
                                                     }
@@ -489,7 +489,7 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                                                     type="button"
                                                     onClick={(event) => {
                                                         event.stopPropagation();
-                                                        requestDeleteChat(
+                                                        void requestDeleteChat(
                                                             chat.id,
                                                         );
                                                     }}

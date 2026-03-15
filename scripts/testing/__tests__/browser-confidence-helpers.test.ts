@@ -1,12 +1,19 @@
 import { describe, expect, test } from "bun:test";
 
-import { parseBrowserConfidenceArgs } from "../browser-confidence-helpers";
+import {
+    buildBrowserConfidenceFailureReport,
+    buildBrowserConfidenceSuccessReport,
+    formatBrowserConfidenceText,
+    getBrowserConfidenceScenarios,
+    parseBrowserConfidenceArgs,
+} from "../browser-confidence-helpers";
 
 describe("parseBrowserConfidenceArgs", () => {
     test("returns defaults when no arguments are provided", () => {
         expect(parseBrowserConfidenceArgs([])).toEqual({
             baseUrl: "http://127.0.0.1:4040",
             mode: "full",
+            json: false,
         });
     });
 
@@ -14,11 +21,12 @@ describe("parseBrowserConfidenceArgs", () => {
         expect(
             parseBrowserConfidenceArgs([
                 "--base-url",
-                "http://192.168.50.11:4040///",
+                "http://192.168.1.20:4040///",
             ]),
         ).toEqual({
-            baseUrl: "http://192.168.50.11:4040",
+            baseUrl: "http://192.168.1.20:4040",
             mode: "full",
+            json: false,
         });
     });
 
@@ -28,6 +36,15 @@ describe("parseBrowserConfidenceArgs", () => {
         ).toEqual({
             baseUrl: "http://127.0.0.1:4040",
             mode: "interrupt",
+            json: false,
+        });
+    });
+
+    test("parses explicit json output", () => {
+        expect(parseBrowserConfidenceArgs(["--json"])).toEqual({
+            baseUrl: "http://127.0.0.1:4040",
+            mode: "full",
+            json: true,
         });
     });
 
@@ -47,5 +64,63 @@ describe("parseBrowserConfidenceArgs", () => {
         expect(() =>
             parseBrowserConfidenceArgs(["--mode", "broken"]),
         ).toThrow("--mode must be smoke, interrupt, refresh, or full.");
+    });
+});
+
+describe("browser confidence reports", () => {
+    test("expands full mode into all scenarios", () => {
+        expect(getBrowserConfidenceScenarios("full")).toEqual([
+            { name: "smoke", status: "passed" },
+            { name: "interrupt", status: "passed" },
+            { name: "refresh", status: "passed" },
+        ]);
+    });
+
+    test("builds a structured success report", () => {
+        const report = buildBrowserConfidenceSuccessReport({
+            args: {
+                baseUrl: "http://127.0.0.1:4040",
+                mode: "smoke",
+                json: true,
+            },
+            authProviderKind: "local",
+            startedAtMs: Date.UTC(2026, 2, 15, 15, 0, 0),
+            completedAtMs: Date.UTC(2026, 2, 15, 15, 0, 2),
+            artifactPaths: ["/tmp/browser-confidence-smoke.png"],
+        });
+
+        expect(report).toMatchObject({
+            ok: true,
+            script: "browser-confidence",
+            mode: "smoke",
+            authProviderKind: "local",
+            durationMs: 2000,
+            artifactPaths: ["/tmp/browser-confidence-smoke.png"],
+            scenarios: [{ name: "smoke", status: "passed" }],
+        });
+        expect(formatBrowserConfidenceText(report)).toContain(
+            "artifacts=/tmp/browser-confidence-smoke.png",
+        );
+    });
+
+    test("builds a structured failure report", () => {
+        const report = buildBrowserConfidenceFailureReport({
+            args: null,
+            startedAtMs: Date.UTC(2026, 2, 15, 15, 0, 0),
+            completedAtMs: Date.UTC(2026, 2, 15, 15, 0, 1),
+            issueCode: "browser_confidence_invalid_arguments",
+            message: "Unsupported argument: --broken",
+        });
+
+        expect(report).toMatchObject({
+            ok: false,
+            issueCode: "browser_confidence_invalid_arguments",
+            mode: null,
+            baseUrl: null,
+            durationMs: 1000,
+        });
+        expect(formatBrowserConfidenceText(report)).toContain(
+            "browser_confidence_invalid_arguments",
+        );
     });
 });
