@@ -152,6 +152,14 @@ Manual options:
 - physical Android device via `adb`
 - Android emulator when available
 
+For parity work, prefer the same runtime stack used by iPhone development builds:
+
+- one LAN Metro dev-client session from `bun run --cwd apps/mobile dev-client`
+- the same local `apps/server` backend on port `3030`
+- the same active Convex deployment and local-auth users
+
+That keeps Android and iOS testing on one backend-owned runtime path instead of splitting native validation across different startup modes.
+
 Future automated Android tests should run only when:
 
 - `adb` is installed

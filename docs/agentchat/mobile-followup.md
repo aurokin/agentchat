@@ -23,6 +23,9 @@ This document tracks the remaining mobile work needed to match the current Agent
 - Continue refining the mobile chat flow around the new agent-centric model.
 - Replace any remaining provider-specific client assumptions with backend-driven provider capability and settings options.
 - Keep aligning mobile state helpers with the web runtime model as the architecture settles.
+- Rework the mobile top app bar on home and chat screens; it currently feels awkward and should be revisited as a distinct UI polish pass.
+- Validate Android physical-device behavior against the same LAN `dev-client` plus `apps/server` backend flow used for iPhone development builds.
+- Keep Android and iOS on the same backend/session/runtime path whenever possible so platform parity checks exercise the same product behavior.
 
 ## Documentation Rule
 

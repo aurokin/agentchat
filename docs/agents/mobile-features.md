@@ -16,6 +16,7 @@ This document should reflect the current Agentchat product direction, not older 
 ## UI Guidance
 
 - Keep mobile information architecture aligned with web wherever practical.
+- Treat the top app bar as an active polish area; avoid assuming the current home/chat header layout is final.
 - The selected agent should be easy to switch, and the visible conversation list should change with that selection.
 - Starting a new conversation should require an agent to already be selected.
 - Provider, model, and variant selection should come from backend metadata rather than hardcoded client assumptions.
