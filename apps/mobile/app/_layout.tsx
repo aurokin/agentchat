@@ -35,8 +35,8 @@ function LoadingScreen(): ReactElement {
 function RuntimeProviders(): ReactElement {
     return (
         <AgentchatSocketProvider>
-            <ModelProvider>
-                <WorkspaceProvider>
+            <WorkspaceProvider>
+                <ModelProvider>
                     <ChatProvider>
                         <BackgroundRuntimeSubscriptions />
                         <Stack
@@ -45,8 +45,8 @@ function RuntimeProviders(): ReactElement {
                             }}
                         />
                     </ChatProvider>
-                </WorkspaceProvider>
-            </ModelProvider>
+                </ModelProvider>
+            </WorkspaceProvider>
         </AgentchatSocketProvider>
     );
 }
