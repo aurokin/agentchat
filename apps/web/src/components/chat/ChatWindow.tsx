@@ -20,11 +20,7 @@ import { MessageInput } from "./MessageInput";
 import { useConversationRuntime } from "./useConversationRuntime";
 import { modelSupportsReasoning, type ChatRunSummary } from "@/lib/types";
 import { APP_DEFAULT_MODEL } from "@shared/core/models";
-import {
-    applyModelCapabilities,
-    getLastUserSettings,
-    resolveInitialChatSettings,
-} from "@shared/core/defaults";
+import { resolveChatSettingsAgainstModels } from "@shared/core/defaults";
 import { Hexagon, Sparkles, AlertCircle, RefreshCw } from "lucide-react";
 
 const convexApi = api as typeof api & {
@@ -109,7 +105,6 @@ export function ChatWindow() {
     );
     const socketClient = useMemo(() => getSharedAgentchatSocketClient(), []);
     const inputRef = useRef<HTMLTextAreaElement>(null);
-    const lastInitializedChatIdRef = useRef<string | null>(null);
 
     const getBackendSessionToken = useCallback(async () => {
         const result = await issueBackendSessionToken({});
@@ -121,12 +116,6 @@ export function ChatWindow() {
 
         return result.token;
     }, [issueBackendSessionToken]);
-
-    useEffect(() => {
-        if (!currentChat) {
-            lastInitializedChatIdRef.current = null;
-        }
-    }, [currentChat]);
 
     const runSummariesByMessageId = useMemo(() => {
         const byMessageId = new Map<string, ChatRunSummary>();
@@ -140,49 +129,35 @@ export function ChatWindow() {
 
     useEffect(() => {
         if (!currentChat || isMessagesLoading) return;
-        if (lastInitializedChatIdRef.current === currentChat.id) return;
 
         const messagesMatchChat =
             messages.length === 0 ||
             messages.every((message) => message.sessionId === currentChat.id);
         if (!messagesMatchChat) return;
 
-        const fallbackModelId =
-            currentChat.modelId ||
-            selectedAgent?.defaultModel ||
-            APP_DEFAULT_MODEL;
-        const defaults = {
-            modelId: fallbackModelId,
-            variantId:
-                currentChat.variantId ?? selectedAgent?.defaultVariant ?? null,
-        };
-        const lastUserSettings = getLastUserSettings(messages);
-        const resolvedSettings = resolveInitialChatSettings({
-            messageCount: messages.length,
-            defaults,
-            lastUser: lastUserSettings,
-        });
-        const modelForSettings = models.find(
-            (model) => model.id === resolvedSettings.modelId,
-        );
-        const constrainedSettings = applyModelCapabilities(resolvedSettings, {
-            supportsReasoning: modelForSettings
-                ? modelSupportsReasoning(modelForSettings)
-                : true,
+        const resolvedSettings = resolveChatSettingsAgainstModels({
+            current: {
+                modelId: currentChat.modelId,
+                variantId: currentChat.variantId ?? null,
+            },
+            defaults: {
+                modelId: selectedAgent?.defaultModel ?? APP_DEFAULT_MODEL,
+                variantId: selectedAgent?.defaultVariant ?? null,
+            },
+            models,
         });
 
         if (
-            constrainedSettings.modelId !== currentChat.modelId ||
-            (constrainedSettings.variantId ?? null) !==
+            resolvedSettings.modelId !== currentChat.modelId ||
+            (resolvedSettings.variantId ?? null) !==
                 (currentChat.variantId ?? null)
         ) {
             void updateChat({
                 ...currentChat,
-                modelId: constrainedSettings.modelId,
-                variantId: constrainedSettings.variantId ?? null,
+                modelId: resolvedSettings.modelId,
+                variantId: resolvedSettings.variantId ?? null,
             });
         }
-        lastInitializedChatIdRef.current = currentChat.id;
     }, [
         currentChat,
         isMessagesLoading,

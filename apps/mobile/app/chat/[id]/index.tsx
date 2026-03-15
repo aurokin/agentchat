@@ -32,11 +32,7 @@ import {
     type ProviderModel,
 } from "@shared/core/models";
 import type { ChatSession, Message } from "@shared/core/types";
-import {
-    applyModelCapabilities,
-    getLastUserSettings,
-    resolveInitialChatSettings,
-} from "@shared/core/defaults";
+import { resolveChatSettingsAgainstModels } from "@shared/core/defaults";
 import {
     applyStreamingMessageOverlay,
     createRecoveredActiveRunFromRuntimeState,
@@ -123,7 +119,6 @@ export default function ChatScreen(): ReactElement {
     const smallestSide = Math.min(windowWidth, windowHeight);
     const isTwoPaneLayout = smallestSide >= 700;
     const sidebarWidth = Math.max(280, Math.min(360, windowWidth * 0.32));
-    const lastInitializedChatIdRef = useRef<string | null>(null);
     const suppressInputRef = useRef(false);
     const currentChatRef = useRef<ChatSession | null>(currentChat);
     const chatMessagesRef = useRef<Message[]>(EMPTY_MESSAGES);
@@ -193,12 +188,6 @@ export default function ChatScreen(): ReactElement {
     }, [chatId]);
 
     useEffect(() => {
-        if (!currentChat) {
-            lastInitializedChatIdRef.current = null;
-        }
-    }, [currentChat]);
-
-    useEffect(() => {
         if (flatListRef.current && messages[chatId]) {
             setTimeout(() => {
                 scrollToEnd();
@@ -245,80 +234,36 @@ export default function ChatScreen(): ReactElement {
 
     useEffect(() => {
         if (!currentChat || !hasLoadedMessages) return;
-        if (lastInitializedChatIdRef.current === currentChat.id) return;
-        if (chatMessages.length > 0) {
-            lastInitializedChatIdRef.current = currentChat.id;
-            return;
-        }
-        if (currentChat.settingsLockedAt != null) {
-            lastInitializedChatIdRef.current = currentChat.id;
-            return;
-        }
-        const defaults = {
-            modelId: defaultModel,
-            variantId: selectedVariantId,
-        };
-        const lastUserSettings = getLastUserSettings(chatMessages);
-        const resolvedSettings = resolveInitialChatSettings({
-            messageCount: chatMessages.length,
-            defaults,
-            lastUser: lastUserSettings,
-        });
-        const modelForSettings = models.find(
-            (model) => model.id === resolvedSettings.modelId,
-        );
-        const constrainedSettings = applyModelCapabilities(resolvedSettings, {
-            supportsReasoning: modelForSettings
-                ? modelSupportsReasoning(modelForSettings)
-                : true,
+
+        const resolvedSettings = resolveChatSettingsAgainstModels({
+            current: {
+                modelId: currentChat.modelId,
+                variantId: currentChat.variantId ?? null,
+            },
+            defaults: {
+                modelId: defaultModel,
+                variantId: selectedVariantId,
+            },
+            models,
         });
 
         if (
-            constrainedSettings.modelId !== currentChat.modelId ||
-            (constrainedSettings.variantId ?? null) !==
+            resolvedSettings.modelId !== currentChat.modelId ||
+            (resolvedSettings.variantId ?? null) !==
                 (currentChat.variantId ?? null)
         ) {
             void updateChat({
                 ...currentChat,
-                modelId: constrainedSettings.modelId,
-                variantId: constrainedSettings.variantId ?? null,
+                modelId: resolvedSettings.modelId,
+                variantId: resolvedSettings.variantId ?? null,
             });
         }
-        lastInitializedChatIdRef.current = currentChat.id;
     }, [
-        chatMessages,
         currentChat,
         defaultModel,
         hasLoadedMessages,
         models,
         selectedVariantId,
-        updateChat,
-    ]);
-
-    useEffect(() => {
-        if (!currentChat || !currentModel) return;
-        if (chatMessages.length > 0) return;
-        if (currentChat.settingsLockedAt != null) return;
-        const currentVariantIsValid =
-            !currentChat.variantId ||
-            (currentModel.variants?.some(
-                (variant) => variant.id === currentChat.variantId,
-            ) ??
-                false);
-        const nextVariantId = currentVariantIsValid
-            ? (currentChat.variantId ?? currentModel.variants?.[0]?.id ?? null)
-            : (currentModel.variants?.[0]?.id ?? null);
-        if (nextVariantId !== (currentChat.variantId ?? null)) {
-            void updateChat({
-                ...currentChat,
-                variantId: nextVariantId,
-            });
-        }
-    }, [
-        chatMessages.length,
-        currentChat,
-        currentModel,
-        reasoningSupported,
         updateChat,
     ]);
 

@@ -1,3 +1,8 @@
+import {
+    APP_DEFAULT_MODEL,
+    modelSupportsReasoning,
+    type ProviderModel,
+} from "../models";
 import type { Message } from "../types";
 
 export interface ChatDefaults {
@@ -56,4 +61,48 @@ export function applyModelCapabilities(
             ? (settings.variantId ?? null)
             : null,
     };
+}
+
+export function resolveChatSettingsAgainstModels(params: {
+    current: ChatDefaults;
+    defaults: ChatDefaults;
+    models: ProviderModel[];
+}): ChatDefaults {
+    const availableModels = params.models;
+    const resolvedModel =
+        availableModels.find((model) => model.id === params.current.modelId) ??
+        availableModels.find((model) => model.id === params.defaults.modelId) ??
+        availableModels.find((model) => model.id === APP_DEFAULT_MODEL) ??
+        availableModels[0];
+
+    if (!resolvedModel) {
+        return {
+            modelId: params.current.modelId || params.defaults.modelId,
+            variantId:
+                params.current.variantId ?? params.defaults.variantId ?? null,
+        };
+    }
+
+    const variantIds =
+        resolvedModel.variants?.map((variant) => variant.id) ?? [];
+    const desiredVariantId =
+        params.current.variantId ?? params.defaults.variantId ?? null;
+
+    return applyModelCapabilities(
+        {
+            modelId: resolvedModel.id,
+            variantId:
+                variantIds.length === 0
+                    ? null
+                    : desiredVariantId && variantIds.includes(desiredVariantId)
+                      ? desiredVariantId
+                      : params.defaults.variantId &&
+                          variantIds.includes(params.defaults.variantId)
+                        ? params.defaults.variantId
+                        : (resolvedModel.variants?.[0]?.id ?? null),
+        },
+        {
+            supportsReasoning: modelSupportsReasoning(resolvedModel),
+        },
+    );
 }

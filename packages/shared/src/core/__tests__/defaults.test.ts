@@ -4,10 +4,32 @@ import {
     getLastUserSettings,
     resolveInitialChatSettings,
     applyModelCapabilities,
+    resolveChatSettingsAgainstModels,
     type ChatDefaults,
 } from "../defaults";
+import { SupportedParameter, type ProviderModel } from "../models";
 
 describe("defaults", () => {
+    const models: ProviderModel[] = [
+        {
+            id: "default-model",
+            name: "Default",
+            provider: "Provider",
+            supportedParameters: [SupportedParameter.Reasoning],
+            variants: [
+                { id: "low", label: "Low" },
+                { id: "high", label: "High" },
+            ],
+        },
+        {
+            id: "fallback-model",
+            name: "Fallback",
+            provider: "Provider",
+            supportedParameters: [],
+            variants: [],
+        },
+    ];
+
     it("returns last user settings", () => {
         const messages: Array<
             Pick<Message, "role" | "modelId" | "variantId" | "reasoningEffort">
@@ -96,6 +118,63 @@ describe("defaults", () => {
             }),
         ).toEqual({
             modelId: "model",
+            variantId: null,
+        });
+    });
+
+    it("keeps current chat settings when the selected model and variant are still available", () => {
+        expect(
+            resolveChatSettingsAgainstModels({
+                current: {
+                    modelId: "default-model",
+                    variantId: "high",
+                },
+                defaults: {
+                    modelId: "fallback-model",
+                    variantId: null,
+                },
+                models,
+            }),
+        ).toEqual({
+            modelId: "default-model",
+            variantId: "high",
+        });
+    });
+
+    it("falls back to defaults when the current model is unavailable", () => {
+        expect(
+            resolveChatSettingsAgainstModels({
+                current: {
+                    modelId: "missing-model",
+                    variantId: "high",
+                },
+                defaults: {
+                    modelId: "default-model",
+                    variantId: "low",
+                },
+                models,
+            }),
+        ).toEqual({
+            modelId: "default-model",
+            variantId: "high",
+        });
+    });
+
+    it("drops the variant when the fallback model does not support reasoning", () => {
+        expect(
+            resolveChatSettingsAgainstModels({
+                current: {
+                    modelId: "missing-model",
+                    variantId: "high",
+                },
+                defaults: {
+                    modelId: "fallback-model",
+                    variantId: "low",
+                },
+                models,
+            }),
+        ).toEqual({
+            modelId: "fallback-model",
             variantId: null,
         });
     });
