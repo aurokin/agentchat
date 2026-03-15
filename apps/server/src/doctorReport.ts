@@ -60,26 +60,27 @@ function createIssue(params: {
     };
 }
 
-function mapProviderIssue(
-    providerId: string,
-    issue: string,
-): DoctorIssue {
+function mapProviderIssue(providerId: string, issue: string): DoctorIssue {
     if (issue === "Enabled provider has no enabled models.") {
         return createIssue({
             code: "provider_no_enabled_models",
             severity: "error",
             scope: `provider:${providerId}`,
             message: issue,
-            remediation: "Enable at least one model for the provider in agentchat.config.json.",
+            remediation:
+                "Enable at least one model for the provider in agentchat.config.json.",
         });
     }
-    if (issue === "Configured codex.cwd does not exist or is not a directory.") {
+    if (
+        issue === "Configured codex.cwd does not exist or is not a directory."
+    ) {
         return createIssue({
             code: "provider_codex_cwd_missing",
             severity: "error",
             scope: `provider:${providerId}`,
             message: issue,
-            remediation: "Update provider.codex.cwd to an existing workspace path.",
+            remediation:
+                "Update provider.codex.cwd to an existing workspace path.",
         });
     }
     if (issue === "Configured Codex command path does not exist.") {
@@ -88,7 +89,8 @@ function mapProviderIssue(
             severity: "error",
             scope: `provider:${providerId}`,
             message: issue,
-            remediation: "Update provider.codex.command to an installed executable or rely on PATH resolution.",
+            remediation:
+                "Update provider.codex.command to an installed executable or rely on PATH resolution.",
         });
     }
 
@@ -108,7 +110,8 @@ function mapAgentIssue(agentId: string, issue: string): DoctorIssue {
             severity: "error",
             scope: `agent:${agentId}`,
             message: issue,
-            remediation: "Update agent.rootPath to an existing workspace directory.",
+            remediation:
+                "Update agent.rootPath to an existing workspace directory.",
         });
     }
     if (issue === "Agent has no enabled providers.") {
@@ -120,31 +123,40 @@ function mapAgentIssue(agentId: string, issue: string): DoctorIssue {
             remediation: "Assign at least one enabled provider to the agent.",
         });
     }
-    if (issue === "Agent default provider is disabled; fallback will be used.") {
+    if (
+        issue === "Agent default provider is disabled; fallback will be used."
+    ) {
         return createIssue({
             code: "agent_default_provider_fallback",
             severity: "warning",
             scope: `agent:${agentId}`,
             message: issue,
-            remediation: "Point the agent default provider at an enabled provider to avoid implicit fallback.",
+            remediation:
+                "Point the agent default provider at an enabled provider to avoid implicit fallback.",
         });
     }
-    if (issue === "Agent default model is unavailable; fallback will be used.") {
+    if (
+        issue === "Agent default model is unavailable; fallback will be used."
+    ) {
         return createIssue({
             code: "agent_default_model_fallback",
             severity: "warning",
             scope: `agent:${agentId}`,
             message: issue,
-            remediation: "Update the agent default model or its allowlist to match an enabled model.",
+            remediation:
+                "Update the agent default model or its allowlist to match an enabled model.",
         });
     }
-    if (issue === "Agent default variant is unavailable; fallback will be used.") {
+    if (
+        issue === "Agent default variant is unavailable; fallback will be used."
+    ) {
         return createIssue({
             code: "agent_default_variant_fallback",
             severity: "warning",
             scope: `agent:${agentId}`,
             message: issue,
-            remediation: "Update the agent default variant or variant allowlist to match an enabled variant.",
+            remediation:
+                "Update the agent default variant or variant allowlist to match an enabled variant.",
         });
     }
 
@@ -172,7 +184,8 @@ export function buildDoctorIssues(params: {
                 severity: "error",
                 scope: "config",
                 message: params.configStatus.lastReloadError,
-                remediation: "Fix agentchat.config.json and trigger another config reload attempt.",
+                remediation:
+                    "Fix agentchat.config.json and trigger another config reload attempt.",
             }),
         );
     }
@@ -210,7 +223,8 @@ export function buildDoctorIssues(params: {
                     severity: "error",
                     scope: `provider:${provider.id}`,
                     message: liveProbe.error ?? "Provider live probe failed.",
-                    remediation: "Verify Codex CLI access and provider runtime credentials in the server environment.",
+                    remediation:
+                        "Verify Codex CLI access and provider runtime credentials in the server environment.",
                 }),
             );
         }
