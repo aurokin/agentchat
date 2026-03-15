@@ -46,6 +46,20 @@ export interface ConversationRuntimeBindingSummary {
     lastError: string | null;
     lastEventAt: number | null;
     updatedAt: number;
+    activity:
+        | {
+              label: "Working";
+              tone: "working";
+          }
+        | {
+              label: "New reply";
+              tone: "completed";
+          }
+        | {
+              label: "Needs attention";
+              tone: "errored";
+          }
+        | null;
 }
 
 export type ConversationRuntimePhase =

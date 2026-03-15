@@ -3,6 +3,57 @@ import { query } from "./_generated/server";
 import { isOwner } from "./lib/authz";
 import { requireWorkspaceUser } from "./lib/subscription";
 
+type ConversationActivity =
+    | {
+          label: "Working";
+          tone: "working";
+      }
+    | {
+          label: "New reply";
+          tone: "completed";
+      }
+    | {
+          label: "Needs attention";
+          tone: "errored";
+      }
+    | null;
+
+export function resolvePersistedConversationActivity(params: {
+    status: "idle" | "active" | "expired" | "errored";
+    lastEventAt: number | null;
+    lastViewedAt: number | null;
+}): ConversationActivity {
+    if (params.status === "active") {
+        return {
+            label: "Working",
+            tone: "working",
+        };
+    }
+
+    if (params.status === "errored") {
+        return {
+            label: "Needs attention",
+            tone: "errored",
+        };
+    }
+
+    if (params.lastEventAt === null) {
+        return null;
+    }
+
+    if (
+        params.lastViewedAt === null ||
+        params.lastEventAt > params.lastViewedAt
+    ) {
+        return {
+            label: "New reply",
+            tone: "completed",
+        };
+    }
+
+    return null;
+}
+
 export const getByChat = query({
     args: {
         chatId: v.id("chats"),
@@ -91,6 +142,11 @@ export const listByUser = query({
                     lastError: binding.lastError,
                     lastEventAt: binding.lastEventAt,
                     updatedAt: binding.updatedAt,
+                    activity: resolvePersistedConversationActivity({
+                        status: binding.status,
+                        lastEventAt: binding.lastEventAt,
+                        lastViewedAt: chat.lastViewedAt ?? null,
+                    }),
                 },
             ];
         });

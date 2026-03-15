@@ -43,6 +43,7 @@ The runtime is partway to the target model:
 - runs can survive chat switches, agent switches, reconnects, and zero-client periods
 - multiple conversations can be active at once
 - web and mobile subscribe to active conversations in the background
+- per-thread activity state is now derived in Convex from runtime bindings plus `lastViewedAt`, with clients only applying display-specific suppression for the open conversation
 
 Remaining gaps are mostly about:
 

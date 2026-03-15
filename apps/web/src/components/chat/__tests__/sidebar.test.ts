@@ -7,11 +7,10 @@ describe("resolveConversationActivityState", () => {
         expect(
             resolveConversationActivityState({
                 isActiveConversation: false,
-                runtimeBinding: {
-                    status: "active",
-                    lastEventAt: 10,
+                activity: {
+                    label: "Working",
+                    tone: "working",
                 },
-                lastViewedAt: 5,
             }),
         ).toEqual({
             label: "Working",
@@ -23,11 +22,10 @@ describe("resolveConversationActivityState", () => {
         expect(
             resolveConversationActivityState({
                 isActiveConversation: false,
-                runtimeBinding: {
-                    status: "idle",
-                    lastEventAt: 20,
+                activity: {
+                    label: "New reply",
+                    tone: "completed",
                 },
-                lastViewedAt: 10,
             }),
         ).toEqual({
             label: "New reply",
@@ -39,11 +37,10 @@ describe("resolveConversationActivityState", () => {
         expect(
             resolveConversationActivityState({
                 isActiveConversation: true,
-                runtimeBinding: {
-                    status: "idle",
-                    lastEventAt: 20,
+                activity: {
+                    label: "New reply",
+                    tone: "completed",
                 },
-                lastViewedAt: 10,
             }),
         ).toBeNull();
     });

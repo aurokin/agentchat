@@ -323,9 +323,9 @@ export default function HomeScreen(): React.ReactElement {
                         const isSelected = selectedChatIds.has(item.id);
                         const activityState = resolveConversationActivityState({
                             isActiveConversation: currentChat?.id === item.id,
-                            runtimeBinding:
-                                conversationRuntimeBindings[item.id] ?? null,
-                            lastViewedAt: item.lastViewedAt ?? null,
+                            activity:
+                                conversationRuntimeBindings[item.id]
+                                    ?.activity ?? null,
                         });
                         return (
                             <TouchableOpacity

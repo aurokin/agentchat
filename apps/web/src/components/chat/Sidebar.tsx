@@ -41,20 +41,27 @@ interface SidebarProps {
 
 export function resolveSidebarConversationState({
     isActiveConversation,
-    runtimeBinding,
-    lastViewedAt,
+    activity,
 }: {
     isActiveConversation: boolean;
-    runtimeBinding: {
-        status: "idle" | "active" | "expired" | "errored";
-        lastEventAt: number | null;
-    } | null;
-    lastViewedAt: number | null;
+    activity:
+        | {
+              label: "Working";
+              tone: "working";
+          }
+        | {
+              label: "New reply";
+              tone: "completed";
+          }
+        | {
+              label: "Needs attention";
+              tone: "errored";
+          }
+        | null;
 }) {
     return resolveConversationActivityState({
         isActiveConversation,
-        runtimeBinding,
-        lastViewedAt,
+        activity,
     });
 }
 
@@ -400,8 +407,8 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                                 const sidebarState =
                                     resolveSidebarConversationState({
                                         isActiveConversation: isActive,
-                                        runtimeBinding,
-                                        lastViewedAt: chat.lastViewedAt ?? null,
+                                        activity:
+                                            runtimeBinding?.activity ?? null,
                                     });
 
                                 return (
