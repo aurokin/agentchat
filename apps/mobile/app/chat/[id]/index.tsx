@@ -89,6 +89,7 @@ export default function ChatScreen(): ReactElement {
         selectProvider,
         selectModel: setSelectedModel,
         selectVariant: setSelectedVariant,
+        syncSelectionFromChat,
         favoriteModels,
         toggleFavoriteModel,
     } = useModelContext();
@@ -222,6 +223,17 @@ export default function ChatScreen(): ReactElement {
     useEffect(() => {
         currentChatRef.current = currentChat;
     }, [currentChat]);
+
+    useEffect(() => {
+        if (!currentChat) {
+            return;
+        }
+
+        syncSelectionFromChat({
+            modelId: currentChat.modelId,
+            variantId: currentChat.variantId ?? null,
+        });
+    }, [currentChat, syncSelectionFromChat]);
 
     useEffect(() => {
         chatMessagesRef.current = chatMessages;
@@ -583,7 +595,6 @@ export default function ChatScreen(): ReactElement {
                 addMessage,
                 updateMessage,
                 updateChat,
-                setDefaultModel: setSelectedModel,
                 queueStreamingMessageUpdate: setStreamingMessage,
                 ensureConnected: async () => {
                     if (!conversationSubscriptionCleanupRef.current) {

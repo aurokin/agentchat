@@ -75,7 +75,6 @@ interface ChatContextValue {
             >
         >,
     ) => void;
-    setDefaultModel: (modelId: string) => void;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -111,13 +110,8 @@ export function ChatProvider({
     const [isLoading, setIsLoading] = useState(false);
     const [isMessagesLoading, setIsMessagesLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const {
-        defaultAgentId,
-        selectedModel,
-        selectedVariantId,
-        selectModel,
-        models,
-    } = useModelContext();
+    const { defaultAgentId, selectedModel, selectedVariantId, models } =
+        useModelContext();
     const { selectedAgentId } = useAgent();
     const validatedSelectedModel =
         selectedModel && models.some((model) => model.id === selectedModel)
@@ -679,13 +673,6 @@ export function ChatProvider({
         [],
     );
 
-    const setDefaultModel = useCallback(
-        (modelId: string) => {
-            void selectModel(modelId);
-        },
-        [selectModel],
-    );
-
     useEffect(() => {
         setCurrentChat(null);
         setMessages({});
@@ -718,7 +705,6 @@ export function ChatProvider({
                 insertMessage,
                 updateMessage,
                 patchMessage,
-                setDefaultModel,
             }}
         >
             {children}

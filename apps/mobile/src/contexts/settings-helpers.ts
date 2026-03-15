@@ -45,14 +45,14 @@ export function filterModelsForAgent(params: {
 
 export function selectScopedDefaultModel(params: {
     models: ProviderModel[];
-    userPreferredModel: string | null;
+    currentModelId: string | null;
     agentDefaultModel: string | null;
 }): string | null {
-    const { models, userPreferredModel, agentDefaultModel } = params;
+    const { models, currentModelId, agentDefaultModel } = params;
     const modelIds = models.map((model) => model.id);
 
-    if (userPreferredModel && modelIds.includes(userPreferredModel)) {
-        return userPreferredModel;
+    if (currentModelId && modelIds.includes(currentModelId)) {
+        return currentModelId;
     }
 
     if (agentDefaultModel && modelIds.includes(agentDefaultModel)) {
@@ -86,7 +86,7 @@ export function filterModelsForProvider(params: {
 
 export function selectScopedDefaultVariant(params: {
     model: ProviderModel | null | undefined;
-    userPreferredVariantId: string | null;
+    currentVariantId: string | null;
     agentDefaultVariantId: string | null;
 }): string | null {
     const variants = params.model?.variants ?? [];
@@ -97,10 +97,10 @@ export function selectScopedDefaultVariant(params: {
     }
 
     if (
-        params.userPreferredVariantId &&
-        variantIds.includes(params.userPreferredVariantId)
+        params.currentVariantId &&
+        variantIds.includes(params.currentVariantId)
     ) {
-        return params.userPreferredVariantId;
+        return params.currentVariantId;
     }
 
     if (
@@ -121,7 +121,7 @@ export function getVariantsForModel(
 
 export function selectScopedDefaultProvider(params: {
     models: ProviderModel[];
-    userPreferredProviderId: string | null;
+    currentProviderId: string | null;
     selectedModelId: string | null;
     agentDefaultProviderId: string | null;
 }): string | null {
@@ -143,10 +143,10 @@ export function selectScopedDefaultProvider(params: {
     }
 
     if (
-        params.userPreferredProviderId &&
-        availableProviderIds.includes(params.userPreferredProviderId)
+        params.currentProviderId &&
+        availableProviderIds.includes(params.currentProviderId)
     ) {
-        return params.userPreferredProviderId;
+        return params.currentProviderId;
     }
 
     if (

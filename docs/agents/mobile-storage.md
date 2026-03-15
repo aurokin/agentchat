@@ -4,14 +4,15 @@ The mobile app is now Convex-first. Do not add new SQLite, file-system, or other
 
 ## Active Storage
 
-- `expo-secure-store` stores auth tokens, onboarding state, theme, selected agent, selected chat, and per-agent default provider/model/variant preferences.
+- `expo-secure-store` stores auth tokens, onboarding state, theme, selected agent, and selected chat.
+- Convex stores cross-client user workspace data such as favorite models.
 - Convex is the authoritative backend for chats, messages, runs, and runtime recovery state.
 - Mobile runtime code reads and writes through the Convex-backed persistence adapter in `apps/mobile/src/lib/workspace/convex-adapter.ts`.
 
 ## What To Use
 
 - Use `src/lib/storage/credential-storage.ts` for auth credentials.
-- Use `src/lib/storage/user-settings-storage.ts` for selected agent/chat and per-agent defaults.
+- Use `src/lib/storage/user-settings-storage.ts` for selected agent/chat only.
 - Use `src/lib/storage/sync-storage.ts` only for theme and onboarding persistence.
 - Use `src/contexts/WorkspaceContext.tsx` and the shared `PersistenceAdapter` interface for chat/message persistence.
 
@@ -24,7 +25,8 @@ The mobile app is now Convex-first. Do not add new SQLite, file-system, or other
 ## Current Model
 
 - Conversations are scoped to the selected agent.
-- Provider, model, and variant defaults can be stored per agent in SecureStore.
+- Agent config provides the defaults for new draft conversations.
+- Each conversation persists its own locked model and variant after the first user message.
 - Active run state is recovered from Convex-backed run summaries plus websocket state.
 
 ## Related Files

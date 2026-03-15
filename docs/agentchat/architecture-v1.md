@@ -148,8 +148,8 @@ For the migration plan, use [Runtime And Auth Plan](./runtime-and-auth-plan.md).
 
 ## Suggested Convex Entity Set
 
-- `user_defaults`
-  - per-user default provider, model, and variant
+- `users`
+  - auth identity, workspace counters, and lightweight cross-client preferences such as favorite models
 - `conversations`
   - user-owned threads bound to one agent
 - `messages`

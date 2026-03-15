@@ -263,9 +263,6 @@ describe("conversation runtime controller", () => {
                 updateMessage: async () => {
                     calls.push("updateMessage");
                 },
-                setDefaultModel: (modelId) => {
-                    calls.push(`defaultModel:${modelId}`);
-                },
                 queueStreamingMessageUpdate: (update) => {
                     calls.push(`stream:${update?.id ?? "none"}`);
                 },
@@ -289,7 +286,6 @@ describe("conversation runtime controller", () => {
         });
         expect(calls).toEqual([
             expect.stringMatching(/^add:user:/),
-            "defaultModel:gpt-5.3-codex",
             "updateChat:Ship it",
             expect.stringMatching(/^add:assistant:/),
             expect.stringMatching(/^stream:/),
@@ -325,7 +321,6 @@ describe("conversation runtime controller", () => {
                         context: update.contextContent ?? "",
                     });
                 },
-                setDefaultModel: () => {},
                 queueStreamingMessageUpdate: () => {},
                 ensureConnected: async () => {
                     throw new Error("socket unavailable");

@@ -46,42 +46,17 @@ Notes:
 
 - access remains controlled by auth plus allowlist, not by a client-supplied user id
 
-### `user_global_defaults`
+### `users.favoriteModelIds`
 
 Purpose:
 
-- store default provider, model, and variant for a user when no agent-specific override exists
+- store the user’s favorite models for cross-client model selection
 
-Fields:
+Notes:
 
-- `userId`
-- `provider`
-- `model`
-- `variant`
-- `updatedAt`
-
-Indexes:
-
-- `by_userId`
-
-### `user_agent_defaults`
-
-Purpose:
-
-- store per-agent overrides on top of global defaults
-
-Fields:
-
-- `userId`
-- `agentId`
-- `provider`
-- `model`
-- `variant`
-- `updatedAt`
-
-Indexes:
-
-- `by_userId_and_agentId`
+- agent config supplies the defaults for new draft conversations
+- conversations persist their own `modelId` and `variantId`
+- we do not persist per-user default provider/model/variant state
 
 ### `conversations`
 

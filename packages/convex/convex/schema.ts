@@ -17,6 +17,7 @@ export default defineSchema({
         username: v.optional(v.string()),
         authProvider: v.optional(v.string()),
         localAuthEnabled: v.optional(v.boolean()),
+        favoriteModelIds: v.optional(v.array(v.string())),
         emailVerificationTime: v.optional(v.number()),
         phone: v.optional(v.string()),
         phoneVerificationTime: v.optional(v.number()),

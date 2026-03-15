@@ -54,7 +54,6 @@ export type ConversationSendRuntimeDependencies = {
     }) => Promise<Message>;
     updateChat: (chat: ChatSession) => Promise<void>;
     updateMessage: (id: string, updates: MessageUpdate) => Promise<void>;
-    setDefaultModel: (modelId: string) => void;
     queueStreamingMessageUpdate: (
         update: StreamingMessageState | null,
     ) => void | Promise<void>;
@@ -117,7 +116,6 @@ export async function runConversationSend(params: {
         assistantMessageId = sendPlan.assistantMessage.id;
 
         await params.dependencies.addMessage(sendPlan.userMessage);
-        params.dependencies.setDefaultModel(params.chat.modelId);
 
         if (sendPlan.titleUpdate) {
             await params.dependencies.updateChat(sendPlan.titleUpdate);

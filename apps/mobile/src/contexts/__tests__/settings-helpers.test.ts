@@ -83,21 +83,21 @@ describe("settings helpers", () => {
         ]);
     });
 
-    test("prefers a stored user model when it is still allowed", () => {
+    test("prefers the current model when it is still allowed", () => {
         expect(
             selectScopedDefaultModel({
                 models,
-                userPreferredModel: "other/model-b",
+                currentModelId: "other/model-b",
                 agentDefaultModel: "codex/model-a",
             }),
         ).toBe("other/model-b");
     });
 
-    test("falls back to the agent default model when the stored preference is unavailable", () => {
+    test("falls back to the agent default model when the current model is unavailable", () => {
         expect(
             selectScopedDefaultModel({
                 models: [models[0]!],
-                userPreferredModel: "other/model-b",
+                currentModelId: "other/model-b",
                 agentDefaultModel: "codex/model-a",
             }),
         ).toBe("codex/model-a");
@@ -107,18 +107,18 @@ describe("settings helpers", () => {
         expect(
             selectScopedDefaultProvider({
                 models,
-                userPreferredProviderId: "codex",
+                currentProviderId: "codex",
                 selectedModelId: "other/model-b",
                 agentDefaultProviderId: "codex",
             }),
         ).toBe("other");
     });
 
-    test("falls back to the agent default provider when the stored provider is unavailable", () => {
+    test("falls back to the agent default provider when the current provider is unavailable", () => {
         expect(
             selectScopedDefaultProvider({
                 models: [models[0]!],
-                userPreferredProviderId: "other",
+                currentProviderId: "other",
                 selectedModelId: null,
                 agentDefaultProviderId: "codex",
             }),
@@ -134,11 +134,11 @@ describe("settings helpers", () => {
         ).toEqual(["codex/model-a"]);
     });
 
-    test("prefers a stored variant when it is still available", () => {
+    test("prefers the current variant when it is still available", () => {
         expect(
             selectScopedDefaultVariant({
                 model: models[0],
-                userPreferredVariantId: "low",
+                currentVariantId: "low",
                 agentDefaultVariantId: "high",
             }),
         ).toBe("low");
@@ -148,7 +148,7 @@ describe("settings helpers", () => {
         expect(
             selectScopedDefaultVariant({
                 model: models[0],
-                userPreferredVariantId: "missing",
+                currentVariantId: "missing",
                 agentDefaultVariantId: "high",
             }),
         ).toBe("high");

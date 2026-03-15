@@ -3,10 +3,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import {
     clearSelectedChatId,
     clearSelectedAgentId,
-    getDefaultModel,
     getSelectedAgentId,
     getSelectedChatId,
-    setDefaultModel,
     setSelectedAgentId,
     setSelectedChatId,
     setTheme,
@@ -40,7 +38,7 @@ class MockLocalStorage implements Storage {
     }
 }
 
-describe("storage scoped defaults", () => {
+describe("web storage", () => {
     const originalWindow = globalThis.window;
     const originalLocalStorage = globalThis.localStorage;
 
@@ -55,40 +53,12 @@ describe("storage scoped defaults", () => {
         globalThis.localStorage = originalLocalStorage;
     });
 
-    test("falls back to the global default model when an agent-specific value is missing", () => {
-        setDefaultModel("global-model");
-
-        expect(getDefaultModel("agent-a")).toBe("global-model");
-        expect(getDefaultModel()).toBe("global-model");
-    });
-
-    test("stores agent-specific model overrides independently", () => {
-        setDefaultModel("global-model");
-        setDefaultModel("agent-a-model", "agent-a");
-        setDefaultModel("agent-b-model", "agent-b");
-
-        expect(getDefaultModel("agent-a")).toBe("agent-a-model");
-        expect(getDefaultModel("agent-b")).toBe("agent-b-model");
-        expect(getDefaultModel()).toBe("global-model");
-    });
-
-    test("ignores malformed scoped storage values and falls back safely", () => {
-        localStorage.setItem("agentchat-default-model-by-agent", "not-json");
-        setDefaultModel("global-model");
-
-        expect(getDefaultModel("agent-a")).toBe("global-model");
-    });
-
     test("uses the agentchat namespace for top-level web storage keys", () => {
         setTheme("dark");
-        setDefaultModel("global-model");
         setSelectedAgentId("agent-a");
         setSelectedChatId("agent-a", "chat-1");
 
         expect(localStorage.getItem("agentchat-theme")).toBe("dark");
-        expect(localStorage.getItem("agentchat-default-model")).toBe(
-            "global-model",
-        );
         expect(localStorage.getItem("agentchat-selected-agent")).toBe(
             "agent-a",
         );

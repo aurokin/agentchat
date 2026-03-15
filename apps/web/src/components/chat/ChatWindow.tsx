@@ -103,8 +103,7 @@ export function ChatWindow() {
         createChat,
     } = useChat();
     const { agents, selectedAgent } = useAgent();
-    const { defaultModel, setDefaultModel, models, favoriteModels } =
-        useSettings();
+    const { models, favoriteModels } = useSettings();
     const issueBackendSessionToken = useActionSafe(
         convexApi.backendTokens.issue,
     );
@@ -149,7 +148,9 @@ export function ChatWindow() {
         if (!messagesMatchChat) return;
 
         const fallbackModelId =
-            defaultModel || currentChat.modelId || APP_DEFAULT_MODEL;
+            currentChat.modelId ||
+            selectedAgent?.defaultModel ||
+            APP_DEFAULT_MODEL;
         const defaults = {
             modelId: fallbackModelId,
             variantId:
@@ -184,10 +185,10 @@ export function ChatWindow() {
         lastInitializedChatIdRef.current = currentChat.id;
     }, [
         currentChat,
-        defaultModel,
         isMessagesLoading,
         messages,
         models,
+        selectedAgent?.defaultModel,
         selectedAgent?.defaultVariant,
         updateChat,
     ]);
@@ -213,7 +214,6 @@ export function ChatWindow() {
         updateMessage,
         patchMessage,
         updateChat,
-        setDefaultModel,
     });
 
     const effectiveRuntimeState = useMemo(
@@ -302,7 +302,6 @@ export function ChatWindow() {
                         modelId: nextModelId,
                         variantId: nextVariantId,
                     });
-                    setDefaultModel(nextModelId);
                 }
                 return;
             }
@@ -310,14 +309,7 @@ export function ChatWindow() {
 
         window.addEventListener("keydown", handleKeyDown, true);
         return () => window.removeEventListener("keydown", handleKeyDown, true);
-    }, [
-        currentChat,
-        favoriteModels,
-        models,
-        router,
-        setDefaultModel,
-        updateChat,
-    ]);
+    }, [currentChat, favoriteModels, models, router, updateChat]);
 
     const handleModelChange = async (modelId: string) => {
         if (!currentChat) return;
@@ -334,7 +326,6 @@ export function ChatWindow() {
             modelId,
             variantId: nextVariantId,
         });
-        setDefaultModel(modelId);
     };
 
     const handleVariantChange = async (variantId: string) => {

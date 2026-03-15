@@ -45,14 +45,14 @@ export function filterModelsForAgent(params: {
 
 export function selectScopedDefaultModel(params: {
     models: ProviderModel[];
-    userPreferredModel: string | null;
+    currentModelId: string | null;
     agentDefaultModel: string | null;
 }): string | null {
-    const { models, userPreferredModel, agentDefaultModel } = params;
+    const { models, currentModelId, agentDefaultModel } = params;
     const modelIds = models.map((model) => model.id);
 
-    if (userPreferredModel && modelIds.includes(userPreferredModel)) {
-        return userPreferredModel;
+    if (currentModelId && modelIds.includes(currentModelId)) {
+        return currentModelId;
     }
 
     if (agentDefaultModel && modelIds.includes(agentDefaultModel)) {

@@ -75,17 +75,17 @@ describe("settings helpers", () => {
         ).toEqual([{ id: "balanced", label: "Balanced" }]);
     });
 
-    test("prefers a stored user model when it is still allowed", () => {
+    test("prefers the current model when it is still allowed", () => {
         expect(
             selectScopedDefaultModel({
                 models,
-                userPreferredModel: "gpt-5.3-codex",
+                currentModelId: "gpt-5.3-codex",
                 agentDefaultModel: "codex-mini",
             }),
         ).toBe("gpt-5.3-codex");
     });
 
-    test("falls back to the agent default model when the stored preference is unavailable", () => {
+    test("falls back to the agent default model when the current model is unavailable", () => {
         expect(
             selectScopedDefaultModel({
                 models: filterModelsForAgent({
@@ -93,7 +93,7 @@ describe("settings helpers", () => {
                     selectedAgent,
                     selectedAgentOptions: null,
                 }),
-                userPreferredModel: "codex-mini",
+                currentModelId: "codex-mini",
                 agentDefaultModel: "gpt-5.3-codex",
             }),
         ).toBe("gpt-5.3-codex");

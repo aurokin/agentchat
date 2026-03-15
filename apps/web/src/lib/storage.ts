@@ -1,8 +1,5 @@
 const STORAGE_KEYS = {
     THEME: "agentchat-theme",
-    DEFAULT_MODEL: "agentchat-default-model",
-    DEFAULT_MODEL_BY_AGENT: "agentchat-default-model-by-agent",
-    FAVORITE_MODELS: "agentchat-favorite-models",
     SELECTED_AGENT: "agentchat-selected-agent",
     SELECTED_CHAT_BY_AGENT: "agentchat-selected-chat-by-agent",
 } as const;
@@ -52,53 +49,6 @@ function getStringMap(storageKey: string): Record<string, string> {
 function setStringMap(storageKey: string, value: Record<string, string>): void {
     if (typeof window === "undefined") return;
     localStorage.setItem(storageKey, JSON.stringify(value));
-}
-
-export function getDefaultModel(agentId?: string | null): string {
-    if (typeof window === "undefined") return "";
-    if (agentId) {
-        const scopedModel = getStringMap(STORAGE_KEYS.DEFAULT_MODEL_BY_AGENT)[
-            agentId
-        ];
-        if (scopedModel) {
-            return scopedModel;
-        }
-    }
-
-    return localStorage.getItem(STORAGE_KEYS.DEFAULT_MODEL) || "";
-}
-
-export function setDefaultModel(
-    modelId: string,
-    agentId?: string | null,
-): void {
-    if (typeof window === "undefined") return;
-    if (agentId) {
-        const scopedModels = getStringMap(STORAGE_KEYS.DEFAULT_MODEL_BY_AGENT);
-        scopedModels[agentId] = modelId;
-        setStringMap(STORAGE_KEYS.DEFAULT_MODEL_BY_AGENT, scopedModels);
-        return;
-    }
-
-    localStorage.setItem(STORAGE_KEYS.DEFAULT_MODEL, modelId);
-}
-
-export function getFavoriteModels(): string[] {
-    if (typeof window === "undefined") return [];
-    try {
-        const stored = localStorage.getItem(STORAGE_KEYS.FAVORITE_MODELS);
-        return stored ? JSON.parse(stored) : [];
-    } catch {
-        return [];
-    }
-}
-
-export function setFavoriteModels(modelIds: string[]): void {
-    if (typeof window === "undefined") return;
-    localStorage.setItem(
-        STORAGE_KEYS.FAVORITE_MODELS,
-        JSON.stringify(modelIds),
-    );
 }
 
 export function getSelectedAgentId(): string | null {

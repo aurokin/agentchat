@@ -84,6 +84,17 @@ export const getCurrentUserId = query({
     },
 });
 
+export const getPreferences = query({
+    args: {},
+    handler: async (ctx) => {
+        const userId = await requireWorkspaceUser(ctx);
+        const user = await ctx.db.get(userId);
+        return {
+            favoriteModelIds: user?.favoriteModelIds ?? [],
+        };
+    },
+});
+
 export const getStorageUsage = query({
     args: { userId: v.id("users") },
     handler: async (ctx, args) => {
@@ -127,11 +138,31 @@ export const create = internalMutation({
             username: args.username ?? undefined,
             authProvider: args.authProvider ?? undefined,
             localAuthEnabled: args.localAuthEnabled ?? undefined,
+            favoriteModelIds: [],
             workspaceChatCount: 0,
             workspaceMessageCount: 0,
             createdAt: now,
             updatedAt: now,
         });
+    },
+});
+
+export const setFavoriteModels = mutation({
+    args: {
+        modelIds: v.array(v.string()),
+    },
+    handler: async (ctx, args) => {
+        const userId = await requireWorkspaceUser(ctx);
+        const favoriteModelIds = Array.from(
+            new Set(args.modelIds.map((modelId) => modelId.trim())),
+        ).filter((modelId) => modelId.length > 0);
+        await ctx.db.patch(userId, {
+            favoriteModelIds,
+            updatedAt: Date.now(),
+        });
+        return {
+            favoriteModelIds,
+        };
     },
 });
 

@@ -62,7 +62,6 @@ type UseConversationRuntimeParams = {
         >,
     ) => void;
     updateChat: (chat: ChatSession) => Promise<void>;
-    setDefaultModel: (modelId: string) => void;
 };
 
 type UseConversationRuntimeResult = {
@@ -89,7 +88,6 @@ export function useConversationRuntime({
     updateMessage,
     patchMessage,
     updateChat,
-    setDefaultModel,
 }: UseConversationRuntimeParams): UseConversationRuntimeResult {
     const [sending, setSending] = useState(false);
     const [error, setError] = useState<RuntimeErrorState | null>(null);
@@ -404,7 +402,6 @@ export function useConversationRuntime({
                     addMessage,
                     updateChat,
                     updateMessage,
-                    setDefaultModel,
                     queueStreamingMessageUpdate,
                     ensureConnected: () =>
                         socketClient.ensureConnected(getBackendSessionToken),
@@ -432,7 +429,6 @@ export function useConversationRuntime({
             messages,
             models,
             queueStreamingMessageUpdate,
-            setDefaultModel,
             socketClient,
             updateChat,
             updateMessage,

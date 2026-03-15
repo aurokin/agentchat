@@ -9,6 +9,8 @@ import React, {
     useCallback,
     useRef,
 } from "react";
+import { useMutation, useQuery } from "convex/react";
+import { api } from "@convex/_generated/api";
 import type { UserSettings, ProviderModel } from "@/lib/types";
 import * as storage from "@/lib/storage";
 import { fetchAvailableModels } from "@/lib/agentchat-server";
@@ -17,13 +19,10 @@ import {
     toAgentchatServerIssue,
 } from "@/lib/server-issues";
 import { useAgent } from "@/contexts/AgentContext";
-import {
-    filterModelsForAgent,
-    selectScopedDefaultModel,
-} from "@/contexts/settings-helpers";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { filterModelsForAgent } from "@/contexts/settings-helpers";
 
 interface SettingsContextType extends UserSettings {
-    setDefaultModel: (modelId: string) => void;
     setTheme: (theme: UserSettings["theme"]) => void;
     toggleFavoriteModel: (modelId: string) => void;
     models: ProviderModel[];
@@ -33,27 +32,15 @@ interface SettingsContextType extends UserSettings {
 }
 
 const defaultSettings: UserSettings = {
-    defaultModel: "",
     theme: "system",
     favoriteModels: [],
 };
 
 const SettingsContext = createContext<SettingsContextType | null>(null);
 
-export function selectInitialDefaultModel(params: {
-    fetchedModels: ProviderModel[];
-    userPreferredModel: string | null;
-    agentDefaultModel: string | null;
-}): string | null {
-    return selectScopedDefaultModel({
-        models: params.fetchedModels,
-        userPreferredModel: params.userPreferredModel,
-        agentDefaultModel: params.agentDefaultModel,
-    });
-}
-
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
-    const { selectedAgentId, selectedAgent, selectedAgentOptions } = useAgent();
+    const { selectedAgent, selectedAgentOptions } = useAgent();
+    const { isWorkspaceReady } = useWorkspace();
     const [settings, setSettings] = useState<UserSettings>(defaultSettings);
     const [allModels, setAllModels] = useState<ProviderModel[]>([]);
     const [loadingModels, setLoadingModels] = useState(false);
@@ -62,6 +49,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     );
     const [mounted, setMounted] = useState(false);
     const refreshPromiseRef = useRef<Promise<void> | null>(null);
+    const preferences = useQuery(
+        api.users.getPreferences,
+        isWorkspaceReady ? {} : "skip",
+    );
+    const saveFavoriteModels = useMutation(api.users.setFavoriteModels);
 
     const models = useMemo(
         () =>
@@ -74,7 +66,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     );
 
     const refreshModels = useCallback(async () => {
-        // Prevent duplicate requests
         if (refreshPromiseRef.current) {
             return refreshPromiseRef.current;
         }
@@ -104,58 +95,27 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         setSettings((prev) => ({
             ...prev,
-            defaultModel: storage.getDefaultModel(),
             theme: storage.getTheme(),
-            favoriteModels: storage.getFavoriteModels(),
         }));
         setMounted(true);
     }, []);
 
     useEffect(() => {
         if (mounted) {
-            refreshModels();
+            void refreshModels();
         }
     }, [mounted, refreshModels]);
 
     useEffect(() => {
-        if (!mounted) return;
-
-        const selectedModelId = selectInitialDefaultModel({
-            fetchedModels: models,
-            userPreferredModel: storage.getDefaultModel(selectedAgentId),
-            agentDefaultModel:
-                selectedAgentOptions?.defaultModel ??
-                selectedAgent?.defaultModel ??
-                null,
-        });
-
-        if (!selectedModelId) {
+        if (preferences === undefined) {
             return;
         }
 
-        storage.setDefaultModel(selectedModelId, selectedAgentId);
-        setSettings((prev) => {
-            if (prev.defaultModel === selectedModelId) {
-                return prev;
-            }
-
-            return {
-                ...prev,
-                defaultModel: selectedModelId,
-            };
-        });
-    }, [
-        models,
-        mounted,
-        selectedAgentId,
-        selectedAgent?.defaultModel,
-        selectedAgentOptions?.defaultModel,
-    ]);
-
-    const setDefaultModel = (modelId: string) => {
-        storage.setDefaultModel(modelId, selectedAgentId);
-        setSettings((prev) => ({ ...prev, defaultModel: modelId }));
-    };
+        setSettings((prev) => ({
+            ...prev,
+            favoriteModels: preferences.favoriteModelIds,
+        }));
+    }, [preferences]);
 
     const setTheme = (theme: UserSettings["theme"]) => {
         storage.setTheme(theme);
@@ -181,11 +141,15 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     const toggleFavoriteModel = (modelId: string) => {
         setSettings((prev) => {
             const isFavorite = prev.favoriteModels.includes(modelId);
-            const newFavorites = isFavorite
+            const favoriteModels = isFavorite
                 ? prev.favoriteModels.filter((id) => id !== modelId)
                 : [...prev.favoriteModels, modelId];
-            storage.setFavoriteModels(newFavorites);
-            return { ...prev, favoriteModels: newFavorites };
+            void saveFavoriteModels({ modelIds: favoriteModels }).catch(
+                (error) => {
+                    console.error("Failed to save favorite models:", error);
+                },
+            );
+            return { ...prev, favoriteModels };
         });
     };
 
@@ -199,7 +163,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         <SettingsContext.Provider
             value={{
                 ...settings,
-                setDefaultModel,
                 setTheme,
                 toggleFavoriteModel,
                 models,

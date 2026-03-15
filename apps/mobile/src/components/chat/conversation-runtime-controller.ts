@@ -21,7 +21,6 @@ export type MobileConversationSendDependencies = {
     ) => Promise<Message>;
     updateMessage: (message: Message) => Promise<void>;
     updateChat: (chat: ChatSession) => Promise<void>;
-    setDefaultModel: (modelId: string) => void;
     queueStreamingMessageUpdate: (
         update: StreamingMessageState | null,
     ) => void | Promise<void>;
@@ -72,8 +71,6 @@ export async function runMobileConversationSend(params: {
             reasoningEffort: sendPlan.userMessage.reasoningEffort,
             completedAt: Date.now(),
         });
-
-        params.dependencies.setDefaultModel(params.chat.modelId);
 
         if (
             sendPlan.titleUpdate ||

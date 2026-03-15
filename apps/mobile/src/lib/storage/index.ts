@@ -15,16 +15,6 @@ export {
     type UserTheme,
 } from "@/lib/storage/sync-storage";
 export {
-    getDefaultProviderForAgent,
-    setDefaultProviderForAgent,
-    getDefaultModel,
-    setDefaultModel,
-    getDefaultModelForAgent,
-    setDefaultModelForAgent,
-    getDefaultVariantForAgent,
-    setDefaultVariantForAgent,
-    getFavoriteModels,
-    setFavoriteModels,
     getSelectedAgentId,
     setSelectedAgentId,
     clearSelectedAgentId,

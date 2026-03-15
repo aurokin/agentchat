@@ -81,7 +81,6 @@ describe("mobile conversation runtime controller", () => {
                 updateChat: async (chat) => {
                     updatedChats.push(chat);
                 },
-                setDefaultModel: () => {},
                 queueStreamingMessageUpdate: () => {},
                 ensureConnected: async () => {},
                 sendCommand: (command) => {
@@ -110,7 +109,6 @@ describe("mobile conversation runtime controller", () => {
                     createMessage(message as Partial<Message>),
                 updateMessage: async () => {},
                 updateChat: async () => {},
-                setDefaultModel: () => {},
                 queueStreamingMessageUpdate: () => {},
                 ensureConnected: async () => {
                     throw new Error("socket failed");

@@ -7,23 +7,16 @@ import React, {
     useMemo,
     type ReactNode,
 } from "react";
+import { useMutation, useQuery } from "convex/react";
+import { api } from "@convex/_generated/api";
 import {
     modelSupportsReasoning as providerSupportsReasoning,
     modelSupportsVision as providerSupportsVision,
     type ProviderModel,
 } from "@shared/core/models";
-import {
-    getDefaultProviderForAgent,
-    getDefaultModelForAgent,
-    getDefaultVariantForAgent,
-    getFavoriteModels,
-    setDefaultProviderForAgent,
-    setDefaultModelForAgent,
-    setDefaultVariantForAgent,
-    setFavoriteModels,
-} from "@/lib/storage";
 import { fetchAvailableModels } from "@/lib/agentchat-server";
 import { useAgent } from "@/contexts/AgentContext";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 import {
     filterModelsForProvider,
     filterModelsForAgent,
@@ -55,6 +48,10 @@ interface ModelContextValue {
     }>;
     selectedVariantId: string | null;
     selectVariant: (variantId: string) => Promise<void>;
+    syncSelectionFromChat: (params: {
+        modelId: string;
+        variantId: string | null;
+    }) => void;
     refreshModels: () => Promise<void>;
     favoriteModels: string[];
     toggleFavoriteModel: (modelId: string) => void;
@@ -88,12 +85,26 @@ export function ModelProvider({
         null,
     );
     const [favoriteModels, setFavoriteModelsState] = useState<string[]>([]);
-    const [hasLoadedSelectedProvider, setHasLoadedSelectedProvider] =
-        useState(false);
-    const [hasLoadedSelectedModel, setHasLoadedSelectedModel] = useState(false);
-    const [hasLoadedSelectedVariant, setHasLoadedSelectedVariant] =
-        useState(false);
+    const { isWorkspaceReady } = useWorkspace();
     const { selectedAgentId, selectedAgent, selectedAgentOptions } = useAgent();
+    const preferences = useQuery(
+        api.users.getPreferences,
+        isWorkspaceReady ? {} : "skip",
+    );
+    const saveFavoriteModels = useMutation(api.users.setFavoriteModels);
+
+    const agentDefaultProviderId =
+        selectedAgentOptions?.defaultProviderId ??
+        selectedAgent?.defaultProviderId ??
+        null;
+    const agentDefaultModel =
+        selectedAgentOptions?.defaultModel ??
+        selectedAgent?.defaultModel ??
+        null;
+    const agentDefaultVariantId =
+        selectedAgentOptions?.defaultVariant ??
+        selectedAgent?.defaultVariant ??
+        null;
 
     const agentModels = useMemo(
         () =>
@@ -145,57 +156,6 @@ export function ModelProvider({
         [selectedModelEntry],
     );
 
-    const loadSelectedProvider = useCallback(async () => {
-        try {
-            const providerId =
-                await getDefaultProviderForAgent(selectedAgentId);
-            if (providerId) {
-                setSelectedProviderId(providerId);
-            }
-        } catch {
-            console.error("Failed to load selected provider");
-        } finally {
-            setHasLoadedSelectedProvider(true);
-        }
-    }, [selectedAgentId]);
-
-    const loadSelectedModel = useCallback(async () => {
-        try {
-            const modelId = await getDefaultModelForAgent(selectedAgentId);
-            if (modelId) {
-                setSelectedModel(modelId);
-            }
-        } catch {
-            console.error("Failed to load selected model");
-        } finally {
-            setHasLoadedSelectedModel(true);
-        }
-    }, [selectedAgentId]);
-
-    const loadSelectedVariant = useCallback(async () => {
-        try {
-            const variantId = await getDefaultVariantForAgent(selectedAgentId);
-            if (variantId) {
-                setSelectedVariantId(variantId);
-            } else {
-                setSelectedVariantId(null);
-            }
-        } catch {
-            console.error("Failed to load selected variant");
-        } finally {
-            setHasLoadedSelectedVariant(true);
-        }
-    }, [selectedAgentId]);
-
-    const loadFavoriteModels = useCallback(async () => {
-        try {
-            const storedFavorites = await getFavoriteModels();
-            setFavoriteModelsState(storedFavorites);
-        } catch {
-            console.error("Failed to load favorite models");
-        }
-    }, []);
-
     const refreshModels = useCallback(async () => {
         setIsLoading(true);
         setError(null);
@@ -212,6 +172,26 @@ export function ModelProvider({
         }
     }, []);
 
+    const applySelection = useCallback(
+        (params: { modelId: string | null; variantId: string | null }) => {
+            const modelEntry =
+                agentModels.find((model) => model.id === params.modelId) ??
+                null;
+            setSelectedModel(params.modelId);
+            setSelectedProviderId(
+                modelEntry ? getProviderIdForModel(modelEntry) : null,
+            );
+            setSelectedVariantId(
+                selectScopedDefaultVariant({
+                    model: modelEntry,
+                    currentVariantId: params.variantId,
+                    agentDefaultVariantId,
+                }),
+            );
+        },
+        [agentDefaultVariantId, agentModels],
+    );
+
     const selectProvider = useCallback(
         async (providerId: string) => {
             const providerModels = filterModelsForProvider({
@@ -222,111 +202,63 @@ export function ModelProvider({
                 return;
             }
 
-            try {
-                await setDefaultProviderForAgent(providerId, selectedAgentId);
-                setSelectedProviderId(providerId);
+            setSelectedProviderId(providerId);
 
-                if (
-                    !providerModels.some((model) => model.id === selectedModel)
-                ) {
-                    const nextModel = selectScopedDefaultModel({
-                        models: providerModels,
-                        userPreferredModel: null,
-                        agentDefaultModel:
-                            selectedAgentOptions?.defaultModel ??
-                            selectedAgent?.defaultModel ??
-                            null,
-                    });
-
-                    if (nextModel) {
-                        await setDefaultModelForAgent(
-                            nextModel,
-                            selectedAgentId,
-                        );
-                        setSelectedModel(nextModel);
-
-                        const nextModelEntry =
-                            providerModels.find(
-                                (model) => model.id === nextModel,
-                            ) ?? null;
-                        const nextVariantId = selectScopedDefaultVariant({
-                            model: nextModelEntry,
-                            userPreferredVariantId: null,
-                            agentDefaultVariantId:
-                                selectedAgentOptions?.defaultVariant ??
-                                selectedAgent?.defaultVariant ??
-                                null,
-                        });
-                        if (nextVariantId) {
-                            await setDefaultVariantForAgent(
-                                nextVariantId,
-                                selectedAgentId,
-                            );
-                        }
-                        setSelectedVariantId(nextVariantId);
-                    }
-                }
-            } catch {
-                console.error("Failed to save selected provider");
+            if (providerModels.some((model) => model.id === selectedModel)) {
+                return;
             }
+
+            const nextModelId = selectScopedDefaultModel({
+                models: providerModels,
+                currentModelId: null,
+                agentDefaultModel,
+            });
+            if (!nextModelId) {
+                setSelectedModel(null);
+                setSelectedVariantId(null);
+                return;
+            }
+
+            const nextModelEntry =
+                providerModels.find((model) => model.id === nextModelId) ??
+                null;
+            setSelectedModel(nextModelId);
+            setSelectedVariantId(
+                selectScopedDefaultVariant({
+                    model: nextModelEntry,
+                    currentVariantId: selectedVariantId,
+                    agentDefaultVariantId,
+                }),
+            );
         },
         [
+            agentDefaultModel,
+            agentDefaultVariantId,
             agentModels,
-            selectedAgent?.defaultVariant,
-            selectedAgent?.defaultModel,
-            selectedAgentId,
-            selectedAgentOptions?.defaultVariant,
-            selectedAgentOptions?.defaultModel,
             selectedModel,
+            selectedVariantId,
         ],
     );
 
     const selectModel = useCallback(
         async (modelId: string) => {
-            try {
-                await setDefaultModelForAgent(modelId, selectedAgentId);
-                setSelectedModel(modelId);
-
-                const nextModelEntry =
-                    agentModels.find((entry) => entry.id === modelId) ?? null;
-                const providerId = nextModelEntry
-                    ? getProviderIdForModel(nextModelEntry)
-                    : null;
-                if (providerId) {
-                    await setDefaultProviderForAgent(
-                        providerId,
-                        selectedAgentId,
-                    );
-                    setSelectedProviderId(providerId);
-                }
-
-                const nextVariantId = selectScopedDefaultVariant({
-                    model: nextModelEntry,
-                    userPreferredVariantId: selectedVariantId,
-                    agentDefaultVariantId:
-                        selectedAgentOptions?.defaultVariant ??
-                        selectedAgent?.defaultVariant ??
-                        null,
-                });
-
-                if (nextVariantId) {
-                    await setDefaultVariantForAgent(
-                        nextVariantId,
-                        selectedAgentId,
-                    );
-                }
-                setSelectedVariantId(nextVariantId);
-            } catch {
-                console.error("Failed to save selected model");
+            const nextModelEntry =
+                agentModels.find((entry) => entry.id === modelId) ?? null;
+            if (!nextModelEntry) {
+                return;
             }
+
+            setSelectedModel(modelId);
+            setSelectedProviderId(getProviderIdForModel(nextModelEntry));
+            setSelectedVariantId(
+                selectScopedDefaultVariant({
+                    model: nextModelEntry,
+                    currentVariantId: selectedVariantId,
+                    agentDefaultVariantId,
+                }),
+            );
         },
-        [
-            agentModels,
-            selectedAgent?.defaultVariant,
-            selectedAgentId,
-            selectedAgentOptions?.defaultVariant,
-            selectedVariantId,
-        ],
+        [agentDefaultVariantId, agentModels, selectedVariantId],
     );
 
     const selectVariant = useCallback(
@@ -338,136 +270,87 @@ export function ModelProvider({
                 return;
             }
 
-            try {
-                await setDefaultVariantForAgent(variantId, selectedAgentId);
-                setSelectedVariantId(variantId);
-            } catch {
-                console.error("Failed to save selected variant");
-            }
+            setSelectedVariantId(variantId);
         },
-        [availableVariants, selectedAgentId],
+        [availableVariants],
     );
 
-    const toggleFavoriteModel = useCallback((modelId: string) => {
-        setFavoriteModelsState((prev) => {
-            const isFavorite = prev.includes(modelId);
-            const nextFavorites = isFavorite
-                ? prev.filter((id) => id !== modelId)
-                : [...prev, modelId];
-            void setFavoriteModels(nextFavorites);
-            return nextFavorites;
-        });
-    }, []);
+    const syncSelectionFromChat = useCallback(
+        (params: { modelId: string; variantId: string | null }) => {
+            applySelection(params);
+        },
+        [applySelection],
+    );
 
-    useEffect(() => {
-        loadSelectedProvider();
-        loadSelectedModel();
-        loadSelectedVariant();
-        loadFavoriteModels();
-    }, [
-        loadFavoriteModels,
-        loadSelectedModel,
-        loadSelectedProvider,
-        loadSelectedVariant,
-    ]);
-
-    useEffect(() => {
-        if (
-            hasLoadedSelectedModel &&
-            hasLoadedSelectedProvider &&
-            hasLoadedSelectedVariant
-        ) {
-            refreshModels();
-        }
-    }, [
-        hasLoadedSelectedModel,
-        hasLoadedSelectedProvider,
-        hasLoadedSelectedVariant,
-        refreshModels,
-    ]);
-
-    useEffect(() => {
-        if (
-            !hasLoadedSelectedModel ||
-            !hasLoadedSelectedProvider ||
-            !hasLoadedSelectedVariant
-        ) {
-            return;
-        }
-
-        const nextSelectedProvider = selectScopedDefaultProvider({
-            models: agentModels,
-            userPreferredProviderId: selectedProviderId,
-            selectedModelId: selectedModel,
-            agentDefaultProviderId:
-                selectedAgentOptions?.defaultProviderId ??
-                selectedAgent?.defaultProviderId ??
-                null,
-        });
-
-        if (
-            nextSelectedProvider &&
-            nextSelectedProvider !== selectedProviderId
-        ) {
-            setSelectedProviderId(nextSelectedProvider);
-            void setDefaultProviderForAgent(
-                nextSelectedProvider,
-                selectedAgentId,
-            );
-            return;
-        }
-
-        const nextSelectedVariant = selectScopedDefaultVariant({
-            model: selectedModelEntry,
-            userPreferredVariantId: selectedVariantId,
-            agentDefaultVariantId:
-                selectedAgentOptions?.defaultVariant ??
-                selectedAgent?.defaultVariant ??
-                null,
-        });
-
-        if (nextSelectedVariant !== selectedVariantId) {
-            setSelectedVariantId(nextSelectedVariant);
-            if (nextSelectedVariant) {
-                void setDefaultVariantForAgent(
-                    nextSelectedVariant,
-                    selectedAgentId,
+    const toggleFavoriteModel = useCallback(
+        (modelId: string) => {
+            setFavoriteModelsState((prev) => {
+                const isFavorite = prev.includes(modelId);
+                const nextFavorites = isFavorite
+                    ? prev.filter((id) => id !== modelId)
+                    : [...prev, modelId];
+                void saveFavoriteModels({ modelIds: nextFavorites }).catch(
+                    (saveError) => {
+                        console.error(
+                            "Failed to save favorite models:",
+                            saveError,
+                        );
+                    },
                 );
-            }
+                return nextFavorites;
+            });
+        },
+        [saveFavoriteModels],
+    );
+
+    useEffect(() => {
+        void refreshModels();
+    }, [refreshModels]);
+
+    useEffect(() => {
+        if (preferences === undefined) {
             return;
         }
+        setFavoriteModelsState(preferences.favoriteModelIds);
+    }, [preferences]);
 
+    useEffect(() => {
         const nextSelectedModel = selectScopedDefaultModel({
             models,
-            userPreferredModel: selectedModel,
-            agentDefaultModel:
-                selectedAgentOptions?.defaultModel ??
-                selectedAgent?.defaultModel ??
-                null,
+            currentModelId: selectedModel,
+            agentDefaultModel,
+        });
+        const nextSelectedModelEntry =
+            agentModels.find((model) => model.id === nextSelectedModel) ?? null;
+        const nextSelectedProvider = selectScopedDefaultProvider({
+            models: agentModels,
+            currentProviderId: selectedProviderId,
+            selectedModelId: nextSelectedModel,
+            agentDefaultProviderId,
+        });
+        const nextSelectedVariant = selectScopedDefaultVariant({
+            model: nextSelectedModelEntry,
+            currentVariantId: selectedVariantId,
+            agentDefaultVariantId,
         });
 
-        if (!nextSelectedModel || nextSelectedModel === selectedModel) {
-            return;
+        if (nextSelectedProvider !== selectedProviderId) {
+            setSelectedProviderId(nextSelectedProvider);
         }
-
-        setSelectedModel(nextSelectedModel);
-        void setDefaultModelForAgent(nextSelectedModel, selectedAgentId);
+        if (nextSelectedModel !== selectedModel) {
+            setSelectedModel(nextSelectedModel);
+        }
+        if (nextSelectedVariant !== selectedVariantId) {
+            setSelectedVariantId(nextSelectedVariant);
+        }
     }, [
+        agentDefaultModel,
+        agentDefaultProviderId,
+        agentDefaultVariantId,
         agentModels,
-        hasLoadedSelectedProvider,
-        hasLoadedSelectedModel,
-        hasLoadedSelectedVariant,
         models,
-        selectedAgent?.defaultVariant,
-        selectedAgent?.defaultProviderId,
-        selectedAgent?.defaultModel,
-        selectedAgentId,
-        selectedAgentOptions?.defaultVariant,
-        selectedAgentOptions?.defaultProviderId,
-        selectedAgentOptions?.defaultModel,
-        selectedProviderId,
         selectedModel,
-        selectedModelEntry,
+        selectedProviderId,
         selectedVariantId,
     ]);
 
@@ -486,6 +369,7 @@ export function ModelProvider({
                 availableVariants,
                 selectedVariantId,
                 selectVariant,
+                syncSelectionFromChat,
                 refreshModels,
                 favoriteModels,
                 toggleFavoriteModel,
