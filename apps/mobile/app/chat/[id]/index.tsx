@@ -47,6 +47,7 @@ import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { MessageInput } from "@/components/chat/MessageInput";
 import { AgentSwitcher } from "@/components/chat/AgentSwitcher";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
+import { TopBar } from "@/components/ui/TopBar";
 import { consumePendingSharePayload } from "@/lib/share-intent/pending-share";
 import {
     interruptMobileConversationRun,
@@ -1066,19 +1067,27 @@ export default function ChatScreen(): ReactElement {
 
     const threadContent = (
         <>
-            <View style={styles.header}>
-                <View style={styles.headerLeft}>
-                    {isTwoPaneLayout ? (
-                        <View
-                            style={[
-                                styles.iconButton,
-                                styles.backButtonPlaceholder,
-                            ]}
-                        />
-                    ) : (
+            <TopBar
+                eyebrow={selectedAgent?.name ?? "Agentchat"}
+                title={currentChat.title}
+                subtitle={
+                    currentModel?.name
+                        ? `${currentModel.name}${
+                              currentChat.variantId
+                                  ? ` · ${currentChat.variantId}`
+                                  : ""
+                          }`
+                        : currentChat.variantId
+                          ? currentChat.variantId
+                          : undefined
+                }
+                leftSlot={
+                    isTwoPaneLayout ? null : (
                         <TouchableOpacity
                             onPress={() => router.replace("/")}
-                            style={[styles.iconButton, styles.backButton]}
+                            style={styles.iconButton}
+                            accessibilityRole="button"
+                            accessibilityLabel="Back to chats"
                         >
                             <Feather
                                 name="arrow-left"
@@ -1086,33 +1095,29 @@ export default function ChatScreen(): ReactElement {
                                 color={colors.accent}
                             />
                         </TouchableOpacity>
-                    )}
-                </View>
-                <View style={styles.headerCenter}>
-                    <Text style={styles.headerTitle} numberOfLines={1}>
-                        {currentChat.title}
-                    </Text>
-                    <Text style={styles.headerSubtitle} numberOfLines={1}>
-                        {selectedAgent?.name ?? "Agentchat"}
-                    </Text>
-                </View>
-                <View style={styles.headerRight}>
+                    )
+                }
+                rightSlot={
+                    <TouchableOpacity
+                        onPress={handleDeleteChat}
+                        style={[styles.iconButton, styles.deleteButton]}
+                        accessibilityRole="button"
+                        accessibilityLabel="Delete chat"
+                    >
+                        <Feather
+                            name="trash-2"
+                            size={18}
+                            color={colors.danger}
+                        />
+                    </TouchableOpacity>
+                }
+                bottomSlot={
                     <AgentSwitcher
                         compact
                         onAgentChange={() => router.replace("/")}
                     />
-                    <TouchableOpacity
-                        onPress={handleDeleteChat}
-                        style={[styles.iconButton, styles.deleteButton]}
-                    >
-                        <Feather
-                            name="trash-2"
-                            size={20}
-                            color={colors.danger}
-                        />
-                    </TouchableOpacity>
-                </View>
-            </View>
+                }
+            />
 
             {error && (
                 <View style={styles.errorBanner}>
@@ -1357,50 +1362,19 @@ const createStyles = (colors: ThemeColors) =>
             alignItems: "center",
             justifyContent: "center",
         },
-        header: {
-            flexDirection: "row",
-            alignItems: "center",
-            paddingHorizontal: 16,
-            paddingVertical: 12,
-            borderBottomWidth: 1,
-            borderBottomColor: colors.border,
-            backgroundColor: colors.surface,
-        },
-        headerLeft: {
-            marginRight: 8,
-        },
-        headerCenter: {
-            flex: 1,
-            minWidth: 0,
-            gap: 2,
-        },
-        headerRight: {
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 8,
-            marginLeft: 8,
-        },
         iconButton: {
-            padding: 4,
-        },
-        backButton: {
-            marginRight: 8,
-        },
-        backButtonPlaceholder: {
-            width: 28,
-            marginRight: 8,
-        },
-        headerTitle: {
-            fontSize: 17,
-            fontWeight: "600",
-            color: colors.text,
-        },
-        headerSubtitle: {
-            fontSize: 12,
-            color: colors.textMuted,
+            width: 36,
+            height: 36,
+            borderRadius: 18,
+            alignItems: "center",
+            justifyContent: "center",
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.surfaceMuted,
         },
         deleteButton: {
-            marginLeft: 0,
+            borderColor: colors.dangerSoft,
+            backgroundColor: colors.dangerSoft,
         },
         errorBanner: {
             flexDirection: "row",

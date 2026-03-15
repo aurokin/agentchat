@@ -22,6 +22,7 @@ import { useAgent } from "@/contexts/AgentContext";
 import { useModelContext } from "@/contexts/ModelContext";
 import { AgentSwitcher } from "@/components/chat/AgentSwitcher";
 import { buildAgentSettingsSummary } from "@/lib/settings-summary";
+import { TopBar } from "@/components/ui/TopBar";
 
 export default function SettingsScreen(): ReactElement {
     const router = useRouter();
@@ -226,21 +227,24 @@ export default function SettingsScreen(): ReactElement {
 
                     <View style={styles.settingsMain}>
                         {!isTwoPaneLayout && (
-                            <View style={styles.header}>
-                                <TouchableOpacity
-                                    onPress={handleBack}
-                                    style={styles.backButton}
-                                    accessibilityLabel="Back"
-                                >
-                                    <Feather
-                                        name="arrow-left"
-                                        size={20}
-                                        color={colors.accent}
-                                    />
-                                </TouchableOpacity>
-                                <Text style={styles.headerTitle}>Settings</Text>
-                                <View style={styles.headerSpacer} />
-                            </View>
+                            <TopBar
+                                eyebrow="Agentchat"
+                                title="Settings"
+                                subtitle={authSummaryLabel}
+                                leftSlot={
+                                    <TouchableOpacity
+                                        onPress={handleBack}
+                                        style={styles.backButton}
+                                        accessibilityLabel="Back"
+                                    >
+                                        <Feather
+                                            name="arrow-left"
+                                            size={20}
+                                            color={colors.accent}
+                                        />
+                                    </TouchableOpacity>
+                                }
+                            />
                         )}
 
                         <ScrollView
@@ -710,19 +714,14 @@ const createStyles = (colors: ThemeColors) =>
             backgroundColor: colors.surface,
         },
         backButton: {
-            width: 60,
+            width: 36,
+            height: 36,
+            borderRadius: 18,
+            alignItems: "center",
             justifyContent: "center",
-            alignItems: "flex-start",
-        },
-        headerTitle: {
-            flex: 1,
-            fontSize: 18,
-            fontWeight: "600",
-            textAlign: "center",
-            color: colors.text,
-        },
-        headerSpacer: {
-            width: 60,
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.surfaceMuted,
         },
         scrollContent: {
             flex: 1,

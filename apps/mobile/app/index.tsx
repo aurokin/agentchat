@@ -26,6 +26,7 @@ import { useAgent } from "@/contexts/AgentContext";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AgentSwitcher } from "@/components/chat/AgentSwitcher";
 import { getPreferredHomeChatId } from "@/lib/home-chat-route";
+import { TopBar } from "@/components/ui/TopBar";
 
 export default function HomeScreen(): React.ReactElement {
     const router = useRouter();
@@ -213,25 +214,21 @@ export default function HomeScreen(): React.ReactElement {
 
     return (
         <SafeAreaView style={styles.container}>
-            <View
-                style={[
-                    styles.header,
-                    isSelecting && headerHeight
-                        ? { height: headerHeight }
-                        : null,
-                ]}
-                onLayout={handleHeaderLayout}
-            >
-                <Text
-                    style={styles.title}
-                    numberOfLines={1}
-                    ellipsizeMode="tail"
+            {isSelecting ? (
+                <View
+                    style={[
+                        styles.header,
+                        headerHeight ? { height: headerHeight } : null,
+                    ]}
+                    onLayout={handleHeaderLayout}
                 >
-                    {isSelecting
-                        ? `${selectedChatIds.size} selected`
-                        : (selectedAgent?.name ?? "Agentchat")}
-                </Text>
-                {isSelecting ? (
+                    <Text
+                        style={styles.title}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                    >
+                        {selectedChatIds.size} selected
+                    </Text>
                     <View style={styles.selectionActions}>
                         <TouchableOpacity
                             accessibilityRole="button"
@@ -273,9 +270,15 @@ export default function HomeScreen(): React.ReactElement {
                             </Text>
                         </TouchableOpacity>
                     </View>
-                ) : (
-                    <View style={styles.headerActions}>
-                        <AgentSwitcher compact />
+                </View>
+            ) : (
+                <TopBar
+                    eyebrow="Workspace"
+                    title={selectedAgent?.name ?? "Select an agent"}
+                    subtitle={`${chats.length} ${
+                        chats.length === 1 ? "conversation" : "conversations"
+                    }`}
+                    rightSlot={
                         <TouchableOpacity
                             accessibilityRole="button"
                             accessibilityLabel="Settings"
@@ -284,13 +287,14 @@ export default function HomeScreen(): React.ReactElement {
                         >
                             <Feather
                                 name="settings"
-                                size={22}
+                                size={20}
                                 color={colors.accent}
                             />
                         </TouchableOpacity>
-                    </View>
-                )}
-            </View>
+                    }
+                    bottomSlot={<AgentSwitcher compact />}
+                />
+            )}
 
             {error && (
                 <View style={styles.errorContainer}>
@@ -460,19 +464,21 @@ const createStyles = (colors: ThemeColors) =>
             backgroundColor: colors.surface,
         },
         title: {
-            fontSize: 20,
-            fontWeight: "bold",
+            fontSize: 19,
+            fontWeight: "700",
             color: colors.text,
             flexShrink: 1,
             marginRight: 12,
         },
         settingsButton: {
-            padding: 8,
-        },
-        headerActions: {
-            flexDirection: "row",
+            width: 36,
+            height: 36,
+            borderRadius: 18,
             alignItems: "center",
-            gap: 8,
+            justifyContent: "center",
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.surfaceMuted,
         },
         selectionActions: {
             flexDirection: "row",
