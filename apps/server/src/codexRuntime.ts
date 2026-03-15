@@ -33,7 +33,6 @@ type ActiveTurn = {
 
 type ConversationRuntime = {
     key: string;
-    userSub: string;
     userId: string;
     conversationId: string;
     agentId: string;
@@ -64,8 +63,8 @@ function invariant(condition: unknown, message: string): asserts condition {
     }
 }
 
-function getRuntimeKey(userSub: string, conversationId: string): string {
-    return `${userSub}:${conversationId}`;
+function getRuntimeKey(userId: string, conversationId: string): string {
+    return `${userId}:${conversationId}`;
 }
 
 function createServerEvent(
@@ -188,7 +187,6 @@ export class CodexRuntimeManager {
     }
 
     async sendMessage(params: {
-        userSub: string;
         userId: string;
         subscriberId: string;
         command: ConversationSendCommand;
@@ -390,11 +388,11 @@ export class CodexRuntimeManager {
     }
 
     async interrupt(params: {
-        userSub: string;
+        userId: string;
         conversationId: string;
     }): Promise<void> {
         const runtime = this.runtimes.get(
-            getRuntimeKey(params.userSub, params.conversationId),
+            getRuntimeKey(params.userId, params.conversationId),
         );
         if (!runtime?.activeTurn?.turnId) {
             return;
@@ -407,14 +405,13 @@ export class CodexRuntimeManager {
     }
 
     subscribe(params: {
-        userSub: string;
         userId: string;
         conversationId: string;
         subscriberId: string;
         sendEvent: (event: ServerEvent) => void;
     }): Promise<void> | void {
         const runtime = this.runtimes.get(
-            getRuntimeKey(params.userSub, params.conversationId),
+            getRuntimeKey(params.userId, params.conversationId),
         );
         if (!runtime) {
             return this.recoverOrphanedActiveRun({
@@ -492,7 +489,6 @@ export class CodexRuntimeManager {
     }
 
     private async ensureRuntime(params: {
-        userSub: string;
         userId: string;
         command: ConversationSendCommand;
         sendEvent: (event: ServerEvent) => void;
@@ -500,7 +496,7 @@ export class CodexRuntimeManager {
         const config = this.getConfig();
         const resources = resolveRuntimeResources(config, params.command);
         const key = getRuntimeKey(
-            params.userSub,
+            params.userId,
             params.command.payload.conversationId,
         );
         const existing = this.runtimes.get(key);
@@ -534,7 +530,6 @@ export class CodexRuntimeManager {
 
         const runtime: ConversationRuntime = {
             key,
-            userSub: params.userSub,
             userId: params.userId,
             conversationId: params.command.payload.conversationId,
             agentId: resources.agent.id,

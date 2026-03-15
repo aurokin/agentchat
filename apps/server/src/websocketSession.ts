@@ -10,7 +10,6 @@ export type BackendSession = {
 
 export type RuntimeManagerLike = {
     subscribe(params: {
-        userSub: string;
         userId: string;
         conversationId: string;
         subscriberId: string;
@@ -21,11 +20,10 @@ export type RuntimeManagerLike = {
         conversationId?: string;
     }): void;
     interrupt(params: {
-        userSub: string;
+        userId: string;
         conversationId: string;
     }): Promise<void>;
     sendMessage(params: {
-        userSub: string;
         userId: string;
         subscriberId: string;
         command: Extract<
@@ -100,7 +98,6 @@ export async function handleConnectedSocketMessage(params: {
 
         if (command.type === "conversation.subscribe") {
             await params.runtimeManager.subscribe({
-                userSub: params.session.sub,
                 userId: params.session.userId,
                 conversationId: command.payload.conversationId,
                 subscriberId: params.connectionId,
@@ -119,7 +116,7 @@ export async function handleConnectedSocketMessage(params: {
 
         if (command.type === "conversation.interrupt") {
             await params.runtimeManager.interrupt({
-                userSub: params.session.sub,
+                userId: params.session.userId,
                 conversationId: command.payload.conversationId,
             });
             return;
@@ -130,7 +127,6 @@ export async function handleConnectedSocketMessage(params: {
         }
 
         await params.runtimeManager.sendMessage({
-            userSub: params.session.sub,
             userId: params.session.userId,
             subscriberId: params.connectionId,
             command,

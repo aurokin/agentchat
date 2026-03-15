@@ -331,7 +331,6 @@ describe("CodexRuntimeManager", () => {
             payload: Record<string, unknown>;
         }> = [];
         await manager.sendMessage({
-            userSub: "sub-1",
             userId: "user-1",
             subscriberId: "socket-1",
             command: createCommand(),
@@ -376,7 +375,6 @@ describe("CodexRuntimeManager", () => {
         });
 
         await manager.sendMessage({
-            userSub: "sub-1",
             userId: "user-1",
             subscriberId: "socket-1",
             command: {
@@ -417,7 +415,6 @@ describe("CodexRuntimeManager", () => {
         });
 
         await manager.sendMessage({
-            userSub: "sub-1",
             userId: "user-1",
             subscriberId: "socket-1",
             command: createCommand(),
@@ -462,7 +459,6 @@ describe("CodexRuntimeManager", () => {
 
         await expect(
             manager.sendMessage({
-                userSub: "sub-1",
                 userId: "user-1",
                 subscriberId: "socket-1",
                 command: createCommand(),
@@ -489,7 +485,6 @@ describe("CodexRuntimeManager", () => {
         });
 
         const sendPromise = manager.sendMessage({
-            userSub: "sub-1",
             userId: "user-1",
             subscriberId: "socket-1",
             command: createCommand(),
@@ -510,7 +505,6 @@ describe("CodexRuntimeManager", () => {
         }> = [];
 
         manager.subscribe({
-            userSub: "sub-1",
             userId: "user-1",
             conversationId: "chat-1",
             subscriberId: "socket-2",
@@ -579,7 +573,6 @@ describe("CodexRuntimeManager", () => {
         });
 
         const sendPromise = manager.sendMessage({
-            userSub: "sub-1",
             userId: "user-1",
             subscriberId: "socket-1",
             command: createCommand(),
@@ -635,7 +628,6 @@ describe("CodexRuntimeManager", () => {
         });
 
         await manager.subscribe({
-            userSub: "sub-1",
             userId: "user-1",
             conversationId: "chat-1",
             subscriberId: "socket-2",
@@ -658,6 +650,68 @@ describe("CodexRuntimeManager", () => {
         });
     });
 
+    test("keeps an active runtime across reconnects for the same user", async () => {
+        const config = createConfig();
+        const persistence = createPersistence(null);
+        const fakeClient = new FakeCodexClient({
+            startedThreadId: "thread-fresh",
+            autoComplete: false,
+        });
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: () => fakeClient,
+        });
+
+        const primaryEvents: Array<{
+            type: string;
+            payload: Record<string, unknown>;
+        }> = [];
+        const reconnectedEvents: Array<{
+            type: string;
+            payload: Record<string, unknown>;
+        }> = [];
+
+        const sendPromise = manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: (event) => {
+                primaryEvents.push(event);
+            },
+        });
+
+        await Bun.sleep(0);
+
+        await manager.subscribe({
+            userId: "user-1",
+            conversationId: "chat-1",
+            subscriberId: "socket-2",
+            sendEvent: (event) => {
+                reconnectedEvents.push(event);
+            },
+        });
+
+        fakeClient.emit({
+            method: "turn/completed",
+            params: {
+                turn: {
+                    status: "completed",
+                },
+            },
+        });
+
+        await sendPromise;
+
+        expect(persistence.recoverStaleRunCalls).toHaveLength(0);
+        expect(reconnectedEvents.map((event) => event.type)).toEqual([
+            "run.started",
+            "message.started",
+            "message.completed",
+            "run.completed",
+        ]);
+    });
+
     test("promotes Codex agent reasoning into an assistant status message before output", async () => {
         const config = createConfig();
         const persistence = createPersistence(null);
@@ -676,7 +730,6 @@ describe("CodexRuntimeManager", () => {
         });
 
         const sendPromise = manager.sendMessage({
-            userSub: "sub-1",
             userId: "user-1",
             subscriberId: "socket-1",
             command: createCommand(),
@@ -750,7 +803,6 @@ describe("CodexRuntimeManager", () => {
         });
 
         const sendPromise = manager.sendMessage({
-            userSub: "sub-1",
             userId: "user-1",
             subscriberId: "socket-1",
             command: createCommand(),
@@ -805,7 +857,6 @@ describe("CodexRuntimeManager", () => {
         });
 
         const sendPromise = manager.sendMessage({
-            userSub: "sub-1",
             userId: "user-1",
             subscriberId: "socket-1",
             command: createCommand(),
@@ -858,7 +909,6 @@ describe("CodexRuntimeManager", () => {
         });
 
         await manager.sendMessage({
-            userSub: "sub-1",
             userId: "user-1",
             subscriberId: "socket-1",
             command: createCommand(),
@@ -905,7 +955,6 @@ describe("CodexRuntimeManager", () => {
         });
 
         const sendPromise = manager.sendMessage({
-            userSub: "sub-1",
             userId: "user-1",
             subscriberId: "socket-1",
             command: createCommand(),
@@ -955,7 +1004,7 @@ describe("CodexRuntimeManager", () => {
 
         await expect(
             manager.interrupt({
-                userSub: "sub-1",
+                userId: "user-1",
                 conversationId: "chat-1",
             }),
         ).resolves.toBeUndefined();
@@ -976,7 +1025,6 @@ describe("CodexRuntimeManager", () => {
         });
 
         await manager.sendMessage({
-            userSub: "sub-1",
             userId: "user-1",
             subscriberId: "socket-1",
             command: createCommand(),
@@ -994,7 +1042,6 @@ describe("CodexRuntimeManager", () => {
         };
 
         await manager.sendMessage({
-            userSub: "sub-1",
             userId: "user-1",
             subscriberId: "socket-1",
             command: createCommand(),

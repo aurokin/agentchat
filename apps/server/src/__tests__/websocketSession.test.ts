@@ -51,7 +51,6 @@ describe("websocketSession", () => {
         expect(runtimeManager.subscribe).toHaveBeenCalledTimes(1);
         expect(runtimeManager.subscribe).toHaveBeenCalledWith(
             expect.objectContaining({
-                userSub: "sub-1",
                 userId: "user-1",
                 conversationId: "chat-1",
                 subscriberId: "socket-1",
@@ -128,7 +127,7 @@ describe("websocketSession", () => {
 
         expect(runtimeManager.interrupt).toHaveBeenCalledTimes(1);
         expect(runtimeManager.interrupt).toHaveBeenCalledWith({
-            userSub: "sub-1",
+            userId: "user-1",
             conversationId: "chat-1",
         });
     });
@@ -184,7 +183,6 @@ describe("websocketSession", () => {
         expect(runtimeManager.sendMessage).toHaveBeenCalledTimes(1);
         expect(runtimeManager.sendMessage).toHaveBeenCalledWith(
             expect.objectContaining({
-                userSub: "sub-1",
                 userId: "user-1",
                 subscriberId: "socket-1",
                 sendEvent: expect.any(Function),
