@@ -27,6 +27,7 @@ type ActiveTurn = {
     nextSequence: number;
     lastPersistedContent: string;
     pendingDeltaFlush: ReturnType<typeof setTimeout> | null;
+    pendingMessageStartPersistence: Promise<void> | null;
     reject: (error: Error) => void;
     resolve: () => void;
 };
@@ -245,6 +246,7 @@ export class CodexRuntimeManager {
                 nextSequence: 3,
                 lastPersistedContent: "",
                 pendingDeltaFlush: null,
+                pendingMessageStartPersistence: null,
                 reject,
                 resolve,
             };
@@ -964,46 +966,9 @@ export class CodexRuntimeManager {
         }
 
         if (notification.method === "turn/aborted") {
-            this.emitToSubscribers(
-                runtime,
-                createServerEvent("message.completed", {
-                    conversationId: runtime.conversationId,
-                    messageId: activeTurn.currentMessageId,
-                    content: activeTurn.text,
-                }),
-            );
-
-            this.cancelPendingMessageDelta(activeTurn);
-
-            const sequence = activeTurn.nextSequence;
-            activeTurn.nextSequence += 2;
-            void this.persistence
-                .runInterrupted({
-                    userId: activeTurn.userId,
-                    conversationLocalId: runtime.conversationId,
-                    assistantMessageLocalId: activeTurn.currentMessageId,
-                    externalRunId: activeTurn.runId,
-                    sequence,
-                    content: activeTurn.text,
-                    completedAt: Date.now(),
-                })
-                .catch((error) => {
-                    console.error(
-                        "[agentchat-server] failed to persist aborted run",
-                        error,
-                    );
-                });
-            this.emitToSubscribers(
-                runtime,
-                createServerEvent("run.interrupted", {
-                    conversationId: runtime.conversationId,
-                    runId: activeTurn.runId,
-                }),
-            );
-            runtime.activeTurn = null;
-            this.releaseActiveTurnSubscribers(runtime);
-            this.scheduleIdleExpiration(runtime);
-            activeTurn.resolve();
+            void this.finalizeTurn(runtime, activeTurn, {
+                finalStatus: "interrupted",
+            });
             return;
         }
 
@@ -1020,116 +985,24 @@ export class CodexRuntimeManager {
                 ? turn.error.message
                 : "Codex run failed";
 
-        this.emitToSubscribers(
-            runtime,
-            createServerEvent("message.completed", {
-                conversationId: runtime.conversationId,
-                messageId: activeTurn.currentMessageId,
-                content: activeTurn.text,
-            }),
-        );
-
-        this.cancelPendingMessageDelta(activeTurn);
-
         if (status === "completed") {
-            const sequence = activeTurn.nextSequence;
-            activeTurn.nextSequence += 2;
-            void this.persistence
-                .runCompleted({
-                    userId: activeTurn.userId,
-                    conversationLocalId: runtime.conversationId,
-                    assistantMessageLocalId: activeTurn.currentMessageId,
-                    externalRunId: activeTurn.runId,
-                    sequence,
-                    content: activeTurn.text,
-                    completedAt: Date.now(),
-                })
-                .catch((error) => {
-                    console.error(
-                        "[agentchat-server] failed to persist run completion",
-                        error,
-                    );
-                });
-            this.emitToSubscribers(
-                runtime,
-                createServerEvent("run.completed", {
-                    conversationId: runtime.conversationId,
-                    runId: activeTurn.runId,
-                }),
-            );
-            runtime.activeTurn = null;
-            this.releaseActiveTurnSubscribers(runtime);
-            this.scheduleIdleExpiration(runtime);
-            activeTurn.resolve();
+            void this.finalizeTurn(runtime, activeTurn, {
+                finalStatus: "completed",
+            });
             return;
         }
 
         if (status === "interrupted") {
-            const sequence = activeTurn.nextSequence;
-            activeTurn.nextSequence += 2;
-            void this.persistence
-                .runInterrupted({
-                    userId: activeTurn.userId,
-                    conversationLocalId: runtime.conversationId,
-                    assistantMessageLocalId: activeTurn.currentMessageId,
-                    externalRunId: activeTurn.runId,
-                    sequence,
-                    content: activeTurn.text,
-                    completedAt: Date.now(),
-                })
-                .catch((error) => {
-                    console.error(
-                        "[agentchat-server] failed to persist interrupted run",
-                        error,
-                    );
-                });
-            this.emitToSubscribers(
-                runtime,
-                createServerEvent("run.interrupted", {
-                    conversationId: runtime.conversationId,
-                    runId: activeTurn.runId,
-                }),
-            );
-            runtime.activeTurn = null;
-            this.releaseActiveTurnSubscribers(runtime);
-            this.scheduleIdleExpiration(runtime);
-            activeTurn.resolve();
+            void this.finalizeTurn(runtime, activeTurn, {
+                finalStatus: "interrupted",
+            });
             return;
         }
 
-        const sequence = activeTurn.nextSequence;
-        activeTurn.nextSequence += 2;
-        void this.persistence
-            .runFailed({
-                userId: activeTurn.userId,
-                conversationLocalId: runtime.conversationId,
-                assistantMessageLocalId: activeTurn.currentMessageId,
-                externalRunId: activeTurn.runId,
-                sequence,
-                content: activeTurn.text,
-                completedAt: Date.now(),
-                errorMessage,
-            })
-            .catch((error) => {
-                console.error(
-                    "[agentchat-server] failed to persist failed run",
-                    error,
-                );
-            });
-        this.emitToSubscribers(
-            runtime,
-            createServerEvent("run.failed", {
-                conversationId: runtime.conversationId,
-                runId: activeTurn.runId,
-                error: {
-                    message: errorMessage,
-                },
-            }),
-        );
-        runtime.activeTurn = null;
-        this.releaseActiveTurnSubscribers(runtime);
-        this.scheduleIdleExpiration(runtime);
-        activeTurn.reject(new Error(errorMessage));
+        void this.finalizeTurn(runtime, activeTurn, {
+            finalStatus: "errored",
+            errorMessage,
+        });
     }
 
     private transitionStatusMessageToAssistantOutput(
@@ -1178,7 +1051,7 @@ export class CodexRuntimeManager {
             }),
         );
 
-        void this.persistence
+        const pendingMessageStartPersistence = this.persistence
             .messageStarted({
                 userId: activeTurn.userId,
                 conversationLocalId: runtime.conversationId,
@@ -1199,7 +1072,146 @@ export class CodexRuntimeManager {
                     "[agentchat-server] failed to persist assistant output transition",
                     error,
                 );
+            })
+            .finally(() => {
+                if (
+                    activeTurn.pendingMessageStartPersistence ===
+                    pendingMessageStartPersistence
+                ) {
+                    activeTurn.pendingMessageStartPersistence = null;
+                }
             });
+        activeTurn.pendingMessageStartPersistence =
+            pendingMessageStartPersistence;
+    }
+
+    private async finalizeTurn(
+        runtime: ConversationRuntime,
+        activeTurn: ActiveTurn,
+        params:
+            | {
+                  finalStatus: "completed" | "interrupted";
+              }
+            | {
+                  finalStatus: "errored";
+                  errorMessage: string;
+              },
+    ): Promise<void> {
+        this.emitToSubscribers(
+            runtime,
+            createServerEvent("message.completed", {
+                conversationId: runtime.conversationId,
+                messageId: activeTurn.currentMessageId,
+                content: activeTurn.text,
+            }),
+        );
+
+        this.cancelPendingMessageDelta(activeTurn);
+        await activeTurn.pendingMessageStartPersistence;
+
+        const sequence = activeTurn.nextSequence;
+        activeTurn.nextSequence += 2;
+        const completedAt = Date.now();
+
+        if (params.finalStatus === "completed") {
+            void this.persistence
+                .runCompleted({
+                    userId: activeTurn.userId,
+                    conversationLocalId: runtime.conversationId,
+                    assistantMessageLocalId: activeTurn.currentMessageId,
+                    externalRunId: activeTurn.runId,
+                    sequence,
+                    content: activeTurn.text,
+                    completedAt,
+                })
+                .catch((error) => {
+                    console.error(
+                        "[agentchat-server] failed to persist run completion",
+                        error,
+                    );
+                });
+            this.emitToSubscribers(
+                runtime,
+                createServerEvent("run.completed", {
+                    conversationId: runtime.conversationId,
+                    runId: activeTurn.runId,
+                }),
+            );
+            runtime.activeTurn = null;
+            this.releaseActiveTurnSubscribers(runtime);
+            this.scheduleIdleExpiration(runtime);
+            activeTurn.resolve();
+            return;
+        }
+
+        if (params.finalStatus === "interrupted") {
+            void this.persistence
+                .runInterrupted({
+                    userId: activeTurn.userId,
+                    conversationLocalId: runtime.conversationId,
+                    assistantMessageLocalId: activeTurn.currentMessageId,
+                    externalRunId: activeTurn.runId,
+                    sequence,
+                    content: activeTurn.text,
+                    completedAt,
+                })
+                .catch((error) => {
+                    console.error(
+                        "[agentchat-server] failed to persist interrupted run",
+                        error,
+                    );
+                });
+            this.emitToSubscribers(
+                runtime,
+                createServerEvent("run.interrupted", {
+                    conversationId: runtime.conversationId,
+                    runId: activeTurn.runId,
+                }),
+            );
+            runtime.activeTurn = null;
+            this.releaseActiveTurnSubscribers(runtime);
+            this.scheduleIdleExpiration(runtime);
+            activeTurn.resolve();
+            return;
+        }
+
+        invariant(
+            params.finalStatus === "errored",
+            "Expected errored final status for failed runtime finalization.",
+        );
+        const errorMessage = params.errorMessage;
+
+        void this.persistence
+            .runFailed({
+                userId: activeTurn.userId,
+                conversationLocalId: runtime.conversationId,
+                assistantMessageLocalId: activeTurn.currentMessageId,
+                externalRunId: activeTurn.runId,
+                sequence,
+                content: activeTurn.text,
+                completedAt,
+                errorMessage,
+            })
+            .catch((error) => {
+                console.error(
+                    "[agentchat-server] failed to persist failed run",
+                    error,
+                );
+            });
+        this.emitToSubscribers(
+            runtime,
+            createServerEvent("run.failed", {
+                conversationId: runtime.conversationId,
+                runId: activeTurn.runId,
+                error: {
+                    message: errorMessage,
+                },
+            }),
+        );
+        runtime.activeTurn = null;
+        this.releaseActiveTurnSubscribers(runtime);
+        this.scheduleIdleExpiration(runtime);
+        activeTurn.reject(new Error(errorMessage));
     }
 
     private scheduleIdleExpiration(runtime: ConversationRuntime): void {

@@ -20,7 +20,8 @@ type Mode =
     | "interrupt"
     | "status"
     | "multi-client"
-    | "multi-conversation";
+    | "multi-conversation"
+    | "multi-agent";
 type ExtendedMode = Mode | "stale-resume";
 
 type AgentOptions = {
@@ -54,6 +55,13 @@ type ProviderModels = {
             label: string;
         }>;
     }>;
+};
+
+type ResolvedAgentExecutionTarget = {
+    agentId: string;
+    providerId: string;
+    modelId: string;
+    variantId: string | null;
 };
 
 type ServerEvent = {
@@ -141,6 +149,8 @@ const INTERRUPT_FALLBACK_DELAY_MS = 5000;
 const INTERRUPT_RETRY_INTERVAL_MS = 250;
 const MULTI_CLIENT_SUBSCRIPTION_SETTLE_MS = 100;
 const RUNTIME_TIMEOUT_MS = 120_000;
+const PERSISTENCE_SETTLE_TIMEOUT_MS = 15_000;
+const PERSISTENCE_POLL_INTERVAL_MS = 250;
 const DEBUG_LIVE_SMOKE = process.env.AGENTCHAT_DEBUG_LIVE_SMOKE === "1";
 
 function invariant(condition: unknown, message: string): asserts condition {
@@ -154,6 +164,10 @@ function debugLiveSmoke(...parts: unknown[]): void {
         return;
     }
     console.error("[live-runtime-smoke]", ...parts);
+}
+
+async function sleep(ms: number): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function getRepoRoot(): string {
@@ -181,10 +195,11 @@ function parseArgs(argv: string[]): LiveSmokeArgs {
                 value !== "status" &&
                 value !== "multi-client" &&
                 value !== "multi-conversation" &&
+                value !== "multi-agent" &&
                 value !== "stale-resume"
             ) {
                 throw new Error(
-                    "--mode must be smoke, interrupt, status, multi-client, multi-conversation, or stale-resume.",
+                    "--mode must be smoke, interrupt, status, multi-client, multi-conversation, multi-agent, or stale-resume.",
                 );
             }
             mode = value;
@@ -336,6 +351,56 @@ async function fetchJson<T>(url: string): Promise<T> {
     return (await response.json()) as T;
 }
 
+async function resolveAgentExecutionTarget(params: {
+    serverUrl: string;
+    agentId: string;
+    mode: ExtendedMode;
+    requestedModelId: string | null;
+    requestedVariantId: string | null;
+}): Promise<ResolvedAgentExecutionTarget> {
+    const agentOptions = await fetchJson<AgentOptions>(
+        `${params.serverUrl}/api/agents/${encodeURIComponent(params.agentId)}/options`,
+    );
+    const providerId = agentOptions.defaultProviderId;
+    const providerModels = await fetchJson<ProviderModels>(
+        `${params.serverUrl}/api/providers/${encodeURIComponent(providerId)}/models`,
+    );
+
+    const modelId = params.requestedModelId ?? agentOptions.defaultModel;
+    invariant(modelId, `Agent ${params.agentId} is missing a default model.`);
+    const model = providerModels.models.find((entry) => entry.id === modelId);
+    invariant(
+        model,
+        `Model ${modelId} is not available for provider ${providerId}.`,
+    );
+
+    const variantId =
+        params.requestedVariantId ??
+        (params.mode === "interrupt" &&
+        model.variants.some((variant) => variant.id === "high")
+            ? "high"
+            : params.mode === "status" &&
+                model.variants.some((variant) => variant.id === "xhigh")
+              ? "xhigh"
+              : params.mode === "status" &&
+                  model.variants.some((variant) => variant.id === "high")
+                ? "high"
+                : agentOptions.defaultVariant);
+    if (variantId !== null) {
+        invariant(
+            model.variants.some((variant) => variant.id === variantId),
+            `Variant ${variantId} is not available for model ${modelId}.`,
+        );
+    }
+
+    return {
+        agentId: params.agentId,
+        providerId,
+        modelId,
+        variantId,
+    };
+}
+
 async function assertServerReady(serverUrl: string): Promise<void> {
     let health: { ok: boolean; summary?: string };
     try {
@@ -353,6 +418,14 @@ async function assertServerReady(serverUrl: string): Promise<void> {
 
 function getDefaultAgentId(mode: ExtendedMode): string {
     return mode === "interrupt" ? "agentchat-workspace" : "agentchat-test";
+}
+
+function getSecondaryAgentId(mode: ExtendedMode): string | null {
+    if (mode === "multi-agent") {
+        return "agentchat-smoke";
+    }
+
+    return null;
 }
 
 function resolveReasoningEffort(variantId: string | null): string {
@@ -395,6 +468,17 @@ function buildPrompt(mode: ExtendedMode): string {
     }
 
     return "Read src/math.ts and reply with only the result of add(2, 3).";
+}
+
+function buildPromptForAgent(params: {
+    mode: ExtendedMode;
+    agentId: string;
+}): string {
+    if (params.mode === "multi-agent" && params.agentId === "agentchat-smoke") {
+        return "Say hello in one short sentence.";
+    }
+
+    return buildPrompt(params.mode);
 }
 
 function createIds(label: string, now: number) {
@@ -1219,6 +1303,198 @@ async function postRuntimeIngress<T>(params: {
     return (await response.json()) as T;
 }
 
+type PersistedRunState = {
+    assistantMessage: {
+        status: string;
+        content: string;
+        runId: string | null;
+        kind?: string | null;
+    };
+    initialAssistantMessage: {
+        status: string;
+        content: string;
+        runId: string | null;
+        kind?: string | null;
+    };
+    run: {
+        externalId: string;
+        status: string;
+        outputMessageLocalId: string | null;
+        latestEventKind: string | null;
+    };
+    runEvents: PersistedRunEvent[];
+    binding: {
+        provider: string;
+        status: string;
+        providerThreadId: string | null;
+        activeRunId: string | null;
+        lastError: string | null;
+        lastEventAt: number | null;
+        expiresAt: number | null;
+    } | null;
+    persistedMessages: Array<{
+        localId?: string | null;
+        kind?: string | null;
+        content: string;
+        runId?: string | null;
+        runMessageIndex?: number | null;
+        status?: string | null;
+    }> | null;
+};
+
+async function readPersistedRunState(params: {
+    repoRoot: string;
+    identity: Identity;
+    userId: string;
+    chatId: string;
+    assistantMessageLocalId: string;
+    conversationLocalId: string;
+    runId: string;
+    includeMessages?: boolean;
+}): Promise<PersistedRunState> {
+    const initialAssistantMessage = runConvex<{
+        status: string;
+        content: string;
+        runId: string | null;
+        kind?: string | null;
+    } | null>({
+        repoRoot: params.repoRoot,
+        functionName: "messages:getByLocalId",
+        args: {
+            userId: params.userId,
+            localId: params.assistantMessageLocalId,
+        },
+        identity: params.identity,
+    });
+    invariant(initialAssistantMessage, "Assistant message was not persisted.");
+
+    const persistedMessages = params.includeMessages
+        ? runConvex<
+              Array<{
+                  localId?: string | null;
+                  kind?: string | null;
+                  content: string;
+                  runId?: string | null;
+                  runMessageIndex?: number | null;
+                  status?: string | null;
+              }>
+          >({
+              repoRoot: params.repoRoot,
+              functionName: "messages:listByChat",
+              args: { chatId: params.chatId },
+              identity: params.identity,
+          })
+        : null;
+
+    const runs = runConvex<
+        Array<{
+            externalId: string;
+            status: string;
+            outputMessageLocalId: string | null;
+            latestEventKind: string | null;
+        }>
+    >({
+        repoRoot: params.repoRoot,
+        functionName: "runs:listByChat",
+        args: { chatId: params.chatId },
+        identity: params.identity,
+    });
+    const run = runs.find((entry) => entry.externalId === params.runId);
+    invariant(run, `Run ${params.runId} was not persisted.`);
+
+    const assistantMessage =
+        run.outputMessageLocalId === null ||
+        run.outputMessageLocalId === params.assistantMessageLocalId
+            ? initialAssistantMessage
+            : runConvex<{
+                  status: string;
+                  content: string;
+                  runId: string | null;
+                  kind?: string | null;
+              } | null>({
+                  repoRoot: params.repoRoot,
+                  functionName: "messages:getByLocalId",
+                  args: {
+                      userId: params.userId,
+                      localId: run.outputMessageLocalId,
+                  },
+                  identity: params.identity,
+              });
+    invariant(
+        assistantMessage,
+        `Output assistant message ${run.outputMessageLocalId} was not persisted.`,
+    );
+
+    const runEvents = runConvex<PersistedRunEvent[]>({
+        repoRoot: params.repoRoot,
+        functionName: "runs:listEventsByExternalId",
+        args: {
+            externalId: params.runId,
+        },
+        identity: params.identity,
+    });
+
+    const binding = await postRuntimeIngress<{
+        provider: string;
+        status: string;
+        providerThreadId: string | null;
+        activeRunId: string | null;
+        lastError: string | null;
+        lastEventAt: number | null;
+        expiresAt: number | null;
+    } | null>({
+        repoRoot: params.repoRoot,
+        path: "/runtime/runtime-binding/read",
+        payload: {
+            userId: params.userId,
+            conversationLocalId: params.conversationLocalId,
+        },
+    });
+
+    return {
+        assistantMessage,
+        initialAssistantMessage,
+        persistedMessages,
+        run,
+        runEvents,
+        binding,
+    };
+}
+
+async function waitForPersistedTerminalState(params: {
+    repoRoot: string;
+    identity: Identity;
+    userId: string;
+    chatId: string;
+    assistantMessageLocalId: string;
+    conversationLocalId: string;
+    runId: string;
+    expectedStatus: "completed" | "interrupted";
+    includeMessages?: boolean;
+}): Promise<PersistedRunState> {
+    const deadline = Date.now() + PERSISTENCE_SETTLE_TIMEOUT_MS;
+    let lastState: PersistedRunState | null = null;
+    while (Date.now() < deadline) {
+        const state = await readPersistedRunState(params);
+        lastState = state;
+        if (
+            state.run.outputMessageLocalId !== null &&
+            state.assistantMessage.status === params.expectedStatus &&
+            state.run.status === params.expectedStatus &&
+            state.run.latestEventKind === `run_${params.expectedStatus}`
+        ) {
+            return state;
+        }
+        await sleep(PERSISTENCE_POLL_INTERVAL_MS);
+    }
+
+    invariant(
+        lastState,
+        `Expected persisted ${params.expectedStatus} state for run ${params.runId}.`,
+    );
+    return lastState;
+}
+
 async function tryCollectFailureSnapshot(params: {
     repoRoot: string;
     userId: string;
@@ -1289,7 +1565,7 @@ async function tryCollectFailureSnapshot(params: {
             assistantMessage,
             messages,
             runs,
-            runtimeBinding: null,
+            runtimeBinding,
         };
     } catch {
         return null;
@@ -1301,6 +1577,18 @@ function assertSmokeContent(content: string): void {
     invariant(
         /(^|[^0-9])5[.]?$/u.test(normalized),
         `Unexpected smoke response: ${JSON.stringify(content)}`,
+    );
+}
+
+function assertSmokeGreetingContent(content: string): void {
+    const normalized = content.trim();
+    invariant(
+        normalized.length > 0,
+        `Expected a non-empty smoke greeting, got ${JSON.stringify(content)}`,
+    );
+    invariant(
+        normalized.split(/\s+/u).length <= 20,
+        `Expected a short smoke greeting, got ${JSON.stringify(content)}`,
     );
 }
 
@@ -1370,7 +1658,8 @@ function assertTerminalBinding(params: {
 
 function assertRunEventTimeline(params: {
     events: PersistedRunEvent[];
-    assistantMessageId: string;
+    initialAssistantMessageId: string;
+    finalAssistantMessageId: string;
     finalStatus: "completed" | "interrupted";
     finalContent: string;
     sawDelta: boolean;
@@ -1390,7 +1679,7 @@ function assertRunEventTimeline(params: {
         `Expected first run event to be run_started, got ${firstEvent.kind}.`,
     );
     invariant(
-        firstEvent.messageLocalId === params.assistantMessageId,
+        firstEvent.messageLocalId === params.initialAssistantMessageId,
         "Expected run_started event to point at the assistant message.",
     );
 
@@ -1411,7 +1700,9 @@ function assertRunEventTimeline(params: {
     );
 
     const deltaEvents = params.events.filter(
-        (event) => event.kind === "message_delta",
+        (event) =>
+            event.kind === "message_delta" &&
+            event.messageLocalId === params.finalAssistantMessageId,
     );
     if (params.sawDelta) {
         if (deltaEvents.length > 0) {
@@ -1536,43 +1827,22 @@ async function main() {
     });
 
     const agentId = args.agentId ?? getDefaultAgentId(args.mode);
-    const agentOptions = await fetchJson<AgentOptions>(
-        `${args.serverUrl}/api/agents/${encodeURIComponent(agentId)}/options`,
-    );
-    const providerId = agentOptions.defaultProviderId;
-    const providerModels = await fetchJson<ProviderModels>(
-        `${args.serverUrl}/api/providers/${encodeURIComponent(providerId)}/models`,
-    );
-
-    const modelId = args.modelId ?? agentOptions.defaultModel;
-    invariant(modelId, `Agent ${agentId} is missing a default model.`);
-    const model = providerModels.models.find((entry) => entry.id === modelId);
-    invariant(
-        model,
-        `Model ${modelId} is not available for provider ${providerId}.`,
-    );
-
-    const variantId =
-        args.variantId ??
-        (args.mode === "interrupt" &&
-        model.variants.some((variant) => variant.id === "high")
-            ? "high"
-            : args.mode === "status" &&
-                model.variants.some((variant) => variant.id === "xhigh")
-              ? "xhigh"
-              : args.mode === "status" &&
-                  model.variants.some((variant) => variant.id === "high")
-                ? "high"
-                : agentOptions.defaultVariant);
-    if (variantId !== null) {
-        invariant(
-            model.variants.some((variant) => variant.id === variantId),
-            `Variant ${variantId} is not available for model ${modelId}.`,
-        );
-    }
+    const primaryTarget = await resolveAgentExecutionTarget({
+        serverUrl: args.serverUrl,
+        agentId,
+        mode: args.mode,
+        requestedModelId: args.modelId,
+        requestedVariantId: args.variantId,
+    });
+    const providerId = primaryTarget.providerId;
+    const modelId = primaryTarget.modelId;
+    const variantId = primaryTarget.variantId;
 
     const now = Date.now();
-    const prompt = buildPrompt(args.mode);
+    const prompt = buildPromptForAgent({
+        mode: args.mode,
+        agentId,
+    });
     const seededConversation = seedConversationAndDraft({
         repoRoot,
         identity,
@@ -1616,6 +1886,17 @@ async function main() {
         repoRoot,
         identity,
     });
+    const secondaryAgentId = getSecondaryAgentId(args.mode);
+    const secondaryTarget =
+        secondaryAgentId !== null
+            ? await resolveAgentExecutionTarget({
+                  serverUrl: args.serverUrl,
+                  agentId: secondaryAgentId,
+                  mode: "smoke",
+                  requestedModelId: null,
+                  requestedVariantId: null,
+              })
+            : null;
     const secondarySeededConversation =
         args.mode === "multi-conversation"
             ? seedConversationAndDraft({
@@ -1630,7 +1911,23 @@ async function main() {
                   title: "Live runtime smoke B",
                   prompt,
               })
-            : null;
+            : args.mode === "multi-agent" && secondaryTarget !== null
+              ? seedConversationAndDraft({
+                    repoRoot,
+                    identity,
+                    userId,
+                    label: `${args.mode}-${secondaryTarget.agentId}`,
+                    now: now + 100,
+                    agentId: secondaryTarget.agentId,
+                    modelId: secondaryTarget.modelId,
+                    variantId: secondaryTarget.variantId,
+                    title: `Live runtime ${secondaryTarget.agentId}`,
+                    prompt: buildPromptForAgent({
+                        mode: args.mode,
+                        agentId: secondaryTarget.agentId,
+                    }),
+                })
+              : null;
 
     let outcome: LiveOutcome | MultiClientOutcome;
     let secondaryOutcome: LiveOutcome | null = null;
@@ -1680,7 +1977,48 @@ async function main() {
                     modelId,
                     variantId,
                     content: prompt,
-                    userMessageId: secondarySeededConversation.ids.userMessageId,
+                    userMessageId:
+                        secondarySeededConversation.ids.userMessageId,
+                    assistantMessageId:
+                        secondarySeededConversation.ids.assistantMessageId,
+                    mode: "smoke",
+                }),
+            ]);
+            outcome = primaryOutcome;
+            secondaryOutcome = secondOutcome;
+        } else if (args.mode === "multi-agent") {
+            invariant(
+                secondarySeededConversation !== null &&
+                    secondaryTarget !== null,
+                "Expected a secondary seeded agent conversation.",
+            );
+            const [primaryOutcome, secondOutcome] = await Promise.all([
+                runLiveConversation({
+                    serverUrl: args.serverUrl,
+                    token: token.token,
+                    conversationId: ids.conversationId,
+                    agentId,
+                    modelId,
+                    variantId,
+                    content: prompt,
+                    userMessageId: ids.userMessageId,
+                    assistantMessageId: ids.assistantMessageId,
+                    mode: "smoke",
+                }),
+                runLiveConversation({
+                    serverUrl: args.serverUrl,
+                    token: token.token,
+                    conversationId:
+                        secondarySeededConversation.ids.conversationId,
+                    agentId: secondaryTarget.agentId,
+                    modelId: secondaryTarget.modelId,
+                    variantId: secondaryTarget.variantId,
+                    content: buildPromptForAgent({
+                        mode: args.mode,
+                        agentId: secondaryTarget.agentId,
+                    }),
+                    userMessageId:
+                        secondarySeededConversation.ids.userMessageId,
                     assistantMessageId:
                         secondarySeededConversation.ids.assistantMessageId,
                     mode: "smoke",
@@ -1730,14 +2068,18 @@ async function main() {
         throw error;
     }
 
-    if (args.mode === "multi-conversation") {
+    if (args.mode === "multi-conversation" || args.mode === "multi-agent") {
         invariant(
             secondarySeededConversation !== null && secondaryOutcome !== null,
-            "Expected secondary multi-conversation outcome data.",
+            `Expected secondary ${args.mode} outcome data.`,
         );
         invariant(
             outcome.runId !== secondaryOutcome.runId,
-            "Expected concurrent conversations to persist distinct run ids.",
+            `Expected concurrent ${args.mode} runs to persist distinct run ids.`,
+        );
+        invariant(
+            secondaryTarget !== null || args.mode === "multi-conversation",
+            "Expected a secondary agent target for multi-agent mode.",
         );
 
         const conversationChecks = [
@@ -1745,78 +2087,46 @@ async function main() {
                 chatId,
                 ids,
                 outcome,
+                expectedProviderId: providerId,
+                assertContent: assertSmokeContent,
+                agentId,
             },
             {
                 chatId: secondarySeededConversation.chatId,
                 ids: secondarySeededConversation.ids,
                 outcome: secondaryOutcome,
+                expectedProviderId:
+                    args.mode === "multi-agent"
+                        ? secondaryTarget!.providerId
+                        : providerId,
+                assertContent:
+                    args.mode === "multi-agent"
+                        ? assertSmokeGreetingContent
+                        : assertSmokeContent,
+                agentId:
+                    args.mode === "multi-agent"
+                        ? secondaryTarget!.agentId
+                        : agentId,
             },
         ].map(async (entry) => {
-            const assistantMessage = runConvex<{
-                status: string;
-                content: string;
-                runId: string | null;
-            } | null>({
+            const persistedState = await waitForPersistedTerminalState({
                 repoRoot,
-                functionName: "messages:getByLocalId",
-                args: {
-                    userId,
-                    localId: entry.ids.assistantMessageId,
-                },
                 identity,
-            });
-            invariant(assistantMessage, "Assistant message was not persisted.");
-
-            const runs = runConvex<
-                Array<{
-                    externalId: string;
-                    status: string;
-                    outputMessageLocalId: string | null;
-                    latestEventKind: string | null;
-                }>
-            >({
-                repoRoot,
-                functionName: "runs:listByChat",
-                args: { chatId: entry.chatId },
-                identity,
-            });
-            const run = runs.find(
-                (runEntry) => runEntry.externalId === entry.outcome.runId,
-            );
-            invariant(run, `Run ${entry.outcome.runId} was not persisted.`);
-
-            const runEvents = runConvex<PersistedRunEvent[]>({
-                repoRoot,
-                functionName: "runs:listEventsByExternalId",
-                args: {
-                    externalId: entry.outcome.runId,
-                },
-                identity,
-            });
-            const binding = await postRuntimeIngress<{
-                provider: string;
-                status: string;
-                providerThreadId: string | null;
-                activeRunId: string | null;
-                lastError: string | null;
-                lastEventAt: number | null;
-                expiresAt: number | null;
-            } | null>({
-                repoRoot,
-                path: "/runtime/runtime-binding/read",
-                payload: {
-                    userId,
-                    conversationLocalId: entry.ids.conversationId,
-                },
+                userId,
+                chatId: entry.chatId,
+                assistantMessageLocalId: entry.ids.assistantMessageId,
+                conversationLocalId: entry.ids.conversationId,
+                runId: entry.outcome.runId,
+                expectedStatus: "completed",
             });
 
             return {
-                assistantMessage,
-                run,
-                runEvents,
-                binding,
+                ...persistedState,
                 ids: entry.ids,
                 outcome: entry.outcome,
+                expectedProviderId: entry.expectedProviderId,
+                assertContent: entry.assertContent,
+                agentId: entry.agentId,
             };
         });
 
@@ -1834,17 +2144,20 @@ async function main() {
                 entry.run.latestEventKind === "run_completed",
                 `Expected latest run event kind run_completed, got ${entry.run.latestEventKind}.`,
             );
-            assertSmokeContent(entry.assistantMessage.content);
+            entry.assertContent(entry.assistantMessage.content);
             assertRunEventTimeline({
                 events: entry.runEvents,
-                assistantMessageId: entry.ids.assistantMessageId,
+                initialAssistantMessageId: entry.ids.assistantMessageId,
+                finalAssistantMessageId:
+                    entry.run.outputMessageLocalId ??
+                    entry.ids.assistantMessageId,
                 finalStatus: "completed",
                 finalContent: entry.assistantMessage.content,
                 sawDelta: entry.outcome.sawDelta,
             });
             assertTerminalBinding({
                 binding: entry.binding,
-                expectedProvider: providerId,
+                expectedProvider: entry.expectedProviderId,
                 expectedStatus: "idle",
             });
         }
@@ -1859,6 +2172,7 @@ async function main() {
                     modelId,
                     variantId,
                     userId,
+                    agentIds: resolvedChecks.map((entry) => entry.agentId),
                     conversationIds: resolvedChecks.map(
                         (entry) => entry.ids.conversationId,
                     ),
@@ -1874,82 +2188,24 @@ async function main() {
         return;
     }
 
-    const assistantMessage = runConvex<{
-        status: string;
-        content: string;
-        runId: string | null;
-        kind?: string | null;
-    } | null>({
-        repoRoot,
-        functionName: "messages:getByLocalId",
-        args: {
+    const expectedTerminalStatus =
+        outcome.status === "interrupted" ? "interrupted" : "completed";
+    const { assistantMessage, persistedMessages, run, runEvents, binding } =
+        await waitForPersistedTerminalState({
+            repoRoot,
+            identity,
             userId,
-            localId: ids.assistantMessageId,
-        },
-        identity,
-    });
-    invariant(assistantMessage, "Assistant message was not persisted.");
-    const persistedMessages = runConvex<
-        Array<{
-            localId?: string | null;
-            kind?: string | null;
-            content: string;
-            runId?: string | null;
-            runMessageIndex?: number | null;
-            status?: string | null;
-        }>
-    >({
-        repoRoot,
-        functionName: "messages:listByChat",
-        args: { chatId },
-        identity,
-    });
-
-    const runs = runConvex<
-        Array<{
-            externalId: string;
-            status: string;
-            outputMessageLocalId: string | null;
-            latestEventKind: string | null;
-        }>
-    >({
-        repoRoot,
-        functionName: "runs:listByChat",
-        args: { chatId },
-        identity,
-    });
-    const run = runs.find((entry) => entry.externalId === outcome.runId);
-    invariant(run, `Run ${outcome.runId} was not persisted.`);
+            chatId,
+            assistantMessageLocalId: ids.assistantMessageId,
+            conversationLocalId: ids.conversationId,
+            runId: outcome.runId,
+            expectedStatus: expectedTerminalStatus,
+            includeMessages: true,
+        });
     invariant(
         run.outputMessageLocalId === ids.assistantMessageId,
         "Persisted run output message did not match the seeded assistant message.",
     );
-
-    const runEvents = runConvex<PersistedRunEvent[]>({
-        repoRoot,
-        functionName: "runs:listEventsByExternalId",
-        args: {
-            externalId: outcome.runId,
-        },
-        identity: identity ?? undefined,
-    });
-
-    const binding = await postRuntimeIngress<{
-        provider: string;
-        status: string;
-        providerThreadId: string | null;
-        activeRunId: string | null;
-        lastError: string | null;
-        lastEventAt: number | null;
-        expiresAt: number | null;
-    } | null>({
-        repoRoot,
-        path: "/runtime/runtime-binding/read",
-        payload: {
-            userId,
-            conversationLocalId: ids.conversationId,
-        },
-    });
     debugLiveSmoke("main:persistence-loaded", {
         runId: outcome.runId,
         assistantStatus: assistantMessage.status,
@@ -1983,7 +2239,9 @@ async function main() {
         }
         assertRunEventTimeline({
             events: runEvents,
-            assistantMessageId: ids.assistantMessageId,
+            initialAssistantMessageId: ids.assistantMessageId,
+            finalAssistantMessageId:
+                run.outputMessageLocalId ?? ids.assistantMessageId,
             finalStatus: "completed",
             finalContent: assistantMessage.content,
             sawDelta: outcome.sawDelta,
@@ -2078,7 +2336,9 @@ async function main() {
         );
         assertRunEventTimeline({
             events: runEvents,
-            assistantMessageId: ids.assistantMessageId,
+            initialAssistantMessageId: ids.assistantMessageId,
+            finalAssistantMessageId:
+                run.outputMessageLocalId ?? ids.assistantMessageId,
             finalStatus: "interrupted",
             finalContent: assistantMessage.content,
             sawDelta: outcome.sawDelta,

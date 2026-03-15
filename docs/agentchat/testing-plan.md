@@ -121,6 +121,7 @@ Invocation:
 - `bun run test:manual:live-runtime-smoke`
 - `bun run test:manual:live-runtime-multi-client`
 - `bun run test:manual:live-runtime-multi-conversation`
+- `bun run test:manual:live-runtime-multi-agent`
 - `bun run test:manual:live-runtime-status`
 - `bun run test:manual:live-runtime-repeat`
 - `bun run test:manual:live-runtime-interrupt`
@@ -144,6 +145,7 @@ Coverage targets:
 - prove the same user can observe one live run from two clients concurrently
 - prove the initiating client can disconnect after `run.started` while a second client continues receiving the live stream through completion
 - prove the same user can run two conversations concurrently without runtime-state crossover
+- prove the same user can run two different agents concurrently without runtime-state crossover
 - probe whether provider-native `assistant_status` messages persist before the final assistant reply when Codex emits reasoning events
 - persist completed and interrupted run state back into Convex
 - verify assistant message and run status after the socket flow completes

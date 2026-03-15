@@ -250,6 +250,7 @@ Current implementation note:
 - `bun run test:manual:local-auth-separation` proves `smoke_1` and `smoke_2` stay isolated in Convex and backend token issuance
 - `bun run test:manual:live-runtime-multi-client` proves one same-user run can stay live across two clients and continue after the initiating client disconnects
 - `bun run test:manual:live-runtime-multi-conversation` proves one user can run two conversations concurrently without runtime-state crossover
+- `bun run test:manual:live-runtime-multi-agent` proves one user can run two different agents concurrently without runtime-state crossover
 
 ### Phase 6. Remove Disabled-Auth As A Primary Path
 

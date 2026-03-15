@@ -859,6 +859,80 @@ describe("CodexRuntimeManager", () => {
         });
     });
 
+    test("waits for assistant output transition persistence before completing a run", async () => {
+        const config = createConfig();
+        const persistence = createPersistence(null);
+        let resolveMessageStarted: (() => void) | null = null;
+        const messageStartedPending = new Promise<void>((resolve) => {
+            resolveMessageStarted = resolve;
+        });
+        persistence.messageStarted = async (
+            payload: Record<string, unknown>,
+        ) => {
+            persistence.messageStartedCalls.push(payload);
+            await messageStartedPending;
+        };
+
+        const fakeClient = new FakeCodexClient({
+            startedThreadId: "thread-fresh",
+            autoComplete: false,
+        });
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: () => fakeClient,
+        });
+
+        const sendPromise = manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => {},
+        });
+
+        await Bun.sleep(0);
+        fakeClient.emit({
+            method: "codex/event/agent_reasoning",
+            params: {
+                msg: {
+                    type: "agent_reasoning",
+                    text: "Preparing a concise reply",
+                },
+            },
+        });
+        fakeClient.emit({
+            method: "item/agentMessage/delta",
+            params: {
+                delta: "Hello!",
+            },
+        });
+        fakeClient.emit({
+            method: "turn/completed",
+            params: {
+                turn: {
+                    status: "completed",
+                },
+            },
+        });
+
+        await Bun.sleep(0);
+        expect(persistence.messageStartedCalls).toHaveLength(1);
+        expect(persistence.runCompletedCalls).toHaveLength(0);
+
+        expect(resolveMessageStarted).not.toBeNull();
+        resolveMessageStarted!();
+        await sendPromise;
+
+        expect(persistence.runCompletedCalls).toHaveLength(1);
+        expect(persistence.runCompletedCalls[0]).toMatchObject({
+            assistantMessageLocalId: expect.any(String),
+            content: "Hello!",
+        });
+        expect(
+            persistence.runCompletedCalls[0]?.assistantMessageLocalId,
+        ).not.toBe("assistant-1");
+    });
+
     test("keeps report-style assistant text in a single assistant message without heuristics", async () => {
         const config = createConfig();
         const persistence = createPersistence(null);
