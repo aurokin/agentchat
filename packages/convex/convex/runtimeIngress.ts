@@ -49,15 +49,23 @@ async function getChatByLocalId(
     ctx: RuntimeMutationCtx,
     args: { userId: Id<"users">; localId: string },
 ): Promise<Doc<"chats">> {
+    const chat = await findChatByLocalId(ctx, args);
+    if (!chat) {
+        throw new Error("Conversation not found");
+    }
+    return chat;
+}
+
+async function findChatByLocalId(
+    ctx: RuntimeMutationCtx,
+    args: { userId: Id<"users">; localId: string },
+): Promise<Doc<"chats"> | null> {
     const chat = await ctx.db
         .query("chats")
         .withIndex("by_local_id", (q) =>
             q.eq("userId", args.userId).eq("localId", args.localId),
         )
         .unique();
-    if (!chat) {
-        throw new Error("Conversation not found");
-    }
     return chat;
 }
 
@@ -837,10 +845,13 @@ export const runtimeBinding = internalMutation({
         updatedAt: v.number(),
     },
     handler: async (ctx, args) => {
-        const chat = await getChatByLocalId(ctx, {
+        const chat = await findChatByLocalId(ctx, {
             userId: args.userId,
             localId: args.conversationLocalId,
         });
+        if (!chat) {
+            return null;
+        }
 
         await upsertRuntimeBinding(ctx, {
             chatId: chat._id,
@@ -855,5 +866,7 @@ export const runtimeBinding = internalMutation({
             expiresAt: args.expiresAt,
             updatedAt: args.updatedAt,
         });
+
+        return null;
     },
 });

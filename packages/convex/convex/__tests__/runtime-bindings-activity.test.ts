@@ -112,13 +112,19 @@ describe("runtime binding activity", () => {
                         collect: async () => runtimeBindings,
                     }),
                 }),
-                get: mock(async (id: string) => chatsById[id as keyof typeof chatsById] ?? null),
+                get: mock(
+                    async (id: string) =>
+                        chatsById[id as keyof typeof chatsById] ?? null,
+                ),
             },
         };
 
         const result = await (
             listAgentActivityCounts as unknown as {
-                _handler: (ctx: unknown, args: Record<string, never>) => Promise<
+                _handler: (
+                    ctx: unknown,
+                    args: Record<string, never>,
+                ) => Promise<
                     Array<{
                         agentId: string;
                         activeCount: number;
