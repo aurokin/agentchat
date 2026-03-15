@@ -68,6 +68,7 @@ This roadmap describes the current implementation state and the next major steps
 - Run `bun run test:manual:live-runtime-multi-client` to verify one same-user run stays live across two clients and survives an initiating-client disconnect after `run.started`
 - Run `bun run test:manual:live-runtime-multi-conversation` to verify one user can run two conversations concurrently without runtime-state crossover
 - Run `bun run test:manual:live-runtime-multi-agent` to verify one user can run two different agents concurrently without runtime-state crossover
+- Run `bun run test:manual:live-runtime-multi-user` to verify two authenticated users can run concurrently without runtime-state crossover
 - Run `bun run test:manual:local-auth-separation` after `bun run setup:local-auth-smoke` to verify `smoke_1` and `smoke_2` stay isolated
 - Run `bun run test:manual:live-runtime-status` to verify a real Codex turn persists both `assistant_status` and `assistant_message` transcript items
 - Use `bun run test:manual:live-runtime-repeat` when you need a small manually-invoked flake probe across repeated smoke turns

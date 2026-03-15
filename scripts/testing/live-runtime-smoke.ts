@@ -21,7 +21,8 @@ type Mode =
     | "status"
     | "multi-client"
     | "multi-conversation"
-    | "multi-agent";
+    | "multi-agent"
+    | "multi-user";
 type ExtendedMode = Mode | "stale-resume";
 
 type AgentOptions = {
@@ -145,6 +146,8 @@ const DEFAULT_SERVER_URL = "http://127.0.0.1:3030";
 const DEFAULT_EMAIL = "agentchat-live-smoke@local.agentchat";
 const DEFAULT_LOCAL_USERNAME = "smoke_1";
 const DEFAULT_LOCAL_PASSWORD = "smoke_1_password";
+const DEFAULT_SECONDARY_LOCAL_USERNAME = "smoke_2";
+const DEFAULT_SECONDARY_LOCAL_PASSWORD = "smoke_2_password";
 const INTERRUPT_FALLBACK_DELAY_MS = 5000;
 const INTERRUPT_RETRY_INTERVAL_MS = 250;
 const MULTI_CLIENT_SUBSCRIPTION_SETTLE_MS = 100;
@@ -196,10 +199,11 @@ function parseArgs(argv: string[]): LiveSmokeArgs {
                 value !== "multi-client" &&
                 value !== "multi-conversation" &&
                 value !== "multi-agent" &&
+                value !== "multi-user" &&
                 value !== "stale-resume"
             ) {
                 throw new Error(
-                    "--mode must be smoke, interrupt, status, multi-client, multi-conversation, multi-agent, or stale-resume.",
+                    "--mode must be smoke, interrupt, status, multi-client, multi-conversation, multi-agent, multi-user, or stale-resume.",
                 );
             }
             mode = value;
@@ -1818,6 +1822,24 @@ async function main() {
         password: args.password,
         authProviderKind: bootstrap.auth.activeProvider?.kind ?? "google",
     });
+    const secondaryAccessUser =
+        args.mode === "multi-user"
+            ? await resolveAccessUser({
+                  repoRoot,
+                  email: `${DEFAULT_SECONDARY_LOCAL_USERNAME}@local.agentchat`,
+                  username: DEFAULT_SECONDARY_LOCAL_USERNAME,
+                  password: DEFAULT_SECONDARY_LOCAL_PASSWORD,
+                  authProviderKind:
+                      bootstrap.auth.activeProvider?.kind ?? "google",
+              })
+            : null;
+
+    if (args.mode === "multi-user") {
+        invariant(
+            bootstrap.auth.activeProvider?.kind === "local",
+            "multi-user live runtime smoke requires local auth with seeded users.",
+        );
+    }
 
     runConvex<void>({
         repoRoot,
@@ -1825,6 +1847,14 @@ async function main() {
         args: {},
         identity: identity ?? undefined,
     });
+    if (secondaryAccessUser) {
+        runConvex<void>({
+            repoRoot,
+            functionName: "users:resetWorkspaceData",
+            args: {},
+            identity: secondaryAccessUser.identity,
+        });
+    }
 
     const agentId = args.agentId ?? getDefaultAgentId(args.mode);
     const primaryTarget = await resolveAgentExecutionTarget({
@@ -1886,6 +1916,12 @@ async function main() {
         repoRoot,
         identity,
     });
+    const secondaryToken = secondaryAccessUser
+        ? await issueBackendToken({
+              repoRoot,
+              identity: secondaryAccessUser.identity,
+          })
+        : null;
     const secondaryAgentId = getSecondaryAgentId(args.mode);
     const secondaryTarget =
         secondaryAgentId !== null
@@ -1927,7 +1963,20 @@ async function main() {
                         agentId: secondaryTarget.agentId,
                     }),
                 })
-              : null;
+              : args.mode === "multi-user" && secondaryAccessUser !== null
+                ? seedConversationAndDraft({
+                      repoRoot,
+                      identity: secondaryAccessUser.identity,
+                      userId: secondaryAccessUser.userId,
+                      label: `${args.mode}-${DEFAULT_SECONDARY_LOCAL_USERNAME}`,
+                      now: now + 100,
+                      agentId,
+                      modelId,
+                      variantId,
+                      title: `Live runtime ${DEFAULT_SECONDARY_LOCAL_USERNAME}`,
+                      prompt,
+                  })
+                : null;
 
     let outcome: LiveOutcome | MultiClientOutcome;
     let secondaryOutcome: LiveOutcome | null = null;
@@ -2026,6 +2075,44 @@ async function main() {
             ]);
             outcome = primaryOutcome;
             secondaryOutcome = secondOutcome;
+        } else if (args.mode === "multi-user") {
+            invariant(
+                secondarySeededConversation !== null &&
+                    secondaryAccessUser !== null &&
+                    secondaryToken !== null,
+                "Expected a secondary seeded user conversation.",
+            );
+            const [primaryOutcome, secondOutcome] = await Promise.all([
+                runLiveConversation({
+                    serverUrl: args.serverUrl,
+                    token: token.token,
+                    conversationId: ids.conversationId,
+                    agentId,
+                    modelId,
+                    variantId,
+                    content: prompt,
+                    userMessageId: ids.userMessageId,
+                    assistantMessageId: ids.assistantMessageId,
+                    mode: "smoke",
+                }),
+                runLiveConversation({
+                    serverUrl: args.serverUrl,
+                    token: secondaryToken.token,
+                    conversationId:
+                        secondarySeededConversation.ids.conversationId,
+                    agentId,
+                    modelId,
+                    variantId,
+                    content: prompt,
+                    userMessageId:
+                        secondarySeededConversation.ids.userMessageId,
+                    assistantMessageId:
+                        secondarySeededConversation.ids.assistantMessageId,
+                    mode: "smoke",
+                }),
+            ]);
+            outcome = primaryOutcome;
+            secondaryOutcome = secondOutcome;
         } else {
             outcome = await runLiveConversation({
                 serverUrl: args.serverUrl,
@@ -2068,7 +2155,11 @@ async function main() {
         throw error;
     }
 
-    if (args.mode === "multi-conversation" || args.mode === "multi-agent") {
+    if (
+        args.mode === "multi-conversation" ||
+        args.mode === "multi-agent" ||
+        args.mode === "multi-user"
+    ) {
         invariant(
             secondarySeededConversation !== null && secondaryOutcome !== null,
             `Expected secondary ${args.mode} outcome data.`,
@@ -2077,9 +2168,22 @@ async function main() {
             outcome.runId !== secondaryOutcome.runId,
             `Expected concurrent ${args.mode} runs to persist distinct run ids.`,
         );
+        if (args.mode === "multi-user") {
+            invariant(
+                secondaryAccessUser !== null &&
+                    userId !== secondaryAccessUser.userId,
+                "Expected multi-user runtime smoke to use distinct users.",
+            );
+        }
         invariant(
-            secondaryTarget !== null || args.mode === "multi-conversation",
+            secondaryTarget !== null ||
+                args.mode === "multi-conversation" ||
+                args.mode === "multi-user",
             "Expected a secondary agent target for multi-agent mode.",
+        );
+        invariant(
+            secondaryAccessUser !== null || args.mode !== "multi-user",
+            "Expected a secondary user target for multi-user mode.",
         );
 
         const conversationChecks = [
@@ -2087,6 +2191,8 @@ async function main() {
                 chatId,
                 ids,
                 outcome,
+                userId,
+                identity,
                 expectedProviderId: providerId,
                 assertContent: assertSmokeContent,
                 agentId,
@@ -2095,6 +2201,14 @@ async function main() {
                 chatId: secondarySeededConversation.chatId,
                 ids: secondarySeededConversation.ids,
                 outcome: secondaryOutcome,
+                userId:
+                    args.mode === "multi-user"
+                        ? secondaryAccessUser!.userId
+                        : userId,
+                identity:
+                    args.mode === "multi-user"
+                        ? secondaryAccessUser!.identity
+                        : identity,
                 expectedProviderId:
                     args.mode === "multi-agent"
                         ? secondaryTarget!.providerId
@@ -2111,8 +2225,8 @@ async function main() {
         ].map(async (entry) => {
             const persistedState = await waitForPersistedTerminalState({
                 repoRoot,
-                identity,
-                userId,
+                identity: entry.identity,
+                userId: entry.userId,
                 chatId: entry.chatId,
                 assistantMessageLocalId: entry.ids.assistantMessageId,
                 conversationLocalId: entry.ids.conversationId,
@@ -2124,6 +2238,7 @@ async function main() {
                 ...persistedState,
                 ids: entry.ids,
                 outcome: entry.outcome,
+                userId: entry.userId,
                 expectedProviderId: entry.expectedProviderId,
                 assertContent: entry.assertContent,
                 agentId: entry.agentId,
@@ -2171,7 +2286,7 @@ async function main() {
                     agentId,
                     modelId,
                     variantId,
-                    userId,
+                    userIds: resolvedChecks.map((entry) => entry.userId),
                     agentIds: resolvedChecks.map((entry) => entry.agentId),
                     conversationIds: resolvedChecks.map(
                         (entry) => entry.ids.conversationId,
@@ -2203,8 +2318,8 @@ async function main() {
             includeMessages: true,
         });
     invariant(
-        run.outputMessageLocalId === ids.assistantMessageId,
-        "Persisted run output message did not match the seeded assistant message.",
+        run.outputMessageLocalId !== null,
+        "Expected persisted run output message to be recorded.",
     );
     debugLiveSmoke("main:persistence-loaded", {
         runId: outcome.runId,

@@ -35,6 +35,7 @@
         "test:manual:live-runtime-multi-client": "bun scripts/testing/live-runtime-smoke.ts --mode multi-client",
         "test:manual:live-runtime-multi-conversation": "bun scripts/testing/live-runtime-smoke.ts --mode multi-conversation",
         "test:manual:live-runtime-multi-agent": "bun scripts/testing/live-runtime-smoke.ts --mode multi-agent",
+        "test:manual:live-runtime-multi-user": "bun scripts/testing/live-runtime-smoke.ts --mode multi-user",
         "test:manual:live-runtime-status": "bun scripts/testing/live-runtime-smoke.ts --mode status",
         "test:manual:live-runtime-repeat": "bun scripts/testing/runtime-repeat-smoke.ts",
         "test:manual:live-runtime-interrupt": "bun scripts/testing/live-runtime-smoke.ts --mode interrupt",
