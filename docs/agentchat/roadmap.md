@@ -65,6 +65,8 @@ This roadmap describes the current implementation state and the next major steps
 - Add integration coverage across `apps/server`, Convex ingress, and websocket runtime flow
 - Keep generated Convex bindings in sync with the live deployment before manual confidence passes
 - Run `bun run test:manual:live-runtime-smoke` against a real local `apps/server` instance to verify the full Codex plus Convex persistence path
+- Run `bun run test:manual:live-runtime-zero-client` to verify a run continues with zero active clients and later reconnects without stale active-run replay
+- Run `bun run test:manual:live-runtime-zero-client-recover` to verify a client can reconnect after a real zero-client gap and resume the active run before completion
 - Run `bun run test:manual:live-runtime-multi-client` to verify one same-user run stays live across two clients and survives an initiating-client disconnect after `run.started`
 - Run `bun run test:manual:live-runtime-multi-conversation` to verify one user can run two conversations concurrently without runtime-state crossover
 - Run `bun run test:manual:live-runtime-multi-agent` to verify one user can run two different agents concurrently without runtime-state crossover

@@ -119,6 +119,8 @@ Invocation:
 
 - `bun run test:manual:local-auth-separation`
 - `bun run test:manual:live-runtime-smoke`
+- `bun run test:manual:live-runtime-zero-client`
+- `bun run test:manual:live-runtime-zero-client-recover`
 - `bun run test:manual:live-runtime-multi-client`
 - `bun run test:manual:live-runtime-multi-conversation`
 - `bun run test:manual:live-runtime-multi-agent`
@@ -144,6 +146,8 @@ Coverage targets:
 - connect to the local websocket transport
 - send a live Codex turn
 - prove the same user can observe one live run from two clients concurrently
+- prove one run continues to completion with zero active clients and later reconnects without stale active-run replay
+- prove a client can reconnect after a real zero-client gap and resume the active run before completion
 - prove the initiating client can disconnect after `run.started` while a second client continues receiving the live stream through completion
 - prove the same user can run two conversations concurrently without runtime-state crossover
 - prove the same user can run two different agents concurrently without runtime-state crossover

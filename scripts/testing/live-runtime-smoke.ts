@@ -19,6 +19,8 @@ type Mode =
     | "smoke"
     | "interrupt"
     | "status"
+    | "zero-client"
+    | "zero-client-recover"
     | "multi-client"
     | "multi-conversation"
     | "multi-agent"
@@ -113,6 +115,22 @@ type MultiClientOutcome = {
     observerSawEventsAfterSenderClosed: boolean;
 };
 
+type ZeroClientOutcome = {
+    runId: string;
+    senderClosedAfterRunStarted: boolean;
+};
+
+type ZeroClientRecoveryOutcome = {
+    status: "completed";
+    runId: string;
+    content: string;
+    sawDelta: boolean;
+    senderClosedAfterRunStarted: boolean;
+    observerSawRunStartedAfterGap: boolean;
+    observerSawEventsAfterReconnect: boolean;
+    zeroClientGapMs: number;
+};
+
 type SeededConversation = {
     chatId: string;
     ids: {
@@ -151,6 +169,7 @@ const DEFAULT_SECONDARY_LOCAL_PASSWORD = "smoke_2_password";
 const INTERRUPT_FALLBACK_DELAY_MS = 5000;
 const INTERRUPT_RETRY_INTERVAL_MS = 250;
 const MULTI_CLIENT_SUBSCRIPTION_SETTLE_MS = 100;
+const ZERO_CLIENT_RECOVERY_GAP_MS = 250;
 const RUNTIME_TIMEOUT_MS = 120_000;
 const PERSISTENCE_SETTLE_TIMEOUT_MS = 15_000;
 const PERSISTENCE_POLL_INTERVAL_MS = 250;
@@ -196,6 +215,8 @@ function parseArgs(argv: string[]): LiveSmokeArgs {
                 value !== "smoke" &&
                 value !== "interrupt" &&
                 value !== "status" &&
+                value !== "zero-client" &&
+                value !== "zero-client-recover" &&
                 value !== "multi-client" &&
                 value !== "multi-conversation" &&
                 value !== "multi-agent" &&
@@ -203,7 +224,7 @@ function parseArgs(argv: string[]): LiveSmokeArgs {
                 value !== "stale-resume"
             ) {
                 throw new Error(
-                    "--mode must be smoke, interrupt, status, multi-client, multi-conversation, multi-agent, multi-user, or stale-resume.",
+                    "--mode must be smoke, interrupt, status, zero-client, zero-client-recover, multi-client, multi-conversation, multi-agent, multi-user, or stale-resume.",
                 );
             }
             mode = value;
@@ -383,13 +404,16 @@ async function resolveAgentExecutionTarget(params: {
         (params.mode === "interrupt" &&
         model.variants.some((variant) => variant.id === "high")
             ? "high"
-            : params.mode === "status" &&
-                model.variants.some((variant) => variant.id === "xhigh")
-              ? "xhigh"
+            : params.mode === "zero-client-recover" &&
+                model.variants.some((variant) => variant.id === "high")
+              ? "high"
               : params.mode === "status" &&
-                  model.variants.some((variant) => variant.id === "high")
-                ? "high"
-                : agentOptions.defaultVariant);
+                  model.variants.some((variant) => variant.id === "xhigh")
+                ? "xhigh"
+                : params.mode === "status" &&
+                    model.variants.some((variant) => variant.id === "high")
+                  ? "high"
+                  : agentOptions.defaultVariant);
     if (variantId !== null) {
         invariant(
             model.variants.some((variant) => variant.id === variantId),
@@ -421,7 +445,9 @@ async function assertServerReady(serverUrl: string): Promise<void> {
 }
 
 function getDefaultAgentId(mode: ExtendedMode): string {
-    return mode === "interrupt" ? "agentchat-workspace" : "agentchat-test";
+    return mode === "interrupt" || mode === "zero-client-recover"
+        ? "agentchat-workspace"
+        : "agentchat-test";
 }
 
 function getSecondaryAgentId(mode: ExtendedMode): string | null {
@@ -453,7 +479,7 @@ function resolveReasoningEffort(variantId: string | null): string {
 }
 
 function buildPrompt(mode: ExtendedMode): string {
-    if (mode === "interrupt") {
+    if (mode === "interrupt" || mode === "zero-client-recover") {
         return [
             "Open notes.md.",
             "Write a one hundred item improvement plan for that file.",
@@ -1256,6 +1282,541 @@ async function runMultiClientConversation(params: {
     });
 }
 
+async function runZeroClientConversation(params: {
+    serverUrl: string;
+    token: string;
+    conversationId: string;
+    agentId: string;
+    modelId: string;
+    variantId: string | null;
+    content: string;
+    userMessageId: string;
+    assistantMessageId: string;
+}): Promise<ZeroClientOutcome> {
+    const wsUrl = `${params.serverUrl.replace(/^http/u, "ws")}/ws?token=${encodeURIComponent(params.token)}`;
+    const socket = new WebSocket(wsUrl);
+
+    let runId: string | null = null;
+    let closedIntentionally = false;
+
+    const closeSocket = () => {
+        if (
+            socket.readyState === WebSocket.OPEN ||
+            socket.readyState === WebSocket.CONNECTING
+        ) {
+            socket.close();
+        }
+    };
+
+    return await new Promise<ZeroClientOutcome>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+            closeSocket();
+            reject(
+                new Error(
+                    "Timed out waiting for zero-client run to start before disconnect.",
+                ),
+            );
+        }, RUNTIME_TIMEOUT_MS);
+
+        const finish = (outcome: ZeroClientOutcome) => {
+            clearTimeout(timeout);
+            closeSocket();
+            resolve(outcome);
+        };
+
+        const fail = (error: Error) => {
+            clearTimeout(timeout);
+            closeSocket();
+            reject(error);
+        };
+
+        socket.addEventListener("error", () => {
+            fail(new Error("Zero-client WebSocket connection failed."));
+        });
+
+        socket.addEventListener("close", (event) => {
+            if (closedIntentionally) {
+                return;
+            }
+            fail(
+                new Error(
+                    `Zero-client WebSocket closed unexpectedly (${event.code}) ${event.reason}`,
+                ),
+            );
+        });
+
+        socket.addEventListener("message", (event) => {
+            const payload =
+                typeof event.data === "string"
+                    ? event.data
+                    : Buffer.from(event.data as ArrayBuffer).toString("utf8");
+            const serverEvent = JSON.parse(payload) as ServerEvent;
+
+            if (serverEvent.type === "connection.error") {
+                fail(
+                    new Error(
+                        String(serverEvent.payload.message ?? "Unknown error"),
+                    ),
+                );
+                return;
+            }
+
+            if (serverEvent.type === "connection.ready") {
+                socket.send(
+                    JSON.stringify({
+                        id: crypto.randomUUID(),
+                        type: "conversation.subscribe",
+                        payload: {
+                            conversationId: params.conversationId,
+                        },
+                    }),
+                );
+                socket.send(
+                    JSON.stringify({
+                        id: crypto.randomUUID(),
+                        type: "conversation.send",
+                        payload: {
+                            conversationId: params.conversationId,
+                            agentId: params.agentId,
+                            modelId: params.modelId,
+                            variantId: params.variantId,
+                            content: params.content,
+                            userMessageId: params.userMessageId,
+                            assistantMessageId: params.assistantMessageId,
+                            history: [],
+                        },
+                    }),
+                );
+                return;
+            }
+
+            if (serverEvent.type === "run.started") {
+                const incomingRunId = serverEvent.payload.runId;
+                invariant(
+                    typeof incomingRunId === "string",
+                    "Zero-client run started event missing runId.",
+                );
+                runId = incomingRunId;
+                closedIntentionally = true;
+                closeSocket();
+                finish({
+                    runId,
+                    senderClosedAfterRunStarted: true,
+                });
+                return;
+            }
+
+            if (serverEvent.type === "run.failed") {
+                fail(
+                    new Error(
+                        String(
+                            (
+                                serverEvent.payload.error as
+                                    | { message?: unknown }
+                                    | undefined
+                            )?.message ?? "Runtime failed.",
+                        ),
+                    ),
+                );
+            }
+        });
+    });
+}
+
+async function runZeroClientRecoveryConversation(params: {
+    serverUrl: string;
+    senderToken: string;
+    observerToken: string;
+    conversationId: string;
+    agentId: string;
+    modelId: string;
+    variantId: string | null;
+    content: string;
+    userMessageId: string;
+    assistantMessageId: string;
+}): Promise<ZeroClientRecoveryOutcome> {
+    const senderWsUrl = `${params.serverUrl.replace(/^http/u, "ws")}/ws?token=${encodeURIComponent(params.senderToken)}`;
+    const observerWsUrl = `${params.serverUrl.replace(/^http/u, "ws")}/ws?token=${encodeURIComponent(params.observerToken)}`;
+    const senderSocket = new WebSocket(senderWsUrl);
+    let observerSocket: WebSocket | null = null;
+
+    let runId: string | null = null;
+    let latestContent = "";
+    let sawDelta = false;
+    let senderClosedAfterRunStarted = false;
+    let senderClosedIntentionally = false;
+    let observerStarted = false;
+    let observerSawRunStartedAfterGap = false;
+    let observerSawEventsAfterReconnect = false;
+    let zeroClientGapMs = 0;
+    let senderClosedAt: number | null = null;
+    let observerStartTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const closeSocket = (socket: WebSocket | null) => {
+        if (
+            socket &&
+            (socket.readyState === WebSocket.OPEN ||
+                socket.readyState === WebSocket.CONNECTING)
+        ) {
+            socket.close();
+        }
+    };
+
+    const cleanup = () => {
+        if (observerStartTimer) {
+            clearTimeout(observerStartTimer);
+            observerStartTimer = null;
+        }
+        closeSocket(senderSocket);
+        closeSocket(observerSocket);
+    };
+
+    return await new Promise<ZeroClientRecoveryOutcome>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+            cleanup();
+            reject(
+                new Error(
+                    "Timed out waiting for zero-client recovery outcome.",
+                ),
+            );
+        }, RUNTIME_TIMEOUT_MS);
+
+        const finish = (outcome: ZeroClientRecoveryOutcome) => {
+            clearTimeout(timeout);
+            cleanup();
+            resolve(outcome);
+        };
+
+        const fail = (error: Error) => {
+            clearTimeout(timeout);
+            cleanup();
+            reject(error);
+        };
+
+        const startObserver = () => {
+            if (observerStarted) {
+                return;
+            }
+            observerStarted = true;
+            observerSocket = new WebSocket(observerWsUrl);
+
+            observerSocket.addEventListener("error", () => {
+                fail(new Error("Zero-client recovery observer failed."));
+            });
+
+            observerSocket.addEventListener("close", (event) => {
+                if (event.code === 1000) {
+                    return;
+                }
+                fail(
+                    new Error(
+                        `Zero-client recovery observer closed unexpectedly (${event.code}) ${event.reason}`,
+                    ),
+                );
+            });
+
+            observerSocket.addEventListener("message", (event) => {
+                const payload =
+                    typeof event.data === "string"
+                        ? event.data
+                        : Buffer.from(event.data as ArrayBuffer).toString(
+                              "utf8",
+                          );
+                const serverEvent = JSON.parse(payload) as ServerEvent;
+
+                if (serverEvent.type === "connection.error") {
+                    fail(
+                        new Error(
+                            String(
+                                serverEvent.payload.message ?? "Unknown error",
+                            ),
+                        ),
+                    );
+                    return;
+                }
+
+                if (serverEvent.type === "connection.ready") {
+                    observerSocket?.send(
+                        JSON.stringify({
+                            id: crypto.randomUUID(),
+                            type: "conversation.subscribe",
+                            payload: {
+                                conversationId: params.conversationId,
+                            },
+                        }),
+                    );
+                    return;
+                }
+
+                if (serverEvent.type === "run.started") {
+                    const incomingRunId = serverEvent.payload.runId;
+                    invariant(
+                        typeof incomingRunId === "string",
+                        "Zero-client recovery observer runId missing.",
+                    );
+                    invariant(
+                        runId === null || runId === incomingRunId,
+                        "Expected observer to reconnect to the same run.",
+                    );
+                    runId = incomingRunId;
+                    observerSawRunStartedAfterGap = true;
+                    zeroClientGapMs =
+                        senderClosedAt === null
+                            ? 0
+                            : Date.now() - senderClosedAt;
+                    return;
+                }
+
+                if (serverEvent.type === "message.delta") {
+                    const content = serverEvent.payload.content;
+                    invariant(
+                        typeof content === "string",
+                        "Zero-client recovery message delta missing content.",
+                    );
+                    latestContent = content;
+                    sawDelta = true;
+                    observerSawEventsAfterReconnect = true;
+                    return;
+                }
+
+                if (serverEvent.type === "message.completed") {
+                    const content = serverEvent.payload.content;
+                    invariant(
+                        typeof content === "string",
+                        "Zero-client recovery message completed missing content.",
+                    );
+                    latestContent = content;
+                    observerSawEventsAfterReconnect = true;
+                    return;
+                }
+
+                if (serverEvent.type === "run.completed") {
+                    invariant(
+                        runId,
+                        "Recovered run completed before run started.",
+                    );
+                    finish({
+                        status: "completed",
+                        runId,
+                        content: latestContent,
+                        sawDelta,
+                        senderClosedAfterRunStarted,
+                        observerSawRunStartedAfterGap,
+                        observerSawEventsAfterReconnect,
+                        zeroClientGapMs,
+                    });
+                    return;
+                }
+
+                if (serverEvent.type === "run.failed") {
+                    fail(
+                        new Error(
+                            String(
+                                (
+                                    serverEvent.payload.error as
+                                        | { message?: unknown }
+                                        | undefined
+                                )?.message ?? "Runtime failed.",
+                            ),
+                        ),
+                    );
+                }
+            });
+        };
+
+        senderSocket.addEventListener("error", () => {
+            fail(new Error("Zero-client recovery sender failed."));
+        });
+
+        senderSocket.addEventListener("close", (event) => {
+            if (senderClosedIntentionally) {
+                return;
+            }
+            fail(
+                new Error(
+                    `Zero-client recovery sender closed unexpectedly (${event.code}) ${event.reason}`,
+                ),
+            );
+        });
+
+        senderSocket.addEventListener("message", (event) => {
+            const payload =
+                typeof event.data === "string"
+                    ? event.data
+                    : Buffer.from(event.data as ArrayBuffer).toString("utf8");
+            const serverEvent = JSON.parse(payload) as ServerEvent;
+
+            if (serverEvent.type === "connection.error") {
+                fail(
+                    new Error(
+                        String(serverEvent.payload.message ?? "Unknown error"),
+                    ),
+                );
+                return;
+            }
+
+            if (serverEvent.type === "connection.ready") {
+                senderSocket.send(
+                    JSON.stringify({
+                        id: crypto.randomUUID(),
+                        type: "conversation.subscribe",
+                        payload: {
+                            conversationId: params.conversationId,
+                        },
+                    }),
+                );
+                senderSocket.send(
+                    JSON.stringify({
+                        id: crypto.randomUUID(),
+                        type: "conversation.send",
+                        payload: {
+                            conversationId: params.conversationId,
+                            agentId: params.agentId,
+                            modelId: params.modelId,
+                            variantId: params.variantId,
+                            content: params.content,
+                            userMessageId: params.userMessageId,
+                            assistantMessageId: params.assistantMessageId,
+                            history: [],
+                        },
+                    }),
+                );
+                return;
+            }
+
+            if (serverEvent.type === "run.started") {
+                const incomingRunId = serverEvent.payload.runId;
+                invariant(
+                    typeof incomingRunId === "string",
+                    "Zero-client recovery sender runId missing.",
+                );
+                runId = incomingRunId;
+                senderClosedAfterRunStarted = true;
+                senderClosedIntentionally = true;
+                senderClosedAt = Date.now();
+                closeSocket(senderSocket);
+                observerStartTimer = setTimeout(() => {
+                    startObserver();
+                }, ZERO_CLIENT_RECOVERY_GAP_MS);
+                return;
+            }
+
+            if (serverEvent.type === "run.failed") {
+                fail(
+                    new Error(
+                        String(
+                            (
+                                serverEvent.payload.error as
+                                    | { message?: unknown }
+                                    | undefined
+                            )?.message ?? "Runtime failed.",
+                        ),
+                    ),
+                );
+            }
+        });
+    });
+}
+
+async function captureSubscriptionReplay(params: {
+    serverUrl: string;
+    token: string;
+    conversationId: string;
+}): Promise<string[]> {
+    const wsUrl = `${params.serverUrl.replace(/^http/u, "ws")}/ws?token=${encodeURIComponent(params.token)}`;
+    const socket = new WebSocket(wsUrl);
+    const eventTypes: string[] = [];
+
+    return await new Promise<string[]>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+            if (
+                socket.readyState === WebSocket.OPEN ||
+                socket.readyState === WebSocket.CONNECTING
+            ) {
+                socket.close();
+            }
+            resolve(eventTypes);
+        }, MULTI_CLIENT_SUBSCRIPTION_SETTLE_MS * 4);
+
+        const finish = () => {
+            clearTimeout(timeout);
+            if (
+                socket.readyState === WebSocket.OPEN ||
+                socket.readyState === WebSocket.CONNECTING
+            ) {
+                socket.close();
+            }
+            resolve(eventTypes);
+        };
+
+        const fail = (error: Error) => {
+            clearTimeout(timeout);
+            if (
+                socket.readyState === WebSocket.OPEN ||
+                socket.readyState === WebSocket.CONNECTING
+            ) {
+                socket.close();
+            }
+            reject(error);
+        };
+
+        socket.addEventListener("error", () => {
+            fail(new Error("Replay capture WebSocket connection failed."));
+        });
+
+        socket.addEventListener("close", (event) => {
+            if (event.code === 1000) {
+                return;
+            }
+            fail(
+                new Error(
+                    `Replay capture WebSocket closed unexpectedly (${event.code}) ${event.reason}`,
+                ),
+            );
+        });
+
+        socket.addEventListener("message", (event) => {
+            const payload =
+                typeof event.data === "string"
+                    ? event.data
+                    : Buffer.from(event.data as ArrayBuffer).toString("utf8");
+            const serverEvent = JSON.parse(payload) as ServerEvent;
+            eventTypes.push(serverEvent.type);
+            if (serverEvent.type === "connection.error") {
+                fail(
+                    new Error(
+                        String(serverEvent.payload.message ?? "Unknown error"),
+                    ),
+                );
+                return;
+            }
+
+            if (serverEvent.type === "connection.ready") {
+                socket.send(
+                    JSON.stringify({
+                        id: crypto.randomUUID(),
+                        type: "conversation.subscribe",
+                        payload: {
+                            conversationId: params.conversationId,
+                        },
+                    }),
+                );
+                return;
+            }
+
+            if (
+                serverEvent.type === "run.started" ||
+                serverEvent.type === "message.started" ||
+                serverEvent.type === "message.delta" ||
+                serverEvent.type === "run.completed" ||
+                serverEvent.type === "run.interrupted"
+            ) {
+                finish();
+            }
+        });
+    });
+}
+
 function getConvexSiteUrl(repoRoot: string): string {
     const value =
         process.env.AGENTCHAT_CONVEX_SITE_URL?.trim() ||
@@ -1593,6 +2154,18 @@ function assertSmokeGreetingContent(content: string): void {
     invariant(
         normalized.split(/\s+/u).length <= 20,
         `Expected a short smoke greeting, got ${JSON.stringify(content)}`,
+    );
+}
+
+function assertWorkspacePlanContent(content: string): void {
+    const normalized = content.trim();
+    invariant(
+        normalized.length > 50,
+        `Expected non-trivial workspace recovery content, got ${JSON.stringify(content)}`,
+    );
+    invariant(
+        /notes\.md|improvement plan|100-item|100 numbered/iu.test(normalized),
+        `Expected workspace recovery content to reflect the workspace plan task, got ${JSON.stringify(content)}`,
     );
 }
 
@@ -1978,7 +2551,11 @@ async function main() {
                   })
                 : null;
 
-    let outcome: LiveOutcome | MultiClientOutcome;
+    let outcome:
+        | LiveOutcome
+        | MultiClientOutcome
+        | ZeroClientOutcome
+        | ZeroClientRecoveryOutcome;
     let secondaryOutcome: LiveOutcome | null = null;
     try {
         if (args.mode === "multi-client") {
@@ -1996,6 +2573,35 @@ async function main() {
                 modelId,
                 variantId,
                 content: buildPrompt(args.mode),
+                userMessageId: ids.userMessageId,
+                assistantMessageId: ids.assistantMessageId,
+            });
+        } else if (args.mode === "zero-client") {
+            outcome = await runZeroClientConversation({
+                serverUrl: args.serverUrl,
+                token: token.token,
+                conversationId: ids.conversationId,
+                agentId,
+                modelId,
+                variantId,
+                content: prompt,
+                userMessageId: ids.userMessageId,
+                assistantMessageId: ids.assistantMessageId,
+            });
+        } else if (args.mode === "zero-client-recover") {
+            const observerToken = await issueBackendToken({
+                repoRoot,
+                identity,
+            });
+            outcome = await runZeroClientRecoveryConversation({
+                serverUrl: args.serverUrl,
+                senderToken: token.token,
+                observerToken: observerToken.token,
+                conversationId: ids.conversationId,
+                agentId,
+                modelId,
+                variantId,
+                content: prompt,
                 userMessageId: ids.userMessageId,
                 assistantMessageId: ids.assistantMessageId,
             });
@@ -2304,7 +2910,9 @@ async function main() {
     }
 
     const expectedTerminalStatus =
-        outcome.status === "interrupted" ? "interrupted" : "completed";
+        "status" in outcome && outcome.status === "interrupted"
+            ? "interrupted"
+            : "completed";
     const { assistantMessage, persistedMessages, run, runEvents, binding } =
         await waitForPersistedTerminalState({
             repoRoot,
@@ -2332,6 +2940,8 @@ async function main() {
     if (
         args.mode === "smoke" ||
         args.mode === "status" ||
+        args.mode === "zero-client" ||
+        args.mode === "zero-client-recover" ||
         args.mode === "multi-client" ||
         args.mode === "stale-resume"
     ) {
@@ -2349,6 +2959,8 @@ async function main() {
         );
         if (args.mode === "status") {
             assertStatusContent(assistantMessage.content);
+        } else if (args.mode === "zero-client-recover") {
+            assertWorkspacePlanContent(assistantMessage.content);
         } else {
             assertSmokeContent(assistantMessage.content);
         }
@@ -2359,7 +2971,7 @@ async function main() {
                 run.outputMessageLocalId ?? ids.assistantMessageId,
             finalStatus: "completed",
             finalContent: assistantMessage.content,
-            sawDelta: outcome.sawDelta,
+            sawDelta: "sawDelta" in outcome ? outcome.sawDelta : false,
         });
         assertTerminalBinding({
             binding,
@@ -2384,6 +2996,83 @@ async function main() {
                 outcome.observerSawEventsAfterSenderClosed,
                 "Expected observer client to continue receiving live events after the sender disconnected.",
             );
+        }
+
+        if (args.mode === "zero-client") {
+            invariant(
+                outcome.senderClosedAfterRunStarted,
+                "Expected zero-client smoke to disconnect after run.started.",
+            );
+            const replayEventTypes = await captureSubscriptionReplay({
+                serverUrl: args.serverUrl,
+                token: token.token,
+                conversationId: ids.conversationId,
+            });
+            invariant(
+                !replayEventTypes.includes("run.started"),
+                "Expected no active run replay after a zero-client run completed.",
+            );
+            invariant(
+                !replayEventTypes.includes("message.started"),
+                "Expected no active message replay after a zero-client run completed.",
+            );
+            console.log(
+                JSON.stringify(
+                    {
+                        ok: true,
+                        mode: args.mode,
+                        tokenSource: token.source,
+                        agentId,
+                        modelId,
+                        variantId,
+                        userId,
+                        runId: outcome.runId,
+                        finalStatus: run.status,
+                        replayEventTypes,
+                    },
+                    null,
+                    2,
+                ),
+            );
+            return;
+        }
+
+        if (args.mode === "zero-client-recover") {
+            invariant(
+                outcome.senderClosedAfterRunStarted,
+                "Expected zero-client recovery smoke to disconnect after run.started.",
+            );
+            invariant(
+                outcome.observerSawRunStartedAfterGap,
+                "Expected a later client to recover the active run after a zero-client gap.",
+            );
+            invariant(
+                outcome.observerSawEventsAfterReconnect,
+                "Expected the reconnecting client to receive live events after recovery.",
+            );
+            invariant(
+                outcome.zeroClientGapMs >= ZERO_CLIENT_RECOVERY_GAP_MS,
+                `Expected a zero-client gap of at least ${ZERO_CLIENT_RECOVERY_GAP_MS}ms, got ${outcome.zeroClientGapMs}ms.`,
+            );
+            console.log(
+                JSON.stringify(
+                    {
+                        ok: true,
+                        mode: args.mode,
+                        tokenSource: token.source,
+                        agentId,
+                        modelId,
+                        variantId,
+                        userId,
+                        runId: outcome.runId,
+                        finalStatus: run.status,
+                        zeroClientGapMs: outcome.zeroClientGapMs,
+                    },
+                    null,
+                    2,
+                ),
+            );
+            return;
         }
 
         if (args.mode === "status") {
@@ -2456,7 +3145,7 @@ async function main() {
                 run.outputMessageLocalId ?? ids.assistantMessageId,
             finalStatus: "interrupted",
             finalContent: assistantMessage.content,
-            sawDelta: outcome.sawDelta,
+            sawDelta: "sawDelta" in outcome ? outcome.sawDelta : false,
         });
         assertTerminalBinding({
             binding,

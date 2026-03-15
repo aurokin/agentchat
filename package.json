@@ -32,6 +32,8 @@
         "local-user:create": "bun scripts/testing/create-local-user.ts",
         "test:manual:local-auth-separation": "bun scripts/testing/local-auth-separation.ts",
         "test:manual:live-runtime-smoke": "bun scripts/testing/live-runtime-smoke.ts --mode smoke",
+        "test:manual:live-runtime-zero-client": "bun scripts/testing/live-runtime-smoke.ts --mode zero-client",
+        "test:manual:live-runtime-zero-client-recover": "bun scripts/testing/live-runtime-smoke.ts --mode zero-client-recover",
         "test:manual:live-runtime-multi-client": "bun scripts/testing/live-runtime-smoke.ts --mode multi-client",
         "test:manual:live-runtime-multi-conversation": "bun scripts/testing/live-runtime-smoke.ts --mode multi-conversation",
         "test:manual:live-runtime-multi-agent": "bun scripts/testing/live-runtime-smoke.ts --mode multi-agent",

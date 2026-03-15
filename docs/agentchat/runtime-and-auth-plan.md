@@ -248,6 +248,8 @@ Current implementation note:
 
 - `bun run setup:local-auth-smoke` prepares the active local setup for `local` auth
 - `bun run test:manual:local-auth-separation` proves `smoke_1` and `smoke_2` stay isolated in Convex and backend token issuance
+- `bun run test:manual:live-runtime-zero-client` proves a run continues with zero active clients and later reconnects without stale active-run replay
+- `bun run test:manual:live-runtime-zero-client-recover` proves a client can reconnect after a real zero-client gap and resume the active run before completion
 - `bun run test:manual:live-runtime-multi-client` proves one same-user run can stay live across two clients and continue after the initiating client disconnects
 - `bun run test:manual:live-runtime-multi-conversation` proves one user can run two conversations concurrently without runtime-state crossover
 - `bun run test:manual:live-runtime-multi-agent` proves one user can run two different agents concurrently without runtime-state crossover
