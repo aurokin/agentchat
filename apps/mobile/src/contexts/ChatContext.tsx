@@ -17,6 +17,7 @@ import {
 } from "@/contexts/WorkspaceContext";
 import type { ChatSession, Message } from "@shared/core/types";
 import type {
+    AgentRuntimeActivitySummary,
     ChatRunSummary,
     ConversationRuntimeBindingSummary,
     ConversationRuntimeState,
@@ -48,6 +49,7 @@ interface ChatContextValue {
         string,
         ConversationRuntimeBindingSummary
     >;
+    agentRuntimeActivitySummaries: AgentRuntimeActivitySummary[];
     isLoading: boolean;
     isMessagesLoading: boolean;
     error: string | null;
@@ -86,6 +88,7 @@ const convexApi = api as typeof api & {
     runtimeBindings: {
         getByChat: FunctionReference<"query">;
         listByUser: FunctionReference<"query">;
+        listAgentActivityCounts: FunctionReference<"query">;
     };
 };
 
@@ -176,6 +179,10 @@ export function ChatProvider({
         convexApi.runtimeBindings.listByUser,
         isWorkspaceActive && workspaceUserId ? {} : "skip",
     ) as ConversationRuntimeBindingSummary[] | undefined;
+    const workspaceAgentRuntimeActivitySummaries = useQuery(
+        convexApi.runtimeBindings.listAgentActivityCounts,
+        isWorkspaceActive && workspaceUserId ? {} : "skip",
+    ) as AgentRuntimeActivitySummary[] | undefined;
     const runSummaries = useMemo(
         () => workspaceRunSummaries ?? [],
         [workspaceRunSummaries],
@@ -209,6 +216,10 @@ export function ChatProvider({
                 ]),
             ) as Record<string, ConversationRuntimeBindingSummary>,
         [workspaceConversationRuntimeBindings],
+    );
+    const agentRuntimeActivitySummaries = useMemo(
+        () => workspaceAgentRuntimeActivitySummaries ?? [],
+        [workspaceAgentRuntimeActivitySummaries],
     );
 
     useEffect(() => {
@@ -689,6 +700,7 @@ export function ChatProvider({
                 runSummaries,
                 runtimeState,
                 conversationRuntimeBindings,
+                agentRuntimeActivitySummaries,
                 isLoading,
                 isMessagesLoading,
                 error,

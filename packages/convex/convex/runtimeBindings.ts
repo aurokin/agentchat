@@ -1,5 +1,6 @@
 import { v } from "convex/values";
-import { query } from "./_generated/server";
+import { query, type QueryCtx } from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
 import { isOwner } from "./lib/authz";
 import { requireWorkspaceUser } from "./lib/subscription";
 
@@ -54,6 +55,34 @@ export function resolvePersistedConversationActivity(params: {
     return null;
 }
 
+async function listRuntimeBindingsWithChatsByUser(
+    ctx: QueryCtx,
+    userId: Id<"users">,
+): Promise<
+    Array<{
+        binding: Doc<"runtime_bindings">;
+        chat: Doc<"chats">;
+    }>
+> {
+    const bindings = await ctx.db
+        .query("runtime_bindings")
+        .withIndex("by_userId_and_updatedAt", (q) => q.eq("userId", userId))
+        .collect();
+
+    const chats = await Promise.all(
+        bindings.map((binding) => ctx.db.get(binding.chatId)),
+    );
+
+    return bindings.flatMap((binding, index) => {
+        const chat = chats[index];
+        if (!chat) {
+            return [];
+        }
+
+        return [{ binding, chat }];
+    });
+}
+
 export const getByChat = query({
     args: {
         chatId: v.id("chats"),
@@ -88,24 +117,17 @@ export const listActiveConversationIds = query({
     args: {},
     handler: async (ctx) => {
         const authenticatedUserId = await requireWorkspaceUser(ctx);
-        const bindings = await ctx.db
-            .query("runtime_bindings")
-            .withIndex("by_userId_and_updatedAt", (q) =>
-                q.eq("userId", authenticatedUserId),
+        const entries = await listRuntimeBindingsWithChatsByUser(
+            ctx,
+            authenticatedUserId,
+        );
+
+        return entries
+            .filter(
+                ({ binding }) =>
+                    binding.status === "active" && binding.activeRunId !== null,
             )
-            .collect();
-
-        const activeBindings = bindings.filter(
-            (binding) =>
-                binding.status === "active" && binding.activeRunId !== null,
-        );
-        const chats = await Promise.all(
-            activeBindings.map((binding) => ctx.db.get(binding.chatId)),
-        );
-
-        return chats
-            .filter((chat): chat is NonNullable<typeof chat> => chat !== null)
-            .map((chat) => ({
+            .map(({ chat }) => ({
                 conversationId: chat.localId ?? chat._id,
                 agentId: chat.agentId,
             }));
@@ -116,23 +138,12 @@ export const listByUser = query({
     args: {},
     handler: async (ctx) => {
         const authenticatedUserId = await requireWorkspaceUser(ctx);
-        const bindings = await ctx.db
-            .query("runtime_bindings")
-            .withIndex("by_userId_and_updatedAt", (q) =>
-                q.eq("userId", authenticatedUserId),
-            )
-            .collect();
-
-        const chats = await Promise.all(
-            bindings.map((binding) => ctx.db.get(binding.chatId)),
+        const entries = await listRuntimeBindingsWithChatsByUser(
+            ctx,
+            authenticatedUserId,
         );
 
-        return bindings.flatMap((binding, index) => {
-            const chat = chats[index];
-            if (!chat) {
-                return [];
-            }
-
+        return entries.flatMap(({ binding, chat }) => {
             return [
                 {
                     conversationId: chat.localId ?? chat._id,
@@ -150,5 +161,52 @@ export const listByUser = query({
                 },
             ];
         });
+    },
+});
+
+export const listAgentActivityCounts = query({
+    args: {},
+    handler: async (ctx) => {
+        const authenticatedUserId = await requireWorkspaceUser(ctx);
+        const entries = await listRuntimeBindingsWithChatsByUser(
+            ctx,
+            authenticatedUserId,
+        );
+
+        const counts = new Map<
+            string,
+            {
+                agentId: string;
+                activeCount: number;
+                newReplyCount: number;
+                needsAttentionCount: number;
+            }
+        >();
+
+        for (const { binding, chat } of entries) {
+            const existing = counts.get(chat.agentId) ?? {
+                agentId: chat.agentId,
+                activeCount: 0,
+                newReplyCount: 0,
+                needsAttentionCount: 0,
+            };
+            const activity = resolvePersistedConversationActivity({
+                status: binding.status,
+                lastEventAt: binding.lastEventAt,
+                lastViewedAt: chat.lastViewedAt ?? null,
+            });
+
+            if (activity?.tone === "working") {
+                existing.activeCount += 1;
+            } else if (activity?.tone === "completed") {
+                existing.newReplyCount += 1;
+            } else if (activity?.tone === "errored") {
+                existing.needsAttentionCount += 1;
+            }
+
+            counts.set(chat.agentId, existing);
+        }
+
+        return [...counts.values()];
     },
 });

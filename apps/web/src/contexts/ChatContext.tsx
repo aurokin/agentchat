@@ -13,6 +13,7 @@ import { usePaginatedQuery, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import type { FunctionReference } from "convex/server";
 import type {
+    AgentRuntimeActivitySummary,
     ChatRunSummary,
     ConversationRuntimeBindingSummary,
     ConversationRuntimeState,
@@ -50,6 +51,7 @@ interface ChatContextType {
         string,
         ConversationRuntimeBindingSummary
     >;
+    agentRuntimeActivitySummaries: AgentRuntimeActivitySummary[];
     loading: boolean;
     isMessagesLoading: boolean;
     canLoadMoreChats: boolean;
@@ -99,6 +101,7 @@ const convexApi = api as typeof api & {
     runtimeBindings: {
         getByChat: FunctionReference<"query">;
         listByUser: FunctionReference<"query">;
+        listAgentActivityCounts: FunctionReference<"query">;
     };
 };
 
@@ -163,6 +166,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         convexApi.runtimeBindings.listByUser,
         isWorkspaceActive && workspaceUserId ? {} : "skip",
     ) as ConversationRuntimeBindingSummary[] | undefined;
+    const workspaceAgentRuntimeActivitySummaries = useQuery(
+        convexApi.runtimeBindings.listAgentActivityCounts,
+        isWorkspaceActive && workspaceUserId ? {} : "skip",
+    ) as AgentRuntimeActivitySummary[] | undefined;
     const runSummaries = useMemo(
         () => workspaceRunSummaries ?? [],
         [workspaceRunSummaries],
@@ -189,6 +196,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 ]),
             ) as Record<string, ConversationRuntimeBindingSummary>,
         [workspaceConversationRuntimeBindings],
+    );
+    const agentRuntimeActivitySummaries = useMemo(
+        () => workspaceAgentRuntimeActivitySummaries ?? [],
+        [workspaceAgentRuntimeActivitySummaries],
     );
 
     useEffect(() => {
@@ -720,6 +731,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 runSummaries,
                 runtimeState,
                 conversationRuntimeBindings,
+                agentRuntimeActivitySummaries,
                 loading,
                 isMessagesLoading,
                 canLoadMoreChats,

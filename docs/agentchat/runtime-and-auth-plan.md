@@ -44,6 +44,7 @@ The runtime is partway to the target model:
 - multiple conversations can be active at once
 - web and mobile subscribe to active conversations in the background
 - per-thread activity state is now derived in Convex from runtime bindings plus `lastViewedAt`, with clients only applying display-specific suppression for the open conversation
+- per-agent activity counts are now derived in Convex too, so workspace summaries no longer depend on each client recomputing raw binding state
 
 Remaining gaps are mostly about:
 
@@ -259,6 +260,7 @@ Current implementation note:
 
 1. Add workspace-level active-run state surfaces for both clients.
     - Completed for thread-level visibility: web and mobile now surface per-conversation `Working`, `New reply`, and `Needs attention` state from runtime bindings.
+    - Completed for agent-level counts: web and mobile now consume Convex-derived per-agent activity summaries instead of tallying raw bindings locally.
 2. Make websocket/runtime recovery behavior fully user-centric rather than current-chat-centric.
     - In progress: live smoke now covers a same-user two-client handoff after `run.started`.
 3. Keep improving higher-level workspace activity/navigation above individual conversation lists.

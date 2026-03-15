@@ -72,6 +72,7 @@ This roadmap describes the current implementation state and the next major steps
 - Run `bun run test:manual:live-runtime-interrupt` to verify partial-output retention and interrupted run persistence
 - Keep live runtime smoke assertions on terminal runtime bindings and persisted run-event timelines, not just final transcript rows
 - Keep per-thread `Working`, `New reply`, and `Needs attention` state derived from Convex so web and mobile stay in sync instead of recomputing unread/runtime activity separately on each client
+- Keep workspace-level per-agent active counts derived from Convex as well, so chat lists and agent switchers are reading the same backend-owned activity summary
 - Run `bun run test:manual:config-reload-smoke` to verify watched config changes disable or fallback safely without restarting the server
 - Keep `bun run test:manual:runtime-confidence` as the single manual operator command for the local runtime stack
 - Prefer Convex-issued backend session tokens for these live passes; allow the local signing fallback only while the deployment is still missing `BACKEND_TOKEN_SECRET`

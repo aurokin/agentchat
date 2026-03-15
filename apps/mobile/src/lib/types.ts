@@ -62,6 +62,13 @@ export interface ConversationRuntimeBindingSummary {
         | null;
 }
 
+export interface AgentRuntimeActivitySummary {
+    agentId: string;
+    activeCount: number;
+    newReplyCount: number;
+    needsAttentionCount: number;
+}
+
 export type ConversationRuntimePhase =
     | "idle"
     | "active"

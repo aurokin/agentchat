@@ -19,22 +19,22 @@ export function AgentSwitcher({
         setSelectedAgentId,
         loadingAgents,
     } = useAgent();
-    const { conversationRuntimeBindings } = useChatContext();
+    const { agentRuntimeActivitySummaries } = useChatContext();
     const { colors } = useTheme();
     const styles = useMemo(() => createStyles(colors), [colors]);
     const [isOpen, setIsOpen] = useState(false);
 
     const visibleAgents = agents.filter((agent) => agent.enabled);
-    const activeRunCountsByAgent = useMemo(() => {
-        const counts = new Map<string, number>();
-        for (const binding of Object.values(conversationRuntimeBindings)) {
-            if (binding.status !== "active") {
-                continue;
-            }
-            counts.set(binding.agentId, (counts.get(binding.agentId) ?? 0) + 1);
-        }
-        return counts;
-    }, [conversationRuntimeBindings]);
+    const activeRunCountsByAgent = useMemo(
+        () =>
+            new Map(
+                agentRuntimeActivitySummaries.map((summary) => [
+                    summary.agentId,
+                    summary.activeCount,
+                ]),
+            ),
+        [agentRuntimeActivitySummaries],
+    );
 
     const handleSelect = async (agentId: string) => {
         await setSelectedAgentId(agentId);

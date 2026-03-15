@@ -81,6 +81,7 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
         currentChat,
         messages,
         conversationRuntimeBindings,
+        agentRuntimeActivitySummaries,
     } = useChat();
     const isMobile = useIsMobile();
     const isTablet = useIsTablet();
@@ -98,16 +99,16 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
         () => chats.find((chat) => chat.id === pendingDeleteChatId) ?? null,
         [chats, pendingDeleteChatId],
     );
-    const activeRunCountsByAgent = useMemo(() => {
-        const counts = new Map<string, number>();
-        for (const binding of Object.values(conversationRuntimeBindings)) {
-            if (binding.status !== "active") {
-                continue;
-            }
-            counts.set(binding.agentId, (counts.get(binding.agentId) ?? 0) + 1);
-        }
-        return counts;
-    }, [conversationRuntimeBindings]);
+    const activeRunCountsByAgent = useMemo(
+        () =>
+            new Map(
+                agentRuntimeActivitySummaries.map((summary) => [
+                    summary.agentId,
+                    summary.activeCount,
+                ]),
+            ),
+        [agentRuntimeActivitySummaries],
+    );
     const isMobileActionMode = isMobile || isTablet || isTouchDevice;
 
     const handleNewChat = useCallback(async () => {
