@@ -15,7 +15,7 @@ type Identity = {
     name: string;
 };
 
-type Mode = "smoke" | "interrupt" | "status";
+type Mode = "smoke" | "interrupt" | "status" | "multi-client";
 type ExtendedMode = Mode | "stale-resume";
 
 type AgentOptions = {
@@ -89,6 +89,16 @@ type LiveOutcome =
           sawDelta: boolean;
       };
 
+type MultiClientOutcome = {
+    status: "completed";
+    runId: string;
+    content: string;
+    sawDelta: boolean;
+    observerSawRunStarted: boolean;
+    senderClosedAfterRunStarted: boolean;
+    observerSawEventsAfterSenderClosed: boolean;
+};
+
 type PersistedRunEvent = {
     sequence: number;
     kind:
@@ -115,12 +125,21 @@ const DEFAULT_LOCAL_USERNAME = "smoke_1";
 const DEFAULT_LOCAL_PASSWORD = "smoke_1_password";
 const INTERRUPT_FALLBACK_DELAY_MS = 5000;
 const INTERRUPT_RETRY_INTERVAL_MS = 250;
+const MULTI_CLIENT_SUBSCRIPTION_SETTLE_MS = 100;
 const RUNTIME_TIMEOUT_MS = 120_000;
+const DEBUG_LIVE_SMOKE = process.env.AGENTCHAT_DEBUG_LIVE_SMOKE === "1";
 
 function invariant(condition: unknown, message: string): asserts condition {
     if (!condition) {
         throw new Error(message);
     }
+}
+
+function debugLiveSmoke(...parts: unknown[]): void {
+    if (!DEBUG_LIVE_SMOKE) {
+        return;
+    }
+    console.error("[live-runtime-smoke]", ...parts);
 }
 
 function getRepoRoot(): string {
@@ -146,10 +165,11 @@ function parseArgs(argv: string[]): LiveSmokeArgs {
                 value !== "smoke" &&
                 value !== "interrupt" &&
                 value !== "status" &&
+                value !== "multi-client" &&
                 value !== "stale-resume"
             ) {
                 throw new Error(
-                    "--mode must be smoke, interrupt, status, or stale-resume.",
+                    "--mode must be smoke, interrupt, status, multi-client, or stale-resume.",
                 );
             }
             mode = value;
@@ -436,9 +456,7 @@ async function ensureLocalTestUser(params: {
 
     if (
         existingSignIn.status !== 0 &&
-        !/Invalid credentials|InvalidAccountId/i.test(
-            existingSignIn.stderr,
-        )
+        !/Invalid credentials|InvalidAccountId/i.test(existingSignIn.stderr)
     ) {
         throw new Error(
             `Failed to verify local user ${params.username}: ${existingSignIn.stderr}`,
@@ -822,10 +840,326 @@ async function runLiveConversation(params: {
     });
 }
 
+async function runMultiClientConversation(params: {
+    serverUrl: string;
+    senderToken: string;
+    observerToken: string;
+    conversationId: string;
+    agentId: string;
+    modelId: string;
+    variantId: string | null;
+    content: string;
+    userMessageId: string;
+    assistantMessageId: string;
+}): Promise<MultiClientOutcome> {
+    debugLiveSmoke("multi-client:start", {
+        conversationId: params.conversationId,
+        agentId: params.agentId,
+        modelId: params.modelId,
+        variantId: params.variantId,
+    });
+    const senderWsUrl = `${params.serverUrl.replace(/^http/u, "ws")}/ws?token=${encodeURIComponent(params.senderToken)}`;
+    const observerWsUrl = `${params.serverUrl.replace(/^http/u, "ws")}/ws?token=${encodeURIComponent(params.observerToken)}`;
+    const senderSocket = new WebSocket(senderWsUrl);
+    const observerSocket = new WebSocket(observerWsUrl);
+
+    let senderReady = false;
+    let observerReady = false;
+    let sendStarted = false;
+    let senderClosedIntentionally = false;
+    let senderClosedAfterRunStarted = false;
+    let observerSawRunStarted = false;
+    let observerSawEventsAfterSenderClosed = false;
+    let latestContent = "";
+    let sawDelta = false;
+    let runId: string | null = null;
+    let startTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const closeSocket = (socket: WebSocket) => {
+        if (
+            socket.readyState === WebSocket.OPEN ||
+            socket.readyState === WebSocket.CONNECTING
+        ) {
+            socket.close();
+        }
+    };
+
+    const cleanup = () => {
+        if (startTimer) {
+            clearTimeout(startTimer);
+            startTimer = null;
+        }
+        closeSocket(senderSocket);
+        closeSocket(observerSocket);
+    };
+
+    const maybeStart = () => {
+        if (sendStarted || !senderReady || !observerReady) {
+            return;
+        }
+        sendStarted = true;
+        debugLiveSmoke("multi-client:both-clients-ready");
+        observerSocket.send(
+            JSON.stringify({
+                id: crypto.randomUUID(),
+                type: "conversation.subscribe",
+                payload: {
+                    conversationId: params.conversationId,
+                },
+            }),
+        );
+        senderSocket.send(
+            JSON.stringify({
+                id: crypto.randomUUID(),
+                type: "conversation.subscribe",
+                payload: {
+                    conversationId: params.conversationId,
+                },
+            }),
+        );
+        startTimer = setTimeout(() => {
+            debugLiveSmoke("multi-client:sender-send");
+            senderSocket.send(
+                JSON.stringify({
+                    id: crypto.randomUUID(),
+                    type: "conversation.send",
+                    payload: {
+                        conversationId: params.conversationId,
+                        agentId: params.agentId,
+                        modelId: params.modelId,
+                        variantId: params.variantId,
+                        content: params.content,
+                        userMessageId: params.userMessageId,
+                        assistantMessageId: params.assistantMessageId,
+                        history: [],
+                    },
+                }),
+            );
+        }, MULTI_CLIENT_SUBSCRIPTION_SETTLE_MS);
+    };
+
+    return await new Promise<MultiClientOutcome>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+            cleanup();
+            reject(
+                new Error(
+                    "Timed out waiting for multi-client runtime outcome.",
+                ),
+            );
+        }, RUNTIME_TIMEOUT_MS);
+
+        const finish = (outcome: MultiClientOutcome) => {
+            clearTimeout(timeout);
+            cleanup();
+            resolve(outcome);
+        };
+
+        const fail = (error: Error) => {
+            clearTimeout(timeout);
+            cleanup();
+            reject(error);
+        };
+
+        const parsePayload = (event: MessageEvent): ServerEvent => {
+            const payload =
+                typeof event.data === "string"
+                    ? event.data
+                    : Buffer.from(event.data as ArrayBuffer).toString("utf8");
+            return JSON.parse(payload) as ServerEvent;
+        };
+
+        senderSocket.addEventListener("error", () => {
+            fail(new Error("Sender WebSocket connection failed."));
+        });
+        observerSocket.addEventListener("error", () => {
+            fail(new Error("Observer WebSocket connection failed."));
+        });
+
+        senderSocket.addEventListener("close", (event) => {
+            if (senderClosedIntentionally) {
+                return;
+            }
+            fail(
+                new Error(
+                    `Sender WebSocket closed unexpectedly (${event.code}) ${event.reason}`,
+                ),
+            );
+        });
+        observerSocket.addEventListener("close", (event) => {
+            if (event.code === 1000) {
+                return;
+            }
+            fail(
+                new Error(
+                    `Observer WebSocket closed unexpectedly (${event.code}) ${event.reason}`,
+                ),
+            );
+        });
+
+        senderSocket.addEventListener("message", (event) => {
+            const serverEvent = parsePayload(event);
+
+            if (serverEvent.type === "connection.error") {
+                fail(
+                    new Error(
+                        String(serverEvent.payload.message ?? "Unknown error"),
+                    ),
+                );
+                return;
+            }
+
+            if (serverEvent.type === "connection.ready") {
+                senderReady = true;
+                debugLiveSmoke("multi-client:sender-ready");
+                maybeStart();
+                return;
+            }
+
+            if (serverEvent.type === "run.started") {
+                const incomingRunId = serverEvent.payload.runId;
+                invariant(
+                    typeof incomingRunId === "string",
+                    "Sender run started event missing runId.",
+                );
+                runId = incomingRunId;
+                debugLiveSmoke("multi-client:sender-run-started", {
+                    runId,
+                });
+                if (!senderClosedIntentionally) {
+                    senderClosedAfterRunStarted = true;
+                    senderClosedIntentionally = true;
+                    debugLiveSmoke("multi-client:sender-close");
+                    closeSocket(senderSocket);
+                }
+                return;
+            }
+
+            if (serverEvent.type === "run.failed") {
+                fail(
+                    new Error(
+                        String(
+                            (
+                                serverEvent.payload.error as
+                                    | { message?: unknown }
+                                    | undefined
+                            )?.message ?? "Runtime failed.",
+                        ),
+                    ),
+                );
+            }
+        });
+
+        observerSocket.addEventListener("message", (event) => {
+            const serverEvent = parsePayload(event);
+
+            if (serverEvent.type === "connection.error") {
+                fail(
+                    new Error(
+                        String(serverEvent.payload.message ?? "Unknown error"),
+                    ),
+                );
+                return;
+            }
+
+            if (serverEvent.type === "connection.ready") {
+                observerReady = true;
+                debugLiveSmoke("multi-client:observer-ready");
+                maybeStart();
+                return;
+            }
+
+            if (serverEvent.type === "run.started") {
+                const incomingRunId = serverEvent.payload.runId;
+                invariant(
+                    typeof incomingRunId === "string",
+                    "Observer run started event missing runId.",
+                );
+                runId = incomingRunId;
+                observerSawRunStarted = true;
+                debugLiveSmoke("multi-client:observer-run-started", {
+                    runId,
+                });
+                if (senderClosedIntentionally) {
+                    observerSawEventsAfterSenderClosed = true;
+                }
+                return;
+            }
+
+            if (serverEvent.type === "message.delta") {
+                const content = serverEvent.payload.content;
+                invariant(
+                    typeof content === "string",
+                    "Observer message delta event missing content.",
+                );
+                latestContent = content;
+                sawDelta = true;
+                debugLiveSmoke("multi-client:observer-delta", {
+                    length: content.length,
+                });
+                if (senderClosedIntentionally) {
+                    observerSawEventsAfterSenderClosed = true;
+                }
+                return;
+            }
+
+            if (serverEvent.type === "message.completed") {
+                const content = serverEvent.payload.content;
+                invariant(
+                    typeof content === "string",
+                    "Observer message completed event missing content.",
+                );
+                latestContent = content;
+                debugLiveSmoke("multi-client:observer-message-completed", {
+                    length: content.length,
+                });
+                if (senderClosedIntentionally) {
+                    observerSawEventsAfterSenderClosed = true;
+                }
+                return;
+            }
+
+            if (serverEvent.type === "run.completed") {
+                invariant(runId, "Run completed before run started.");
+                debugLiveSmoke("multi-client:observer-run-completed", {
+                    runId,
+                    sawDelta,
+                });
+                finish({
+                    status: "completed",
+                    runId,
+                    content: latestContent,
+                    sawDelta,
+                    observerSawRunStarted,
+                    senderClosedAfterRunStarted,
+                    observerSawEventsAfterSenderClosed,
+                });
+                return;
+            }
+
+            if (serverEvent.type === "run.failed") {
+                fail(
+                    new Error(
+                        String(
+                            (
+                                serverEvent.payload.error as
+                                    | { message?: unknown }
+                                    | undefined
+                            )?.message ?? "Runtime failed.",
+                        ),
+                    ),
+                );
+            }
+        });
+    });
+}
+
 function getConvexSiteUrl(repoRoot: string): string {
     const value =
         process.env.AGENTCHAT_CONVEX_SITE_URL?.trim() ||
-        tryReadEnvValue(getServerEnvPath(repoRoot), "AGENTCHAT_CONVEX_SITE_URL");
+        tryReadEnvValue(
+            getServerEnvPath(repoRoot),
+            "AGENTCHAT_CONVEX_SITE_URL",
+        );
     if (!value) {
         throw new Error("AGENTCHAT_CONVEX_SITE_URL is not configured.");
     }
@@ -853,8 +1187,9 @@ async function postRuntimeIngress<T>(params: {
             method: "POST",
             headers: {
                 "content-type": "application/json",
-                "x-agentchat-runtime-secret":
-                    getRuntimeIngressSecret(params.repoRoot),
+                "x-agentchat-runtime-secret": getRuntimeIngressSecret(
+                    params.repoRoot,
+                ),
             },
             body: JSON.stringify(params.payload),
         },
@@ -898,7 +1233,9 @@ async function tryCollectFailureSnapshot(params: {
         });
 
         const messages =
-            conversation && typeof conversation === "object" && "_id" in conversation
+            conversation &&
+            typeof conversation === "object" &&
+            "_id" in conversation
                 ? runConvex({
                       repoRoot: params.repoRoot,
                       functionName: "messages:listByChat",
@@ -910,7 +1247,9 @@ async function tryCollectFailureSnapshot(params: {
                 : null;
 
         const runs =
-            conversation && typeof conversation === "object" && "_id" in conversation
+            conversation &&
+            typeof conversation === "object" &&
+            "_id" in conversation
                 ? runConvex({
                       repoRoot: params.repoRoot,
                       functionName: "runs:listByChat",
@@ -1228,25 +1567,46 @@ async function main() {
         identity,
     });
 
-    let outcome: LiveOutcome;
+    let outcome: LiveOutcome | MultiClientOutcome;
     try {
-        outcome = await runLiveConversation({
-            serverUrl: args.serverUrl,
-            token: token.token,
-            conversationId: ids.conversationId,
-            agentId,
-            modelId,
-            variantId,
-            content: buildPrompt(args.mode),
-            userMessageId: ids.userMessageId,
-            assistantMessageId: ids.assistantMessageId,
-            mode:
-                args.mode === "interrupt"
-                    ? "interrupt"
-                    : args.mode === "status"
-                      ? "status"
-                      : "smoke",
-        });
+        if (args.mode === "multi-client") {
+            const observerToken = await issueBackendToken({
+                repoRoot,
+                identity,
+            });
+            debugLiveSmoke("main:issued-multi-client-tokens");
+            outcome = await runMultiClientConversation({
+                serverUrl: args.serverUrl,
+                senderToken: token.token,
+                observerToken: observerToken.token,
+                conversationId: ids.conversationId,
+                agentId,
+                modelId,
+                variantId,
+                content: buildPrompt(args.mode),
+                userMessageId: ids.userMessageId,
+                assistantMessageId: ids.assistantMessageId,
+            });
+        } else {
+            outcome = await runLiveConversation({
+                serverUrl: args.serverUrl,
+                token: token.token,
+                conversationId: ids.conversationId,
+                agentId,
+                modelId,
+                variantId,
+                content: buildPrompt(args.mode),
+                userMessageId: ids.userMessageId,
+                assistantMessageId: ids.assistantMessageId,
+                mode:
+                    args.mode === "interrupt"
+                        ? "interrupt"
+                        : args.mode === "status"
+                          ? "status"
+                          : "smoke",
+            });
+        }
+        debugLiveSmoke("main:outcome", outcome);
     } catch (error) {
         const snapshot = await tryCollectFailureSnapshot({
             repoRoot,
@@ -1345,8 +1705,20 @@ async function main() {
             conversationLocalId: ids.conversationId,
         },
     });
+    debugLiveSmoke("main:persistence-loaded", {
+        runId: outcome.runId,
+        assistantStatus: assistantMessage.status,
+        runStatus: run.status,
+        eventCount: runEvents.length,
+        bindingStatus: binding?.status ?? null,
+    });
 
-    if (args.mode === "smoke" || args.mode === "status" || args.mode === "stale-resume") {
+    if (
+        args.mode === "smoke" ||
+        args.mode === "status" ||
+        args.mode === "multi-client" ||
+        args.mode === "stale-resume"
+    ) {
         invariant(
             assistantMessage.status === "completed",
             `Expected a completed assistant message, got ${assistantMessage.status}.`,
@@ -1377,6 +1749,25 @@ async function main() {
             expectedStatus: "idle",
         });
 
+        if (args.mode === "multi-client") {
+            invariant(
+                outcome.status === "completed",
+                `Expected a completed multi-client outcome, got ${outcome.status}.`,
+            );
+            invariant(
+                outcome.observerSawRunStarted,
+                "Expected observer client to receive run.started.",
+            );
+            invariant(
+                outcome.senderClosedAfterRunStarted,
+                "Expected sender client to disconnect after run.started.",
+            );
+            invariant(
+                outcome.observerSawEventsAfterSenderClosed,
+                "Expected observer client to continue receiving live events after the sender disconnected.",
+            );
+        }
+
         if (args.mode === "status") {
             const statusMessages = persistedMessages.filter(
                 (message) =>
@@ -1397,7 +1788,9 @@ async function main() {
                 "Expected at least one persisted assistant_message for status mode.",
             );
             invariant(
-                statusMessages.some((message) => message.content.trim().length > 0),
+                statusMessages.some(
+                    (message) => message.content.trim().length > 0,
+                ),
                 "Expected persisted assistant_status content for status mode.",
             );
             invariant(
@@ -1472,6 +1865,18 @@ async function main() {
                 runId: outcome.runId,
                 sawDelta: outcome.sawDelta,
                 finalStatus: run.status,
+                observerSawRunStarted:
+                    "observerSawRunStarted" in outcome
+                        ? outcome.observerSawRunStarted
+                        : undefined,
+                senderClosedAfterRunStarted:
+                    "senderClosedAfterRunStarted" in outcome
+                        ? outcome.senderClosedAfterRunStarted
+                        : undefined,
+                observerSawEventsAfterSenderClosed:
+                    "observerSawEventsAfterSenderClosed" in outcome
+                        ? outcome.observerSawEventsAfterSenderClosed
+                        : undefined,
                 contentPreview: assistantMessage.content.slice(0, 120),
             },
             null,

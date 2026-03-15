@@ -28,20 +28,20 @@ This roadmap describes the current implementation state and the next major steps
 - Keep Codex-backed model and variant discovery well-tested and operator-friendly
 - Plan and implement local multi-user auth together with the backend-owned runtime model so Agentchat is always user-based, even for insecure local usage
 - Bring the runtime fully in line with backend-owned execution semantics across web, mobile, server, and Convex
-  - users can switch conversations or agents during submission
-  - users can have active runs in multiple conversations and agents at the same time
-  - runs continue with zero active clients and recover cleanly later
-  - multiple clients can observe the same run concurrently without duplicating execution
-  - clients keep background subscriptions to all active conversations instead of only the visible thread
-  - web and mobile both surface per-thread runtime activity (`Working`, `New reply`, `Needs attention`) from backend-owned runtime state
-  - multiple users can use the same instance at the same time without crossing runtime state
-  - every accepted request resolves to a concrete Convex user
-  - local seeded users such as `smoke_1` and `smoke_2` are the standard local multi-user runtime fixtures
+    - users can switch conversations or agents during submission
+    - users can have active runs in multiple conversations and agents at the same time
+    - runs continue with zero active clients and recover cleanly later
+    - multiple clients can observe the same run concurrently without duplicating execution
+    - clients keep background subscriptions to all active conversations instead of only the visible thread
+    - web and mobile both surface per-thread runtime activity (`Working`, `New reply`, `Needs attention`) from backend-owned runtime state
+    - multiple users can use the same instance at the same time without crossing runtime state
+    - every accepted request resolves to a concrete Convex user
+    - local seeded users such as `smoke_1` and `smoke_2` are the standard local multi-user runtime fixtures
 - Investigate Codex model and variant mapping in the live product path
 - Verify whether Codex Spark is functioning correctly in the current integration
 - Expand provider-native runtime item mapping so multi-message output follows real Codex events instead of transcript inference
-  - emit first-class progress/status items when the provider gives us typed runtime events
-  - keep transcript formatting cleanup separate from transcript structure
+    - emit first-class progress/status items when the provider gives us typed runtime events
+    - keep transcript formatting cleanup separate from transcript structure
 - Validate provider-native `assistant_status` items with real Codex turns and keep them covered by manual smoke commands
 - Improve operator-facing diagnostics and health reporting
 - Build a practical testing stack around the dedicated local fixtures in `/home/auro/agents/agentchat_test`
@@ -65,6 +65,7 @@ This roadmap describes the current implementation state and the next major steps
 - Add integration coverage across `apps/server`, Convex ingress, and websocket runtime flow
 - Keep generated Convex bindings in sync with the live deployment before manual confidence passes
 - Run `bun run test:manual:live-runtime-smoke` against a real local `apps/server` instance to verify the full Codex plus Convex persistence path
+- Run `bun run test:manual:live-runtime-multi-client` to verify one same-user run stays live across two clients and survives an initiating-client disconnect after `run.started`
 - Run `bun run test:manual:local-auth-separation` after `bun run setup:local-auth-smoke` to verify `smoke_1` and `smoke_2` stay isolated
 - Run `bun run test:manual:live-runtime-status` to verify a real Codex turn persists both `assistant_status` and `assistant_message` transcript items
 - Use `bun run test:manual:live-runtime-repeat` when you need a small manually-invoked flake probe across repeated smoke turns

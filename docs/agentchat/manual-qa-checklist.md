@@ -13,6 +13,7 @@ For live runtime persistence validation with a running local server, also run:
 
 ```bash
 bun run test:manual:live-runtime-smoke
+bun run test:manual:live-runtime-multi-client
 bun run test:manual:live-runtime-status
 bun run test:manual:live-runtime-interrupt
 bun run test:manual:stale-runtime-resume

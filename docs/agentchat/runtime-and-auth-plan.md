@@ -88,22 +88,22 @@ Agentchat no longer treats disabled-auth as a supported product mode. Local seed
 ### Ownership
 
 - Convex owns:
-  - access identity
-  - workspace user identity
-  - conversations
-  - messages
-  - runs
-  - run events
-  - runtime bindings
+    - access identity
+    - workspace user identity
+    - conversations
+    - messages
+    - runs
+    - run events
+    - runtime bindings
 - Backend owns:
-  - in-memory live provider runtimes
-  - websocket fanout
-  - in-flight stream buffering
-  - transient reconnect bookkeeping
+    - in-memory live provider runtimes
+    - websocket fanout
+    - in-flight stream buffering
+    - transient reconnect bookkeeping
 - Clients own:
-  - visible UI state
-  - input actions
-  - local display-only hints
+    - visible UI state
+    - input actions
+    - local display-only hints
 
 ### Runtime Invariants
 
@@ -134,22 +134,22 @@ Target shape:
 
 ```json
 {
-  "auth": {
-    "defaultProviderId": "local-main",
-    "providers": [
-      {
-        "id": "google-main",
-        "kind": "google",
-        "enabled": true
-      },
-      {
-        "id": "local-main",
-        "kind": "local",
-        "enabled": true,
-        "allowSignup": false
-      }
-    ]
-  }
+    "auth": {
+        "defaultProviderId": "local-main",
+        "providers": [
+            {
+                "id": "google-main",
+                "kind": "google",
+                "enabled": true
+            },
+            {
+                "id": "local-main",
+                "kind": "local",
+                "enabled": true,
+                "allowSignup": false
+            }
+        ]
+    }
 }
 ```
 
@@ -246,6 +246,7 @@ Current implementation note:
 
 - `bun run setup:local-auth-smoke` prepares the active local setup for `local` auth
 - `bun run test:manual:local-auth-separation` proves `smoke_1` and `smoke_2` stay isolated in Convex and backend token issuance
+- `bun run test:manual:live-runtime-multi-client` proves one same-user run can stay live across two clients and continue after the initiating client disconnects
 
 ### Phase 6. Remove Disabled-Auth As A Primary Path
 
@@ -256,8 +257,9 @@ Current implementation note:
 ## Immediate Follow-Up Work
 
 1. Add workspace-level active-run state surfaces for both clients.
-   - Completed for thread-level visibility: web and mobile now surface per-conversation `Working`, `New reply`, and `Needs attention` state from runtime bindings.
+    - Completed for thread-level visibility: web and mobile now surface per-conversation `Working`, `New reply`, and `Needs attention` state from runtime bindings.
 2. Make websocket/runtime recovery behavior fully user-centric rather than current-chat-centric.
+    - In progress: live smoke now covers a same-user two-client handoff after `run.started`.
 3. Keep improving higher-level workspace activity/navigation above individual conversation lists.
 4. Move smoke coverage from shared default-user assumptions to `smoke_1` and `smoke_2`.
 

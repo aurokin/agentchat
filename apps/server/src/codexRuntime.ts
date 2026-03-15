@@ -170,6 +170,10 @@ function getAgentReasoningText(
 
 export class CodexRuntimeManager {
     private readonly runtimes = new Map<string, ConversationRuntime>();
+    private readonly pendingSubscriptions = new Map<
+        string,
+        Map<string, RuntimeSubscriber>
+    >();
     private readonly getConfig: () => AgentchatConfig;
     private readonly persistence: RuntimePersistenceClient;
     private readonly createClient: CreateCodexClient;
@@ -410,10 +414,14 @@ export class CodexRuntimeManager {
         subscriberId: string;
         sendEvent: (event: ServerEvent) => void;
     }): Promise<void> | void {
-        const runtime = this.runtimes.get(
-            getRuntimeKey(params.userId, params.conversationId),
-        );
+        const key = getRuntimeKey(params.userId, params.conversationId);
+        const runtime = this.runtimes.get(key);
         if (!runtime) {
+            this.addPendingSubscription(
+                key,
+                params.subscriberId,
+                params.sendEvent,
+            );
             return this.recoverOrphanedActiveRun({
                 userId: params.userId,
                 conversationId: params.conversationId,
@@ -486,6 +494,29 @@ export class CodexRuntimeManager {
             );
             this.cleanupSubscriber(runtime, params.subscriberId);
         }
+
+        for (const [key, subscribers] of this.pendingSubscriptions) {
+            if (
+                params.conversationId &&
+                !key.endsWith(`:${params.conversationId}`)
+            ) {
+                continue;
+            }
+
+            const subscriber = subscribers.get(params.subscriberId);
+            if (!subscriber) {
+                continue;
+            }
+
+            subscriber.subscriptionCount = Math.max(
+                0,
+                subscriber.subscriptionCount - 1,
+            );
+            this.cleanupSubscriberMap(subscribers, params.subscriberId);
+            if (subscribers.size === 0) {
+                this.pendingSubscriptions.delete(key);
+            }
+        }
     }
 
     private async ensureRuntime(params: {
@@ -543,6 +574,12 @@ export class CodexRuntimeManager {
             subscribers: new Map(),
         };
 
+        const pendingSubscribers = this.pendingSubscriptions.get(key);
+        if (pendingSubscribers) {
+            runtime.subscribers = new Map(pendingSubscribers);
+            this.pendingSubscriptions.delete(key);
+        }
+
         client.onNotification((notification) => {
             this.handleNotification(runtime, notification);
         });
@@ -559,12 +596,7 @@ export class CodexRuntimeManager {
         subscriberId: string,
         sendEvent: (event: ServerEvent) => void,
     ): void {
-        const existing = runtime.subscribers.get(subscriberId);
-        runtime.subscribers.set(subscriberId, {
-            sendEvent,
-            subscriptionCount: (existing?.subscriptionCount ?? 0) + 1,
-            retainDuringActiveTurn: existing?.retainDuringActiveTurn ?? false,
-        });
+        this.addSubscriber(runtime.subscribers, subscriberId, sendEvent);
     }
 
     private retainSubscriberForActiveTurn(
@@ -577,6 +609,30 @@ export class CodexRuntimeManager {
             sendEvent,
             subscriptionCount: existing?.subscriptionCount ?? 0,
             retainDuringActiveTurn: true,
+        });
+    }
+
+    private addPendingSubscription(
+        runtimeKey: string,
+        subscriberId: string,
+        sendEvent: (event: ServerEvent) => void,
+    ): void {
+        const subscribers =
+            this.pendingSubscriptions.get(runtimeKey) ?? new Map();
+        this.addSubscriber(subscribers, subscriberId, sendEvent);
+        this.pendingSubscriptions.set(runtimeKey, subscribers);
+    }
+
+    private addSubscriber(
+        subscribers: Map<string, RuntimeSubscriber>,
+        subscriberId: string,
+        sendEvent: (event: ServerEvent) => void,
+    ): void {
+        const existing = subscribers.get(subscriberId);
+        subscribers.set(subscriberId, {
+            sendEvent,
+            subscriptionCount: (existing?.subscriptionCount ?? 0) + 1,
+            retainDuringActiveTurn: existing?.retainDuringActiveTurn ?? false,
         });
     }
 
@@ -601,6 +657,23 @@ export class CodexRuntimeManager {
             !subscriber.retainDuringActiveTurn
         ) {
             runtime.subscribers.delete(subscriberId);
+        }
+    }
+
+    private cleanupSubscriberMap(
+        subscribers: Map<string, RuntimeSubscriber>,
+        subscriberId: string,
+    ): void {
+        const subscriber = subscribers.get(subscriberId);
+        if (!subscriber) {
+            return;
+        }
+
+        if (
+            subscriber.subscriptionCount === 0 &&
+            !subscriber.retainDuringActiveTurn
+        ) {
+            subscribers.delete(subscriberId);
         }
     }
 

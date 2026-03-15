@@ -712,6 +712,80 @@ describe("CodexRuntimeManager", () => {
         ]);
     });
 
+    test("attaches subscribers that subscribed before the runtime existed", async () => {
+        const config = createConfig();
+        const persistence = createPersistence(null);
+        const fakeClient = new FakeCodexClient({
+            startedThreadId: "thread-fresh",
+            autoComplete: false,
+        });
+        const observerEvents: Array<{
+            type: string;
+            payload: Record<string, unknown>;
+        }> = [];
+        const senderEvents: Array<{
+            type: string;
+            payload: Record<string, unknown>;
+        }> = [];
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: () => fakeClient,
+        });
+
+        await manager.subscribe({
+            userId: "user-1",
+            conversationId: "chat-1",
+            subscriberId: "socket-2",
+            sendEvent: (event) => {
+                observerEvents.push(event);
+            },
+        });
+
+        const sendPromise = manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: (event) => {
+                senderEvents.push(event);
+            },
+        });
+
+        await Bun.sleep(0);
+        fakeClient.emit({
+            method: "item/agentMessage/delta",
+            params: {
+                delta: "Still streaming",
+            },
+        });
+        fakeClient.emit({
+            method: "turn/completed",
+            params: {
+                turn: {
+                    status: "completed",
+                },
+            },
+        });
+
+        await sendPromise;
+
+        expect(senderEvents.map((event) => event.type)).toEqual([
+            "run.started",
+            "message.started",
+            "message.delta",
+            "message.completed",
+            "run.completed",
+        ]);
+        expect(observerEvents.map((event) => event.type)).toEqual([
+            "run.started",
+            "message.started",
+            "message.delta",
+            "message.completed",
+            "run.completed",
+        ]);
+        expect(persistence.recoverStaleRunCalls).toHaveLength(0);
+    });
+
     test("promotes Codex agent reasoning into an assistant status message before output", async () => {
         const config = createConfig();
         const persistence = createPersistence(null);
