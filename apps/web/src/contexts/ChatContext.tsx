@@ -116,6 +116,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     const [loading, setLoading] = useState(true);
     const [isMessagesLoading, setIsMessagesLoading] = useState(false);
     const currentChatIdRef = useRef<string | null>(null);
+    const chatsRef = useRef<ChatSession[]>([]);
     const latestViewedAtRef = useRef<Record<string, number>>({});
     const markViewedTimeoutRef = useRef<number | null>(null);
     const pendingViewedChatRef = useRef<{
@@ -206,6 +207,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         currentChatIdRef.current = currentChat?.id ?? null;
     }, [currentChat?.id]);
 
+    useEffect(() => {
+        chatsRef.current = chats;
+    }, [chats]);
+
     const applyChatLastViewedAt = useCallback(
         (chatId: string, timestamp: number) => {
             setChats((prev) =>
@@ -245,17 +250,17 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             pending.delete(chat.id);
         }
 
-        setChats((prev) =>
-            mergeByIdWithPending(
-                mapped,
-                prev,
-                pending,
-                (a, b) => b.updatedAt - a.updatedAt,
-            ),
+        const mergedChats = mergeByIdWithPending(
+            mapped,
+            chatsRef.current,
+            pending,
+            (a, b) => b.updatedAt - a.updatedAt,
         );
+
+        setChats(mergedChats);
         setCurrentChat((prev) =>
             resolveCurrentChatForAgent({
-                chats: mapped,
+                chats: mergedChats,
                 currentChat: prev,
                 storedChatId: selectedAgentId
                     ? storage.getSelectedChatId(selectedAgentId)

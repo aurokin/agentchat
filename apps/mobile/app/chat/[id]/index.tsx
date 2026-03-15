@@ -137,10 +137,20 @@ export default function ChatScreen(): ReactElement {
     }, []);
 
     useEffect(() => {
-        if (chatId) {
-            selectChat(chatId);
+        if (!chatId) {
+            return;
         }
-    }, [chatId, selectChat]);
+
+        if (currentChat?.id === chatId) {
+            return;
+        }
+
+        if (!chats.some((chat) => chat.id === chatId)) {
+            return;
+        }
+
+        void selectChat(chatId);
+    }, [chatId, chats, currentChat?.id, selectChat]);
 
     useEffect(() => {
         if (!chatId) {
