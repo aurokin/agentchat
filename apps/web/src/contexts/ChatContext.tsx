@@ -304,9 +304,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         const lastRuntimeEventAt =
             conversationRuntimeBindings[currentChat.id]?.lastEventAt ?? 0;
         const visibleAt = Math.max(
-            Date.now(),
             lastMessageAt,
             lastRuntimeEventAt,
+            currentChat.updatedAt,
+            currentChat.createdAt,
         );
         const alreadyViewedAt = Math.max(
             currentChat.lastViewedAt ?? 0,
