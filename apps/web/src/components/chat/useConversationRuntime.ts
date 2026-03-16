@@ -111,6 +111,7 @@ export function useConversationRuntime({
     const pendingReconnectNoticeRef = useRef(false);
     const pendingSendConversationIdRef = useRef<string | null>(null);
     const currentChatRef = useRef<ChatSession | null>(null);
+    const previousConversationIdRef = useRef<string | null>(null);
     const messagesRef = useRef<Message[]>([]);
 
     const queueStreamingMessageUpdate = useCallback(
@@ -154,6 +155,20 @@ export function useConversationRuntime({
     useEffect(() => {
         currentChatRef.current = currentChat;
     }, [currentChat]);
+
+    useEffect(() => {
+        const currentConversationId = currentChat?.id ?? null;
+        if (
+            previousConversationIdRef.current !== null &&
+            previousConversationIdRef.current !== currentConversationId
+        ) {
+            setError(null);
+            setRetryChat(null);
+            setRecoveredRunNotice(false);
+        }
+
+        previousConversationIdRef.current = currentConversationId;
+    }, [currentChat?.id]);
 
     useEffect(() => {
         if (

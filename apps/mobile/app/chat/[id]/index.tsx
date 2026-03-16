@@ -132,6 +132,7 @@ export default function ChatScreen(): ReactElement {
     const sidebarWidth = Math.max(280, Math.min(360, windowWidth * 0.32));
     const suppressInputRef = useRef(false);
     const currentChatRef = useRef<ChatSession | null>(currentChat);
+    const previousConversationIdRef = useRef<string | null>(null);
     const chatMessagesRef = useRef<Message[]>(EMPTY_MESSAGES);
     const activeRunRef = useRef<ActiveRunState | null>(null);
     const pendingReconnectNoticeRef = useRef(false);
@@ -233,6 +234,20 @@ export default function ChatScreen(): ReactElement {
     useEffect(() => {
         currentChatRef.current = currentChat;
     }, [currentChat]);
+
+    useEffect(() => {
+        const currentConversationId = currentChat?.id ?? null;
+        if (
+            previousConversationIdRef.current !== null &&
+            previousConversationIdRef.current !== currentConversationId
+        ) {
+            setError(null);
+            setRetryPayload(null);
+            setRecoveredRunNotice(false);
+        }
+
+        previousConversationIdRef.current = currentConversationId;
+    }, [currentChat?.id]);
 
     useEffect(() => {
         if (!currentChat) {
