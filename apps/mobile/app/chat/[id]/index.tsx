@@ -844,6 +844,58 @@ export default function ChatScreen(): ReactElement {
         const hasModelBadge = Boolean(item.modelId);
         const showDivider = hasReasoningBadge || hasModelBadge;
         const modelDisplayName = getModelDisplayName(item.modelId, models);
+        const messageTimestamp = (
+            <Text
+                style={[
+                    styles.messageMetaText,
+                    isUser && styles.messageMetaTextUser,
+                ]}
+            >
+                {formatMessageTime(item.createdAt)}
+            </Text>
+        );
+        const messageBadges = (
+            <>
+                {hasReasoningBadge && (
+                    <View style={[styles.messageBadge, styles.reasoningBadge]}>
+                        <Text
+                            style={[
+                                styles.messageBadgeText,
+                                styles.reasoningBadgeText,
+                            ]}
+                        >
+                            {item.reasoningEffort?.toUpperCase()}
+                        </Text>
+                    </View>
+                )}
+                {hasModelBadge && (
+                    <TouchableOpacity
+                        style={[styles.messageBadge, styles.modelBadge]}
+                        activeOpacity={0.7}
+                        onPress={() => Alert.alert("Model", modelDisplayName)}
+                    >
+                        <Feather
+                            name="cpu"
+                            size={12}
+                            color={colors.textMuted}
+                            style={styles.modelBadgeIcon}
+                        />
+                        <Text
+                            style={[
+                                styles.messageBadgeText,
+                                styles.modelBadgeText,
+                            ]}
+                            numberOfLines={1}
+                        >
+                            {modelDisplayName}
+                        </Text>
+                    </TouchableOpacity>
+                )}
+            </>
+        );
+        const messageDivider = showDivider ? (
+            <View style={styles.messageMetaDivider} />
+        ) : null;
 
         return (
             <View
@@ -950,54 +1002,9 @@ export default function ChatScreen(): ReactElement {
                             : styles.messageMetaRowAssistant,
                     ]}
                 >
-                    <Text
-                        style={[
-                            styles.messageMetaText,
-                            isUser && styles.messageMetaTextUser,
-                        ]}
-                    >
-                        {formatMessageTime(item.createdAt)}
-                    </Text>
-                    {showDivider && <View style={styles.messageMetaDivider} />}
-                    {hasReasoningBadge && (
-                        <View
-                            style={[styles.messageBadge, styles.reasoningBadge]}
-                        >
-                            <Text
-                                style={[
-                                    styles.messageBadgeText,
-                                    styles.reasoningBadgeText,
-                                ]}
-                            >
-                                {item.reasoningEffort?.toUpperCase()}
-                            </Text>
-                        </View>
-                    )}
-                    {hasModelBadge && (
-                        <TouchableOpacity
-                            style={[styles.messageBadge, styles.modelBadge]}
-                            activeOpacity={0.7}
-                            onPress={() =>
-                                Alert.alert("Model", modelDisplayName)
-                            }
-                        >
-                            <Feather
-                                name="cpu"
-                                size={12}
-                                color={colors.textMuted}
-                                style={styles.modelBadgeIcon}
-                            />
-                            <Text
-                                style={[
-                                    styles.messageBadgeText,
-                                    styles.modelBadgeText,
-                                ]}
-                                numberOfLines={1}
-                            >
-                                {modelDisplayName}
-                            </Text>
-                        </TouchableOpacity>
-                    )}
+                    {isUser ? messageBadges : messageTimestamp}
+                    {messageDivider}
+                    {isUser ? messageTimestamp : messageBadges}
                 </View>
             </View>
         );

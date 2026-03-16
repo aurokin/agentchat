@@ -57,6 +57,18 @@ export function MarkdownRenderer({
 
     const markdownRules = useMemo<MarkdownRules>(
         () => ({
+            paragraph: (node, children, _parent, styles) => (
+                <View
+                    key={getNodeKey(node)}
+                    style={[
+                        styles._VIEW_SAFE_paragraph,
+                        { marginBottom: 0 },
+                        node.index > 0 ? { marginTop: 8 } : null,
+                    ]}
+                >
+                    {children}
+                </View>
+            ),
             fence: (node) => (
                 <View
                     key={getNodeKey(node)}
@@ -135,7 +147,7 @@ function createMarkdownStyles(
         },
         paragraph: {
             marginTop: 0,
-            marginBottom: 8,
+            marginBottom: 0,
         },
         strong: {
             fontWeight: "700",
