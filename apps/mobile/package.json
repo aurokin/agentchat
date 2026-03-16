@@ -9,7 +9,7 @@
         "android": "expo run:android",
         "ios": "expo run:ios",
         "android:local": "mkdir -p build/android && TIMESTAMP=$(date +%Y%m%d-%H%M%S) && bunx eas-cli build --profile development --platform android --local --output=./build/android/agentchat-dev-${TIMESTAMP}.apk",
-        "ios:local": "mkdir -p build/ios && TIMESTAMP=$(date +%Y%m%d-%H%M%S) && bunx eas-cli build --profile development --platform ios --local --output=./build/ios/agentchat-dev-simulator-${TIMESTAMP}.tar.gz",
+        "ios:local-sim": "mkdir -p build/ios && TIMESTAMP=$(date +%Y%m%d-%H%M%S) && bunx eas-cli build --profile development --platform ios --local --output=./build/ios/agentchat-dev-simulator-${TIMESTAMP}.tar.gz",
         "ios:local-device": "mkdir -p build/ios && TIMESTAMP=$(date +%Y%m%d-%H%M%S) && bunx eas-cli build --profile development-device --platform ios --local --non-interactive --output=./build/ios/agentchat-dev-device-${TIMESTAMP}.ipa",
         "ios:eas-device": "bunx eas-cli build --profile development-device --platform ios",
         "ios:eas-register-device": "bunx eas-cli device:create",
