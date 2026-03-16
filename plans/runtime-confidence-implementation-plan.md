@@ -49,6 +49,7 @@ Recently completed and intentionally removed from the active backlog:
 - shared conversation-scoped send gating so web and mobile ignore stale send settlements after a conversation switch, and web clears pending send state when the user switches away before run binding
 - web and mobile now clear transient retry/error/recovered UI state on conversation switches so one chat's local runtime state does not leak into the next chat
 - web now keys the socket subscription effect by conversation id rather than the whole chat object, avoiding resubscribe churn on title/model updates, and both clients clear leftover reconnect/interrupt flags on conversation switches
+- shared background runtime subscription helpers now back both clients' workspace-level socket subscriptions, with direct reconciliation and cleanup coverage
 
 Current Phase 1 focus:
 

@@ -7,6 +7,10 @@ import { api } from "@convex/_generated/api";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { getSharedAgentchatSocketClient } from "@/lib/agentchat-socket";
 import { useActionSafe } from "@/hooks/useConvexSafe";
+import {
+    clearBackgroundConversationSubscriptions,
+    reconcileBackgroundConversationSubscriptions,
+} from "@shared/core/background-runtime-subscriptions";
 
 const convexApi = api as typeof api & {
     backendTokens: {
@@ -37,47 +41,26 @@ export function BackgroundRuntimeSubscriptions() {
     useEffect(() => {
         const subscriptions = subscriptionsRef.current;
         return () => {
-            for (const unsubscribe of subscriptions.values()) {
-                unsubscribe();
-            }
-            subscriptions.clear();
+            clearBackgroundConversationSubscriptions(subscriptions);
         };
     }, []);
 
     useEffect(() => {
         if (!isWorkspaceReady || !activeConversations) {
-            for (const unsubscribe of subscriptionsRef.current.values()) {
-                unsubscribe();
-            }
-            subscriptionsRef.current.clear();
+            clearBackgroundConversationSubscriptions(subscriptionsRef.current);
             return;
         }
 
-        const desiredConversationIds = new Set(
-            activeConversations.map((entry) => entry.conversationId),
-        );
-
-        for (const [conversationId, unsubscribe] of subscriptionsRef.current) {
-            if (desiredConversationIds.has(conversationId)) {
-                continue;
-            }
-
-            unsubscribe();
-            subscriptionsRef.current.delete(conversationId);
-        }
-
-        for (const conversationId of desiredConversationIds) {
-            if (subscriptionsRef.current.has(conversationId)) {
-                continue;
-            }
-
-            subscriptionsRef.current.set(
-                conversationId,
+        const activeCount = reconcileBackgroundConversationSubscriptions({
+            subscriptions: subscriptionsRef.current,
+            desiredConversationIds: activeConversations.map(
+                (entry) => entry.conversationId,
+            ),
+            subscribeToConversation: (conversationId) =>
                 socketClient.subscribeToConversation(conversationId),
-            );
-        }
+        });
 
-        if (desiredConversationIds.size === 0) {
+        if (activeCount === 0) {
             return;
         }
 
