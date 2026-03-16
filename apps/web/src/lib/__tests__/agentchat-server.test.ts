@@ -50,6 +50,31 @@ describe("agentchat-server", () => {
         expect(getAgentchatServerUrl()).toBe("http://192.168.1.20:3030");
     });
 
+    test("rewrites ipv6 loopback server urls to the browser host on lan clients", () => {
+        process.env.NEXT_PUBLIC_AGENTCHAT_SERVER_URL = "http://[::1]:3030///";
+        globalThis.window = {
+            location: {
+                hostname: "192.168.1.20",
+            },
+        } as Window & typeof globalThis;
+
+        expect(getAgentchatServerUrl()).toBe("http://192.168.1.20:3030");
+    });
+
+    test("preserves path and port when rewriting loopback server urls", () => {
+        process.env.NEXT_PUBLIC_AGENTCHAT_SERVER_URL =
+            "https://localhost:3030/base/path///";
+        globalThis.window = {
+            location: {
+                hostname: "agentchat.local",
+            },
+        } as Window & typeof globalThis;
+
+        expect(getAgentchatServerUrl()).toBe(
+            "https://agentchat.local:3030/base/path",
+        );
+    });
+
     test("keeps loopback server urls unchanged for local browsers", () => {
         process.env.NEXT_PUBLIC_AGENTCHAT_SERVER_URL = "http://localhost:3030";
         globalThis.window = {
