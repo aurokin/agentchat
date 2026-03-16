@@ -8,6 +8,7 @@
 - Convex-first development: runtime behavior should assume Convex-backed storage.
 - Cloud fallback: features should fail clearly when Convex is unavailable instead of silently inventing a local persistence mode.
 - Settings parity: changes to stored defaults and theme settings must be reflected in both app shells.
+- Theme parity: color tokens live in `packages/shared/src/theme/` (`light.ts`, `dark.ts`, `types.ts`). Never define color values directly in `globals.css` or `ThemeContext.tsx` — edit the shared palettes and both platforms pick them up. Web-only extension tokens (e.g. `--secondary`, `--accent`) are in `apps/web/src/lib/theme-css.ts`. When adding a new color, add it to `ThemeColors`, both palettes, and `css-mapping.ts`, then register the CSS variable in the `@theme` block in `globals.css` so Tailwind can use it.
 
 ## Workspace Notes
 

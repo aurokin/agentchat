@@ -19,7 +19,7 @@ The canonical architecture and product docs live in `docs/agentchat/`.
 - `apps/server`: instance-local backend server for provider/runtime orchestration
 - `apps/mobile`: Expo app (React Native), catching up to the web/server architecture
 - `packages/convex`: Convex backend (schema, auth, workspace persistence)
-- `packages/shared`: shared runtime, provider, and persistence helpers
+- `packages/shared`: shared runtime, provider, persistence helpers, and unified theme palettes (`src/theme/`)
 - `apps/web/src/lib/storage.ts`: browser UI preference storage for the web shell
 
 ## Documentation Expectations
