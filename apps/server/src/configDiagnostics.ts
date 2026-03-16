@@ -40,6 +40,32 @@ export type ConfigDiagnostics = {
     agents: AgentDiagnostics[];
 };
 
+export const AUTH_DIAGNOSTIC_ISSUES = {
+    noEnabledProviders: "No enabled auth providers are configured.",
+    defaultProviderMissing:
+        "Configured default auth provider is missing; fallback will be used.",
+    defaultProviderDisabled:
+        "Configured default auth provider is disabled; fallback will be used.",
+} as const;
+
+export const PROVIDER_DIAGNOSTIC_ISSUES = {
+    noEnabledModels: "Enabled provider has no enabled models.",
+    codexCwdMissing:
+        "Configured codex.cwd does not exist or is not a directory.",
+    codexCommandMissing: "Configured Codex command path does not exist.",
+} as const;
+
+export const AGENT_DIAGNOSTIC_ISSUES = {
+    rootPathMissing: "Agent rootPath does not exist or is not a directory.",
+    noEnabledProviders: "Agent has no enabled providers.",
+    defaultProviderFallback:
+        "Agent default provider is disabled; fallback will be used.",
+    defaultModelFallback:
+        "Agent default model is unavailable; fallback will be used.",
+    defaultVariantFallback:
+        "Agent default variant is unavailable; fallback will be used.",
+} as const;
+
 type ResolvedAgentDefaults = {
     defaultProviderId: string | null;
     defaultModel: string | null;
@@ -64,15 +90,11 @@ function getAuthDiagnostics(config: AgentchatConfig): ConfigDiagnostics["auth"] 
     const issues: string[] = [];
 
     if (enabledProviders.length === 0) {
-        issues.push("No enabled auth providers are configured.");
+        issues.push(AUTH_DIAGNOSTIC_ISSUES.noEnabledProviders);
     } else if (!configuredDefaultProvider) {
-        issues.push(
-            "Configured default auth provider is missing; fallback will be used.",
-        );
+        issues.push(AUTH_DIAGNOSTIC_ISSUES.defaultProviderMissing);
     } else if (!configuredDefaultProvider.enabled) {
-        issues.push(
-            "Configured default auth provider is disabled; fallback will be used.",
-        );
+        issues.push(AUTH_DIAGNOSTIC_ISSUES.defaultProviderDisabled);
     }
 
     return {
@@ -194,20 +216,18 @@ export function getProviderDiagnostics(
     ).length;
 
     if (provider.enabled && enabledModelCount === 0) {
-        issues.push("Enabled provider has no enabled models.");
+        issues.push(PROVIDER_DIAGNOSTIC_ISSUES.noEnabledModels);
     }
 
     if (provider.codex.cwd && !isExistingDirectory(provider.codex.cwd)) {
-        issues.push(
-            "Configured codex.cwd does not exist or is not a directory.",
-        );
+        issues.push(PROVIDER_DIAGNOSTIC_ISSUES.codexCwdMissing);
     }
 
     if (
         path.isAbsolute(provider.codex.command) &&
         !existsSync(provider.codex.command)
     ) {
-        issues.push("Configured Codex command path does not exist.");
+        issues.push(PROVIDER_DIAGNOSTIC_ISSUES.codexCommandMissing);
     }
 
     return {
@@ -231,11 +251,11 @@ export function getAgentDiagnostics(
     );
 
     if (agent.enabled && !isExistingDirectory(agent.rootPath)) {
-        issues.push("Agent rootPath does not exist or is not a directory.");
+        issues.push(AGENT_DIAGNOSTIC_ISSUES.rootPathMissing);
     }
 
     if (agent.enabled && availableProviderIds.length === 0) {
-        issues.push("Agent has no enabled providers.");
+        issues.push(AGENT_DIAGNOSTIC_ISSUES.noEnabledProviders);
     }
 
     if (
@@ -243,9 +263,7 @@ export function getAgentDiagnostics(
         availableProviderIds.length > 0 &&
         !availableProviderIds.includes(agent.defaultProviderId)
     ) {
-        issues.push(
-            "Agent default provider is disabled; fallback will be used.",
-        );
+        issues.push(AGENT_DIAGNOSTIC_ISSUES.defaultProviderFallback);
     }
 
     if (
@@ -253,9 +271,7 @@ export function getAgentDiagnostics(
         agent.defaultModel &&
         resolvedDefaults.defaultModel === null
     ) {
-        issues.push(
-            "Agent default model is unavailable; fallback will be used.",
-        );
+        issues.push(AGENT_DIAGNOSTIC_ISSUES.defaultModelFallback);
     }
 
     if (
@@ -264,9 +280,7 @@ export function getAgentDiagnostics(
         resolvedDefaults.defaultModel !== null &&
         resolvedDefaults.defaultVariant === null
     ) {
-        issues.push(
-            "Agent default variant is unavailable; fallback will be used.",
-        );
+        issues.push(AGENT_DIAGNOSTIC_ISSUES.defaultVariantFallback);
     }
 
     return {

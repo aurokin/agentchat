@@ -39,6 +39,7 @@ Recently completed and intentionally removed from the active backlog:
 - manual LAN browser-confidence command and supporting config/example files
 - server doctor/auth diagnostics improvements and confidence coverage
 - direct server coverage for last-known-good config reload failure and recovery behavior
+- shared operator issue catalog wiring across config diagnostics, doctor mapping, and smoke helpers
 
 Current Phase 1 focus:
 

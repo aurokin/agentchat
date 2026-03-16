@@ -1,5 +1,10 @@
 import type { ConfigStoreStatus } from "./config.ts";
-import type { ConfigDiagnostics } from "./configDiagnostics.ts";
+import {
+    AGENT_DIAGNOSTIC_ISSUES,
+    AUTH_DIAGNOSTIC_ISSUES,
+    PROVIDER_DIAGNOSTIC_ISSUES,
+    type ConfigDiagnostics,
+} from "./configDiagnostics.ts";
 import type { RuntimeEnvSummary } from "./envDiagnostics.ts";
 
 type ProviderLiveProbe = {
@@ -61,7 +66,7 @@ function createIssue(params: {
 }
 
 function mapProviderIssue(providerId: string, issue: string): DoctorIssue {
-    if (issue === "Enabled provider has no enabled models.") {
+    if (issue === PROVIDER_DIAGNOSTIC_ISSUES.noEnabledModels) {
         return createIssue({
             code: "provider_no_enabled_models",
             severity: "error",
@@ -71,9 +76,7 @@ function mapProviderIssue(providerId: string, issue: string): DoctorIssue {
                 "Enable at least one model for the provider in agentchat.config.json.",
         });
     }
-    if (
-        issue === "Configured codex.cwd does not exist or is not a directory."
-    ) {
+    if (issue === PROVIDER_DIAGNOSTIC_ISSUES.codexCwdMissing) {
         return createIssue({
             code: "provider_codex_cwd_missing",
             severity: "error",
@@ -83,7 +86,7 @@ function mapProviderIssue(providerId: string, issue: string): DoctorIssue {
                 "Update provider.codex.cwd to an existing workspace path.",
         });
     }
-    if (issue === "Configured Codex command path does not exist.") {
+    if (issue === PROVIDER_DIAGNOSTIC_ISSUES.codexCommandMissing) {
         return createIssue({
             code: "provider_codex_command_missing",
             severity: "error",
@@ -104,7 +107,7 @@ function mapProviderIssue(providerId: string, issue: string): DoctorIssue {
 }
 
 function mapAgentIssue(agentId: string, issue: string): DoctorIssue {
-    if (issue === "Agent rootPath does not exist or is not a directory.") {
+    if (issue === AGENT_DIAGNOSTIC_ISSUES.rootPathMissing) {
         return createIssue({
             code: "agent_root_path_missing",
             severity: "error",
@@ -114,7 +117,7 @@ function mapAgentIssue(agentId: string, issue: string): DoctorIssue {
                 "Update agent.rootPath to an existing workspace directory.",
         });
     }
-    if (issue === "Agent has no enabled providers.") {
+    if (issue === AGENT_DIAGNOSTIC_ISSUES.noEnabledProviders) {
         return createIssue({
             code: "agent_no_enabled_providers",
             severity: "error",
@@ -123,9 +126,7 @@ function mapAgentIssue(agentId: string, issue: string): DoctorIssue {
             remediation: "Assign at least one enabled provider to the agent.",
         });
     }
-    if (
-        issue === "Agent default provider is disabled; fallback will be used."
-    ) {
+    if (issue === AGENT_DIAGNOSTIC_ISSUES.defaultProviderFallback) {
         return createIssue({
             code: "agent_default_provider_fallback",
             severity: "warning",
@@ -135,9 +136,7 @@ function mapAgentIssue(agentId: string, issue: string): DoctorIssue {
                 "Point the agent default provider at an enabled provider to avoid implicit fallback.",
         });
     }
-    if (
-        issue === "Agent default model is unavailable; fallback will be used."
-    ) {
+    if (issue === AGENT_DIAGNOSTIC_ISSUES.defaultModelFallback) {
         return createIssue({
             code: "agent_default_model_fallback",
             severity: "warning",
@@ -147,9 +146,7 @@ function mapAgentIssue(agentId: string, issue: string): DoctorIssue {
                 "Update the agent default model or its allowlist to match an enabled model.",
         });
     }
-    if (
-        issue === "Agent default variant is unavailable; fallback will be used."
-    ) {
+    if (issue === AGENT_DIAGNOSTIC_ISSUES.defaultVariantFallback) {
         return createIssue({
             code: "agent_default_variant_fallback",
             severity: "warning",
@@ -170,7 +167,7 @@ function mapAgentIssue(agentId: string, issue: string): DoctorIssue {
 }
 
 function mapAuthIssue(issue: string): DoctorIssue {
-    if (issue === "No enabled auth providers are configured.") {
+    if (issue === AUTH_DIAGNOSTIC_ISSUES.noEnabledProviders) {
         return createIssue({
             code: "auth_no_enabled_providers",
             severity: "error",
@@ -180,10 +177,7 @@ function mapAuthIssue(issue: string): DoctorIssue {
                 "Enable at least one auth provider and point auth.defaultProviderId at it.",
         });
     }
-    if (
-        issue ===
-        "Configured default auth provider is disabled; fallback will be used."
-    ) {
+    if (issue === AUTH_DIAGNOSTIC_ISSUES.defaultProviderDisabled) {
         return createIssue({
             code: "auth_default_provider_fallback",
             severity: "warning",
@@ -193,10 +187,7 @@ function mapAuthIssue(issue: string): DoctorIssue {
                 "Enable the configured auth default provider or update auth.defaultProviderId to the intended enabled provider.",
         });
     }
-    if (
-        issue ===
-        "Configured default auth provider is missing; fallback will be used."
-    ) {
+    if (issue === AUTH_DIAGNOSTIC_ISSUES.defaultProviderMissing) {
         return createIssue({
             code: "auth_default_provider_missing",
             severity: "warning",

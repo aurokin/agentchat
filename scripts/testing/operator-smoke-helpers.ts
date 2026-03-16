@@ -1,3 +1,8 @@
+import {
+    AGENT_DIAGNOSTIC_ISSUES,
+    PROVIDER_DIAGNOSTIC_ISSUES,
+} from "../../apps/server/src/configDiagnostics.ts";
+
 export type OperatorSmokeProvider = {
     id: string;
     enabled: boolean;
@@ -153,9 +158,7 @@ export function hasMissingAgentRootIssue(params: {
     return params.diagnostics.agents.some(
         (agent) =>
             agent.id === params.agentId &&
-            agent.issues.includes(
-                "Agent rootPath does not exist or is not a directory.",
-            ),
+            agent.issues.includes(AGENT_DIAGNOSTIC_ISSUES.rootPathMissing),
     );
 }
 
@@ -166,9 +169,7 @@ export function hasMissingProviderCwdIssue(params: {
     return params.diagnostics.providers.some(
         (provider) =>
             provider.id === params.providerId &&
-            provider.issues.includes(
-                "Configured codex.cwd does not exist or is not a directory.",
-            ),
+            provider.issues.includes(PROVIDER_DIAGNOSTIC_ISSUES.codexCwdMissing),
     );
 }
 
@@ -187,7 +188,7 @@ export function isRestoredOperatorDiagnostics(params: {
             (provider) =>
                 provider.id === params.providerId &&
                 provider.issues.includes(
-                    "Configured codex.cwd does not exist or is not a directory.",
+                    PROVIDER_DIAGNOSTIC_ISSUES.codexCwdMissing,
                 ),
         )
     );
