@@ -22,12 +22,10 @@ import { resolveConversationActivityState } from "@shared/core/conversation-acti
 import { useChatContext } from "@/contexts/ChatContext";
 import { useAppContext } from "@/contexts/AppContext";
 import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
-import { useAgent } from "@/contexts/AgentContext";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AgentSwitcher } from "@/components/chat/AgentSwitcher";
 import { getPreferredHomeChatId } from "@/lib/home-chat-route";
 import { resolveResponsiveLayout } from "@/lib/responsive-layout";
-import { TopBar } from "@/components/ui/TopBar";
 
 export default function HomeScreen(): React.ReactElement {
     const router = useRouter();
@@ -43,7 +41,6 @@ export default function HomeScreen(): React.ReactElement {
         hasMessagesInChats,
     } = useChatContext();
     const { isInitialized } = useAppContext();
-    const { selectedAgent } = useAgent();
     const { colors } = useTheme();
     const styles = useMemo(() => createStyles(colors), [colors]);
     const [isSelecting, setIsSelecting] = useState(false);
@@ -276,28 +273,23 @@ export default function HomeScreen(): React.ReactElement {
                     </View>
                 </View>
             ) : (
-                <TopBar
-                    eyebrow="Workspace"
-                    title={selectedAgent?.name ?? "Select an agent"}
-                    subtitle={`${chats.length} ${
-                        chats.length === 1 ? "conversation" : "conversations"
-                    }`}
-                    rightSlot={
-                        <TouchableOpacity
-                            accessibilityRole="button"
-                            accessibilityLabel="Settings"
-                            style={styles.settingsButton}
-                            onPress={() => router.push("/settings")}
-                        >
-                            <Feather
-                                name="settings"
-                                size={20}
-                                color={colors.accent}
-                            />
-                        </TouchableOpacity>
-                    }
-                    bottomSlot={<AgentSwitcher compact />}
-                />
+                <View style={styles.listHeader}>
+                    <View style={styles.listHeaderAgentSwitch}>
+                        <AgentSwitcher compact />
+                    </View>
+                    <TouchableOpacity
+                        accessibilityRole="button"
+                        accessibilityLabel="Settings"
+                        style={styles.settingsButton}
+                        onPress={() => router.push("/settings")}
+                    >
+                        <Feather
+                            name="settings"
+                            size={20}
+                            color={colors.accent}
+                        />
+                    </TouchableOpacity>
+                </View>
             )}
 
             {error && (
@@ -466,6 +458,21 @@ const createStyles = (colors: ThemeColors) =>
             borderBottomWidth: 1,
             borderBottomColor: colors.border,
             backgroundColor: colors.surface,
+        },
+        listHeader: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 12,
+            paddingHorizontal: 16,
+            paddingTop: 10,
+            paddingBottom: 12,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.border,
+            backgroundColor: colors.surface,
+        },
+        listHeaderAgentSwitch: {
+            flex: 1,
+            minWidth: 0,
         },
         title: {
             fontSize: 19,

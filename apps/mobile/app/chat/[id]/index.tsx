@@ -706,47 +706,47 @@ export default function ChatScreen(): ReactElement {
         return (
             <View style={[styles.tabletSidebar, { width: sidebarWidth }]}>
                 <View style={styles.tabletSidebarHeader}>
-                    <View style={styles.tabletSidebarHeaderText}>
-                        <Text style={styles.tabletSidebarTitle}>
-                            {selectedAgent?.name ?? "Agentchat"}
-                        </Text>
+                    <View style={styles.tabletSidebarAgentSwitch}>
                         <AgentSwitcher
                             compact
                             onAgentChange={() => router.replace("/")}
                         />
                     </View>
-                    <View style={styles.tabletSidebarHeaderActions}>
-                        <TouchableOpacity
-                            style={styles.tabletSidebarHeaderButton}
-                            onPress={() => router.push("/settings")}
-                            accessibilityRole="button"
-                            accessibilityLabel="Open settings"
-                        >
-                            <Feather
-                                name="settings"
-                                size={18}
-                                color={colors.accent}
-                            />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.tabletSidebarHeaderButton}
-                            onPress={handleStartNewChat}
-                            accessibilityRole="button"
-                            accessibilityLabel="Start new chat"
-                        >
-                            <Feather
-                                name="plus"
-                                size={18}
-                                color={colors.accent}
-                            />
-                        </TouchableOpacity>
-                    </View>
+                    <TouchableOpacity
+                        style={styles.tabletSidebarHeaderButton}
+                        onPress={() => router.push("/settings")}
+                        accessibilityRole="button"
+                        accessibilityLabel="Open settings"
+                    >
+                        <Feather
+                            name="settings"
+                            size={18}
+                            color={colors.accent}
+                        />
+                    </TouchableOpacity>
                 </View>
                 {chats.length === 0 ? (
                     <View style={styles.tabletSidebarEmpty}>
                         <Text style={styles.tabletSidebarEmptyText}>
                             No chats yet
                         </Text>
+                        <TouchableOpacity
+                            style={styles.tabletSidebarEmptyButton}
+                            onPress={() => {
+                                void handleStartNewChat();
+                            }}
+                            accessibilityRole="button"
+                            accessibilityLabel="Start new chat"
+                        >
+                            <Feather
+                                name="plus"
+                                size={16}
+                                color={colors.textOnAccent}
+                            />
+                            <Text style={styles.tabletSidebarEmptyButtonText}>
+                                New Chat
+                            </Text>
+                        </TouchableOpacity>
                     </View>
                 ) : (
                     <FlatList
@@ -780,6 +780,22 @@ export default function ChatScreen(): ReactElement {
                         }}
                     />
                 )}
+                {chats.length > 0 ? (
+                    <TouchableOpacity
+                        style={styles.tabletSidebarFab}
+                        onPress={() => {
+                            void handleStartNewChat();
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel="Start new chat"
+                    >
+                        <Feather
+                            name="plus"
+                            size={22}
+                            color={colors.textOnAccent}
+                        />
+                    </TouchableOpacity>
+                ) : null}
             </View>
         );
     };
@@ -1071,19 +1087,8 @@ export default function ChatScreen(): ReactElement {
     const threadContent = (
         <>
             <TopBar
-                eyebrow={selectedAgent?.name ?? "Agentchat"}
                 title={currentChat.title}
-                subtitle={
-                    currentModel?.name
-                        ? `${currentModel.name}${
-                              currentChat.variantId
-                                  ? ` · ${currentChat.variantId}`
-                                  : ""
-                          }`
-                        : currentChat.variantId
-                          ? currentChat.variantId
-                          : undefined
-                }
+                subtitle={selectedAgent?.name ?? "Agentchat"}
                 leftSlot={
                     useTabletLandscapeLayout ? null : (
                         <TouchableOpacity
@@ -1113,12 +1118,6 @@ export default function ChatScreen(): ReactElement {
                             color={colors.danger}
                         />
                     </TouchableOpacity>
-                }
-                bottomSlot={
-                    <AgentSwitcher
-                        compact
-                        onAgentChange={() => router.replace("/")}
-                    />
                 }
             />
 
@@ -1287,26 +1286,15 @@ const createStyles = (colors: ThemeColors) =>
         tabletSidebarHeader: {
             flexDirection: "row",
             alignItems: "center",
-            justifyContent: "space-between",
             paddingHorizontal: 16,
             paddingVertical: 12,
+            gap: 12,
             borderBottomWidth: 1,
             borderBottomColor: colors.border,
         },
-        tabletSidebarHeaderText: {
+        tabletSidebarAgentSwitch: {
             flex: 1,
-            gap: 8,
-            marginRight: 12,
-        },
-        tabletSidebarTitle: {
-            fontSize: 20,
-            fontWeight: "700",
-            color: colors.text,
-        },
-        tabletSidebarHeaderActions: {
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 6,
+            minWidth: 0,
         },
         tabletSidebarHeaderButton: {
             width: 34,
@@ -1320,7 +1308,7 @@ const createStyles = (colors: ThemeColors) =>
         },
         tabletSidebarListContent: {
             padding: 12,
-            paddingBottom: 24,
+            paddingBottom: 88,
             gap: 8,
         },
         tabletSidebarChatItem: {
@@ -1350,11 +1338,42 @@ const createStyles = (colors: ThemeColors) =>
             alignItems: "center",
             justifyContent: "center",
             paddingHorizontal: 24,
+            gap: 16,
         },
         tabletSidebarEmptyText: {
             fontSize: 14,
             color: colors.textMuted,
             textAlign: "center",
+        },
+        tabletSidebarEmptyButton: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            paddingHorizontal: 14,
+            paddingVertical: 10,
+            borderRadius: 12,
+            backgroundColor: colors.accent,
+        },
+        tabletSidebarEmptyButtonText: {
+            fontSize: 14,
+            fontWeight: "700",
+            color: colors.textOnAccent,
+        },
+        tabletSidebarFab: {
+            position: "absolute",
+            right: 16,
+            bottom: 16,
+            width: 48,
+            height: 48,
+            borderRadius: 24,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: colors.accent,
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.18,
+            shadowRadius: 4,
+            elevation: 4,
         },
         tabletThreadPane: {
             flex: 1,
