@@ -109,6 +109,7 @@ Coverage targets:
 - Codex turn-start failure persistence and errored binding repair
 - Codex mid-stream runtime exit handling with partial-output failure persistence
 - multi-message assistant output boundaries, including `message.started`
+- Codex model discovery fallback when `model/list` returns no visible models
 - disabled provider / disabled agent handling
 - operator diagnostics for invalid paths and fallback defaults
 
@@ -165,6 +166,7 @@ Coverage targets:
 - prove the same user can run two different agents concurrently without runtime-state crossover
 - prove two different authenticated users can run concurrently without runtime-state crossover
 - probe whether provider-native `assistant_status` messages persist before the final assistant reply when Codex emits reasoning events
+- verify mode-specific model/variant selection stays deterministic before the live manual run chooses a target
 - persist completed and interrupted run state back into Convex
 - verify assistant message and run status after the socket flow completes
 - verify terminal runtime bindings settle to the expected persisted idle state

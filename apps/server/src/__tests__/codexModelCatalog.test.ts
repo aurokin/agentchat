@@ -191,6 +191,134 @@ describe("CodexModelCatalog", () => {
         }
     });
 
+    test("falls back to config models when live discovery returns no visible models", async () => {
+        const consoleError = mock(() => undefined);
+        const originalConsoleError = console.error;
+        console.error = consoleError as typeof console.error;
+
+        try {
+            const catalog = new CodexModelCatalog({
+                getConfig: () => createConfig(),
+                createClient: () => ({
+                    initialize: async () => undefined,
+                    request: async () => ({
+                        data: [
+                            {
+                                id: "hidden-model",
+                                displayName: "Hidden",
+                                hidden: true,
+                                supportedReasoningEfforts: [],
+                            },
+                        ],
+                        nextCursor: null,
+                    }),
+                    onNotification: () => undefined,
+                    onExit: () => undefined,
+                    stop: () => undefined,
+                }),
+            });
+
+            const result = await catalog.getProviderModels("codex-main");
+
+            expect(result).toMatchObject({
+                providerId: "codex-main",
+                fetchedAt: null,
+                expiresAt: null,
+                models: [
+                    {
+                        id: "fallback-model",
+                        label: "Fallback Model",
+                        variants: [{ id: "medium", label: "Medium" }],
+                    },
+                ],
+            });
+        } finally {
+            console.error = originalConsoleError;
+        }
+    });
+
+    test("fetches every model/list page and normalizes variants once per model", async () => {
+        const request = mock(async (_method: string, params: unknown) => {
+            const cursor = (params as { cursor?: string | null }).cursor ?? null;
+            if (cursor === null) {
+                return {
+                    data: [
+                        {
+                            id: "gpt-5.4-codex",
+                            displayName: "GPT-5.4 Codex",
+                            hidden: false,
+                            supportedReasoningEfforts: [
+                                { reasoningEffort: "low" },
+                                { reasoningEffort: "none" },
+                                { reasoningEffort: "xhigh" },
+                                { reasoningEffort: "xhigh" },
+                            ],
+                        },
+                    ],
+                    nextCursor: "page-2",
+                };
+            }
+
+            return {
+                data: [
+                    {
+                        id: "gpt-5.4-codex-spark",
+                        hidden: false,
+                        supportedReasoningEfforts: [],
+                    },
+                    {
+                        id: "hidden-model",
+                        displayName: "Hidden Model",
+                        hidden: true,
+                        supportedReasoningEfforts: [{ reasoningEffort: "high" }],
+                    },
+                ],
+                nextCursor: null,
+            };
+        });
+
+        const catalog = new CodexModelCatalog({
+            getConfig: () => createConfig(),
+            createClient: () => ({
+                initialize: async () => undefined,
+                request,
+                onNotification: () => undefined,
+                onExit: () => undefined,
+                stop: () => undefined,
+            }),
+        });
+
+        const result = await catalog.getProviderModels("codex-main");
+
+        expect(request).toHaveBeenNthCalledWith(1, "model/list", {
+            limit: 100,
+            cursor: null,
+            includeHidden: false,
+        });
+        expect(request).toHaveBeenNthCalledWith(2, "model/list", {
+            limit: 100,
+            cursor: "page-2",
+            includeHidden: false,
+        });
+        expect(result?.models).toEqual([
+            {
+                id: "gpt-5.4-codex",
+                label: "GPT-5.4 Codex",
+                supportsReasoning: true,
+                variants: [
+                    { id: "low", label: "Low" },
+                    { id: "xhigh", label: "X-High" },
+                ],
+            },
+            {
+                id: "gpt-5.4-codex-spark",
+                label: "gpt-5.4-codex-spark",
+                supportsReasoning: false,
+                variants: [],
+            },
+        ]);
+    });
+
     test("reports provider probe success with live model count", async () => {
         const catalog = new CodexModelCatalog({
             getConfig: () => createConfig(),
@@ -243,7 +371,32 @@ describe("CodexModelCatalog", () => {
             providerId: "codex-main",
             ok: false,
             modelCount: 0,
-            error: "connection refused",
+                error: "connection refused",
+        });
+    });
+
+    test("reports provider probe failure when live discovery returns no visible models", async () => {
+        const catalog = new CodexModelCatalog({
+            getConfig: () => createConfig(),
+            createClient: () => ({
+                initialize: async () => undefined,
+                request: async () => ({
+                    data: [],
+                    nextCursor: null,
+                }),
+                onNotification: () => undefined,
+                onExit: () => undefined,
+                stop: () => undefined,
+            }),
+        });
+
+        await expect(
+            catalog.probeProviderModels("codex-main"),
+        ).resolves.toEqual({
+            providerId: "codex-main",
+            ok: false,
+            modelCount: 0,
+            error: "Codex model catalog returned no visible models.",
         });
     });
 });

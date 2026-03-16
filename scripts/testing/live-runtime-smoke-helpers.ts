@@ -12,6 +12,14 @@ export type LiveRuntimeSmokeMode =
     | "multi-user"
     | "stale-resume";
 
+type LiveRuntimeSmokeVariant = {
+    id: string;
+};
+
+type LiveRuntimeSmokeModel = {
+    variants: LiveRuntimeSmokeVariant[];
+};
+
 export type LiveSmokeArgs = {
     mode: LiveRuntimeSmokeMode;
     serverUrl: string;
@@ -182,6 +190,58 @@ export function parseLiveRuntimeSmokeArgs(argv: string[]): LiveSmokeArgs {
         variantId,
         json,
     };
+}
+
+export function selectLiveRuntimeVariantId(params: {
+    requestedVariantId: string | null;
+    mode: LiveRuntimeSmokeMode;
+    model: LiveRuntimeSmokeModel;
+    agentDefaultVariantId: string | null;
+}): string | null {
+    if (params.requestedVariantId !== null) {
+        return params.requestedVariantId;
+    }
+
+    const variantIds = new Set(params.model.variants.map((variant) => variant.id));
+
+    if (
+        (params.mode === "interrupt" || params.mode === "zero-client-recover") &&
+        variantIds.has("high")
+    ) {
+        return "high";
+    }
+
+    if (params.mode === "status" && variantIds.has("xhigh")) {
+        return "xhigh";
+    }
+
+    if (params.mode === "status" && variantIds.has("high")) {
+        return "high";
+    }
+
+    return params.agentDefaultVariantId;
+}
+
+export function resolveLiveRuntimeReasoningEffort(
+    variantId: string | null,
+): string {
+    switch (variantId) {
+        case "low":
+        case "medium":
+        case "high":
+        case "xhigh":
+        case "minimal":
+        case "none":
+            return variantId;
+        case "fast":
+            return "low";
+        case "balanced":
+            return "medium";
+        case "deep":
+            return "high";
+        default:
+            return "medium";
+    }
 }
 
 export function buildLiveRuntimeSmokeSuccessReport(params: {

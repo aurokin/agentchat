@@ -22,7 +22,7 @@ Based on the current repository state:
 - seeded smoke users (`smoke_1`, `smoke_2`) already exist and are the normal local multi-user fixtures
 - live runtime, browser-confidence, operator, and diagnostics scripts already exist
 - `assistant_status` and `message.started` support already exist end to end
-- the biggest remaining gaps are confidence coverage, edge-case hardening, diagnostics depth, event-model completeness, and mobile polish/validation
+- the remaining gap is final manual confirmation across the real browser and device matrix
 
 ## Current Status
 
@@ -53,21 +53,19 @@ Recently completed and intentionally removed from the active backlog:
 - web and mobile now derive conversation runtime state through one shared helper, reducing drift in run-summary/runtime-binding interpretation while preserving existing client confidence coverage
 - mobile now matches web on queued interrupt behavior during send-in-flight pre-bind windows, including flushed interrupt error handling once `run.started` arrives
 - web and mobile provider/model/variant scoping now derive from one shared settings-selection helper, with direct shared coverage for provider, model, and variant fallback behavior
+- Codex model discovery now treats empty visible catalogs as degraded, falls back to configured provider metadata for client model flows, and fails provider live probes so operator diagnostics stay explicit
+- live runtime smoke now resolves mode-specific variant selection and reasoning-effort mapping through pure helpers with direct script-level tests
 
-Current Phase 1 focus:
+Remaining work before sign-off:
 
-- expand deterministic and replay-backed coverage where live Codex/manual flows are still the only validation path
-- keep manual/browser reconnect validation deferred until the end of plan execution
-- identify any remaining cross-client runtime invariant that still lacks automated coverage outside the manual flows
-- extend operator/runtime confidence in `apps/server` and `scripts/testing` where unit coverage still lags the documented behavior
-
-Immediate next candidates:
-
-- add automated coverage around server/scripts operator confidence paths that are still only exercised manually
-- keep turning last-known-good reload semantics and operator remediation paths into deterministic server/script coverage
-- add deterministic coverage for any remaining runtime replay or cross-client ordering edge found during implementation
-- harden Codex model discovery against soft-degraded catalog responses and increase deterministic coverage for model/variant fallback selection
-- reassess whether Phase 1 is near exit criteria and Phase 2 should become the active workstream
+- run the final manual confirmation pass across:
+    - Local Browser
+    - Remote Browser via Luma
+    - iPad
+    - iPhone
+    - RedMagic Astra
+- record any manual-only findings back into deterministic tests, docs, or follow-up UI polish tasks
+- if the manual pass stays clean, treat the implementation plan as complete and leave only any newly discovered device-specific polish
 
 ## Operating Rules
 
@@ -89,234 +87,40 @@ Immediate next candidates:
 
 ## Workstreams
 
-### Phase 1. Expand Live Runtime Confidence Coverage
-
-Status: `in_progress`
-
-Goal:
-
-- make the current runtime model cheaper to trust under real local Codex usage
-
-Primary surfaces:
-
-- `scripts/testing/`
-- `apps/server/src/__tests__/`
-- `apps/web/src/components/chat/__tests__/`
-- `apps/mobile/src/components/chat/__tests__/`
-- `packages/convex/convex/__tests__/`
-
-Core tasks:
-
-- extend live/manual confidence coverage for:
-    - zero-client continuation and reconnect
-    - same-user multi-client observation
-    - multi-conversation concurrency
-    - multi-agent concurrency
-    - multi-user isolation
-    - stale runtime binding recovery
-    - browser-visible runtime-state regressions
-    - long streamed assistant responses that change shape during a turn
-    - LAN browser reachability and bootstrap/socket behavior
-- add or improve deterministic replay fixtures for failure-injection and event-order coverage where live Codex turns are not required
-- keep manual commands token-efficient and explicit rather than automatic-on-push
-
-Refactoring and test budget:
-
-- simplify duplicated test helpers before adding more scenarios
-- normalize runtime replay fixture helpers if coverage starts fragmenting
-- promote repeated browser/runtime assertions into reusable helpers
-
-Exit criteria:
-
-- the confidence suite covers the main backend-owned runtime invariants already described in docs
-- replay fixtures exist for the most failure-prone ordering and recovery cases
-- new tests reduce the need for ad hoc manual spot checks
-
-### Phase 2. Harden Cross-Client Runtime Behavior And Recovery UX
+### Final Manual Confirmation Pass
 
 Status: `pending`
 
 Goal:
 
-- make web and mobile behave consistently under active-run edge cases
+- confirm the now-shared runtime, operator, and model-selection behavior on the real browser and device matrix before closing the plan
 
 Primary surfaces:
 
-- `apps/web/src/components/chat/`
-- `apps/web/src/contexts/`
-- `apps/mobile/src/components/chat/`
-- `apps/mobile/src/contexts/`
-- `packages/shared/src/core/`
-- `packages/convex/convex/runtimeBindings.ts`
-
-Core tasks:
-
-- audit client handling for:
-    - send-in-flight conversation switches
-    - send-in-flight agent switches
-    - stale stop button recovery
-    - reconnect-banner gating
-    - active-run recovery after refresh or reconnect
-    - conversation-list and workspace-level activity consistency
-- improve higher-level workspace activity/navigation above individual conversation lists
-- remove any remaining current-screen ownership assumptions from client code
-
-Refactoring and test budget:
-
-- consolidate overlapping runtime helper logic between web and mobile where shared behavior is drifting
-- trim client-only inference that duplicates Convex-derived runtime state
-- add targeted controller/helper tests before and after each behavioral fix
-
-Exit criteria:
-
-- web and mobile match the documented backend-owned runtime model in the common failure paths
-- workspace activity state is consistent with Convex-derived state
-- stale UI controls are covered by regression tests
-
-### Phase 3. Continue Operator Hardening
-
-Status: `pending`
-
-Goal:
-
-- make the local/self-hosted operator path more observable and less fragile
-
-Primary surfaces:
-
-- `apps/server/src/config.ts`
-- `apps/server/src/configDiagnostics.ts`
-- `apps/server/src/doctorReport.ts`
-- `apps/server/src/http.ts`
-- `scripts/testing/config-reload-smoke.ts`
-- `scripts/testing/operator-failure-smoke.ts`
-- `scripts/testing/doctor-env-smoke.ts`
-- `docs/agentchat/operator-guide.md`
-
-Core tasks:
-
-- improve readiness and remediation detail in server diagnostics
-- tighten last-known-good config behavior during reload failures
-- verify disabled provider/agent fallback behavior stays explicit and safe
-- add more low-token operator smoke checks where helpful
-- keep diagnostics aligned between `/api/diagnostics`, `doctor:server`, and browser-visible operator behavior
-
-Refactoring and test budget:
-
-- centralize duplicated config-diagnostic issue mapping
-- keep doctor output and JSON output derived from the same underlying issue model
-- add tests whenever a new operator-facing failure mode is documented
-
-Exit criteria:
-
-- operators can quickly distinguish config, environment, provider, and workspace-path failures
-- invalid config reloads never silently degrade into misleading runtime behavior
-- operator docs match what the diagnostics actually surface
-
-### Phase 4. Finish Provider-Native Codex Event Mapping
-
-Status: `pending`
-
-Goal:
-
-- rely on real Codex event structure for transcript items wherever available
-
-Primary surfaces:
-
-- `apps/server/src/codexRuntime.ts`
-- `apps/server/src/socketProtocol.ts`
-- `apps/server/src/runtimePersistence.ts`
-- `packages/convex/convex/runtimeIngress.ts`
-- `packages/shared/src/core/agentchat-socket.ts`
-- client message rendering in web and mobile
-
-Core tasks:
-
-- map more provider-native runtime items directly instead of depending on transcript heuristics
-- keep progress/status items first-class when Codex emits typed events
-- separate transcript structure correctness from formatting cleanup
-- verify persistence ordering and message-boundary behavior for multi-message runs
-
-Refactoring and test budget:
-
-- split Codex event normalization from persistence side effects when that improves clarity
-- extend server and replay tests before adding new event mappings
-- keep client message rendering tolerant of richer runtime item sequences
-
-Exit criteria:
-
-- multi-message output boundaries are driven by real Codex events wherever available
-- persisted run events and transcript rows stay consistent for status-to-output transitions
-- live and deterministic tests cover the added event types
-
-### Phase 5. Validate Live Codex Model And Variant Behavior
-
-Status: `pending`
-
-Goal:
-
-- make provider/model/variant behavior trustworthy in the real product path
-
-Primary surfaces:
-
-- `apps/server/src/codexModelCatalog.ts`
-- `apps/server/src/codexRuntime.ts`
-- `apps/server/src/doctor.ts`
-- `scripts/testing/live-runtime-smoke.ts`
-- web and mobile settings/model selection helpers
-
-Core tasks:
-
-- verify model catalog freshness and fallback behavior
-- validate variant mapping in real local Codex turns
-- investigate Codex Spark specifically and document the result
-- make operator-facing diagnostics clearer when model discovery or variant use is degraded
-
-Refactoring and test budget:
-
-- simplify model/variant selection logic if live validation exposes drift between server defaults and client assumptions
-- increase confidence coverage for provider/model/variant locking behavior
-- keep shared settings helpers aligned between web and mobile
-
-Exit criteria:
-
-- supported model and variant options are accurate in bootstrap and agent-option flows
-- the live path for the currently supported Codex variants is documented and covered
-- any unsupported or degraded Codex variant behavior is explicit in docs and diagnostics
-
-### Phase 6. Finish Mobile Parity And Platform Validation
-
-Status: `pending`
-
-Goal:
-
-- treat mobile as a first-class subscriber of the same runtime model, then close the remaining UX gap
-
-Primary surfaces:
-
-- `apps/mobile/app/`
-- `apps/mobile/src/components/`
-- `apps/mobile/src/contexts/`
+- Local Browser
+- Remote Browser via Luma
+- iPad
+- iPhone
+- RedMagic Astra
+- `docs/agentchat/manual-qa-checklist.md`
 - `docs/agentchat/mobile-followup.md`
-- `docs/agentchat/mobile-integration-testing.md`
 
 Core tasks:
 
-- finish parity on the current runtime/auth path
-- validate Android physical-device behavior against the LAN dev-client plus local server flow
-- keep iPhone development-build testing aligned with the same backend/session/runtime path
-- revisit the mobile top app bar and remaining chat-flow polish issues
-
-Refactoring and test budget:
-
-- reduce mobile-only runtime assumptions where web and mobile should share behavior
-- keep adding targeted mobile confidence tests for controller and settings behavior
-- document any host-platform-specific limitations instead of leaving them implicit
+- run the deliberate browser/runtime/operator flows on Local Browser and Remote Browser via Luma
+- confirm mobile parity on iPad, iPhone, and RedMagic Astra against the same backend/session/runtime path
+- verify long-stream, interrupt, recovery, agent switching, and provider/model/variant selection flows behave the same way on real clients
+- validate the currently supported Codex variants in the real product path and note any degraded or unsupported behavior, including Codex Spark if encountered
+- convert any manual-only regression into:
+    - a deterministic unit or replay test
+    - a scripted browser/smoke assertion
+    - or a documented follow-up if the issue is platform-specific polish
 
 Exit criteria:
 
-- mobile behavior matches web on the supported runtime/auth path
-- Android and iPhone manual validation steps are clear and repeatable
-- the remaining mobile-specific follow-up list is small and UI-focused rather than architectural
+- the browser and device matrix completes without architectural/runtime surprises
+- any remaining follow-up is explicitly device- or UI-polish-scoped, not runtime-scoped
+- the plan can be closed or replaced by a smaller polish backlog
 
 ## Cross-Cutting Expectations
 

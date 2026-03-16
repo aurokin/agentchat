@@ -135,6 +135,7 @@ This checks:
 - missing directories
 - disabled default fallback situations
 - live Codex model access for each enabled provider
+- soft-degraded Codex model discovery, including providers that answer `model/list` but return no visible models
 
 For machine-readable output:
 
@@ -145,6 +146,7 @@ bun run doctor:server -- --json
 That JSON output includes stable issue codes, severities, scopes, and remediation hints alongside the existing readiness details.
 
 If this command fails, fix server config or Codex runtime access before opening the web or mobile app.
+When live model discovery degrades softly, the provider models API now falls back to configured model metadata for client flows, but `doctor:server` still fails so the operator path stays explicit.
 
 ## 5. Start The Local Stack
 

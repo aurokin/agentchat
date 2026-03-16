@@ -5,6 +5,8 @@ import {
     buildLiveRuntimeSmokeSuccessReport,
     formatLiveRuntimeSmokeText,
     parseLiveRuntimeSmokeArgs,
+    resolveLiveRuntimeReasoningEffort,
+    selectLiveRuntimeVariantId,
 } from "../live-runtime-smoke-helpers";
 
 describe("parseLiveRuntimeSmokeArgs", () => {
@@ -118,5 +120,98 @@ describe("live runtime smoke reports", () => {
         expect(formatLiveRuntimeSmokeText(report)).toContain(
             "live_runtime_smoke_invalid_arguments",
         );
+    });
+});
+
+describe("live runtime smoke model selection", () => {
+    test("prefers an explicitly requested variant", () => {
+        expect(
+            selectLiveRuntimeVariantId({
+                requestedVariantId: "balanced",
+                mode: "status",
+                model: {
+                    variants: [{ id: "high" }, { id: "xhigh" }],
+                },
+                agentDefaultVariantId: "high",
+            }),
+        ).toBe("balanced");
+    });
+
+    test("prefers high for interrupt-style modes when available", () => {
+        expect(
+            selectLiveRuntimeVariantId({
+                requestedVariantId: null,
+                mode: "interrupt",
+                model: {
+                    variants: [{ id: "low" }, { id: "high" }],
+                },
+                agentDefaultVariantId: "low",
+            }),
+        ).toBe("high");
+        expect(
+            selectLiveRuntimeVariantId({
+                requestedVariantId: null,
+                mode: "zero-client-recover",
+                model: {
+                    variants: [{ id: "low" }, { id: "high" }],
+                },
+                agentDefaultVariantId: "low",
+            }),
+        ).toBe("high");
+    });
+
+    test("prefers xhigh then high for status mode", () => {
+        expect(
+            selectLiveRuntimeVariantId({
+                requestedVariantId: null,
+                mode: "status",
+                model: {
+                    variants: [{ id: "high" }, { id: "xhigh" }],
+                },
+                agentDefaultVariantId: "low",
+            }),
+        ).toBe("xhigh");
+        expect(
+            selectLiveRuntimeVariantId({
+                requestedVariantId: null,
+                mode: "status",
+                model: {
+                    variants: [{ id: "high" }],
+                },
+                agentDefaultVariantId: "low",
+            }),
+        ).toBe("high");
+    });
+
+    test("falls back to the agent default variant when no mode-specific variant applies", () => {
+        expect(
+            selectLiveRuntimeVariantId({
+                requestedVariantId: null,
+                mode: "smoke",
+                model: {
+                    variants: [{ id: "low" }],
+                },
+                agentDefaultVariantId: "low",
+            }),
+        ).toBe("low");
+        expect(
+            selectLiveRuntimeVariantId({
+                requestedVariantId: null,
+                mode: "smoke",
+                model: {
+                    variants: [],
+                },
+                agentDefaultVariantId: null,
+            }),
+        ).toBeNull();
+    });
+
+    test("maps live runtime variants to reasoning efforts", () => {
+        expect(resolveLiveRuntimeReasoningEffort("fast")).toBe("low");
+        expect(resolveLiveRuntimeReasoningEffort("balanced")).toBe("medium");
+        expect(resolveLiveRuntimeReasoningEffort("deep")).toBe("high");
+        expect(resolveLiveRuntimeReasoningEffort("xhigh")).toBe("xhigh");
+        expect(resolveLiveRuntimeReasoningEffort("custom")).toBe("medium");
+        expect(resolveLiveRuntimeReasoningEffort(null)).toBe("medium");
     });
 });

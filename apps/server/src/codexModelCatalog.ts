@@ -46,6 +46,9 @@ type CachedProviderModels = ProviderModelsPayload & {
     expiresAtEpochMs: number;
 };
 
+const EMPTY_CATALOG_ERROR =
+    "Codex model catalog returned no visible models.";
+
 function toTitleCase(value: string): string {
     return value
         .split(/[-_]/g)
@@ -91,6 +94,16 @@ function buildFallbackModels(provider: ProviderConfig): ProviderModelsPayload {
                     })),
             })),
     };
+}
+
+function assertLiveModelsAvailable(
+    models: ProviderModelCatalogEntry[],
+): ProviderModelCatalogEntry[] {
+    if (models.length === 0) {
+        throw new Error(EMPTY_CATALOG_ERROR);
+    }
+
+    return models;
 }
 
 function toBootstrapAgent(provider: ProviderConfig): AgentConfig {
@@ -191,7 +204,9 @@ export class CodexModelCatalog {
         }
 
         try {
-            const liveModels = await this.fetchLiveModels(provider);
+            const liveModels = assertLiveModelsAvailable(
+                await this.fetchLiveModels(provider),
+            );
             const fetchedAt = new Date(now).toISOString();
             const expiresAtEpochMs = now + provider.modelCacheTtlSeconds * 1000;
             const expiresAt = new Date(expiresAtEpochMs).toISOString();
@@ -235,7 +250,9 @@ export class CodexModelCatalog {
         }
 
         try {
-            const models = await this.fetchLiveModels(provider);
+            const models = assertLiveModelsAvailable(
+                await this.fetchLiveModels(provider),
+            );
             return {
                 providerId: provider.id,
                 ok: true,

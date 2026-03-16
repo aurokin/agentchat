@@ -13,6 +13,8 @@ import {
     buildLiveRuntimeSmokeSuccessReport,
     formatLiveRuntimeSmokeText,
     parseLiveRuntimeSmokeArgs,
+    resolveLiveRuntimeReasoningEffort,
+    selectLiveRuntimeVariantId,
     type LiveSmokeArgs,
     type LiveRuntimeSmokeFailureReport,
     type LiveRuntimeSmokeMode,
@@ -250,21 +252,12 @@ async function resolveAgentExecutionTarget(params: {
         `Model ${modelId} is not available for provider ${providerId}.`,
     );
 
-    const variantId =
-        params.requestedVariantId ??
-        (params.mode === "interrupt" &&
-        model.variants.some((variant) => variant.id === "high")
-            ? "high"
-            : params.mode === "zero-client-recover" &&
-                model.variants.some((variant) => variant.id === "high")
-              ? "high"
-              : params.mode === "status" &&
-                  model.variants.some((variant) => variant.id === "xhigh")
-                ? "xhigh"
-                : params.mode === "status" &&
-                    model.variants.some((variant) => variant.id === "high")
-                  ? "high"
-                  : agentOptions.defaultVariant);
+    const variantId = selectLiveRuntimeVariantId({
+        requestedVariantId: params.requestedVariantId,
+        mode: params.mode,
+        model,
+        agentDefaultVariantId: agentOptions.defaultVariant,
+    });
     if (variantId !== null) {
         invariant(
             model.variants.some((variant) => variant.id === variantId),
@@ -307,26 +300,6 @@ function getSecondaryAgentId(mode: ExtendedMode): string | null {
     }
 
     return null;
-}
-
-function resolveReasoningEffort(variantId: string | null): string {
-    switch (variantId) {
-        case "low":
-        case "medium":
-        case "high":
-        case "xhigh":
-        case "minimal":
-        case "none":
-            return variantId;
-        case "fast":
-            return "low";
-        case "balanced":
-            return "medium";
-        case "deep":
-            return "high";
-        default:
-            return "medium";
-    }
 }
 
 function buildPrompt(mode: ExtendedMode): string {
@@ -2097,7 +2070,9 @@ function seedConversationAndDraft(params: {
     prompt: string;
 }): SeededConversation {
     const ids = createIds(params.label, params.now);
-    const reasoningEffort = resolveReasoningEffort(params.variantId);
+    const reasoningEffort = resolveLiveRuntimeReasoningEffort(
+        params.variantId,
+    );
 
     const chatId = runConvex<string>({
         repoRoot: params.repoRoot,
