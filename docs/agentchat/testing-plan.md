@@ -50,7 +50,6 @@ Examples:
     - confirm it reports live Codex model access for each enabled provider
 - sign in with Google if auth provider kind is `google`
 - sign in with a seeded user like `smoke_1` if auth provider kind is `local`
-- let the default workspace user initialize only if you are intentionally validating the transitional disabled provider path
 - run `bun run test:manual:local-auth-separation` when local auth is active
     - confirm `smoke_1` and `smoke_2` stay isolated at the Convex user, chat, message, and backend-token layers
 - select the smoke agent

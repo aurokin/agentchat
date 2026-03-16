@@ -26,17 +26,20 @@ This roadmap describes the current implementation state and the next major steps
 - Tighten end-to-end reliability across web, server, Convex, and Codex
 - Close the remaining mobile parity gaps
 - Keep Codex-backed model and variant discovery well-tested and operator-friendly
-- Plan and implement local multi-user auth together with the backend-owned runtime model so Agentchat is always user-based, even for insecure local usage
-- Bring the runtime fully in line with backend-owned execution semantics across web, mobile, server, and Convex
+- Keep local multi-user auth and backend-issued runtime identity hardened across web, mobile, server, and Convex
+    - local auth is now a real Convex-backed provider path rather than a shared default-user mode
+    - web and mobile both expose local username/password login when the active auth provider kind is `local`
+    - backend session tokens resolve to a concrete Convex user and stay user-scoped through websocket runtime commands
+    - local seeded users such as `smoke_1` and `smoke_2` are the standard local multi-user runtime fixtures
+- Keep the backend-owned runtime model honest under reconnect, zero-client, and multi-observer scenarios
     - users can switch conversations or agents during submission
     - users can have active runs in multiple conversations and agents at the same time
     - runs continue with zero active clients and recover cleanly later
     - multiple clients can observe the same run concurrently without duplicating execution
     - clients keep background subscriptions to all active conversations instead of only the visible thread
     - web and mobile both surface per-thread runtime activity (`Working`, `New reply`, `Needs attention`) from backend-owned runtime state
+    - workspace-level per-agent activity counts are derived in Convex instead of per-client tallying
     - multiple users can use the same instance at the same time without crossing runtime state
-    - every accepted request resolves to a concrete Convex user
-    - local seeded users such as `smoke_1` and `smoke_2` are the standard local multi-user runtime fixtures
 - Investigate Codex model and variant mapping in the live product path
 - Verify whether Codex Spark is functioning correctly in the current integration
 - Expand provider-native runtime item mapping so multi-message output follows real Codex events instead of transcript inference
@@ -44,12 +47,11 @@ This roadmap describes the current implementation state and the next major steps
     - keep transcript formatting cleanup separate from transcript structure
 - Validate provider-native `assistant_status` items with real Codex turns and keep them covered by manual smoke commands
 - Improve operator-facing diagnostics and health reporting
-- Build a practical testing stack around the dedicated local fixtures in `~/agents/agentchat_test`
+- Expand the practical testing stack around the dedicated local fixtures in `~/agents/agentchat_test`
 - Keep the active roadmap narrowly focused on Codex confidence rather than adding more providers
 - Use the live Convex deployment for real codegen, runtime persistence validation, and end-to-end confidence passes
 - Use local seeded users like `smoke_1` and `smoke_2` as the default local integration and browser-confidence path
 - Use [Runtime And Auth Plan](./runtime-and-auth-plan.md) as the detailed source doc for the remaining backend-owned runtime and provider-oriented auth work
-- Use real local smoke users like `smoke_1` and `smoke_2` as the primary local multi-user runtime fixtures once the active deployment is flipped to local auth
 - Keep targeted regression coverage for browser-visible runtime state so manual catches like stale stop buttons and false reconnect banners stay scriptable checks
 - Add regression fixtures for long streamed assistant prose formatting and LAN browser access during local development
 - Keep mobile integration testing explicitly gated by host-platform support instead of implying universal simulator/device coverage

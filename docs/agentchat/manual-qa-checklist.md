@@ -151,7 +151,7 @@ Use the primary fixture.
 
 Run the same smoke and deterministic checks on mobile.
 
-- sign in if auth mode is `google`
+- sign in if auth mode is `google` or `local`
 - select the same fixture agent
 - send and interrupt
 - reconnect if possible

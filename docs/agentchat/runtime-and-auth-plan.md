@@ -37,9 +37,9 @@ That means:
 
 ### Runtime
 
-The runtime is partway to the target model:
+The runtime is largely in the target shape already:
 
-- backend-owned execution is documented and partially implemented
+- backend-owned execution is documented and implemented across web, mobile, server, and Convex
 - runs can survive chat switches, agent switches, reconnects, and zero-client periods
 - multiple conversations can be active at once
 - web and mobile subscribe to active conversations in the background
@@ -49,7 +49,7 @@ The runtime is partway to the target model:
 Remaining gaps are mostly about:
 
 - richer workspace-level activity state and navigation
-- cross-client consistency
+- live confidence coverage for cross-client and recovery edge cases
 - making every client behavior match the documented execution model
 
 ### Auth
@@ -59,7 +59,13 @@ Current auth states are:
 - `google`
 - `local`
 
-Agentchat no longer treats disabled-auth as a supported product mode. Local seeded users such as `smoke_1` and `smoke_2` are now the normal local testing and operator path.
+Agentchat no longer treats disabled-auth as a supported product mode. The current auth/runtime stack already includes:
+
+- provider-oriented auth config in `apps/server/agentchat.config.json`
+- a real Convex-backed local password provider
+- backend session token issuance that resolves to a concrete Convex user
+- local login UX in both web and mobile
+- seeded local users such as `smoke_1` and `smoke_2` as the normal local testing and operator path
 
 ## Goals
 
@@ -219,6 +225,11 @@ These should become the standard local multi-user test fixtures.
 - Define the provider-oriented auth config shape.
 - Define the migration path from current `auth.mode` to `auth.providers[]`.
 
+Status:
+
+- Completed for the active server config and bootstrap surface.
+- Legacy `auth.mode` normalization remains only as a compatibility read path in server config parsing.
+
 ### Phase 2. Convex Local User Provider
 
 - Add a `local` auth provider path in Convex.
@@ -226,11 +237,21 @@ These should become the standard local multi-user test fixtures.
 - Map every local login to a concrete `users` row.
 - Add operator tooling to seed users such as `smoke_1` and `smoke_2`.
 
+Status:
+
+- Completed for the current local-auth path.
+- `setup:local-smoke-users`, `local-user:create`, and `setup:local-auth-smoke` now cover operator setup.
+
 ### Phase 3. Server Runtime Identity Tightening
 
 - Remove assumptions that a shared default user can own local runtime activity.
 - Ensure backend token validation always resolves to a concrete user.
 - Keep websocket subscriptions, runtime bindings, and persistence strictly user-scoped.
+
+Status:
+
+- Mostly completed in the current server and Convex implementation.
+- Remaining work is hardening and broader live validation, not designing the model.
 
 ### Phase 4. Web And Mobile Local Login
 
@@ -239,10 +260,19 @@ These should become the standard local multi-user test fixtures.
 - Keep Google login available where configured.
 - Make provider kind drive the client login surface.
 
+Status:
+
+- Completed for the current clients.
+
 ### Phase 5. Smoke And Integration Migration
 
 - Add `smoke_2` separation checks.
 - Update browser, mobile, runtime, and operator confidence commands to use real local users.
+
+Status:
+
+- Mostly completed.
+- The remaining work is to keep expanding confidence coverage around the seeded-user path rather than migrating off a shared default user.
 
 Current implementation note:
 
@@ -267,9 +297,9 @@ Current implementation note:
     - Completed for thread-level visibility: web and mobile now surface per-conversation `Working`, `New reply`, and `Needs attention` state from runtime bindings.
     - Completed for agent-level counts: web and mobile now consume Convex-derived per-agent activity summaries instead of tallying raw bindings locally.
 2. Make websocket/runtime recovery behavior fully user-centric rather than current-chat-centric.
-    - In progress: live smoke now covers a same-user two-client handoff after `run.started`.
+    - In progress: live smoke now covers a same-user two-client handoff after `run.started`, zero-client continuation, multi-conversation, multi-agent, and multi-user runtime flows.
 3. Keep improving higher-level workspace activity/navigation above individual conversation lists.
-4. Move smoke coverage from shared default-user assumptions to `smoke_1` and `smoke_2`.
+4. Keep the seeded-user smoke path (`smoke_1` / `smoke_2`) as the default browser, runtime, and operator confidence path.
 
 ## Success Criteria
 

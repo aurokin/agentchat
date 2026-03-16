@@ -59,7 +59,7 @@ Agentchat is designed to keep you in control of users, agents, and runtime infra
 ## Using the App
 
 1. Open your Agentchat instance
-2. Sign in with an approved account, or use the default workspace user if the instance has auth disabled
+2. Sign in with an approved Google account or a seeded local user, depending on the configured auth provider
 3. Select an agent
 4. Start a new conversation and choose a provider/model if needed
 
@@ -70,7 +70,7 @@ For local development and self-hosting.
 ### Prerequisites
 
 - Bun 1.x
-- Convex workspace configured for either Google auth or disabled-auth mode
+- Convex workspace configured for either Google auth or local auth
 - A locally running provider runtime such as Codex app-server
 
 ### Installation
@@ -93,8 +93,8 @@ cd apps/web && bun dev
 ### Configuration
 
 1. Choose an auth mode for your Convex workspace
-   - `google` for allowlisted Google sign-in
-   - `disabled` for a single default workspace user behind your own firewall
+    - `google` for allowlisted Google sign-in
+    - `local` for seeded or operator-created local users
 2. Set the same `BACKEND_TOKEN_SECRET` in Convex and `apps/server/.env.local`
 3. Set the same `RUNTIME_INGRESS_SECRET` in Convex and `apps/server/.env.local`
 4. Point `AGENTCHAT_CONVEX_SITE_URL` in `apps/server/.env.local` at your Convex site URL
@@ -145,12 +145,9 @@ Local dev only. Configure the Convex CLI target workspace in `packages/convex/.e
 These are Convex-managed environment variables. Set them in the Convex dashboard, or via `bun run convex:env`.
 
 - `SITE_URL` - Base URL for the local or self-hosted web app (no trailing slash). Used to validate auth redirects.
-- `AGENTCHAT_AUTH_MODE` - `google` or `disabled`.
+- `AGENTCHAT_AUTH_MODE` - `google` or `local`.
 - `AUTH_GOOGLE_ID` - Google OAuth client ID (from Google Cloud Console). Required only when `AGENTCHAT_AUTH_MODE=google`.
 - `AUTH_GOOGLE_SECRET` - Google OAuth client secret (from Google Cloud Console). Required only when `AGENTCHAT_AUTH_MODE=google`.
-- `AGENTCHAT_DEFAULT_USER_EMAIL` - Optional email for the default workspace user when `AGENTCHAT_AUTH_MODE=disabled`.
-- `AGENTCHAT_DEFAULT_USER_NAME` - Optional display name for the default workspace user when `AGENTCHAT_AUTH_MODE=disabled`.
-- `AGENTCHAT_DEFAULT_USER_SUBJECT` - Optional stable subject for the default workspace user when `AGENTCHAT_AUTH_MODE=disabled`.
 - `BACKEND_TOKEN_SECRET` - Shared secret used to mint short-lived backend session tokens for `apps/server`.
 - `RUNTIME_INGRESS_SECRET` - Shared secret used by `apps/server` to persist run/runtime state into Convex HTTP ingress.
 - `JWKS` - JSON Web Key Set used by Convex auth.
