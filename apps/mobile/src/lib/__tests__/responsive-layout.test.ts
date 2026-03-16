@@ -35,4 +35,17 @@ describe("resolveResponsiveLayout", () => {
             useTabletLandscapeLayout: true,
         });
     });
+
+    test("treats sw600dp-class Android tablets as tablets", () => {
+        expect(resolveResponsiveLayout({ width: 668, height: 1067 })).toEqual({
+            isTablet: true,
+            isLandscape: false,
+            useTabletLandscapeLayout: false,
+        });
+        expect(resolveResponsiveLayout({ width: 1067, height: 668 })).toEqual({
+            isTablet: true,
+            isLandscape: true,
+            useTabletLandscapeLayout: true,
+        });
+    });
 });

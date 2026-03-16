@@ -4,8 +4,9 @@ export type ResponsiveLayout = {
     useTabletLandscapeLayout: boolean;
 };
 
-const TABLET_MIN_SHORTEST_SIDE = 700;
-const TABLET_MIN_LONGEST_SIDE = 900;
+// React Native window dimensions are density-independent pixels, so align the
+// cutoff with Android's common sw600dp tablet breakpoint.
+const TABLET_MIN_SHORTEST_SIDE = 600;
 
 export function resolveResponsiveLayout(params: {
     width: number;
@@ -13,10 +14,7 @@ export function resolveResponsiveLayout(params: {
 }): ResponsiveLayout {
     const { width, height } = params;
     const shortestSide = Math.min(width, height);
-    const longestSide = Math.max(width, height);
-    const isTablet =
-        shortestSide >= TABLET_MIN_SHORTEST_SIDE &&
-        longestSide >= TABLET_MIN_LONGEST_SIDE;
+    const isTablet = shortestSide >= TABLET_MIN_SHORTEST_SIDE;
     const isLandscape = width >= height;
 
     return {
