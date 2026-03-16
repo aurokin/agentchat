@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Implement the next major work in the currently recommended order:
+Implement the remaining work in the current recommended order:
 
 1. expand live runtime confidence coverage
 2. harden cross-client runtime behavior and recovery UX
@@ -11,7 +11,7 @@ Implement the next major work in the currently recommended order:
 5. validate live Codex model and variant behavior
 6. finish mobile parity and platform validation
 
-This plan is intended to be updated as work lands. Keep it current alongside code changes, commits, and pushes.
+This document is the active forward plan. Finished milestones should be removed from the active backlog and summarized only in the current status section.
 
 ## Verified Starting Point
 
@@ -23,6 +23,34 @@ Based on the current repository state:
 - live runtime, browser-confidence, operator, and diagnostics scripts already exist
 - `assistant_status` and `message.started` support already exist end to end
 - the biggest remaining gaps are confidence coverage, edge-case hardening, diagnostics depth, event-model completeness, and mobile polish/validation
+
+## Current Status
+
+Recently completed and intentionally removed from the active backlog:
+
+- roadmap/docs alignment with the shipped runtime and auth model
+- deterministic web and mobile recovery fixes for:
+    - persisted `recovering` runs
+    - stale same-chat run handoff
+    - `runId` hydration from authoritative runtime state
+    - reconnect-notice grace-pass handling
+- web planner coverage for runtime sync, run lifecycle, and message lifecycle
+- mobile planner coverage for runtime sync, run lifecycle, message lifecycle, and active-run connection error handling
+- manual LAN browser-confidence command and supporting config/example files
+- server doctor/auth diagnostics improvements and confidence coverage
+
+Current Phase 1 focus:
+
+- expand deterministic and replay-backed coverage where live Codex/manual flows are still the only validation path
+- keep manual/browser reconnect validation deferred until the end of plan execution
+- identify any remaining cross-client runtime invariant that still lacks automated coverage outside the manual flows
+- extend operator/runtime confidence in `apps/server` and `scripts/testing` where unit coverage still lags the documented behavior
+
+Immediate next candidates:
+
+- add automated coverage around server/scripts operator confidence paths that are still only exercised manually
+- add deterministic coverage for any remaining runtime replay or cross-client ordering edge found during implementation
+- reassess whether Phase 1 is near exit criteria and Phase 2 should become the active workstream
 
 ## Operating Rules
 
@@ -285,385 +313,3 @@ These apply in every phase:
     - follow-up items
 - increase deterministic coverage whenever a live/manual failure teaches us something reusable
 - prefer removing obsolete code paths rather than documenting around them forever
-
-## Suggested Milestone Update Template
-
-Use this block when updating the plan after a commit or push:
-
-```md
-### Update YYYY-MM-DD
-
-- Phase: `...`
-- Status: `pending|in_progress|blocked|done`
-- Landed:
-    - ...
-- Refactors:
-    - ...
-- Tests added or updated:
-    - ...
-- Docs updated:
-    - ...
-- Commit / push:
-    - commit: `...`
-    - push: `...`
-- Next step:
-    - ...
-```
-
-### Update 2026-03-16
-
-- Phase: `Phase 1. Expand Live Runtime Confidence Coverage`
-- Status: `in_progress`
-- Landed:
-    - roadmap and product docs were updated to match the shipped runtime/auth model
-    - the runtime-confidence implementation plan was added under `plans/`
-- Refactors:
-    - none yet in this phase
-- Tests added or updated:
-    - documentation integrity was rechecked after the roadmap/auth doc sweep
-- Docs updated:
-    - `README.md`
-    - `docs/agentchat/backend-api-spec.md`
-    - `docs/agentchat/manual-qa-checklist.md`
-    - `docs/agentchat/roadmap.md`
-    - `docs/agentchat/runtime-and-auth-plan.md`
-    - `docs/agentchat/testing-plan.md`
-- Commit / push:
-    - commit: `fbf1d6c`
-    - push: `origin/master`
-- Next step:
-    - land additional Phase 1 confidence coverage starting with the browser long-stream markdown scenario
-
-### Update 2026-03-16
-
-- Phase: `Phase 1. Expand Live Runtime Confidence Coverage`
-- Status: `in_progress`
-- Landed:
-    - `web-browser-confidence` now includes a scripted `long-stream` scenario for local-auth browser confidence work
-    - the default `full` browser-confidence mode now covers smoke, interrupt, refresh, and long-stream markdown rendering
-    - runtime replay analysis now validates `previousMessageId` and `previousKind` across multi-message assistant transitions
-    - shared transcript text normalization now inserts paragraph breaks before markdown headings when prose runs into structured markdown
-- Refactors:
-    - browser-confidence gained reusable helpers for locating the latest assistant message and waiting for streamed content length
-    - runtime replay validation now tracks prior message kinds instead of only message ids and content
-- Tests added or updated:
-    - `scripts/testing/__tests__/browser-confidence-helpers.test.ts`
-    - `scripts/testing/__tests__/runtime-replay-helpers.test.ts`
-    - `packages/shared/src/core/__tests__/text.test.ts`
-    - `bun run test:scripts`
-    - `bun run --cwd packages/shared test`
-- Docs updated:
-    - `docs/agentchat/operator-guide.md`
-    - `docs/agentchat/roadmap.md`
-    - `docs/agentchat/testing-plan.md`
-- Commit / push:
-    - commit: `e57aab4`
-    - push: `origin/master`
-    - commit: `ba14a13`
-    - push: `origin/master`
-    - commit: `d6990b5`
-    - push: `origin/master`
-- Next step:
-    - add the next Phase 1 confidence slice around LAN/browser reachability or another deterministic regression for cross-client recovery behavior
-
-### Update 2026-03-16
-
-- Phase: `Phase 1. Expand Live Runtime Confidence Coverage`
-- Status: `in_progress`
-- Landed:
-    - shared socket coverage now verifies that active conversation subscriptions are replayed after an unexpected reconnect
-    - web LAN browser URL rewriting now covers IPv4 loopback, IPv6 loopback, and path-preserving rewrites for non-loopback browser hosts
-    - the web client now correctly rewrites bracketed IPv6 loopback backend URLs such as `http://[::1]:3030`
-- Refactors:
-    - none beyond the targeted recovery and LAN confidence fixes
-- Tests added or updated:
-    - `packages/shared/src/core/__tests__/agentchat-socket.test.ts`
-    - `apps/web/src/lib/__tests__/agentchat-server.test.ts`
-    - `bun run --cwd packages/shared test`
-    - `bun run --cwd apps/web test:confidence`
-- Docs updated:
-    - plan progress only in this milestone
-- Commit / push:
-    - commit: `337530b`
-    - push: `origin/master`
-    - commit: `963a138`
-    - push: `origin/master`
-- Next step:
-    - continue Phase 1 with either a browser/LAN-specific manual confidence script addition or another deterministic regression around cross-client recovery state
-
-### Update 2026-03-16
-
-- Phase: `Phase 1. Expand Live Runtime Confidence Coverage`
-- Status: `in_progress`
-- Landed:
-    - added a dedicated manual LAN browser confidence command: `bun run test:manual:web-lan-confidence`
-    - moved the LAN host setting into a gitignored local JSON config: `scripts/testing/web-lan-confidence.local.json`
-    - added a tracked example config so setup stays discoverable without storing host-specific details in git
-- Refactors:
-    - kept the LAN path as a thin wrapper over the existing browser-confidence flow instead of cloning the underlying Playwright logic
-- Tests added or updated:
-    - `scripts/testing/__tests__/web-lan-confidence-helpers.test.ts`
-    - `bun run test:scripts`
-    - `bun run docs:check`
-- Docs updated:
-    - `docs/agentchat/manual-qa-checklist.md`
-    - `docs/agentchat/operator-guide.md`
-    - `docs/agentchat/roadmap.md`
-    - `docs/agentchat/testing-plan.md`
-- Commit / push:
-    - commit: `3e52254`
-    - push: `origin/master`
-- Next step:
-    - choose the next Phase 1 slice between broader LAN/browser runtime assertions and another deterministic cross-client recovery regression
-
-### Update 2026-03-16
-
-- Phase: `Phase 1. Expand Live Runtime Confidence Coverage`
-- Status: `in_progress`
-- Landed:
-    - shared runtime recovery now treats persisted `recovering` snapshots as resumable active runs instead of dropping them on client reload
-    - web runtime synchronization now restores the active run UI when the current chat reconnects into a persisted `recovering` state
-    - mobile runtime synchronization now restores the active run UI for the same persisted `recovering` state path
-- Refactors:
-    - kept the runtime recovery rule centralized in `packages/shared` so web and mobile continue to share the same active-run reconstruction logic
-- Tests added or updated:
-    - `apps/web/src/components/chat/__tests__/conversation-runtime-helpers.test.ts`
-    - `apps/web/src/components/chat/__tests__/conversation-runtime-controller.test.ts`
-    - `apps/mobile/src/components/chat/__tests__/conversation-runtime-controller.test.ts`
-    - `bun run --cwd packages/shared test`
-    - `bun run --cwd apps/web test:confidence`
-    - `bun run --cwd apps/mobile test:confidence`
-- Docs updated:
-    - plan progress only in this milestone
-- Commit / push:
-    - commit: `30cd9f0`
-    - push: `origin/master`
-- Next step:
-    - keep Phase 1 focused on another deterministic recovery invariant, most likely around stale run handoff or cross-client recovery after conversation switches
-
-### Update 2026-03-16
-
-- Phase: `Phase 1. Expand Live Runtime Confidence Coverage`
-- Status: `in_progress`
-- Landed:
-    - web runtime sync now resets and recovers when the current chat's authoritative persisted run has moved to a different assistant message
-    - mobile runtime sync now applies the same authoritative run handoff behavior for same-chat recovery
-    - same-chat stale local runs no longer survive when Convex runtime state points at a newer run in the same conversation
-- Refactors:
-    - centralized the shared reset decision in `packages/shared/src/core/conversation-runtime.ts` so web and mobile follow one runtime-snapshot compatibility rule
-    - extracted a shared live-runtime predicate to remove duplicated `active`/`recovering` phase checks
-- Tests added or updated:
-    - `packages/shared/src/core/__tests__/conversation-runtime.test.ts`
-    - `apps/web/src/components/chat/__tests__/conversation-runtime-controller.test.ts`
-    - `apps/mobile/src/components/chat/__tests__/conversation-runtime-controller.test.ts`
-    - `bun run --cwd packages/shared test`
-    - `bun run --cwd apps/web test:confidence`
-    - `bun run --cwd apps/mobile test:confidence`
-- Docs updated:
-    - plan progress only in this milestone
-- Commit / push:
-    - commit: `db71ad4`
-    - push: `origin/master`
-- Next step:
-    - inspect the remaining recovery path around whether an active local run should be upgraded from `runId: null` to an authoritative persisted `runId` without waiting for fresh socket events
-
-### Update 2026-03-16
-
-- Phase: `Phase 1. Expand Live Runtime Confidence Coverage`
-- Status: `in_progress`
-- Landed:
-    - web runtime sync now upgrades a same-chat active run from `runId: null` to the authoritative persisted `runId` without forcing a reset
-    - mobile runtime sync now applies the same non-reset `runId` hydration behavior
-    - local active runs keep their in-memory content while gaining the authoritative `runId`, reducing ambiguity for later runtime events
-- Refactors:
-    - added a shared active-run synchronization helper in `packages/shared/src/core/conversation-runtime.ts` so web and mobile enrich local runs through one code path
-- Tests added or updated:
-    - `packages/shared/src/core/__tests__/conversation-runtime.test.ts`
-    - `apps/web/src/components/chat/__tests__/conversation-runtime-controller.test.ts`
-    - `apps/mobile/src/components/chat/__tests__/conversation-runtime-controller.test.ts`
-    - `bun run --cwd packages/shared test`
-    - `bun run --cwd apps/web test:confidence`
-    - `bun run --cwd apps/mobile test:confidence`
-- Docs updated:
-    - plan progress only in this milestone
-- Commit / push:
-    - commit: `2c8e11f`
-    - push: `origin/master`
-- Next step:
-    - inspect the remaining Phase 1 recovery edges around interrupted runs, reconnect notices, and browser-visible recovery state after a local reset
-
-### Update 2026-03-16
-
-- Phase: `Phase 1. Expand Live Runtime Confidence Coverage`
-- Status: `in_progress`
-- Landed:
-    - extracted web runtime display phase mapping so reconnect-driven recovery state is represented through a single helper instead of ad hoc JSX logic
-    - added explicit browser-visible coverage for recovering, interrupted, and already-recovering runtime banner states
-    - wired the new display-state test into `apps/web`'s curated `test:confidence` command so it stays in the normal confidence loop
-- Refactors:
-    - `ChatWindow` now derives its display runtime state through `resolveDisplayedRuntimeState`
-- Tests added or updated:
-    - `apps/web/src/components/chat/__tests__/conversation-runtime-display.test.ts`
-    - `bun run --cwd apps/web test:confidence`
-- Docs updated:
-    - plan progress only in this milestone
-- Commit / push:
-    - commit: `ef812b7`
-    - push: `origin/master`
-- Next step:
-    - decide whether the remaining reconnect-notice edge warrants extracting a pure sync/notice-state helper from `useConversationRuntime` for direct unit coverage
-
-### Update 2026-03-16
-
-- Phase: `Phase 1. Expand Live Runtime Confidence Coverage`
-- Status: `in_progress`
-- Landed:
-    - web runtime sync now keeps a pending reconnect notice through one post-reset grace pass instead of clearing it immediately on the first idle or terminal snapshot
-    - recovered runs still consume the reconnect notice immediately once the browser can display the recovered state
-    - terminal runtime states without a reset continue to clear stale reconnect notices so banners do not linger indefinitely
-- Refactors:
-    - extracted a web runtime-sync helper to make reconnect-notice clearing rules explicit and directly testable
-- Tests added or updated:
-    - `apps/web/src/components/chat/__tests__/conversation-runtime-sync.test.ts`
-    - `bun run --cwd apps/web test:confidence`
-- Docs updated:
-    - plan progress only in this milestone
-- Commit / push:
-    - commit: `c7bfd79`
-    - push: `origin/master`
-- Next step:
-    - decide whether the next highest-leverage Phase 1 slice is a hook-level runtime-sync unit harness or a manual/browser flow that exercises the reconnect notice end to end
-
-### Update 2026-03-16
-
-- Phase: `Phase 1. Expand Live Runtime Confidence Coverage`
-- Status: `in_progress`
-- Landed:
-    - extracted a hook-level runtime-sync planning helper for `useConversationRuntime`, so the reconnect/recovery effect is now driven by a pure, directly testable plan
-    - added targeted unit coverage for the hook planning layer around reconnect notice retention and recovered-run notice consumption
-    - folded the new hook-planning test into the curated web confidence command
-- Refactors:
-    - `useConversationRuntime` now delegates sync-effect planning to `planConversationRuntimeSync` instead of inlining reconnect-notice and recovery decisions
-- Tests added or updated:
-    - `apps/web/src/components/chat/__tests__/conversation-runtime-hook.test.ts`
-    - `bun run --cwd apps/web test:confidence`
-- Docs updated:
-    - plan progress only in this milestone
-- Commit / push:
-    - commit: `74282a3`
-    - push: `origin/master`
-- Next step:
-    - choose between expanding the hook harness deeper into socket-event handling or switching back to a browser/manual reconnect flow that validates the same behavior end to end
-
-### Update 2026-03-16
-
-- Phase: `Phase 1. Expand Live Runtime Confidence Coverage`
-- Status: `in_progress`
-- Landed:
-    - extracted a pure run-lifecycle planner for the `useConversationRuntime` socket-event path, covering recovered `run.started` and terminal run handling
-    - added direct unit coverage for recovered reconnect notice consumption, flushed interrupt errors on `run.started`, and terminal failure cleanup planning
-    - removed an unreachable `connection.error` branch from the web hook after `tsc` confirmed it could never be produced by `resolveConversationSocketEvent`
-- Refactors:
-    - `useConversationRuntime` now delegates more of its socket-event state machine to `planConversationRunLifecycleResolution`
-- Tests added or updated:
-    - `apps/web/src/components/chat/__tests__/conversation-runtime-events.test.ts`
-    - `bun run --cwd apps/web typecheck`
-    - `bun run --cwd apps/web test:confidence`
-- Docs updated:
-    - plan progress only in this milestone
-- Commit / push:
-    - commit: `e0ac19d`
-    - push: `origin/master`
-- Next step:
-    - keep deepening deterministic hook-level coverage, likely by extracting the remaining message event application path or by adding mobile/shared parity tests for the new recovery invariants
-
-### Update 2026-03-16
-
-- Phase: `Phase 1. Expand Live Runtime Confidence Coverage`
-- Status: `in_progress`
-- Landed:
-    - extracted a pure message-lifecycle planner for the `useConversationRuntime` socket-event path, covering `message.started`, `message.updated`, and `message.completed`
-    - added direct unit coverage for previous assistant message patching during `message.started` and for assistant-stream overlay updates during `message.completed`
-    - folded the new message planner into the web hook so the remaining inline socket-event mutations are thinner and more testable
-- Refactors:
-    - `useConversationRuntime` now delegates the message event application path to `planConversationMessageLifecycleResolution`
-- Tests added or updated:
-    - `apps/web/src/components/chat/__tests__/conversation-runtime-messages.test.ts`
-    - `bun run --cwd apps/web typecheck`
-    - `bun run --cwd apps/web test:confidence`
-- Docs updated:
-    - plan progress only in this milestone
-- Commit / push:
-    - commit: `e9ec3f5`
-    - push: `origin/master`
-- Next step:
-    - shift the next deterministic slice toward parity work, most likely mobile/shared recovery tests or a comparable extracted planner on the mobile runtime path
-
-### Update 2026-03-16
-
-- Phase: `Phase 1. Expand Live Runtime Confidence Coverage`
-- Status: `in_progress`
-- Landed:
-    - moved reconnect-notice clearing rules into `packages/shared` so web and mobile can follow the same runtime-sync semantics
-    - mobile chat runtime sync now keeps a pending reconnect notice through one post-reset grace pass instead of clearing it immediately
-    - added direct mobile planning coverage for recovered-run notice consumption and the post-reset grace-pass behavior
-- Refactors:
-    - extracted a mobile runtime-sync planning helper and rewired the mobile chat screen to use it
-- Tests added or updated:
-    - `packages/shared/src/core/__tests__/conversation-runtime.test.ts`
-    - `apps/mobile/src/components/chat/__tests__/conversation-runtime-sync.test.ts`
-    - `bun run --cwd packages/shared test`
-    - `bun run --cwd apps/mobile typecheck`
-    - `bun run --cwd apps/mobile test:confidence`
-- Docs updated:
-    - plan progress only in this milestone
-- Commit / push:
-    - commit: `1ab1ffb`
-    - push: `origin/master`
-- Next step:
-    - continue parity work by extracting and testing the mobile socket-event application path, which is now the largest remaining inline runtime state machine outside manual/browser flows
-
-### Update 2026-03-16
-
-- Phase: `Phase 1. Expand Live Runtime Confidence Coverage`
-- Status: `in_progress`
-- Landed:
-    - extracted pure mobile planners for run lifecycle, message lifecycle, and active-run connection error handling in the chat screen
-    - added direct mobile unit coverage for recovered `run.started`, active-run `connection.error`, and assistant-message completion streaming behavior
-    - rewired the mobile chat screen to use these planners so its socket-event state machine is substantially thinner and more testable
-- Refactors:
-    - mobile socket-event application now mirrors the web direction of using pure planners for deterministic runtime behavior
-- Tests added or updated:
-    - `apps/mobile/src/components/chat/__tests__/conversation-runtime-events.test.ts`
-    - `bun run --cwd apps/mobile typecheck`
-    - `bun run --cwd apps/mobile test:confidence`
-- Docs updated:
-    - plan progress only in this milestone
-- Commit / push:
-    - commit: `2992c26`
-    - push: `origin/master`
-- Next step:
-    - choose the next non-manual Phase 1 target between operator/runtime confidence expansion and any remaining cross-client recovery gaps that still lack deterministic coverage
-
-### Update 2026-03-16
-
-- Phase: `Phase 1. Expand Live Runtime Confidence Coverage`
-- Status: `in_progress`
-- Landed:
-    - server config diagnostics now surface auth readiness problems instead of always reporting auth as issue-free
-    - doctor reports now promote auth diagnostics into structured issues with explicit error/warning codes and remediations
-    - the curated server confidence suite now includes `doctorReport.test.ts`, so operator-facing report behavior is exercised in the normal confidence loop
-- Refactors:
-    - auth readiness is now derived through a dedicated config-diagnostics helper instead of being embedded as an always-empty stub
-- Tests added or updated:
-    - `apps/server/src/__tests__/configDiagnostics.test.ts`
-    - `apps/server/src/__tests__/doctorReport.test.ts`
-    - `bun run --cwd apps/server typecheck`
-    - `bun run --cwd apps/server test:confidence`
-- Docs updated:
-    - plan progress only in this milestone
-- Commit / push:
-    - commit: `pending`
-    - push: `pending`
-- Next step:
-    - move from low-hanging deterministic extraction toward the next broader confidence target, likely server/scripts operator coverage or the next uncovered cross-client runtime invariant outside manual flows

@@ -2,88 +2,15 @@ import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-type AgentchatConfig = {
-    version: number;
-    auth: {
-        defaultProviderId: string;
-        providers: Array<
-            | {
-                  id: string;
-                  kind: "google";
-                  enabled: boolean;
-                  allowlistMode: string;
-                  allowedEmails: string[];
-                  allowedDomains: string[];
-                  googleHostedDomain: string | null;
-              }
-            | {
-                  id: string;
-                  kind: "local";
-                  enabled: boolean;
-                  allowSignup: boolean;
-              }
-        >;
-    };
-    providers: Array<{
-        id: string;
-        kind: string;
-        label: string;
-        enabled: boolean;
-        idleTtlSeconds: number;
-        modelCacheTtlSeconds: number;
-        models: Array<{
-            id: string;
-            label: string;
-            enabled: boolean;
-            supportsReasoning: boolean;
-            variants: Array<{
-                id: string;
-                label: string;
-                enabled: boolean;
-            }>;
-        }>;
-        codex: {
-            command: string;
-            args: string[];
-            baseEnv: Record<string, string>;
-            cwd?: string;
-        };
-    }>;
-    agents: Array<{
-        id: string;
-        name: string;
-        description?: string;
-        avatar?: string | null;
-        enabled: boolean;
-        rootPath: string;
-        providerIds: string[];
-        defaultProviderId: string;
-        defaultModel?: string;
-        defaultVariant?: string;
-        modelAllowlist: string[];
-        variantAllowlist: string[];
-        tags: string[];
-        sortOrder: number;
-    }>;
-};
-
-type BootstrapPayload = {
-    providers: Array<{ id: string }>;
-    agents: Array<{ id: string }>;
-};
-
-type AgentOptionsPayload = {
-    agentId: string;
-    defaultProviderId: string;
-    defaultModel: string | null;
-    defaultVariant: string | null;
-};
-
-type ResolvedFallbackDefaults = {
-    defaultProviderId: string;
-    defaultModel: string | null;
-    defaultVariant: string | null;
-};
+import {
+    hasAgentDisappearedFromBootstrap,
+    hasProviderDisappearedFromBootstrap,
+    matchesResolvedFallbackDefaults,
+    resolveFallbackDefaults,
+    type OperatorAgentOptionsPayload as AgentOptionsPayload,
+    type OperatorBootstrapPayload as BootstrapPayload,
+    type OperatorSmokeConfig,
+} from "./operator-smoke-helpers";
 
 const DEFAULT_SERVER_URL = "http://127.0.0.1:3030";
 const WAIT_TIMEOUT_MS = 20_000;
@@ -153,62 +80,20 @@ async function waitFor(
     }
 }
 
-function readConfig(configPath: string): AgentchatConfig {
-    return JSON.parse(readFileSync(configPath, "utf8")) as AgentchatConfig;
+function readConfig(configPath: string): OperatorSmokeConfig {
+    return JSON.parse(readFileSync(configPath, "utf8")) as OperatorSmokeConfig;
 }
 
-function writeConfig(configPath: string, config: AgentchatConfig): void {
+function writeConfig(configPath: string, config: OperatorSmokeConfig): void {
     writeFileSync(configPath, `${JSON.stringify(config, null, 4)}\n`, "utf8");
 }
 
 async function writeConfigAndPause(
     configPath: string,
-    config: AgentchatConfig,
+    config: OperatorSmokeConfig,
 ): Promise<void> {
     writeConfig(configPath, config);
     await new Promise((resolve) => setTimeout(resolve, 300));
-}
-
-function resolveFallbackDefaults(params: {
-    config: AgentchatConfig;
-    agentId: string;
-}): ResolvedFallbackDefaults {
-    const agent = params.config.agents.find(
-        (candidate) => candidate.id === params.agentId,
-    );
-    invariant(agent, `Missing agent ${params.agentId} in config.`);
-
-    const provider =
-        params.config.providers.find(
-            (candidate) =>
-                candidate.id === agent.defaultProviderId && candidate.enabled,
-        ) ??
-        params.config.providers.find(
-            (candidate) =>
-                candidate.enabled && agent.providerIds.includes(candidate.id),
-        ) ??
-        null;
-
-    if (!provider) {
-        return {
-            defaultProviderId: agent.defaultProviderId,
-            defaultModel: null,
-            defaultVariant: null,
-        };
-    }
-
-    const defaultModel =
-        provider.models.find((model) => model.enabled)?.id ?? null;
-    const defaultVariant =
-        provider.models
-            .find((model) => model.id === defaultModel)
-            ?.variants.find((variant) => variant.enabled)?.id ?? null;
-
-    return {
-        defaultProviderId: provider.id,
-        defaultModel,
-        defaultVariant,
-    };
 }
 
 async function main() {
@@ -218,7 +103,7 @@ async function main() {
     const repoRoot = getRepoRoot();
     const configPath = getConfigPath(repoRoot);
     const originalConfigText = readFileSync(configPath, "utf8");
-    const originalConfig = JSON.parse(originalConfigText) as AgentchatConfig;
+    const originalConfig = JSON.parse(originalConfigText) as OperatorSmokeConfig;
 
     const agentId = "agentchat-test";
     const providerId = "codex-main";
@@ -260,7 +145,7 @@ async function main() {
                 const bootstrap = await fetchJson<BootstrapPayload>(
                     `${serverUrl}/api/bootstrap`,
                 );
-                return !bootstrap.agents.some((agent) => agent.id === agentId);
+                return hasAgentDisappearedFromBootstrap(bootstrap, agentId);
             },
             async () => {
                 const bootstrap = await fetchJson<BootstrapPayload>(
@@ -291,13 +176,10 @@ async function main() {
                 const options = await fetchJson<AgentOptionsPayload>(
                     `${serverUrl}/api/agents/${encodeURIComponent(agentId)}/options`,
                 );
-                return (
-                    options.defaultProviderId ===
-                        fallbackDefaults.defaultProviderId &&
-                    options.defaultModel === fallbackDefaults.defaultModel &&
-                    options.defaultVariant ===
-                        fallbackDefaults.defaultVariant
-                );
+                return matchesResolvedFallbackDefaults({
+                    options,
+                    resolvedDefaults: fallbackDefaults,
+                });
             },
             async () => {
                 const options = await fetchJson<AgentOptionsPayload>(
@@ -324,11 +206,10 @@ async function main() {
                 const bootstrap = await fetchJson<BootstrapPayload>(
                     `${serverUrl}/api/bootstrap`,
                 );
-                return (
-                    !bootstrap.providers.some(
-                        (provider) => provider.id === providerId,
-                    ) && bootstrap.agents.length === 0
-                );
+                return hasProviderDisappearedFromBootstrap({
+                    bootstrap,
+                    providerId,
+                });
             },
             async () => {
                 const bootstrap = await fetchJson<BootstrapPayload>(

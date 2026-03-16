@@ -3,48 +3,19 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { trimTrailingSlash } from "./lib";
+import {
+    hasInvalidReloadError,
+    hasMissingAgentRootIssue,
+    hasMissingProviderCwdIssue,
+    isRestoredOperatorDiagnostics,
+    type OperatorBootstrapPayload as BootstrapPayload,
+    type OperatorDiagnosticsPayload as DiagnosticsPayload,
+    type OperatorSmokeConfig,
+} from "./operator-smoke-helpers";
 
 const DEFAULT_SERVER_URL = "http://127.0.0.1:3030";
 const WAIT_TIMEOUT_MS = 20_000;
 const WAIT_STEP_MS = 250;
-
-type AgentchatConfig = {
-    version: number;
-    auth: unknown;
-    providers: Array<{
-        id: string;
-        enabled: boolean;
-        codex: {
-            cwd?: string;
-        };
-    }>;
-    agents: Array<{
-        id: string;
-        enabled: boolean;
-        rootPath: string;
-    }>;
-};
-
-type DiagnosticsPayload = {
-    ok: boolean;
-    config: {
-        loadedAt: number;
-        lastReloadAttemptAt: number | null;
-        lastReloadError: string | null;
-    };
-    providers: Array<{
-        id: string;
-        issues: string[];
-    }>;
-    agents: Array<{
-        id: string;
-        issues: string[];
-    }>;
-};
-
-type BootstrapPayload = {
-    agents: Array<{ id: string }>;
-};
 
 function invariant(condition: unknown, message: string): asserts condition {
     if (!condition) {
@@ -99,17 +70,17 @@ async function waitFor<T>(
     }
 }
 
-function readConfig(configPath: string): AgentchatConfig {
-    return JSON.parse(readFileSync(configPath, "utf8")) as AgentchatConfig;
+function readConfig(configPath: string): OperatorSmokeConfig {
+    return JSON.parse(readFileSync(configPath, "utf8")) as OperatorSmokeConfig;
 }
 
-function writeConfig(configPath: string, config: AgentchatConfig): void {
+function writeConfig(configPath: string, config: OperatorSmokeConfig): void {
     writeFileSync(configPath, `${JSON.stringify(config, null, 4)}\n`, "utf8");
 }
 
 async function writeConfigAndPulse(
     configPath: string,
-    config: AgentchatConfig,
+    config: OperatorSmokeConfig,
 ): Promise<void> {
     writeConfig(configPath, config);
     await new Promise((resolve) => setTimeout(resolve, 150));
@@ -127,7 +98,7 @@ async function main() {
     const repoRoot = getRepoRoot();
     const configPath = getConfigPath(repoRoot);
     const originalConfigText = readFileSync(configPath, "utf8");
-    const originalConfig = JSON.parse(originalConfigText) as AgentchatConfig;
+    const originalConfig = JSON.parse(originalConfigText) as OperatorSmokeConfig;
 
     const providerId = "codex-main";
     const agentId = "agentchat-test";
@@ -145,7 +116,7 @@ async function main() {
         const invalidDiagnostics = await waitFor(
             "invalid config reload error",
             () => fetchJson<DiagnosticsPayload>(`${baseUrl}/api/diagnostics`),
-            (value) => value.config.lastReloadError !== null,
+            hasInvalidReloadError,
         );
         invariant(
             invalidDiagnostics.config.lastReloadError?.length,
@@ -180,13 +151,10 @@ async function main() {
             () => fetchJson<DiagnosticsPayload>(`${baseUrl}/api/diagnostics`),
             (value) =>
                 value.config.loadedAt >= recoveredConfig.config.loadedAt &&
-                value.agents.some(
-                    (agent) =>
-                        agent.id === agentId &&
-                        agent.issues.includes(
-                            "Agent rootPath does not exist or is not a directory.",
-                        ),
-                ),
+                hasMissingAgentRootIssue({
+                    diagnostics: value,
+                    agentId,
+                }),
         );
         invariant(
             missingRootDiagnostics.ok === false,
@@ -206,13 +174,10 @@ async function main() {
             () => fetchJson<DiagnosticsPayload>(`${baseUrl}/api/diagnostics`),
             (value) =>
                 value.config.lastReloadError === null &&
-                value.providers.some(
-                    (provider) =>
-                        provider.id === providerId &&
-                        provider.issues.includes(
-                            "Configured codex.cwd does not exist or is not a directory.",
-                        ),
-                ),
+                hasMissingProviderCwdIssue({
+                    diagnostics: value,
+                    providerId,
+                }),
         );
         invariant(
             missingCwdDiagnostics.ok === false,
@@ -224,15 +189,11 @@ async function main() {
             "restored diagnostics",
             () => fetchJson<DiagnosticsPayload>(`${baseUrl}/api/diagnostics`),
             (value) =>
-                value.config.lastReloadError === null &&
-                !value.agents.some((agent) => agent.id === agentId && agent.issues.length > 0) &&
-                !value.providers.some(
-                    (provider) =>
-                        provider.id === providerId &&
-                        provider.issues.includes(
-                            "Configured codex.cwd does not exist or is not a directory.",
-                        ),
-                ),
+                isRestoredOperatorDiagnostics({
+                    diagnostics: value,
+                    agentId,
+                    providerId,
+                }),
         );
 
         console.log(
