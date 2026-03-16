@@ -231,6 +231,41 @@ export function shouldResetActiveRunForRuntimeSnapshot(params: {
     return false;
 }
 
+export function synchronizeActiveRunWithRuntimeSnapshot(params: {
+    currentConversationId: string;
+    runtimeState: ConversationRuntimeSnapshot;
+    activeRun: ActiveRunState | null;
+}): ActiveRunState | null {
+    if (!params.activeRun) {
+        return null;
+    }
+
+    if (params.activeRun.conversationId !== params.currentConversationId) {
+        return null;
+    }
+
+    if (!isConversationRuntimeSnapshotLive(params.runtimeState)) {
+        return null;
+    }
+
+    if (
+        !params.runtimeState.assistantMessageId ||
+        params.runtimeState.assistantMessageId !==
+            params.activeRun.assistantMessageId
+    ) {
+        return null;
+    }
+
+    if (!params.activeRun.runId && params.runtimeState.runId) {
+        return {
+            ...params.activeRun,
+            runId: params.runtimeState.runId,
+        };
+    }
+
+    return null;
+}
+
 export function buildInterruptCommand(
     conversationId: string,
     createId: RuntimeIdFactory = generateId,

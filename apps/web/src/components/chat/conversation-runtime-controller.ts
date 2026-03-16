@@ -13,6 +13,7 @@ import {
     getChatTitleUpdate,
     prepareConversationSend,
     resolveConversationSocketEvent,
+    synchronizeActiveRunWithRuntimeSnapshot,
     shouldResetActiveRunForRuntimeSnapshot,
     type ActiveRunState,
     type PreparedConversationSend,
@@ -270,7 +271,11 @@ export function resolveConversationRuntimeSync(params: {
     if (params.activeRun && !shouldReset) {
         return {
             shouldReset: false,
-            recoveredRun: null,
+            recoveredRun: synchronizeActiveRunWithRuntimeSnapshot({
+                currentConversationId: params.currentChat.id,
+                runtimeState: params.runtimeState,
+                activeRun: params.activeRun,
+            }),
         };
     }
 

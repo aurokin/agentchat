@@ -2,6 +2,7 @@ import {
     buildInterruptCommand,
     createRecoveredActiveRunFromRuntimeState,
     prepareConversationSend,
+    synchronizeActiveRunWithRuntimeSnapshot,
     shouldResetActiveRunForRuntimeSnapshot,
     type ActiveRunState,
     type RetryChatState,
@@ -172,7 +173,11 @@ export function resolveMobileConversationRuntimeSync(params: {
     if (params.activeRun && !shouldReset) {
         return {
             shouldReset: false,
-            recoveredRun: null,
+            recoveredRun: synchronizeActiveRunWithRuntimeSnapshot({
+                currentConversationId: params.currentChat.id,
+                runtimeState: params.runtimeState,
+                activeRun: params.activeRun,
+            }),
         };
     }
 

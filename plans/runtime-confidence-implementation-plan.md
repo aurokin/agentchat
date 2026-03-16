@@ -462,7 +462,32 @@ Use this block when updating the plan after a commit or push:
 - Docs updated:
     - plan progress only in this milestone
 - Commit / push:
+    - commit: `db71ad4`
+    - push: `origin/master`
+- Next step:
+    - inspect the remaining recovery path around whether an active local run should be upgraded from `runId: null` to an authoritative persisted `runId` without waiting for fresh socket events
+
+### Update 2026-03-16
+
+- Phase: `Phase 1. Expand Live Runtime Confidence Coverage`
+- Status: `in_progress`
+- Landed:
+    - web runtime sync now upgrades a same-chat active run from `runId: null` to the authoritative persisted `runId` without forcing a reset
+    - mobile runtime sync now applies the same non-reset `runId` hydration behavior
+    - local active runs keep their in-memory content while gaining the authoritative `runId`, reducing ambiguity for later runtime events
+- Refactors:
+    - added a shared active-run synchronization helper in `packages/shared/src/core/conversation-runtime.ts` so web and mobile enrich local runs through one code path
+- Tests added or updated:
+    - `packages/shared/src/core/__tests__/conversation-runtime.test.ts`
+    - `apps/web/src/components/chat/__tests__/conversation-runtime-controller.test.ts`
+    - `apps/mobile/src/components/chat/__tests__/conversation-runtime-controller.test.ts`
+    - `bun run --cwd packages/shared test`
+    - `bun run --cwd apps/web test:confidence`
+    - `bun run --cwd apps/mobile test:confidence`
+- Docs updated:
+    - plan progress only in this milestone
+- Commit / push:
     - commit: `pending`
     - push: `pending`
 - Next step:
-    - inspect the remaining recovery path around whether an active local run should be upgraded from `runId: null` to an authoritative persisted `runId` without waiting for fresh socket events
+    - inspect the remaining Phase 1 recovery edges around interrupted runs, reconnect notices, and browser-visible recovery state after a local reset

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
     isConversationRuntimeSnapshotLive,
+    synchronizeActiveRunWithRuntimeSnapshot,
     shouldResetActiveRunForRuntimeSnapshot,
     type ActiveRunState,
     type ConversationRuntimeSnapshot,
@@ -75,5 +76,19 @@ describe("conversation runtime helpers", () => {
                 activeRun: createActiveRun(),
             }),
         ).toBe(false);
+    });
+
+    test("hydrates a missing local run id from the authoritative runtime snapshot", () => {
+        expect(
+            synchronizeActiveRunWithRuntimeSnapshot({
+                currentConversationId: "chat-1",
+                runtimeState: createRuntimeState({
+                    phase: "active",
+                    runId: "run-1",
+                    assistantMessageId: "assistant-1",
+                }),
+                activeRun: createActiveRun({ runId: null }),
+            }),
+        ).toEqual(createActiveRun());
     });
 });

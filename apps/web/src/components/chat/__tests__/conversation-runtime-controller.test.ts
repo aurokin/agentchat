@@ -743,6 +743,42 @@ describe("conversation runtime controller", () => {
         });
     });
 
+    test("hydrates a missing local run id from persisted runtime state", () => {
+        expect(
+            resolveConversationRuntimeSync({
+                currentChat: createChat(),
+                isMessagesLoading: false,
+                messages: createMessages(),
+                runtimeState: {
+                    phase: "active",
+                    runId: "run-1",
+                    assistantMessageId: "assistant-1",
+                    provider: "codex-default",
+                    errorMessage: null,
+                    startedAt: 1,
+                    completedAt: null,
+                    lastEventAt: 2,
+                },
+                activeRun: {
+                    conversationId: "chat-1",
+                    assistantMessageId: "assistant-1",
+                    userContent: "Old prompt",
+                    content: "Old output",
+                    runId: null,
+                },
+            }),
+        ).toEqual({
+            shouldReset: false,
+            recoveredRun: {
+                conversationId: "chat-1",
+                assistantMessageId: "assistant-1",
+                userContent: "Old prompt",
+                content: "Old output",
+                runId: "run-1",
+            },
+        });
+    });
+
     test("resets a stale local active run when persisted runtime state is no longer active", () => {
         expect(
             resolveConversationRuntimeSync({

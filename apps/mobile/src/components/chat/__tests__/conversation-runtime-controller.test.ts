@@ -209,6 +209,40 @@ describe("mobile conversation runtime controller", () => {
         });
     });
 
+    test("hydrates a missing local run id from persisted runtime state", () => {
+        const resolution = resolveMobileConversationRuntimeSync({
+            currentChat: createChat(),
+            isMessagesLoading: false,
+            messages: [],
+            runtimeState: createRuntimeState({
+                phase: "active",
+                runId: "run-1",
+                assistantMessageId: "assistant-1",
+                provider: "codex-default",
+                startedAt: 1,
+                lastEventAt: 2,
+            }),
+            activeRun: {
+                conversationId: "chat-1",
+                assistantMessageId: "assistant-1",
+                userContent: "hello",
+                content: "Old output",
+                runId: null,
+            },
+        });
+
+        expect(resolution).toEqual({
+            shouldReset: false,
+            recoveredRun: {
+                conversationId: "chat-1",
+                assistantMessageId: "assistant-1",
+                userContent: "hello",
+                content: "Old output",
+                runId: "run-1",
+            },
+        });
+    });
+
     test("resets and recovers when the current chat has moved to a different persisted run", () => {
         const resolution = resolveMobileConversationRuntimeSync({
             currentChat: createChat(),
