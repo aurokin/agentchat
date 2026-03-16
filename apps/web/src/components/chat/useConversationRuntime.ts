@@ -27,6 +27,7 @@ import {
     resolveConversationSocketEvent,
     runConversationSend,
 } from "./conversation-runtime-controller";
+import { shouldClearPendingReconnectNoticeAfterSync } from "./conversation-runtime-sync";
 
 type UseConversationRuntimeParams = {
     currentChat: ChatSession | null;
@@ -330,6 +331,11 @@ export function useConversationRuntime({
             runtimeState,
             activeRun: activeRunRef.current,
         });
+        const shouldClearPendingReconnectNotice =
+            shouldClearPendingReconnectNoticeAfterSync({
+                syncResolution,
+                runtimeState,
+            });
 
         if (syncResolution.shouldReset) {
             activeRunRef.current = null;
@@ -346,10 +352,7 @@ export function useConversationRuntime({
         }
 
         if (!syncResolution.recoveredRun) {
-            if (
-                runtimeState.phase !== "active" &&
-                runtimeState.phase !== "recovering"
-            ) {
+            if (shouldClearPendingReconnectNotice) {
                 pendingReconnectNoticeRef.current = false;
             }
             return;
@@ -360,7 +363,9 @@ export function useConversationRuntime({
         queueMicrotask(() => {
             setSending(true);
             setRecoveredRunNotice(pendingReconnectNoticeRef.current);
-            pendingReconnectNoticeRef.current = false;
+            if (shouldClearPendingReconnectNotice) {
+                pendingReconnectNoticeRef.current = false;
+            }
             queueStreamingMessageUpdate({
                 id: recoveredRun.assistantMessageId,
                 content: recoveredRun.content,

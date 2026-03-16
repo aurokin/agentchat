@@ -508,7 +508,28 @@ Use this block when updating the plan after a commit or push:
 - Docs updated:
     - plan progress only in this milestone
 - Commit / push:
+    - commit: `ef812b7`
+    - push: `origin/master`
+- Next step:
+    - decide whether the remaining reconnect-notice edge warrants extracting a pure sync/notice-state helper from `useConversationRuntime` for direct unit coverage
+
+### Update 2026-03-16
+
+- Phase: `Phase 1. Expand Live Runtime Confidence Coverage`
+- Status: `in_progress`
+- Landed:
+    - web runtime sync now keeps a pending reconnect notice through one post-reset grace pass instead of clearing it immediately on the first idle or terminal snapshot
+    - recovered runs still consume the reconnect notice immediately once the browser can display the recovered state
+    - terminal runtime states without a reset continue to clear stale reconnect notices so banners do not linger indefinitely
+- Refactors:
+    - extracted a web runtime-sync helper to make reconnect-notice clearing rules explicit and directly testable
+- Tests added or updated:
+    - `apps/web/src/components/chat/__tests__/conversation-runtime-sync.test.ts`
+    - `bun run --cwd apps/web test:confidence`
+- Docs updated:
+    - plan progress only in this milestone
+- Commit / push:
     - commit: `pending`
     - push: `pending`
 - Next step:
-    - decide whether the remaining reconnect-notice edge warrants extracting a pure sync/notice-state helper from `useConversationRuntime` for direct unit coverage
+    - decide whether the next highest-leverage Phase 1 slice is a hook-level runtime-sync unit harness or a manual/browser flow that exercises the reconnect notice end to end
