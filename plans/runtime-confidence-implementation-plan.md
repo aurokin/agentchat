@@ -22,7 +22,7 @@ Based on the current repository state:
 - seeded smoke users (`smoke_1`, `smoke_2`) already exist and are the normal local multi-user fixtures
 - live runtime, browser-confidence, operator, and diagnostics scripts already exist
 - `assistant_status` and `message.started` support already exist end to end
-- the remaining gap is final manual confirmation across the real browser and device matrix
+- the implementation work is complete, and the final manual browser/device confirmation pass has now succeeded
 
 ## Current Status
 
@@ -58,14 +58,8 @@ Recently completed and intentionally removed from the active backlog:
 
 Remaining work before sign-off:
 
-- run the final manual confirmation pass across:
-    - Local Browser
-    - Remote Browser via Luma
-    - iPad
-    - iPhone
-    - RedMagic Astra
-- record any manual-only findings back into deterministic tests, docs, or follow-up UI polish tasks
-- if the manual pass stays clean, treat the implementation plan as complete and leave only any newly discovered device-specific polish
+- no remaining runtime-confidence implementation work
+- keep any future follow-up limited to newly discovered UI polish or platform-specific ergonomics
 
 ## Operating Rules
 
@@ -89,7 +83,7 @@ Remaining work before sign-off:
 
 ### Final Manual Confirmation Pass
 
-Status: `pending`
+Status: `done`
 
 Goal:
 
@@ -107,14 +101,14 @@ Primary surfaces:
 
 Core tasks:
 
-- run the deliberate browser/runtime/operator flows on Local Browser and Remote Browser via Luma
-- confirm mobile parity on iPad, iPhone, and RedMagic Astra against the same backend/session/runtime path
-- verify long-stream, interrupt, recovery, agent switching, and provider/model/variant selection flows behave the same way on real clients
-- validate the currently supported Codex variants in the real product path and note any degraded or unsupported behavior, including Codex Spark if encountered
-- convert any manual-only regression into:
-    - a deterministic unit or replay test
-    - a scripted browser/smoke assertion
-    - or a documented follow-up if the issue is platform-specific polish
+- completed on:
+    - Local Browser
+    - Remote Browser via Luma
+    - iPad
+    - iPhone
+    - RedMagic Astra
+- confirmed long-stream, interrupt, recovery, agent switching, and provider/model/variant selection behavior worked as expected on the real client matrix
+- no manual-only runtime regressions were discovered during the final pass
 
 Exit criteria:
 

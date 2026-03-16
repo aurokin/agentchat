@@ -210,6 +210,15 @@ Coverage targets:
 
 These should also be manually invoked, not run automatically on push.
 
+Current status:
+
+- the final manual browser/device confirmation pass is green on:
+    - Local Browser
+    - Remote Browser via Luma
+    - iPad
+    - iPhone
+    - RedMagic Astra
+
 Current local browser path:
 
 - local auth with seeded users is the preferred browser-test path for local confidence work that does not specifically need the Google sign-in flow
