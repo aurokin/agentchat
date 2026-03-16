@@ -238,4 +238,20 @@ describe("socket runtime replay fixtures", () => {
             ]),
         );
     });
+
+    test("rejects multi-message replay fixtures without previous-message links", () => {
+        const fixture = readJsonFixture<{
+            events: AgentchatSocketEvent[];
+        }>("socket-multi-message-missing-previous-link.json");
+
+        expect(
+            analyzeSocketReplay({
+                ...fixture,
+            }).issues.map((issue) => issue.code),
+        ).toEqual(
+            expect.arrayContaining([
+                "socket_replay_missing_previous_message_link",
+            ]),
+        );
+    });
 });

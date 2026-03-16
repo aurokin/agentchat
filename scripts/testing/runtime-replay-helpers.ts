@@ -261,6 +261,7 @@ export function analyzeSocketReplay(params: {
 }): SocketReplayAnalysis {
     const issues: RuntimeReplayIssue[] = [];
     const messageContents = new Map<string, string>();
+    const messageKinds = new Map<string, "assistant_message" | "assistant_status">();
     const messageIds: string[] = [];
     let runStartedCount = 0;
     let terminalStatus: SocketReplayAnalysis["terminalStatus"] = "active";
@@ -298,7 +299,40 @@ export function analyzeSocketReplay(params: {
                 );
             }
             highestMessageIndex = event.payload.messageIndex;
+            const previousMessageId = messageIds.at(-1) ?? null;
+            const previousKind =
+                previousMessageId !== null
+                    ? (messageKinds.get(previousMessageId) ?? null)
+                    : null;
+            if (event.payload.messageIndex > 0) {
+                if (!event.payload.previousMessageId || !event.payload.previousKind) {
+                    issues.push(
+                        buildIssue(
+                            "socket_replay_missing_previous_message_link",
+                            "Expected replayed multi-message transitions to include previousMessageId and previousKind.",
+                        ),
+                    );
+                } else {
+                    if (event.payload.previousMessageId !== previousMessageId) {
+                        issues.push(
+                            buildIssue(
+                                "socket_replay_previous_message_mismatch",
+                                "Expected previousMessageId to point at the immediately prior replayed assistant message.",
+                            ),
+                        );
+                    }
+                    if (event.payload.previousKind !== previousKind) {
+                        issues.push(
+                            buildIssue(
+                                "socket_replay_previous_kind_mismatch",
+                                "Expected previousKind to match the immediately prior replayed assistant message kind.",
+                            ),
+                        );
+                    }
+                }
+            }
             messageIds.push(event.payload.messageId);
+            messageKinds.set(event.payload.messageId, event.payload.kind);
             messageContents.set(event.payload.messageId, event.payload.content);
         }
 

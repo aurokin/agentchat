@@ -1,5 +1,5 @@
 {
-  "name": "socket-multi-message",
+  "name": "socket-multi-message-missing-previous-link",
   "events": [
     {
       "type": "run.started",
@@ -36,9 +36,7 @@
         "messageId": "assistant-final-1",
         "messageIndex": 1,
         "kind": "assistant_message",
-        "content": "",
-        "previousMessageId": "assistant-status-1",
-        "previousKind": "assistant_status"
+        "content": ""
       }
     },
     {
