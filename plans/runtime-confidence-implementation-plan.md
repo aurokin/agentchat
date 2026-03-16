@@ -52,6 +52,7 @@ Recently completed and intentionally removed from the active backlog:
 - shared background runtime subscription helpers now back both clients' workspace-level socket subscriptions, with direct reconciliation and cleanup coverage
 - web and mobile now derive conversation runtime state through one shared helper, reducing drift in run-summary/runtime-binding interpretation while preserving existing client confidence coverage
 - mobile now matches web on queued interrupt behavior during send-in-flight pre-bind windows, including flushed interrupt error handling once `run.started` arrives
+- web and mobile provider/model/variant scoping now derive from one shared settings-selection helper, with direct shared coverage for provider, model, and variant fallback behavior
 
 Current Phase 1 focus:
 
@@ -65,6 +66,7 @@ Immediate next candidates:
 - add automated coverage around server/scripts operator confidence paths that are still only exercised manually
 - keep turning last-known-good reload semantics and operator remediation paths into deterministic server/script coverage
 - add deterministic coverage for any remaining runtime replay or cross-client ordering edge found during implementation
+- harden Codex model discovery against soft-degraded catalog responses and increase deterministic coverage for model/variant fallback selection
 - reassess whether Phase 1 is near exit criteria and Phase 2 should become the active workstream
 
 ## Operating Rules
