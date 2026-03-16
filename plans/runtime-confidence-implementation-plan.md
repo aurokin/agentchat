@@ -45,6 +45,7 @@ Recently completed and intentionally removed from the active backlog:
 - shared socket coverage for failed reconnect attempts that preserve the pending recovery signal until a real reconnect succeeds
 - shared socket coverage for conversation unsubscribes that happen during reconnect gaps, so stale subscriptions are not replayed
 - shared socket coverage for conversation subscriptions requested before the first socket-ready event, so initial mounts replay correctly
+- shared socket coverage for explicit client close while a reconnect timer is pending, so background reconnects do not leak past teardown
 
 Current Phase 1 focus:
 
