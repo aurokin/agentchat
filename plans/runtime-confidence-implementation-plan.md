@@ -365,3 +365,28 @@ Use this block when updating the plan after a commit or push:
     - push: `origin/master`
 - Next step:
     - add the next Phase 1 confidence slice around LAN/browser reachability or another deterministic regression for cross-client recovery behavior
+
+### Update 2026-03-16
+
+- Phase: `Phase 1. Expand Live Runtime Confidence Coverage`
+- Status: `in_progress`
+- Landed:
+    - shared socket coverage now verifies that active conversation subscriptions are replayed after an unexpected reconnect
+    - web LAN browser URL rewriting now covers IPv4 loopback, IPv6 loopback, and path-preserving rewrites for non-loopback browser hosts
+    - the web client now correctly rewrites bracketed IPv6 loopback backend URLs such as `http://[::1]:3030`
+- Refactors:
+    - none beyond the targeted recovery and LAN confidence fixes
+- Tests added or updated:
+    - `packages/shared/src/core/__tests__/agentchat-socket.test.ts`
+    - `apps/web/src/lib/__tests__/agentchat-server.test.ts`
+    - `bun run --cwd packages/shared test`
+    - `bun run --cwd apps/web test:confidence`
+- Docs updated:
+    - plan progress only in this milestone
+- Commit / push:
+    - commit: `337530b`
+    - push: `origin/master`
+    - commit: `963a138`
+    - push: `origin/master`
+- Next step:
+    - continue Phase 1 with either a browser/LAN-specific manual confidence script addition or another deterministic regression around cross-client recovery state
