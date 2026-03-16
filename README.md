@@ -242,6 +242,8 @@ bun run test:manual:live-runtime-interrupt
 bun run test:manual:runtime-confidence
 ```
 
+The current manual confirmation matrix is green on Local Browser, Remote Browser via Luma, iPad, iPhone, and RedMagic Astra.
+
 ## Architecture Notes
 
 - **Backend transport**: `apps/server` exposes authenticated HTTP and WebSocket endpoints using short-lived backend tokens minted by Convex

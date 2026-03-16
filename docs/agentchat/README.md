@@ -32,10 +32,10 @@ It exists for both humans and agents:
 These docs describe the active Agentchat direction:
 
 - Self-hosted and open source
-- Convex-managed access moving toward a provider-oriented Google plus local-user model
+- Convex-managed access through provider-oriented Google and local-user auth
 - Conversations stored in Convex
 - An instance-local backend server
-- A provider abstraction that is intentionally being hardened around Codex first
+- A provider abstraction currently focused on Codex
 - Agent-centric UX where conversations are bound to the selected agent
 
 If another document elsewhere in the repo conflicts with these docs, treat this directory as the source of truth.
