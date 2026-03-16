@@ -41,6 +41,7 @@ Recently completed and intentionally removed from the active backlog:
 - direct server coverage for last-known-good config reload failure and recovery behavior
 - shared operator issue catalog wiring across config diagnostics, doctor mapping, and smoke helpers
 - shared browser/operator smoke helpers for auth-provider selection and config mutation paths
+- structured `/api/diagnostics` issue-code coverage for auth, provider, and agent operator failures
 
 Current Phase 1 focus:
 

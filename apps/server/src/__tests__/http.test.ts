@@ -567,4 +567,52 @@ describe("createFetchHandler", () => {
             }),
         );
     });
+
+    test("returns structured auth, provider, and agent issue codes in diagnostics", async () => {
+        const fetchHandler = createFetchHandler({
+            getConfig: () => {
+                const config = createConfig();
+                config.auth.providers.push({
+                    id: "local-fallback",
+                    kind: "local",
+                    enabled: true,
+                    allowSignup: true,
+                });
+                config.auth.providers[0]!.enabled = false;
+                config.providers[0]!.codex.cwd = "/missing/provider-cwd";
+                config.agents[0]!.rootPath = "/missing/visible-agent";
+                config.agents[2]!.rootPath = "/missing/fallback-agent";
+                return config;
+            },
+        });
+
+        const response = await fetchHandler(
+            new Request("http://localhost:3030/api/diagnostics"),
+        );
+        const body = (await response.json()) as {
+            issues: Array<{ code: string; scope: string }>;
+        };
+
+        expect(response.status).toBe(200);
+        expect(body.issues).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    code: "auth_default_provider_fallback",
+                    scope: "auth",
+                }),
+                expect.objectContaining({
+                    code: "provider_codex_cwd_missing",
+                    scope: "provider:codex-main",
+                }),
+                expect.objectContaining({
+                    code: "agent_root_path_missing",
+                    scope: "agent:agent-visible",
+                }),
+                expect.objectContaining({
+                    code: "agent_default_provider_fallback",
+                    scope: "agent:agent-fallback",
+                }),
+            ]),
+        );
+    });
 });
