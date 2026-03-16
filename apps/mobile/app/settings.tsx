@@ -38,7 +38,7 @@ export default function SettingsScreen(): ReactElement {
     const { selectedAgent } = useAgent();
     const { models, selectedProviderId, selectedModel, selectedVariantId } =
         useModelContext();
-    const { colors, userTheme, setUserTheme, isMaterialYouActive } = useTheme();
+    const { colors, userTheme, setUserTheme } = useTheme();
     const { width: windowWidth, height: windowHeight } = useWindowDimensions();
     const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -569,28 +569,6 @@ export default function SettingsScreen(): ReactElement {
                                             </Text>
                                         </TouchableOpacity>
                                     </View>
-                                    {Platform.OS === "android" && (
-                                        <View style={styles.materialYouHint}>
-                                            <Feather
-                                                name={
-                                                    isMaterialYouActive
-                                                        ? "droplet"
-                                                        : "smartphone"
-                                                }
-                                                size={14}
-                                                color={colors.textMuted}
-                                            />
-                                            <Text
-                                                style={
-                                                    styles.materialYouHintText
-                                                }
-                                            >
-                                                {isMaterialYouActive
-                                                    ? "Material You colors are active from your system wallpaper."
-                                                    : "Select System theme to enable Material You colors on Android 12+."}
-                                            </Text>
-                                        </View>
-                                    )}
                                 </View>
 
                                 <View style={styles.section}>
@@ -972,23 +950,6 @@ const createStyles = (colors: ThemeColors) =>
         themeContainer: {
             flexDirection: "row",
             gap: 12,
-        },
-        materialYouHint: {
-            marginTop: 10,
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 8,
-            paddingVertical: 8,
-            paddingHorizontal: 10,
-            borderWidth: 1,
-            borderColor: colors.border,
-            borderRadius: 10,
-            backgroundColor: colors.surfaceMuted,
-        },
-        materialYouHintText: {
-            flex: 1,
-            fontSize: 12,
-            color: colors.textMuted,
         },
         themeOption: {
             flex: 1,

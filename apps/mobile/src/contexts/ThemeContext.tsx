@@ -11,14 +11,10 @@ import React, {
 import { Platform, useColorScheme } from "react-native";
 import * as SystemUI from "expo-system-ui";
 import * as NavigationBar from "expo-navigation-bar";
-import {
-    isDynamicThemeSupported,
-    useMaterial3Theme,
-    type Material3Scheme,
-} from "@pchmn/expo-material3-theme";
 import { getTheme, setTheme, type UserTheme } from "@/lib/storage";
+import { resolveThemeScheme, type ThemeScheme } from "@/contexts/theme-helpers";
 
-export type ThemeScheme = "light" | "dark";
+export type { ThemeScheme } from "@/contexts/theme-helpers";
 
 export type ThemeColors = {
     background: string;
@@ -113,150 +109,10 @@ const darkColors: ThemeColors = {
     overlay: "rgba(11, 13, 18, 0.6)",
 };
 
-function parseHexColor(
-    hexColor: string,
-): { r: number; g: number; b: number } | null {
-    const normalized = hexColor.replace("#", "");
-    if (normalized.length === 3) {
-        const [r, g, b] = normalized.split("");
-        if (!r || !g || !b) return null;
-
-        const parsed = {
-            r: Number.parseInt(`${r}${r}`, 16),
-            g: Number.parseInt(`${g}${g}`, 16),
-            b: Number.parseInt(`${b}${b}`, 16),
-        };
-
-        if (
-            Number.isNaN(parsed.r) ||
-            Number.isNaN(parsed.g) ||
-            Number.isNaN(parsed.b)
-        ) {
-            return null;
-        }
-
-        return parsed;
-    }
-
-    if (normalized.length === 6 || normalized.length === 8) {
-        const offset = normalized.length === 8 ? 2 : 0;
-        const parsed = {
-            r: Number.parseInt(normalized.slice(offset, offset + 2), 16),
-            g: Number.parseInt(normalized.slice(offset + 2, offset + 4), 16),
-            b: Number.parseInt(normalized.slice(offset + 4, offset + 6), 16),
-        };
-
-        if (
-            Number.isNaN(parsed.r) ||
-            Number.isNaN(parsed.g) ||
-            Number.isNaN(parsed.b)
-        ) {
-            return null;
-        }
-
-        return parsed;
-    }
-
-    return null;
-}
-
-function withAlpha(color: string, alpha: number, fallback: string): string {
-    const rgb = parseHexColor(color);
-    if (!rgb) return fallback;
-    const normalizedAlpha = Math.max(0, Math.min(alpha, 1));
-    return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${normalizedAlpha})`;
-}
-
-function mapMaterialSchemeToThemeColors(
-    materialScheme: Material3Scheme,
-    baseColors: ThemeColors,
-    scheme: ThemeScheme,
-): ThemeColors {
-    return {
-        background: materialScheme.background,
-        surface: materialScheme.surface,
-        surfaceMuted: materialScheme.surfaceContainer,
-        surfaceSubtle: materialScheme.surfaceContainerLow,
-        border: materialScheme.outlineVariant,
-        borderMuted: withAlpha(
-            materialScheme.outline,
-            scheme === "dark" ? 0.35 : 0.24,
-            baseColors.borderMuted,
-        ),
-        text: materialScheme.onSurface,
-        textMuted: materialScheme.onSurfaceVariant,
-        textSubtle: withAlpha(
-            materialScheme.onSurfaceVariant,
-            scheme === "dark" ? 0.72 : 0.64,
-            baseColors.textSubtle,
-        ),
-        textFaint: withAlpha(
-            materialScheme.onSurfaceVariant,
-            scheme === "dark" ? 0.44 : 0.36,
-            baseColors.textFaint,
-        ),
-        textOnAccent: materialScheme.onPrimary,
-        accent: materialScheme.primary,
-        accentSoft: withAlpha(
-            materialScheme.primaryContainer,
-            scheme === "dark" ? 0.35 : 0.45,
-            baseColors.accentSoft,
-        ),
-        accentBorder: withAlpha(
-            materialScheme.primary,
-            scheme === "dark" ? 0.48 : 0.32,
-            baseColors.accentBorder,
-        ),
-        warning: materialScheme.tertiary,
-        warningSoft: withAlpha(
-            materialScheme.tertiaryContainer,
-            scheme === "dark" ? 0.38 : 0.48,
-            baseColors.warningSoft,
-        ),
-        warningBorder: withAlpha(
-            materialScheme.tertiary,
-            scheme === "dark" ? 0.52 : 0.4,
-            baseColors.warningBorder,
-        ),
-        danger: materialScheme.error,
-        dangerSoft: withAlpha(
-            materialScheme.errorContainer,
-            scheme === "dark" ? 0.35 : 0.45,
-            baseColors.dangerSoft,
-        ),
-        success: materialScheme.secondary,
-        successSoft: withAlpha(
-            materialScheme.secondaryContainer,
-            scheme === "dark" ? 0.35 : 0.45,
-            baseColors.successSoft,
-        ),
-        inputBackground: materialScheme.surfaceContainerHigh,
-        inputBorder: materialScheme.outlineVariant,
-        link: materialScheme.primary,
-        linkOnAccent: materialScheme.onPrimary,
-        codeBackground: withAlpha(
-            materialScheme.onSurface,
-            scheme === "dark" ? 0.16 : 0.08,
-            baseColors.codeBackground,
-        ),
-        codeBackgroundOnAccent: withAlpha(
-            materialScheme.onPrimary,
-            scheme === "dark" ? 0.25 : 0.2,
-            baseColors.codeBackgroundOnAccent,
-        ),
-        overlay: withAlpha(
-            materialScheme.scrim,
-            scheme === "dark" ? 0.62 : 0.46,
-            baseColors.overlay,
-        ),
-    };
-}
-
 type ThemeContextValue = {
     userTheme: UserTheme;
     scheme: ThemeScheme;
     colors: ThemeColors;
-    isMaterialYouActive: boolean;
     setUserTheme: (theme: UserTheme) => Promise<void>;
 };
 
@@ -276,9 +132,6 @@ export function ThemeProvider({
     children: ReactNode;
 }): ReactElement {
     const systemScheme = useColorScheme();
-    const { theme: materialTheme } = useMaterial3Theme({
-        fallbackSourceColor: lightColors.accent,
-    });
     const [userTheme, setUserThemeState] = useState<UserTheme>("system");
 
     useEffect(() => {
@@ -295,25 +148,8 @@ export function ThemeProvider({
         };
     }, []);
 
-    const scheme: ThemeScheme =
-        userTheme === "system"
-            ? systemScheme === "dark"
-                ? "dark"
-                : "light"
-            : userTheme;
-
-    const baseColors = scheme === "dark" ? darkColors : lightColors;
-    const useMaterialYouColors =
-        Platform.OS === "android" &&
-        userTheme === "system" &&
-        isDynamicThemeSupported;
-    const colors = useMaterialYouColors
-        ? mapMaterialSchemeToThemeColors(
-              scheme === "dark" ? materialTheme.dark : materialTheme.light,
-              baseColors,
-              scheme,
-          )
-        : baseColors;
+    const scheme: ThemeScheme = resolveThemeScheme({ userTheme, systemScheme });
+    const colors = scheme === "dark" ? darkColors : lightColors;
 
     const setUserTheme = useCallback(async (theme: UserTheme) => {
         setUserThemeState(theme);
@@ -347,10 +183,9 @@ export function ThemeProvider({
             userTheme,
             scheme,
             colors,
-            isMaterialYouActive: useMaterialYouColors,
             setUserTheme,
         }),
-        [userTheme, scheme, colors, useMaterialYouColors, setUserTheme],
+        [userTheme, scheme, colors, setUserTheme],
     );
 
     return (
