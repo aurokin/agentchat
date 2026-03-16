@@ -640,7 +640,30 @@ Use this block when updating the plan after a commit or push:
 - Docs updated:
     - plan progress only in this milestone
 - Commit / push:
+    - commit: `2992c26`
+    - push: `origin/master`
+- Next step:
+    - choose the next non-manual Phase 1 target between operator/runtime confidence expansion and any remaining cross-client recovery gaps that still lack deterministic coverage
+
+### Update 2026-03-16
+
+- Phase: `Phase 1. Expand Live Runtime Confidence Coverage`
+- Status: `in_progress`
+- Landed:
+    - server config diagnostics now surface auth readiness problems instead of always reporting auth as issue-free
+    - doctor reports now promote auth diagnostics into structured issues with explicit error/warning codes and remediations
+    - the curated server confidence suite now includes `doctorReport.test.ts`, so operator-facing report behavior is exercised in the normal confidence loop
+- Refactors:
+    - auth readiness is now derived through a dedicated config-diagnostics helper instead of being embedded as an always-empty stub
+- Tests added or updated:
+    - `apps/server/src/__tests__/configDiagnostics.test.ts`
+    - `apps/server/src/__tests__/doctorReport.test.ts`
+    - `bun run --cwd apps/server typecheck`
+    - `bun run --cwd apps/server test:confidence`
+- Docs updated:
+    - plan progress only in this milestone
+- Commit / push:
     - commit: `pending`
     - push: `pending`
 - Next step:
-    - choose the next non-manual Phase 1 target between operator/runtime confidence expansion and any remaining cross-client recovery gaps that still lack deterministic coverage
+    - move from low-hanging deterministic extraction toward the next broader confidence target, likely server/scripts operator coverage or the next uncovered cross-client runtime invariant outside manual flows

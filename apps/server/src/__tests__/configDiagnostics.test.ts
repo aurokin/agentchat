@@ -206,4 +206,37 @@ describe("configDiagnostics", () => {
             issues: [],
         });
     });
+
+    test("reports auth fallback when the configured default provider is disabled", () => {
+        const config = createConfig();
+        config.auth.providers.push({
+            id: "local-fallback",
+            kind: "local",
+            enabled: true,
+            allowSignup: true,
+        });
+        config.auth.defaultProviderId = "google-main";
+        config.auth.providers[0]!.enabled = false;
+
+        const diagnostics = getConfigDiagnostics(config);
+
+        expect(diagnostics.auth).toEqual({
+            activeProviderKind: "local",
+            issues: [
+                "Configured default auth provider is disabled; fallback will be used.",
+            ],
+        });
+    });
+
+    test("reports when no enabled auth providers are configured", () => {
+        const config = createConfig();
+        config.auth.providers[0]!.enabled = false;
+
+        const diagnostics = getConfigDiagnostics(config);
+
+        expect(diagnostics.auth).toEqual({
+            activeProviderKind: null,
+            issues: ["No enabled auth providers are configured."],
+        });
+    });
 });

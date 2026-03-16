@@ -196,4 +196,86 @@ describe("doctorReport", () => {
         );
         expect(getDoctorExitCode(report)).toBe(1);
     });
+
+    test("maps auth diagnostics into structured report issues", () => {
+        const report = buildDoctorReport({
+            configPath: "/tmp/agentchat.config.json",
+            configStatus: {
+                loadedAt: Date.UTC(2026, 2, 15, 12, 0, 0),
+                lastReloadAttemptAt: null,
+                lastReloadError: null,
+            },
+            diagnostics: {
+                ok: true,
+                auth: {
+                    activeProviderKind: "local",
+                    issues: [
+                        "Configured default auth provider is disabled; fallback will be used.",
+                    ],
+                },
+                summary: {
+                    enabledProviderCount: 1,
+                    readyProviderCount: 1,
+                    enabledAgentCount: 1,
+                    readyAgentCount: 1,
+                },
+                providers: [
+                    {
+                        id: "codex",
+                        label: "Codex",
+                        enabled: true,
+                        ready: true,
+                        enabledModelCount: 1,
+                        issues: [],
+                    },
+                ],
+                agents: [
+                    {
+                        id: "agent-1",
+                        name: "Agent One",
+                        enabled: true,
+                        ready: true,
+                        availableProviderIds: ["codex"],
+                        resolvedDefaultProviderId: "codex",
+                        issues: [],
+                    },
+                ],
+            },
+            runtimeEnv: {
+                ok: true,
+                diagnostics: [
+                    {
+                        key: "BACKEND_TOKEN_SECRET",
+                        configured: true,
+                        description: "backend token secret",
+                    },
+                    {
+                        key: "AGENTCHAT_CONVEX_SITE_URL",
+                        configured: true,
+                        description: "convex site url",
+                    },
+                    {
+                        key: "RUNTIME_INGRESS_SECRET",
+                        configured: true,
+                        description: "runtime ingress secret",
+                    },
+                ],
+            },
+            liveProbes: new Map(),
+        });
+
+        expect(report.issues).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    code: "auth_default_provider_fallback",
+                    severity: "warning",
+                    scope: "auth",
+                }),
+            ]),
+        );
+        expect(formatDoctorText(report)).toContain(
+            "Configured default auth provider is disabled; fallback will be used.",
+        );
+        expect(getDoctorExitCode(report)).toBe(1);
+    });
 });

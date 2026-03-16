@@ -47,6 +47,40 @@ type ResolvedAgentDefaults = {
     allowedProviders: ProviderConfig[];
 };
 
+function getAuthDiagnostics(config: AgentchatConfig): ConfigDiagnostics["auth"] {
+    const enabledProviders = config.auth.providers.filter(
+        (provider) => provider.enabled,
+    );
+    const configuredDefaultProvider =
+        config.auth.providers.find(
+            (provider) => provider.id === config.auth.defaultProviderId,
+        ) ?? null;
+    const activeAuthProvider =
+        enabledProviders.find(
+            (provider) => provider.id === config.auth.defaultProviderId,
+        ) ??
+        enabledProviders[0] ??
+        null;
+    const issues: string[] = [];
+
+    if (enabledProviders.length === 0) {
+        issues.push("No enabled auth providers are configured.");
+    } else if (!configuredDefaultProvider) {
+        issues.push(
+            "Configured default auth provider is missing; fallback will be used.",
+        );
+    } else if (!configuredDefaultProvider.enabled) {
+        issues.push(
+            "Configured default auth provider is disabled; fallback will be used.",
+        );
+    }
+
+    return {
+        activeProviderKind: activeAuthProvider?.kind ?? null,
+        issues,
+    };
+}
+
 function isExistingDirectory(targetPath: string): boolean {
     if (!existsSync(targetPath)) {
         return false;
@@ -253,24 +287,14 @@ export function getConfigDiagnostics(
     const agents = config.agents.map((agent) =>
         getAgentDiagnostics(config, agent),
     );
-    const activeAuthProvider =
-        config.auth.providers.find(
-            (provider) =>
-                provider.id === config.auth.defaultProviderId &&
-                provider.enabled,
-        ) ??
-        config.auth.providers.find((provider) => provider.enabled) ??
-        null;
+    const auth = getAuthDiagnostics(config);
 
     return {
         ok:
             providers.every(
                 (provider) => !provider.enabled || provider.ready,
             ) && agents.every((agent) => !agent.enabled || agent.ready),
-        auth: {
-            activeProviderKind: activeAuthProvider?.kind ?? null,
-            issues: [],
-        },
+        auth,
         summary: {
             enabledProviderCount: providers.filter(
                 (provider) => provider.enabled,

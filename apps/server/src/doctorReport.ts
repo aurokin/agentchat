@@ -169,6 +169,53 @@ function mapAgentIssue(agentId: string, issue: string): DoctorIssue {
     });
 }
 
+function mapAuthIssue(issue: string): DoctorIssue {
+    if (issue === "No enabled auth providers are configured.") {
+        return createIssue({
+            code: "auth_no_enabled_providers",
+            severity: "error",
+            scope: "auth",
+            message: issue,
+            remediation:
+                "Enable at least one auth provider and point auth.defaultProviderId at it.",
+        });
+    }
+    if (
+        issue ===
+        "Configured default auth provider is disabled; fallback will be used."
+    ) {
+        return createIssue({
+            code: "auth_default_provider_fallback",
+            severity: "warning",
+            scope: "auth",
+            message: issue,
+            remediation:
+                "Enable the configured auth default provider or update auth.defaultProviderId to the intended enabled provider.",
+        });
+    }
+    if (
+        issue ===
+        "Configured default auth provider is missing; fallback will be used."
+    ) {
+        return createIssue({
+            code: "auth_default_provider_missing",
+            severity: "warning",
+            scope: "auth",
+            message: issue,
+            remediation:
+                "Update auth.defaultProviderId to an existing enabled auth provider.",
+        });
+    }
+
+    return createIssue({
+        code: "auth_issue",
+        severity: "error",
+        scope: "auth",
+        message: issue,
+        remediation: null,
+    });
+}
+
 export function buildDoctorIssues(params: {
     configStatus: ConfigStoreStatus;
     diagnostics: ConfigDiagnostics;
@@ -204,6 +251,10 @@ export function buildDoctorIssues(params: {
                 remediation: diagnostic.description,
             }),
         );
+    }
+
+    for (const issue of params.diagnostics.auth.issues) {
+        issues.push(mapAuthIssue(issue));
     }
 
     for (const provider of params.diagnostics.providers) {
