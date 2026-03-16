@@ -2,6 +2,7 @@ import {
     buildInterruptCommand,
     createRecoveredActiveRunFromRuntimeState,
     prepareConversationSend,
+    shouldResetActiveRunForRuntimeSnapshot,
     type ActiveRunState,
     type RetryChatState,
     type RuntimeErrorState,
@@ -162,11 +163,11 @@ export function resolveMobileConversationRuntimeSync(params: {
         };
     }
 
-    const shouldReset =
-        !!params.activeRun &&
-        (params.activeRun.conversationId !== params.currentChat.id ||
-            (params.runtimeState.phase !== "active" &&
-                params.runtimeState.phase !== "recovering"));
+    const shouldReset = shouldResetActiveRunForRuntimeSnapshot({
+        currentConversationId: params.currentChat.id,
+        runtimeState: params.runtimeState,
+        activeRun: params.activeRun,
+    });
 
     if (params.activeRun && !shouldReset) {
         return {

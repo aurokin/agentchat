@@ -436,7 +436,33 @@ Use this block when updating the plan after a commit or push:
 - Docs updated:
     - plan progress only in this milestone
 - Commit / push:
+    - commit: `30cd9f0`
+    - push: `origin/master`
+- Next step:
+    - keep Phase 1 focused on another deterministic recovery invariant, most likely around stale run handoff or cross-client recovery after conversation switches
+
+### Update 2026-03-16
+
+- Phase: `Phase 1. Expand Live Runtime Confidence Coverage`
+- Status: `in_progress`
+- Landed:
+    - web runtime sync now resets and recovers when the current chat's authoritative persisted run has moved to a different assistant message
+    - mobile runtime sync now applies the same authoritative run handoff behavior for same-chat recovery
+    - same-chat stale local runs no longer survive when Convex runtime state points at a newer run in the same conversation
+- Refactors:
+    - centralized the shared reset decision in `packages/shared/src/core/conversation-runtime.ts` so web and mobile follow one runtime-snapshot compatibility rule
+    - extracted a shared live-runtime predicate to remove duplicated `active`/`recovering` phase checks
+- Tests added or updated:
+    - `packages/shared/src/core/__tests__/conversation-runtime.test.ts`
+    - `apps/web/src/components/chat/__tests__/conversation-runtime-controller.test.ts`
+    - `apps/mobile/src/components/chat/__tests__/conversation-runtime-controller.test.ts`
+    - `bun run --cwd packages/shared test`
+    - `bun run --cwd apps/web test:confidence`
+    - `bun run --cwd apps/mobile test:confidence`
+- Docs updated:
+    - plan progress only in this milestone
+- Commit / push:
     - commit: `pending`
     - push: `pending`
 - Next step:
-    - keep Phase 1 focused on another deterministic recovery invariant, most likely around stale run handoff or cross-client recovery after conversation switches
+    - inspect the remaining recovery path around whether an active local run should be upgraded from `runId: null` to an authoritative persisted `runId` without waiting for fresh socket events

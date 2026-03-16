@@ -13,6 +13,7 @@ import {
     getChatTitleUpdate,
     prepareConversationSend,
     resolveConversationSocketEvent,
+    shouldResetActiveRunForRuntimeSnapshot,
     type ActiveRunState,
     type PreparedConversationSend,
     type RetryChatState,
@@ -260,11 +261,11 @@ export function resolveConversationRuntimeSync(params: {
         };
     }
 
-    const shouldReset =
-        !!params.activeRun &&
-        (params.activeRun.conversationId !== params.currentChat.id ||
-            (params.runtimeState.phase !== "active" &&
-                params.runtimeState.phase !== "recovering"));
+    const shouldReset = shouldResetActiveRunForRuntimeSnapshot({
+        currentConversationId: params.currentChat.id,
+        runtimeState: params.runtimeState,
+        activeRun: params.activeRun,
+    });
 
     if (params.activeRun && !shouldReset) {
         return {

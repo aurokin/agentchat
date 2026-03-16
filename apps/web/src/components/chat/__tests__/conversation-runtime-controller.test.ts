@@ -773,6 +773,62 @@ describe("conversation runtime controller", () => {
         });
     });
 
+    test("resets and recovers when the current chat has moved to a different persisted run", () => {
+        const messages: Message[] = [
+            {
+                id: "user-2",
+                sessionId: "chat-1",
+                role: "user",
+                content: "New prompt",
+                contextContent: "New prompt",
+                createdAt: 1,
+            },
+            {
+                id: "assistant-2",
+                sessionId: "chat-1",
+                role: "assistant",
+                content: "New persisted output",
+                contextContent: "New persisted output",
+                createdAt: 2,
+                runId: "run-2",
+            },
+        ];
+
+        expect(
+            resolveConversationRuntimeSync({
+                currentChat: createChat(),
+                isMessagesLoading: false,
+                messages,
+                runtimeState: {
+                    phase: "active",
+                    runId: "run-2",
+                    assistantMessageId: "assistant-2",
+                    provider: "codex-default",
+                    errorMessage: null,
+                    startedAt: 1,
+                    completedAt: null,
+                    lastEventAt: 2,
+                },
+                activeRun: {
+                    conversationId: "chat-1",
+                    assistantMessageId: "assistant-1",
+                    userContent: "Old prompt",
+                    content: "Old output",
+                    runId: "run-1",
+                },
+            }),
+        ).toEqual({
+            shouldReset: true,
+            recoveredRun: {
+                conversationId: "chat-1",
+                assistantMessageId: "assistant-2",
+                userContent: "New prompt",
+                content: "New persisted output",
+                runId: "run-2",
+            },
+        });
+    });
+
     test("can reset and recover in the same sync pass after a conversation switch", () => {
         const messages: Message[] = [
             {

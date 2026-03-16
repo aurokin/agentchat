@@ -187,6 +187,50 @@ export function prepareConversationSend(params: {
     };
 }
 
+export function isConversationRuntimeSnapshotLive(
+    runtimeState: ConversationRuntimeSnapshot,
+): boolean {
+    return (
+        runtimeState.phase === "active" || runtimeState.phase === "recovering"
+    );
+}
+
+export function shouldResetActiveRunForRuntimeSnapshot(params: {
+    currentConversationId: string;
+    runtimeState: ConversationRuntimeSnapshot;
+    activeRun: ActiveRunState | null;
+}): boolean {
+    if (!params.activeRun) {
+        return false;
+    }
+
+    if (params.activeRun.conversationId !== params.currentConversationId) {
+        return true;
+    }
+
+    if (!isConversationRuntimeSnapshotLive(params.runtimeState)) {
+        return true;
+    }
+
+    if (
+        params.runtimeState.assistantMessageId &&
+        params.runtimeState.assistantMessageId !==
+            params.activeRun.assistantMessageId
+    ) {
+        return true;
+    }
+
+    if (
+        params.runtimeState.runId &&
+        params.activeRun.runId &&
+        params.runtimeState.runId !== params.activeRun.runId
+    ) {
+        return true;
+    }
+
+    return false;
+}
+
 export function buildInterruptCommand(
     conversationId: string,
     createId: RuntimeIdFactory = generateId,
@@ -231,8 +275,7 @@ export function createRecoveredActiveRunFromRuntimeState(params: {
     runtimeState: ConversationRuntimeSnapshot;
 }): ActiveRunState | null {
     if (
-        (params.runtimeState.phase !== "active" &&
-            params.runtimeState.phase !== "recovering") ||
+        !isConversationRuntimeSnapshotLive(params.runtimeState) ||
         !params.runtimeState.assistantMessageId
     ) {
         return null;
