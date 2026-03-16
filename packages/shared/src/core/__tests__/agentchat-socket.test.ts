@@ -194,6 +194,53 @@ describe("agentchat socket helpers", () => {
         ).toHaveLength(1);
     });
 
+    test("replays subscriptions that were requested before the first socket became ready", async () => {
+        globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
+
+        const client = new AgentchatSocketClient({
+            getWebSocketUrl: () => "ws://localhost:3030/ws",
+            createId: () => "id-1",
+            notConfiguredMessage: "missing",
+        });
+
+        const connectPromise = client.ensureConnected(async () => "token-1");
+        await Promise.resolve();
+        const firstSocket = FakeWebSocket.instances[0];
+        if (!firstSocket) {
+            throw new Error("Expected the first websocket connection");
+        }
+
+        client.subscribeToConversation("chat-1");
+        expect(
+            firstSocket.sentMessages.filter((message) =>
+                message.includes('"type":"conversation.subscribe"'),
+            ),
+        ).toHaveLength(0);
+
+        firstSocket.emitOpen();
+        firstSocket.emitEvent({
+            type: "connection.ready",
+            payload: {
+                user: {
+                    sub: "sub-1",
+                    userId: "user-1",
+                    email: "user@example.com",
+                },
+                transport: "websocket",
+            },
+        });
+        await connectPromise;
+
+        expect(
+            firstSocket.sentMessages.filter((message) =>
+                message.includes('"type":"conversation.subscribe"'),
+            ),
+        ).toHaveLength(1);
+        expect(firstSocket.sentMessages.join("\n")).toContain(
+            '"conversationId":"chat-1"',
+        );
+    });
+
     test("replays active conversation subscriptions after reconnect", async () => {
         globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
 

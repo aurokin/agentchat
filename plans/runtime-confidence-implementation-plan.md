@@ -44,6 +44,7 @@ Recently completed and intentionally removed from the active backlog:
 - structured `/api/diagnostics` issue-code coverage for auth, provider, and agent operator failures
 - shared socket coverage for failed reconnect attempts that preserve the pending recovery signal until a real reconnect succeeds
 - shared socket coverage for conversation unsubscribes that happen during reconnect gaps, so stale subscriptions are not replayed
+- shared socket coverage for conversation subscriptions requested before the first socket-ready event, so initial mounts replay correctly
 
 Current Phase 1 focus:
 
