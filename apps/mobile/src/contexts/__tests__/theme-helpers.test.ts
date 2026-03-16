@@ -1,5 +1,28 @@
 import { describe, expect, test } from "bun:test";
-import { resolveThemeScheme } from "@/contexts/theme-helpers";
+import {
+    coalesceSystemScheme,
+    resolveThemeScheme,
+} from "@/contexts/theme-helpers";
+
+describe("coalesceSystemScheme", () => {
+    test("keeps the last known scheme when the next reading is unavailable", () => {
+        expect(
+            coalesceSystemScheme({
+                nextSystemScheme: null,
+                previousSystemScheme: "dark",
+            }),
+        ).toBe("dark");
+    });
+
+    test("accepts a new concrete scheme", () => {
+        expect(
+            coalesceSystemScheme({
+                nextSystemScheme: "light",
+                previousSystemScheme: "dark",
+            }),
+        ).toBe("light");
+    });
+});
 
 describe("resolveThemeScheme", () => {
     test("returns the explicit light selection unchanged", () => {

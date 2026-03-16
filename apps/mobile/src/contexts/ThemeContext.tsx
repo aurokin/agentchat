@@ -8,11 +8,15 @@ import React, {
     type ReactNode,
     type ReactElement,
 } from "react";
-import { Platform, useColorScheme } from "react-native";
+import { Appearance, Platform, type ColorSchemeName } from "react-native";
 import * as SystemUI from "expo-system-ui";
 import * as NavigationBar from "expo-navigation-bar";
 import { getTheme, setTheme, type UserTheme } from "@/lib/storage";
-import { resolveThemeScheme, type ThemeScheme } from "@/contexts/theme-helpers";
+import {
+    coalesceSystemScheme,
+    resolveThemeScheme,
+    type ThemeScheme,
+} from "@/contexts/theme-helpers";
 
 export type { ThemeScheme } from "@/contexts/theme-helpers";
 
@@ -131,8 +135,33 @@ export function ThemeProvider({
 }: {
     children: ReactNode;
 }): ReactElement {
-    const systemScheme = useColorScheme();
+    const [systemScheme, setSystemScheme] = useState<ColorSchemeName | null>(
+        () => Appearance.getColorScheme() ?? null,
+    );
     const [userTheme, setUserThemeState] = useState<UserTheme>("system");
+
+    useEffect(() => {
+        // iOS dev builds can transiently report null; preserve the last known
+        // concrete scheme instead of flashing back to light.
+        const applySystemScheme = (nextScheme: ColorSchemeName | null) => {
+            setSystemScheme((previousScheme) =>
+                coalesceSystemScheme({
+                    nextSystemScheme: nextScheme,
+                    previousSystemScheme: previousScheme,
+                }),
+            );
+        };
+
+        applySystemScheme(Appearance.getColorScheme() ?? null);
+
+        const subscription = Appearance.addChangeListener(({ colorScheme }) => {
+            applySystemScheme(colorScheme ?? null);
+        });
+
+        return () => {
+            subscription.remove();
+        };
+    }, []);
 
     useEffect(() => {
         let isMounted = true;

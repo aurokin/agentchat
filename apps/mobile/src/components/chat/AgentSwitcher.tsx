@@ -135,6 +135,7 @@ const createStyles = (colors: ThemeColors) =>
         trigger: {
             flexDirection: "row",
             alignItems: "center",
+            justifyContent: "space-between",
             gap: 8,
             paddingHorizontal: 12,
             paddingVertical: 8,
@@ -148,7 +149,8 @@ const createStyles = (colors: ThemeColors) =>
             paddingVertical: 6,
         },
         triggerText: {
-            flexShrink: 1,
+            flex: 1,
+            minWidth: 0,
             color: colors.text,
             fontSize: 14,
             fontWeight: "600",
