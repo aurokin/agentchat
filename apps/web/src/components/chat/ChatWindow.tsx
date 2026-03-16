@@ -18,6 +18,7 @@ import { useActionSafe } from "@/hooks/useConvexSafe";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import { useConversationRuntime } from "./useConversationRuntime";
+import { resolveDisplayedRuntimeState } from "./conversation-runtime-display";
 import { modelSupportsReasoning, type ChatRunSummary } from "@/lib/types";
 import { APP_DEFAULT_MODEL } from "@shared/core/models";
 import { resolveChatSettingsAgainstModels } from "@shared/core/defaults";
@@ -193,12 +194,10 @@ export function ChatWindow() {
 
     const effectiveRuntimeState = useMemo(
         () =>
-            recoveredRunNotice && runtimeState.phase === "active"
-                ? {
-                      ...runtimeState,
-                      phase: "recovering" as const,
-                  }
-                : runtimeState,
+            resolveDisplayedRuntimeState({
+                runtimeState,
+                recoveredRunNotice,
+            }),
         [recoveredRunNotice, runtimeState],
     );
 

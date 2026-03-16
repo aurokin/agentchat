@@ -487,7 +487,28 @@ Use this block when updating the plan after a commit or push:
 - Docs updated:
     - plan progress only in this milestone
 - Commit / push:
+    - commit: `2c8e11f`
+    - push: `origin/master`
+- Next step:
+    - inspect the remaining Phase 1 recovery edges around interrupted runs, reconnect notices, and browser-visible recovery state after a local reset
+
+### Update 2026-03-16
+
+- Phase: `Phase 1. Expand Live Runtime Confidence Coverage`
+- Status: `in_progress`
+- Landed:
+    - extracted web runtime display phase mapping so reconnect-driven recovery state is represented through a single helper instead of ad hoc JSX logic
+    - added explicit browser-visible coverage for recovering, interrupted, and already-recovering runtime banner states
+    - wired the new display-state test into `apps/web`'s curated `test:confidence` command so it stays in the normal confidence loop
+- Refactors:
+    - `ChatWindow` now derives its display runtime state through `resolveDisplayedRuntimeState`
+- Tests added or updated:
+    - `apps/web/src/components/chat/__tests__/conversation-runtime-display.test.ts`
+    - `bun run --cwd apps/web test:confidence`
+- Docs updated:
+    - plan progress only in this milestone
+- Commit / push:
     - commit: `pending`
     - push: `pending`
 - Next step:
-    - inspect the remaining Phase 1 recovery edges around interrupted runs, reconnect notices, and browser-visible recovery state after a local reset
+    - decide whether the remaining reconnect-notice edge warrants extracting a pure sync/notice-state helper from `useConversationRuntime` for direct unit coverage
