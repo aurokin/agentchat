@@ -529,7 +529,28 @@ Use this block when updating the plan after a commit or push:
 - Docs updated:
     - plan progress only in this milestone
 - Commit / push:
+    - commit: `c7bfd79`
+    - push: `origin/master`
+- Next step:
+    - decide whether the next highest-leverage Phase 1 slice is a hook-level runtime-sync unit harness or a manual/browser flow that exercises the reconnect notice end to end
+
+### Update 2026-03-16
+
+- Phase: `Phase 1. Expand Live Runtime Confidence Coverage`
+- Status: `in_progress`
+- Landed:
+    - extracted a hook-level runtime-sync planning helper for `useConversationRuntime`, so the reconnect/recovery effect is now driven by a pure, directly testable plan
+    - added targeted unit coverage for the hook planning layer around reconnect notice retention and recovered-run notice consumption
+    - folded the new hook-planning test into the curated web confidence command
+- Refactors:
+    - `useConversationRuntime` now delegates sync-effect planning to `planConversationRuntimeSync` instead of inlining reconnect-notice and recovery decisions
+- Tests added or updated:
+    - `apps/web/src/components/chat/__tests__/conversation-runtime-hook.test.ts`
+    - `bun run --cwd apps/web test:confidence`
+- Docs updated:
+    - plan progress only in this milestone
+- Commit / push:
     - commit: `pending`
     - push: `pending`
 - Next step:
-    - decide whether the next highest-leverage Phase 1 slice is a hook-level runtime-sync unit harness or a manual/browser flow that exercises the reconnect notice end to end
+    - choose between expanding the hook harness deeper into socket-event handling or switching back to a browser/manual reconnect flow that validates the same behavior end to end

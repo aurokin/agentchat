@@ -27,7 +27,7 @@ import {
     resolveConversationSocketEvent,
     runConversationSend,
 } from "./conversation-runtime-controller";
-import { shouldClearPendingReconnectNoticeAfterSync } from "./conversation-runtime-sync";
+import { planConversationRuntimeSync } from "./conversation-runtime-hook";
 
 type UseConversationRuntimeParams = {
     currentChat: ChatSession | null;
@@ -324,20 +324,19 @@ export function useConversationRuntime({
     }, [currentChat, getBackendSessionToken, socketClient]);
 
     useEffect(() => {
-        const syncResolution = resolveConversationRuntimeSync({
-            currentChat,
-            isMessagesLoading,
-            messages,
-            runtimeState,
-            activeRun: activeRunRef.current,
-        });
-        const shouldClearPendingReconnectNotice =
-            shouldClearPendingReconnectNoticeAfterSync({
-                syncResolution,
+        const syncPlan = planConversationRuntimeSync({
+            syncResolution: resolveConversationRuntimeSync({
+                currentChat,
+                isMessagesLoading,
+                messages,
                 runtimeState,
-            });
+                activeRun: activeRunRef.current,
+            }),
+            runtimeState,
+            pendingReconnectNotice: pendingReconnectNoticeRef.current,
+        });
 
-        if (syncResolution.shouldReset) {
+        if (syncPlan.shouldReset) {
             activeRunRef.current = null;
             pendingStreamingUpdateRef.current = null;
             if (streamingFrameRef.current !== null) {
@@ -351,19 +350,19 @@ export function useConversationRuntime({
             });
         }
 
-        if (!syncResolution.recoveredRun) {
-            if (shouldClearPendingReconnectNotice) {
+        if (!syncPlan.recoveredRun) {
+            if (syncPlan.clearPendingReconnectNotice) {
                 pendingReconnectNoticeRef.current = false;
             }
             return;
         }
 
-        const recoveredRun = syncResolution.recoveredRun;
+        const recoveredRun = syncPlan.recoveredRun;
         activeRunRef.current = recoveredRun;
         queueMicrotask(() => {
             setSending(true);
-            setRecoveredRunNotice(pendingReconnectNoticeRef.current);
-            if (shouldClearPendingReconnectNotice) {
+            setRecoveredRunNotice(syncPlan.recoveredRunNotice ?? false);
+            if (syncPlan.clearPendingReconnectNotice) {
                 pendingReconnectNoticeRef.current = false;
             }
             queueStreamingMessageUpdate({
