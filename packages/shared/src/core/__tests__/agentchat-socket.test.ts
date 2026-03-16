@@ -189,4 +189,73 @@ describe("agentchat socket helpers", () => {
             ),
         ).toHaveLength(1);
     });
+
+    test("replays active conversation subscriptions after reconnect", async () => {
+        globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
+
+        const client = new AgentchatSocketClient({
+            getWebSocketUrl: () => "ws://localhost:3030/ws",
+            createId: () => "id-1",
+            notConfiguredMessage: "missing",
+        });
+
+        const connectPromise = client.ensureConnected(async () => "token-1");
+        await Promise.resolve();
+        const firstSocket = FakeWebSocket.instances[0];
+        if (!firstSocket) {
+            throw new Error("Expected the first websocket connection");
+        }
+        firstSocket.emitOpen();
+        firstSocket.emitEvent({
+            type: "connection.ready",
+            payload: {
+                user: {
+                    sub: "sub-1",
+                    userId: "user-1",
+                    email: "user@example.com",
+                },
+                transport: "websocket",
+            },
+        });
+        await connectPromise;
+
+        client.subscribeToConversation("chat-1");
+        client.subscribeToConversation("chat-2");
+
+        expect(
+            firstSocket.sentMessages.filter((message) =>
+                message.includes('"type":"conversation.subscribe"'),
+            ),
+        ).toHaveLength(2);
+
+        firstSocket.close();
+
+        await Bun.sleep(600);
+
+        const secondSocket = FakeWebSocket.instances[1];
+        if (!secondSocket) {
+            throw new Error("Expected a reconnect websocket connection");
+        }
+        secondSocket.emitOpen();
+        secondSocket.emitEvent({
+            type: "connection.ready",
+            payload: {
+                user: {
+                    sub: "sub-1",
+                    userId: "user-1",
+                    email: "user@example.com",
+                },
+                transport: "websocket",
+            },
+        });
+
+        await Bun.sleep(0);
+
+        const resubscribeMessages = secondSocket.sentMessages.filter((message) =>
+            message.includes('"type":"conversation.subscribe"'),
+        );
+        expect(resubscribeMessages).toHaveLength(2);
+        expect(resubscribeMessages.join("\n")).toContain('"conversationId":"chat-1"');
+        expect(resubscribeMessages.join("\n")).toContain('"conversationId":"chat-2"');
+    });
 });
