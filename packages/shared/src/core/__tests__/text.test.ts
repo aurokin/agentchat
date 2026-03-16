@@ -60,8 +60,24 @@ describe("normalizeAssistantDisplayText", () => {
                 "I will return a plan without editing files.1. Add a short introduction.",
             ),
         ).toBe(
-            "I will return a plan without editing files.\n\n1. Add a short introduction.",
-        );
+                "I will return a plan without editing files.\n\n1. Add a short introduction.",
+            );
+    });
+
+    it("adds a paragraph break before markdown headings", () => {
+        expect(
+            normalizeAssistantDisplayText(
+                "Working through the request.## Overview\n- one\n- two",
+            ),
+        ).toBe("Working through the request.\n\n## Overview\n\n- one\n- two");
+    });
+
+    it("widens a single newline before markdown headings into a paragraph break", () => {
+        expect(
+            normalizeAssistantDisplayText(
+                "Working through the request.\n## Overview\n- one\n- two",
+            ),
+        ).toBe("Working through the request.\n\n## Overview\n\n- one\n- two");
     });
 
     it("leaves fenced code blocks untouched", () => {

@@ -40,6 +40,10 @@ function normalizeDisplayTextSegment(segment: string): string {
         "$1\n\n",
     );
 
+    // If prose runs directly into a markdown heading, force a paragraph break first.
+    normalized = normalized.replace(/([.!?])(?=#{1,6}\s+)/g, "$1\n\n");
+    normalized = normalized.replace(/([.!?])\n(#{1,6}\s+)/g, "$1\n\n$2");
+
     // Prefer explicit paragraph breaks before common report-style section titles.
     const sectionPattern = DISPLAY_SECTION_TITLES.map((title) =>
         title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
