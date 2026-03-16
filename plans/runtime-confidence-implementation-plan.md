@@ -572,7 +572,29 @@ Use this block when updating the plan after a commit or push:
 - Docs updated:
     - plan progress only in this milestone
 - Commit / push:
+    - commit: `e0ac19d`
+    - push: `origin/master`
+- Next step:
+    - keep deepening deterministic hook-level coverage, likely by extracting the remaining message event application path or by adding mobile/shared parity tests for the new recovery invariants
+
+### Update 2026-03-16
+
+- Phase: `Phase 1. Expand Live Runtime Confidence Coverage`
+- Status: `in_progress`
+- Landed:
+    - extracted a pure message-lifecycle planner for the `useConversationRuntime` socket-event path, covering `message.started`, `message.updated`, and `message.completed`
+    - added direct unit coverage for previous assistant message patching during `message.started` and for assistant-stream overlay updates during `message.completed`
+    - folded the new message planner into the web hook so the remaining inline socket-event mutations are thinner and more testable
+- Refactors:
+    - `useConversationRuntime` now delegates the message event application path to `planConversationMessageLifecycleResolution`
+- Tests added or updated:
+    - `apps/web/src/components/chat/__tests__/conversation-runtime-messages.test.ts`
+    - `bun run --cwd apps/web typecheck`
+    - `bun run --cwd apps/web test:confidence`
+- Docs updated:
+    - plan progress only in this milestone
+- Commit / push:
     - commit: `pending`
     - push: `pending`
 - Next step:
-    - keep deepening deterministic hook-level coverage, likely by extracting the remaining message event application path or by adding mobile/shared parity tests for the new recovery invariants
+    - shift the next deterministic slice toward parity work, most likely mobile/shared recovery tests or a comparable extracted planner on the mobile runtime path

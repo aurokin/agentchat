@@ -29,6 +29,7 @@ import {
 } from "./conversation-runtime-controller";
 import { planConversationRunLifecycleResolution } from "./conversation-runtime-events";
 import { planConversationRuntimeSync } from "./conversation-runtime-hook";
+import { planConversationMessageLifecycleResolution } from "./conversation-runtime-messages";
 
 type UseConversationRuntimeParams = {
     currentChat: ChatSession | null;
@@ -238,38 +239,55 @@ export function useConversationRuntime({
             }
 
             if (resolution.type === "message.updated") {
-                activeRunRef.current = resolution.activeRun;
-                queueStreamingMessageUpdate(resolution.streamingMessage);
+                const messageLifecyclePlan =
+                    planConversationMessageLifecycleResolution(resolution);
+                if (messageLifecyclePlan.type !== "message.updated") {
+                    return;
+                }
+
+                activeRunRef.current = messageLifecyclePlan.activeRun;
+                queueStreamingMessageUpdate(
+                    messageLifecyclePlan.streamingMessage,
+                );
                 return;
             }
 
             if (resolution.type === "message.started") {
-                activeRunRef.current = resolution.activeRun;
-                if (resolution.previousMessagePatch) {
-                    patchMessage(resolution.previousMessagePatch.id, {
-                        kind: resolution.previousMessagePatch.kind,
+                const messageLifecyclePlan =
+                    planConversationMessageLifecycleResolution(resolution);
+                if (messageLifecyclePlan.type !== "message.started") {
+                    return;
+                }
+
+                activeRunRef.current = messageLifecyclePlan.activeRun;
+                if (messageLifecyclePlan.previousMessagePatch) {
+                    patchMessage(messageLifecyclePlan.previousMessagePatch.id, {
+                        kind: messageLifecyclePlan.previousMessagePatch.kind,
                     });
                 }
-                insertMessage(resolution.message);
-                queueStreamingMessageUpdate(resolution.streamingMessage);
+                insertMessage(messageLifecyclePlan.insertedMessage);
+                queueStreamingMessageUpdate(
+                    messageLifecyclePlan.streamingMessage,
+                );
                 return;
             }
 
             if (resolution.type === "message.completed") {
-                activeRunRef.current = resolution.activeRun;
-                patchMessage(resolution.messageId, {
-                    content: resolution.finalContent,
-                    contextContent: resolution.finalContent,
-                    status: "completed",
-                });
-                if (
-                    resolution.messageId ===
-                    resolution.activeRun.assistantMessageId
-                ) {
-                    queueStreamingMessageUpdate({
-                        id: resolution.messageId,
-                        content: resolution.finalContent,
-                    });
+                const messageLifecyclePlan =
+                    planConversationMessageLifecycleResolution(resolution);
+                if (messageLifecyclePlan.type !== "message.completed") {
+                    return;
+                }
+
+                activeRunRef.current = messageLifecyclePlan.activeRun;
+                patchMessage(
+                    messageLifecyclePlan.messagePatch.id,
+                    messageLifecyclePlan.messagePatch,
+                );
+                if (messageLifecyclePlan.streamingMessage) {
+                    queueStreamingMessageUpdate(
+                        messageLifecyclePlan.streamingMessage,
+                    );
                 }
                 return;
             }
