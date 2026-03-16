@@ -42,6 +42,7 @@ Recently completed and intentionally removed from the active backlog:
 - shared operator issue catalog wiring across config diagnostics, doctor mapping, and smoke helpers
 - shared browser/operator smoke helpers for auth-provider selection and config mutation paths
 - structured `/api/diagnostics` issue-code coverage for auth, provider, and agent operator failures
+- shared socket coverage for failed reconnect attempts that preserve the pending recovery signal until a real reconnect succeeds
 
 Current Phase 1 focus:
 

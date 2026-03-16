@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, mock, test } from "bun:test";
 
 import {
     AgentchatSocketClient,
@@ -36,6 +36,10 @@ class FakeWebSocket {
 
     emitOpen() {
         this.onopen?.();
+    }
+
+    emitError() {
+        this.onerror?.();
     }
 
     emitEvent(event: AgentchatSocketEvent) {
@@ -257,5 +261,84 @@ describe("agentchat socket helpers", () => {
         expect(resubscribeMessages).toHaveLength(2);
         expect(resubscribeMessages.join("\n")).toContain('"conversationId":"chat-1"');
         expect(resubscribeMessages.join("\n")).toContain('"conversationId":"chat-2"');
+    });
+
+    test("keeps the pending reconnect event through failed reconnect attempts", async () => {
+        globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
+
+        const originalConsoleError = console.error;
+        console.error = mock(() => undefined) as typeof console.error;
+
+        try {
+            const client = new AgentchatSocketClient({
+                getWebSocketUrl: () => "ws://localhost:3030/ws",
+                createId: () => "id-1",
+                notConfiguredMessage: "missing",
+            });
+            const events: string[] = [];
+            client.subscribe((event) => {
+                events.push(event.type);
+            });
+
+            const connectPromise = client.ensureConnected(async () => "token-1");
+            await Promise.resolve();
+            const firstSocket = FakeWebSocket.instances[0];
+            if (!firstSocket) {
+                throw new Error("Expected the first websocket connection");
+            }
+            firstSocket.emitOpen();
+            firstSocket.emitEvent({
+                type: "connection.ready",
+                payload: {
+                    user: {
+                        sub: "sub-1",
+                        userId: "user-1",
+                        email: "user@example.com",
+                    },
+                    transport: "websocket",
+                },
+            });
+            await connectPromise;
+
+            firstSocket.close();
+
+            await Bun.sleep(600);
+
+            const secondSocket = FakeWebSocket.instances[1];
+            if (!secondSocket) {
+                throw new Error("Expected the failed reconnect websocket");
+            }
+            secondSocket.emitError();
+            secondSocket.close();
+
+            await Bun.sleep(1100);
+
+            const thirdSocket = FakeWebSocket.instances[2];
+            if (!thirdSocket) {
+                throw new Error("Expected the recovered reconnect websocket");
+            }
+            thirdSocket.emitOpen();
+            thirdSocket.emitEvent({
+                type: "connection.ready",
+                payload: {
+                    user: {
+                        sub: "sub-1",
+                        userId: "user-1",
+                        email: "user@example.com",
+                    },
+                    transport: "websocket",
+                },
+            });
+
+            await Bun.sleep(0);
+
+            expect(events).toEqual([
+                "connection.ready",
+                "connection.ready",
+                "connection.reconnected",
+            ]);
+        } finally {
+            console.error = originalConsoleError;
+        }
     });
 });
