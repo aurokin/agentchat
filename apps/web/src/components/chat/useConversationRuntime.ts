@@ -165,9 +165,11 @@ export function useConversationRuntime({
         ) {
             pendingInterruptRef.current = false;
             pendingReconnectNoticeRef.current = false;
-            setError(null);
-            setRetryChat(null);
-            setRecoveredRunNotice(false);
+            queueMicrotask(() => {
+                setError(null);
+                setRetryChat(null);
+                setRecoveredRunNotice(false);
+            });
         }
 
         previousConversationIdRef.current = currentConversationId;
@@ -177,8 +179,7 @@ export function useConversationRuntime({
         if (
             !shouldResetPendingConversationSendOnConversationChange({
                 currentConversationId: currentChat?.id ?? null,
-                pendingSendConversationId:
-                    pendingSendConversationIdRef.current,
+                pendingSendConversationId: pendingSendConversationIdRef.current,
                 activeRun: activeRunRef.current,
             })
         ) {
@@ -186,7 +187,9 @@ export function useConversationRuntime({
         }
 
         pendingSendConversationIdRef.current = null;
-        setSending(false);
+        queueMicrotask(() => {
+            setSending(false);
+        });
     }, [currentChat]);
 
     useEffect(() => {
@@ -246,12 +249,14 @@ export function useConversationRuntime({
                         sendCommand: (command) => socketClient.send(command),
                     },
                 );
-                const runLifecyclePlan = planConversationRunLifecycleResolution({
-                    resolution,
-                    pendingReconnectNotice:
-                        pendingReconnectNoticeRef.current,
-                    pendingInterruptError,
-                });
+                const runLifecyclePlan = planConversationRunLifecycleResolution(
+                    {
+                        resolution,
+                        pendingReconnectNotice:
+                            pendingReconnectNoticeRef.current,
+                        pendingInterruptError,
+                    },
+                );
                 if (runLifecyclePlan.type !== "run.started") {
                     return;
                 }

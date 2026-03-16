@@ -339,12 +339,16 @@ describe("agentchat socket helpers", () => {
 
         await Bun.sleep(0);
 
-        const resubscribeMessages = secondSocket.sentMessages.filter((message) =>
-            message.includes('"type":"conversation.subscribe"'),
+        const resubscribeMessages = secondSocket.sentMessages.filter(
+            (message) => message.includes('"type":"conversation.subscribe"'),
         );
         expect(resubscribeMessages).toHaveLength(2);
-        expect(resubscribeMessages.join("\n")).toContain('"conversationId":"chat-1"');
-        expect(resubscribeMessages.join("\n")).toContain('"conversationId":"chat-2"');
+        expect(resubscribeMessages.join("\n")).toContain(
+            '"conversationId":"chat-1"',
+        );
+        expect(resubscribeMessages.join("\n")).toContain(
+            '"conversationId":"chat-2"',
+        );
     });
 
     test("does not replay subscriptions that were removed during a reconnect gap", async () => {
@@ -431,7 +435,9 @@ describe("agentchat socket helpers", () => {
                 events.push(event.type);
             });
 
-            const connectPromise = client.ensureConnected(async () => "token-1");
+            const connectPromise = client.ensureConnected(
+                async () => "token-1",
+            );
             await Promise.resolve();
             const firstSocket = FakeWebSocket.instances[0];
             if (!firstSocket) {

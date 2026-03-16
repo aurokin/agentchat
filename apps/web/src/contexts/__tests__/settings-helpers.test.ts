@@ -57,17 +57,11 @@ describe("settings helpers", () => {
                 models,
                 selectedAgent,
                 selectedAgentOptions: {
-                    agentId: "agent-a",
                     allowedProviders: [
                         {
                             id: "codex-main",
-                            kind: "codex",
-                            label: "Codex Main",
                         },
                     ],
-                    defaultProviderId: "codex-main",
-                    defaultModel: "gpt-5.3-codex",
-                    defaultVariant: "balanced",
                     modelAllowlist: ["gpt-5.3-codex"],
                     variantAllowlist: ["balanced"],
                 },

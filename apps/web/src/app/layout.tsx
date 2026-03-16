@@ -7,6 +7,7 @@ import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
 import { AgentProvider } from "@/contexts/AgentContext";
 import { SettingsProvider } from "@/contexts/SettingsContext";
 import { ChatProvider } from "@/contexts/ChatContext";
+import { getThemeCssText } from "@/lib/theme-css";
 
 // Required for CSP nonces:
 // The middleware generates a per-request CSP nonce, and Next can only attach that nonce to
@@ -39,6 +40,11 @@ export default function RootLayout({
 }>) {
     return (
         <html lang="en">
+            <head>
+                <style
+                    dangerouslySetInnerHTML={{ __html: getThemeCssText() }}
+                />
+            </head>
             <body
                 className={`antialiased ${outfit.variable} ${ibmPlexMono.variable}`}
             >

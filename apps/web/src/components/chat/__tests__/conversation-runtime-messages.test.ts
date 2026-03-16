@@ -33,9 +33,7 @@ describe("conversation runtime messages", () => {
             },
         };
 
-        expect(
-            planConversationMessageLifecycleResolution(resolution),
-        ).toEqual({
+        expect(planConversationMessageLifecycleResolution(resolution)).toEqual({
             type: "message.started",
             activeRun: {
                 conversationId: "chat-1",
@@ -71,7 +69,9 @@ describe("conversation runtime messages", () => {
         };
 
         expect(
-            planConversationMessageLifecycleResolution(activeAssistantResolution),
+            planConversationMessageLifecycleResolution(
+                activeAssistantResolution,
+            ),
         ).toEqual({
             type: "message.completed",
             activeRun: activeAssistantResolution.activeRun,

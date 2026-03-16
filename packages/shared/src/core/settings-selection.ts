@@ -27,8 +27,9 @@ export function filterModelsForAgent<Model extends ProviderModel>(params: {
     }
 
     const allowedProviderIds =
-        selectedAgentOptions?.allowedProviders?.map((provider) => provider.id) ??
-        selectedAgent.providerIds;
+        selectedAgentOptions?.allowedProviders?.map(
+            (provider) => provider.id,
+        ) ?? selectedAgent.providerIds;
     const modelAllowlist = selectedAgentOptions?.modelAllowlist ?? [];
     const variantAllowlist = selectedAgentOptions?.variantAllowlist ?? [];
 

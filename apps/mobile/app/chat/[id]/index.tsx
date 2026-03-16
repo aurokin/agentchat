@@ -1,4 +1,4 @@
-import React, {
+import {
     startTransition,
     useEffect,
     useState,
@@ -35,7 +35,6 @@ import type { ChatSession, Message } from "@shared/core/types";
 import { resolveChatSettingsAgainstModels } from "@shared/core/defaults";
 import {
     applyStreamingMessageOverlay,
-    createRecoveredActiveRunFromRuntimeState,
     resolveConversationSocketEvent,
     shouldApplyConversationScopedUpdate,
     type ActiveRunState,
@@ -53,7 +52,6 @@ import { consumePendingSharePayload } from "@/lib/share-intent/pending-share";
 import { resolveResponsiveLayout } from "@/lib/responsive-layout";
 import {
     flushPendingMobileConversationInterrupt,
-    interruptMobileConversationRun,
     requestMobileConversationInterrupt,
     resolveMobileConversationRuntimeSync,
     runMobileConversationSend,
@@ -246,9 +244,11 @@ export default function ChatScreen(): ReactElement {
         ) {
             pendingInterruptRef.current = false;
             pendingReconnectNoticeRef.current = false;
-            setError(null);
-            setRetryPayload(null);
-            setRecoveredRunNotice(false);
+            queueMicrotask(() => {
+                setError(null);
+                setRetryPayload(null);
+                setRecoveredRunNotice(false);
+            });
         }
 
         previousConversationIdRef.current = currentConversationId;
@@ -412,8 +412,7 @@ export default function ChatScreen(): ReactElement {
                     });
                 const runLifecyclePlan = planMobileRunLifecycleResolution({
                     resolution,
-                    pendingReconnectNotice:
-                        pendingReconnectNoticeRef.current,
+                    pendingReconnectNotice: pendingReconnectNoticeRef.current,
                     pendingInterruptError,
                 });
                 if (runLifecyclePlan.type !== "run.started") {
@@ -463,7 +462,8 @@ export default function ChatScreen(): ReactElement {
                         currentChatRef.current?.id ??
                             messageLifecyclePlan.activeRun.conversationId,
                         {
-                            kind: messageLifecyclePlan.previousMessagePatch.kind,
+                            kind: messageLifecyclePlan.previousMessagePatch
+                                .kind,
                         },
                     );
                 }
@@ -496,15 +496,16 @@ export default function ChatScreen(): ReactElement {
             if (resolution.type === "run.completed") {
                 const runLifecyclePlan = planMobileRunLifecycleResolution({
                     resolution,
-                    pendingReconnectNotice:
-                        pendingReconnectNoticeRef.current,
+                    pendingReconnectNotice: pendingReconnectNoticeRef.current,
                 });
                 if (runLifecyclePlan.type !== "terminal") {
                     return;
                 }
 
                 pendingInterruptRef.current = false;
-                void persistAssistantMessage(runLifecyclePlan.persistMessage).finally(() => {
+                void persistAssistantMessage(
+                    runLifecyclePlan.persistMessage,
+                ).finally(() => {
                     setActiveRun(null);
                     setStreamingMessage(null);
                     setRecoveredRunNotice(false);
@@ -516,15 +517,16 @@ export default function ChatScreen(): ReactElement {
             if (resolution.type === "run.interrupted") {
                 const runLifecyclePlan = planMobileRunLifecycleResolution({
                     resolution,
-                    pendingReconnectNotice:
-                        pendingReconnectNoticeRef.current,
+                    pendingReconnectNotice: pendingReconnectNoticeRef.current,
                 });
                 if (runLifecyclePlan.type !== "terminal") {
                     return;
                 }
 
                 pendingInterruptRef.current = false;
-                void persistAssistantMessage(runLifecyclePlan.persistMessage).finally(() => {
+                void persistAssistantMessage(
+                    runLifecyclePlan.persistMessage,
+                ).finally(() => {
                     setActiveRun(null);
                     setStreamingMessage(null);
                     setRecoveredRunNotice(false);
@@ -536,15 +538,16 @@ export default function ChatScreen(): ReactElement {
             if (resolution.type === "run.failed") {
                 const runLifecyclePlan = planMobileRunLifecycleResolution({
                     resolution,
-                    pendingReconnectNotice:
-                        pendingReconnectNoticeRef.current,
+                    pendingReconnectNotice: pendingReconnectNoticeRef.current,
                 });
                 if (runLifecyclePlan.type !== "terminal") {
                     return;
                 }
 
                 pendingInterruptRef.current = false;
-                void persistAssistantMessage(runLifecyclePlan.persistMessage).finally(() => {
+                void persistAssistantMessage(
+                    runLifecyclePlan.persistMessage,
+                ).finally(() => {
                     setError(runLifecyclePlan.error);
                     setRetryPayload(runLifecyclePlan.retryPayload);
                     setActiveRun(null);

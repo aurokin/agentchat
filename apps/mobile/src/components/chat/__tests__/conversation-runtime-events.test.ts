@@ -90,13 +90,15 @@ describe("mobile conversation runtime events", () => {
     });
 
     test("plans connection.error retry state only when a run is active", () => {
-        const event: Extract<AgentchatSocketEvent, { type: "connection.error" }> =
-            {
-                type: "connection.error",
-                payload: {
-                    message: "socket closed",
-                },
-            };
+        const event: Extract<
+            AgentchatSocketEvent,
+            { type: "connection.error" }
+        > = {
+            type: "connection.error",
+            payload: {
+                message: "socket closed",
+            },
+        };
 
         expect(
             planMobileConnectionError({

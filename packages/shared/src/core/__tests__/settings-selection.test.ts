@@ -1,9 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import {
-    SupportedParameter,
-    type ProviderModel,
-} from "../models";
+import { SupportedParameter, type ProviderModel } from "../models";
 import {
     filterModelsForAgent,
     filterModelsForProvider,
@@ -64,7 +61,7 @@ describe("settings selection", () => {
             }),
         ).toEqual([
             {
-                ...models[0],
+                ...models[0]!,
                 variants: [{ id: "high", label: "High" }],
             },
         ]);
@@ -112,8 +109,6 @@ describe("settings selection", () => {
         expect(
             getProviderIdForModel({
                 id: "fallback/model",
-                name: "Fallback",
-                provider: "Fallback",
             }),
         ).toBe("fallback");
         expect(
@@ -147,10 +142,9 @@ describe("settings selection", () => {
                 agentDefaultVariantId: "high",
             }),
         ).toBe("high");
-        expect(getVariantsForModel(models[0]).map((variant) => variant.id)).toEqual([
-            "high",
-            "low",
-        ]);
+        expect(
+            getVariantsForModel(models[0]).map((variant) => variant.id),
+        ).toEqual(["high", "low"]);
         expect(getVariantsForModel(null)).toEqual([]);
     });
 });

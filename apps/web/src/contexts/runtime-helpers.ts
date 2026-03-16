@@ -20,6 +20,7 @@ export function deriveConversationRuntimeState(params: {
     return deriveSharedConversationRuntimeState({
         messages: params.messages,
         runSummaries: params.runSummaries as ChatRunSummaryLike[],
-        runtimeBinding: params.runtimeBinding as RuntimeBindingSummaryLike | null,
+        runtimeBinding:
+            params.runtimeBinding as RuntimeBindingSummaryLike | null,
     }) as ConversationRuntimeStateLike as ConversationRuntimeState;
 }

@@ -15,3 +15,4 @@ export type {
     ChatSession,
     UserSettings,
 } from "./core/types";
+export * from "./theme";

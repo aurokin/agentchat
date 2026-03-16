@@ -1,7 +1,6 @@
 import type {
     ConversationInterruptCommand,
     ConversationSendCommand,
-    AgentchatSocketEvent,
 } from "@/lib/agentchat-socket";
 import {
     type ChatSession,

@@ -31,8 +31,22 @@
     --color-card-foreground: var(--foreground);
 
     --color-success: var(--success);
+    --color-success-soft: var(--success-soft);
     --color-warning: var(--warning);
+    --color-warning-soft: var(--warning-soft);
+    --color-warning-border: var(--warning-border);
     --color-error: var(--error);
+    --color-error-soft: var(--error-soft);
+
+    --color-surface-subtle: var(--surface-subtle);
+    --color-border-muted: var(--border-muted);
+    --color-text-faint: var(--text-faint);
+    --color-input-border: var(--input-border);
+    --color-link: var(--link);
+    --color-link-on-accent: var(--link-on-accent);
+    --color-code-background: var(--code-background);
+    --color-code-bg-on-accent: var(--code-bg-on-accent);
+    --color-overlay: var(--overlay);
 
     --font-display: var(--font-display), Outfit, sans-serif;
     --font-mono: var(--font-mono), IBM Plex Mono, monospace;
@@ -132,44 +146,12 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   MIDNIGHT SLATE - Dark Mode
-   Cool, refined dark theme with exceptional contrast and clarity
+   COLOR TOKENS
+   Generated from shared theme (see apps/web/src/lib/theme-css.ts).
+   Only non-color design tokens remain here.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
-    /* Base - Cool midnight foundation */
-    --background: #0b0d12;
-    --background-elevated: #13161d;
-    --foreground: #eaecf0;
-    --foreground-muted: #8b919e;
-
-    /* Soft Periwinkle - Primary accent */
-    --primary: #a5b4fc;
-    --primary-glow: rgba(165, 180, 252, 0.15);
-    --primary-foreground: #0b0d12;
-
-    /* Soft Mint - Secondary accent */
-    --secondary: #86efac;
-    --secondary-foreground: #0b0d12;
-
-    /* Dusty Rose - Tertiary accent */
-    --accent: #f9a8d4;
-    --accent-foreground: #0b0d12;
-
-    /* UI Surface colors */
-    --muted: #1a1d26;
-    --muted-foreground: #6b7280;
-    --border: #252a36;
-    --border-accent: rgba(165, 180, 252, 0.25);
-    --input: #1a1d26;
-    --ring: #a5b4fc;
-
-    /* Status palette */
-    --success: #34d399;
-    --warning: #fbbf24;
-    --error: #f87171;
-
-    /* Design tokens */
     --radius: 2px;
     --shadow-deco:
         0 4px 24px -4px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(165, 180, 252, 0.08);
@@ -178,45 +160,7 @@
     --shadow-glow: 0 0 24px rgba(165, 180, 252, 0.15);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   DREAMSICLE - Light Mode
-   Warm, soft peachy cream with vibrant orange accents
-   ═══════════════════════════════════════════════════════════════════════════ */
-
 .light {
-    /* Base - Soft peachy cream */
-    --background: #fdf8f3;
-    --background-elevated: #ffffff;
-    --foreground: #2a2523;
-    --foreground-muted: #7a706a;
-
-    /* Dreamsicle Orange - Primary accent */
-    --primary: #f97316;
-    --primary-glow: rgba(249, 115, 22, 0.12);
-    --primary-foreground: #ffffff;
-
-    /* Soft Peach - Secondary accent */
-    --secondary: #fdba74;
-    --secondary-foreground: #2a2523;
-
-    /* Deep Terracotta - Tertiary accent */
-    --accent: #ea580c;
-    --accent-foreground: #ffffff;
-
-    /* UI Surface colors */
-    --muted: #fef3eb;
-    --muted-foreground: #9a8d85;
-    --border: #f5e6da;
-    --border-accent: rgba(249, 115, 22, 0.3);
-    --input: #ffffff;
-    --ring: #f97316;
-
-    /* Status palette - warmer variants */
-    --success: #22c55e;
-    --warning: #f59e0b;
-    --error: #ef4444;
-
-    /* Design tokens */
     --shadow-deco:
         0 4px 24px -4px rgba(42, 37, 35, 0.08),
         0 0 0 1px rgba(249, 115, 22, 0.08);
