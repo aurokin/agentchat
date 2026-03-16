@@ -68,6 +68,7 @@ interface ChatContextType {
         contextContent: string;
         reasoning?: string;
         modelId?: string;
+        variantId?: string | null;
         reasoningEffort?: Message["reasoningEffort"];
         chatId?: string;
     }) => Promise<Message>;
@@ -591,6 +592,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             contextContent: string;
             reasoning?: string;
             modelId?: string;
+            variantId?: string | null;
             reasoningEffort?: Message["reasoningEffort"];
             chatId?: string;
         }): Promise<Message> => {
@@ -605,6 +607,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 contextContent: message.contextContent,
                 reasoning: message.reasoning,
                 modelId: message.modelId,
+                variantId: message.variantId ?? null,
                 reasoningEffort: message.reasoningEffort,
                 sessionId: targetChatId,
                 id: message.id ?? uuid(),

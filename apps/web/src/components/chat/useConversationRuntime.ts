@@ -49,6 +49,7 @@ type UseConversationRuntimeParams = {
         content: string;
         contextContent: string;
         modelId?: string;
+        variantId?: string | null;
         reasoningEffort?: Message["reasoningEffort"];
         chatId?: string;
     }) => Promise<Message>;
