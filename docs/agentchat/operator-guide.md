@@ -214,6 +214,7 @@ For the local-auth web path, also run:
 
 ```bash
 bun run test:manual:web-browser-confidence
+bun run test:manual:web-lan-confidence
 bun run test:manual:web-operator-smoke
 ```
 
@@ -224,6 +225,7 @@ bun run test:manual:web-browser-confidence -- --json
 ```
 
 That browser-confidence command now covers the scripted local-auth smoke, interrupt, refresh, and long-stream markdown rendering path.
+The LAN command is separate on purpose: it reads a gitignored local config from `scripts/testing/web-lan-confidence.local.json` so host-specific LAN details stay out of git and out of the normal smoke path.
 
 Run those browser commands sequentially. The operator smoke command intentionally mutates `apps/server/agentchat.config.json` to validate hot reload behavior.
 

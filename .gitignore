@@ -56,3 +56,4 @@ apps/server/agentchat.config.json
 
 # billing secrets (scripts read repo-root .env.billing.<env>.local)
 billing/*.local
+scripts/testing/*.local.json

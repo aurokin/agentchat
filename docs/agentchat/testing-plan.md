@@ -215,6 +215,10 @@ Current local browser path:
     - covers smoke, interrupt, refresh, and long-stream markdown flows
     - asserts terminal runs restore the send button and clear stale stop state
     - asserts recovery banners stay absent on ordinary flows without a known reconnect
+- use `bun run test:manual:web-lan-confidence` for the separate manual LAN browser path
+    - reads a gitignored local config from `scripts/testing/web-lan-confidence.local.json`
+    - is meant for an explicitly configured LAN host such as `http://luma.home.arpa:4040`
+    - stays outside the normal local smoke path because it depends on a manually maintained host-specific setup
 - use `bun run test:manual:web-operator-smoke` for browser-visible config hot-reload checks
 - run those commands sequentially because the operator smoke mutates `apps/server/agentchat.config.json`
 - Google-auth browser coverage still remains a separate manual/operator concern
@@ -283,6 +287,7 @@ Current manual confidence command:
 - `bun run test:manual:operator-failure-smoke`
 - `bun run test:manual:doctor-env-smoke`
 - `bun run test:manual:web-browser-confidence`
+- `bun run test:manual:web-lan-confidence`
 - `bun run test:manual:web-operator-smoke`
 
 This runs live Convex codegen, the server doctor, and the targeted server and web confidence suites without turning them into always-on checks.

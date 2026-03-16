@@ -390,3 +390,28 @@ Use this block when updating the plan after a commit or push:
     - push: `origin/master`
 - Next step:
     - continue Phase 1 with either a browser/LAN-specific manual confidence script addition or another deterministic regression around cross-client recovery state
+
+### Update 2026-03-16
+
+- Phase: `Phase 1. Expand Live Runtime Confidence Coverage`
+- Status: `in_progress`
+- Landed:
+    - added a dedicated manual LAN browser confidence command: `bun run test:manual:web-lan-confidence`
+    - moved the LAN host setting into a gitignored local JSON config: `scripts/testing/web-lan-confidence.local.json`
+    - added a tracked example config so setup stays discoverable without storing host-specific details in git
+- Refactors:
+    - kept the LAN path as a thin wrapper over the existing browser-confidence flow instead of cloning the underlying Playwright logic
+- Tests added or updated:
+    - `scripts/testing/__tests__/web-lan-confidence-helpers.test.ts`
+    - `bun run test:scripts`
+    - `bun run docs:check`
+- Docs updated:
+    - `docs/agentchat/manual-qa-checklist.md`
+    - `docs/agentchat/operator-guide.md`
+    - `docs/agentchat/roadmap.md`
+    - `docs/agentchat/testing-plan.md`
+- Commit / push:
+    - commit: `pending`
+    - push: `pending`
+- Next step:
+    - choose the next Phase 1 slice between broader LAN/browser runtime assertions and another deterministic cross-client recovery regression

@@ -37,6 +37,7 @@ For the current local-auth browser confidence path, also run:
 
 ```bash
 bun run test:manual:web-browser-confidence
+bun run test:manual:web-lan-confidence
 bun run test:manual:web-operator-smoke
 ```
 

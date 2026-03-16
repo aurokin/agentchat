@@ -53,6 +53,7 @@
         "test:manual:doctor-env-smoke": "bun scripts/testing/doctor-env-smoke.ts",
         "doctor:android": "bun scripts/testing/android-doctor.ts",
         "test:manual:web-browser-confidence": "bun scripts/testing/browser-confidence.ts --mode full",
+        "test:manual:web-lan-confidence": "bun scripts/testing/web-lan-confidence.ts",
         "test:manual:web-operator-smoke": "bun scripts/testing/browser-operator-smoke.ts",
         "test:manual:runtime-confidence": "bun run doctor:server && bun run test:manual:live-runtime-smoke && bun run test:manual:live-runtime-multi-client && bun run test:manual:live-runtime-interrupt && bun run test:manual:config-reload-smoke",
         "convex:env": "bun scripts/env/convex-env.ts",
