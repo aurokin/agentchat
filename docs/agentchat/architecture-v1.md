@@ -1,231 +1,134 @@
-# Agentchat Architecture V1
+# Agentchat Architecture
 
-## Summary
+This document describes the current high-level architecture of Agentchat.
 
-Agentchat is moving to a split architecture:
+Use it as the shortest system overview.
+Use adjacent docs for detail:
 
-- Convex stores identity, conversations, messages, and persisted runtime metadata.
-- An instance-local TypeScript backend server brokers all provider runtime communication.
-- Codex is the only provider implemented in v1.
-- The backend is designed behind a provider interface so OpenCode can be added later without reworking the product model.
+- [Runtime And Auth Plan](./runtime-and-auth-plan.md) for current runtime and auth behavior
+- [Convex Spec](./convex-spec.md) for persisted data and function surfaces
+- [Backend API Spec](./backend-api-spec.md) for `apps/server` HTTP and WebSocket behavior
+- [Codex Runtime Spec](./codex-runtime-spec.md) for provider-runtime specifics
 
 ## Core Components
 
 ### Clients
 
-- Web app
-- Mobile app
+- web app
+- mobile app
 
 Responsibilities:
 
-- Authenticate with Convex and always operate as a concrete workspace user
-- Let the user select an agent
-- Let the user select provider, model, and variant before the first message
-- Open a backend WebSocket connection using a short-lived backend token derived from Convex auth
-- Render streamed run events and persisted conversation history
-- Subscribe and unsubscribe from conversations without owning runtime lifecycle
-- Keep background subscriptions for all currently active conversations owned by the user
-- Accept user input while other conversations or agents still have active runs
+- authenticate as a concrete Convex user
+- select an agent
+- create or open conversations for that agent
+- choose provider, model, and variant before the first message when the draft is still unlocked
+- open authenticated backend WebSocket connections using short-lived backend tokens minted from Convex auth
+- render streamed runtime events plus persisted conversation history
+- subscribe to active conversations without owning execution
 
 ### Convex
 
 Responsibilities:
 
-- Google-based auth today, moving to provider-oriented Google plus local user auth
-- Instance allowlist enforcement
-- User identity
-- Multi-user isolation for conversations, runs, runtime bindings, and subscriptions
-- Conversations
-- Messages
-- Runs
-- Run events
-- Runtime bindings
-- User defaults such as preferred provider, model, and variant
+- user identity and access resolution
+- conversations, messages, runs, run events, and runtime bindings
+- user-scoped authorization and multi-user isolation
+- backend token issuance for `apps/server`
+- conversation and workspace activity summaries derived from persisted runtime state
 
 ### Backend Server
 
 Responsibilities:
 
-- Load provider and agent configuration from a top-level server config file
-- Validate backend tokens from authenticated clients
-- Resolve the selected agent to current server config
-- Open or resume provider runtimes
-- Stream runtime events over WebSocket
-- Persist normalized run and message state into Convex
-- Keep transient runtime process state in memory
-- Continue runs even when no client is currently subscribed
-- Fan out the same run stream to multiple clients for the same user
+- load server-managed auth, provider, and agent configuration
+- validate backend tokens
+- resolve agents and providers against the latest valid server config
+- start, resume, interrupt, and expire provider runtimes
+- stream normalized runtime events over WebSocket
+- persist normalized runtime state back into Convex
+- keep transient live-runtime state in memory
 
 ### Provider Layer
 
+Current provider focus:
+
+- Codex only
+
 Responsibilities:
 
-- Present a provider-agnostic runtime interface to the backend
-- Hide provider-specific concepts such as Codex thread ids or OpenCode session ids
-- Convert provider events into normalized Agentchat run events
+- hide provider-specific protocol details behind backend-owned runtime behavior
+- translate provider events into Agentchat runtime events
+- expose normalized model and variant metadata to the backend
 
-## Canonical Runtime Flow
+## Runtime Model
+
+Agentchat uses a backend-owned runtime model.
+
+- after a send is accepted, execution belongs to `apps/server`
+- Convex stores the durable user, conversation, run, event, and runtime-binding state
+- clients are observers and input surfaces, not execution owners
+
+Current runtime behavior:
+
+- runs are user-scoped
+- one conversation may have one active run at a time
+- one user may have active runs in multiple conversations and multiple agents at once
+- multiple clients for the same user may observe the same run concurrently
+- runs may continue with zero active clients
+- reconnecting clients recover from backend memory plus Convex persistence rather than restarting execution
+
+## Conversation Flow
 
 ### Before First Message
 
-1. The user signs in through Convex as a concrete workspace user.
-2. The client loads the available agents from the backend.
+1. The user signs in through Convex.
+2. The client loads visible agents and provider metadata from `apps/server`.
 3. The user selects an agent.
-4. The client shows only conversations for that agent.
-5. The user may create or open an empty conversation for that agent.
-6. The user selects provider, model, and variant for the conversation draft.
-7. No provider runtime is started yet.
+4. The user creates or opens a conversation for that agent.
+5. The user may choose provider, model, and variant while the conversation is still unlocked.
 
 ### First Message
 
 1. The user sends the first message.
-2. The conversation locks provider, model, and variant.
-3. The backend resolves the latest server config for the agent.
-4. The backend ensures a runtime binding exists for the conversation.
-5. The backend starts or resumes the Codex runtime.
-6. The backend sends the message as a provider turn.
-7. The backend streams normalized events to the client over WebSocket.
-8. The backend persists messages, runs, and run events into Convex.
+2. The conversation locks its provider, model, and variant.
+3. `apps/server` resolves the latest valid agent and provider config.
+4. `apps/server` starts or resumes the provider runtime.
+5. `apps/server` streams normalized events to subscribed clients.
+6. `apps/server` persists normalized runtime state into Convex.
 
-### While The Run Is Active
+### While A Run Is Active
 
-1. The backend keeps the runtime alive for the conversation until the run completes, is interrupted, or expires.
-2. The user may switch to a different conversation or agent without cancelling the run.
-3. The user may submit messages in other conversations while earlier runs continue.
+1. The backend keeps the runtime alive until the run completes, is interrupted, or expires.
+2. The user may switch conversations or agents without canceling the run.
+3. The user may send messages in other conversations while earlier runs continue.
 4. Another client for the same user may subscribe and observe the same active run.
-5. If all clients disconnect, the run still continues in the backend and persists state through Convex.
-6. A later subscriber recovers the current run state from backend memory and Convex summaries rather than restarting the run.
-7. Clients should automatically keep subscribing to active conversations even when those conversations are no longer the visible foreground thread.
-
-### Later Messages
-
-1. The user reopens the conversation.
-2. The backend reads the runtime binding from Convex.
-3. If the runtime process is gone, the backend recreates it from persisted runtime metadata.
-4. The backend sends the next turn and continues streaming.
+5. If all clients disconnect, the run may continue and later be recovered.
 
 ## Data Ownership
 
 ### Stored In Convex
 
-- Users
-- Conversations
-- Messages
-- Runs
-- Run events
-- Runtime bindings
-- User defaults
+- users
+- conversations
+- messages
+- runs
+- run events
+- runtime bindings
+- lightweight cross-client preferences such as favorite models
 
-### Stored In Backend Memory Only
+### Stored In Backend Memory
 
-- Live Codex child processes
-- WebSocket subscriber lists
-- In-flight stream buffers
-- Pending provider approval or user-input requests
-- Heartbeats and reconnect bookkeeping
+- live provider processes or sessions
+- WebSocket subscriber bookkeeping
+- in-flight stream buffering
+- transient reconnect and recovery state
 
-## Runtime State Decision
+## Architectural Constraints
 
-Agentchat should use a hybrid model:
-
-- Persist recoverable runtime metadata in Convex.
-- Keep transient runtime process state in backend memory.
-- Treat clients as subscribers to runtime state, not as the execution owner.
-
-This avoids treating the backend as the source of truth while still allowing reconnect and recovery after process restarts.
-
-## Auth Direction
-
-Agentchat should not depend on a long-term shared default-user mode.
-
-Target auth model:
-
-- Google auth for managed access
-- local Convex-backed users for insecure local or LAN-friendly deployments
-- provider-oriented auth configuration instead of a permanent `auth.mode` split
-
-For the migration plan, use [Runtime And Auth Plan](./runtime-and-auth-plan.md).
-
-## Suggested Convex Entity Set
-
-- `users`
-  - auth identity, workspace counters, and lightweight cross-client preferences such as favorite models
-- `conversations`
-  - user-owned threads bound to one agent
-- `messages`
-  - persisted user and assistant messages
-- `runs`
-  - one assistant execution per user turn
-- `run_events`
-  - append-only normalized runtime events
-- `runtime_bindings`
-  - provider-specific recovery data for a conversation
-
-## Runtime Binding Shape
-
-Recommended fields:
-
-- `conversationId`
-- `provider`
-- `providerThreadId`
-- `providerResumeToken`
-- `status`
-- `activeRunId`
-- `lastError`
-- `lastEventAt`
-- `updatedAt`
-
-For Codex v1, `providerThreadId` is the most important durable field. `providerResumeToken` should still exist as a generic field so the abstraction survives future providers.
-
-## Provider Interface
-
-The backend should code against an interface shaped roughly like this:
-
-- `openConversationRuntime(conversationId)`
-- `resumeConversationRuntime(conversationId)`
-- `sendConversationMessage(conversationId, text)`
-- `interruptConversationRun(conversationId, runId)`
-- `subscribeConversationEvents(conversationId)`
-
-These names are product-oriented. Each provider adapter can map them to its own protocol.
-
-## Codex Mapping
-
-Codex v1 should map the provider interface to:
-
-- `thread/start` or `thread/resume`
-- `turn/start`
-- `turn/interrupt`
-- streamed `turn/*` and `item/*` notifications
-
-## Future OpenCode Support
-
-OpenCode is not part of v1 implementation, but the design must leave room for it.
-
-That means:
-
-- never hardcode Codex-only names into product entities
-- keep provider ids explicit in data models
-- treat model and variant availability as provider-defined
-- keep runtime bindings provider-agnostic even if Codex is the first adapter
-
-## Configuration Model
-
-The server should use one top-level config file with sections for:
-
-- `providers`
-- `agents`
-- `auth`
-
-Agents should reference provider ids instead of embedding provider definitions inline. This keeps the config reusable when multiple agents share the same provider configuration.
-
-## Constraints
-
-- Conversations adopt the latest server config for their agent
-- Users cannot change provider, model, or variant after the first message
-- One active run per conversation is acceptable in v1, but many conversations may have active runs at the same time
-- The same user may observe one run from multiple clients simultaneously
-- A run must not depend on an active foreground client to complete
-- Attachments are out of scope for v1
-- Branching is out of scope for v1
-- Auto-approve is assumed for v1
+- every accepted request resolves to a concrete Convex user
+- runtime state must remain user-scoped end to end
+- conversations are agent-scoped
+- provider, model, and variant lock after the first message
+- operator config changes still apply because the backend resolves the latest valid config on each run
+- the product model stays provider-agnostic even though Codex is the only current provider

@@ -8,7 +8,7 @@ This spec defines how `apps/server` should manage Codex as the first provider ad
 
 The runtime unit is one live Codex app-server process per active conversation.
 
-This is the chosen v1 behavior.
+This is the current behavior.
 
 ## Why This Unit
 
@@ -18,7 +18,7 @@ This is the chosen v1 behavior.
 - process cleanup is predictable
 - concurrent runs across many conversations remain possible without coupling them to one visible client
 
-One global Codex process for all conversations is explicitly not the v1 design.
+One global Codex process for all conversations is explicitly not the current design.
 
 ## Lifecycle Model
 

@@ -1,47 +1,11 @@
 # Agentchat Manual QA Checklist
 
-Use this checklist for deliberate Codex confidence passes. These checks are manual on purpose and should not run automatically on push.
+Use this checklist for the deliberate interactive pass after the scripted confidence commands have already run.
 
-Before the interactive checklist, run:
+For the command inventory and current scripted confidence flow, use:
 
-```bash
-bun run setup:test-agent-config
-bun run test:manual:codex-confidence
-```
-
-For live runtime persistence validation with a running local server, also run:
-
-```bash
-bun run test:manual:live-runtime-smoke
-bun run test:manual:live-runtime-zero-client
-bun run test:manual:live-runtime-zero-client-recover
-bun run test:manual:live-runtime-multi-client
-bun run test:manual:live-runtime-multi-conversation
-bun run test:manual:live-runtime-multi-agent
-bun run test:manual:live-runtime-multi-user
-bun run test:manual:live-runtime-status
-bun run test:manual:live-runtime-interrupt
-bun run test:manual:stale-runtime-resume
-bun run test:manual:config-reload-smoke
-bun run test:manual:operator-failure-smoke
-bun run test:manual:doctor-env-smoke
-```
-
-Or use the bundled command:
-
-```bash
-bun run test:manual:runtime-confidence
-```
-
-For the current local-auth browser confidence path, also run:
-
-```bash
-bun run test:manual:web-browser-confidence
-bun run test:manual:web-lan-confidence
-bun run test:manual:web-operator-smoke
-```
-
-Run those browser commands sequentially. The operator smoke command intentionally edits `apps/server/agentchat.config.json` to verify hot reload behavior.
+- [Testing Plan](./testing-plan.md)
+- [Operator Guide](./operator-guide.md)
 
 ## Fixtures
 
@@ -58,13 +22,7 @@ Run those browser commands sequentially. The operator smoke command intentionall
 - if auth mode is `google`, the selected Google account is allowlisted
 - if auth provider kind is `local`, a seeded user such as `smoke_1` can sign in successfully
 - `bun run doctor:server` reports the configured Codex provider and target agents as ready, and shows live Codex model access for each enabled provider
-
-For the fullest backend-auth coverage:
-
-- `BACKEND_TOKEN_SECRET` is configured in the Convex deployment
-- the same `BACKEND_TOKEN_SECRET` is configured for `apps/server`
-
-If the Convex deployment is still missing `BACKEND_TOKEN_SECRET`, the live runtime smoke command can fall back to a locally signed token. That still validates websocket runtime behavior and Convex persistence, but it does not validate the Convex-issued backend token path.
+- the relevant scripted confidence commands from [Testing Plan](./testing-plan.md) have already completed
 
 ## 1. Smoke
 
@@ -127,16 +85,11 @@ Use `~/agents/agentchat_test/workspace`.
 - Refresh `/api/diagnostics` or rerun `bun run doctor:server`
 - Confirm the UI adapts safely
 - Confirm broken or removed resources do not produce silent failures
-- `bun run test:manual:config-reload-smoke` covers the hot-reload path automatically against the local server
-- `bun run test:manual:web-operator-smoke` covers the browser-visible hot-reload path against the local web app
-- `bun run test:manual:operator-failure-smoke` covers invalid config reloads and missing path diagnostics
-- `bun run test:manual:doctor-env-smoke` covers missing runtime env diagnostics
 
 ## 8. Stale Runtime Binding Recovery
 
 Use the primary fixture.
 
-- Run `bun run test:manual:stale-runtime-resume`
 - Confirm a deliberately stale persisted runtime binding falls back to a fresh Codex thread
 - Confirm the runtime binding is replaced rather than left stale
 
@@ -144,7 +97,6 @@ Use the primary fixture.
 
 Use the primary fixture.
 
-- Run `bun run test:manual:live-runtime-status`
 - Confirm the run persists a short `assistant_status` item before the final `assistant_message`
 - Confirm the final run output still points at the final assistant reply, not the status item
 

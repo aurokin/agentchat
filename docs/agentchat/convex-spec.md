@@ -1,10 +1,17 @@
 # Agentchat Convex Spec
 
-## Purpose
+This document describes the current Convex role in Agentchat.
 
-This spec defines the v1 Convex data model and function boundaries for Agentchat.
+Use it for the durable data model and the main client/backend function boundaries.
+Use adjacent docs for detail:
 
-Convex is the source of truth for:
+- [Architecture](./architecture-v1.md) for the system overview
+- [Runtime And Auth Plan](./runtime-and-auth-plan.md) for runtime and auth behavior
+- [Backend API Spec](./backend-api-spec.md) for `apps/server` transport surfaces
+
+## Convex Responsibilities
+
+Convex is the durable source of truth for:
 
 - authenticated users
 - conversations
@@ -12,327 +19,173 @@ Convex is the source of truth for:
 - runs
 - run events
 - runtime bindings
-- user defaults
+- lightweight cross-client preferences such as favorite models
 
-## Convex Design Rules
+It is also the authority for:
 
-- All public functions must derive the acting user from `ctx.auth.getUserIdentity()`.
-- No function may accept `userId` as an authorization argument.
-- All functions must define argument validators.
-- Node-only work must not live in query or mutation files.
-- Runtime writes from `apps/server` should enter Convex through backend-authenticated ingress, then dispatch to internal mutations and actions.
+- access identity resolution
+- user-scoped authorization
+- backend token issuance for `apps/server`
 
-## Tables
+## Design Rules
+
+- public functions derive the acting user from auth context
+- public functions do not trust caller-supplied `userId` for authorization
+- runtime writes from `apps/server` enter through trusted ingress and dispatch to internal mutations/actions
+- transient live-runtime process state does not belong in Convex
+
+## Main Tables
 
 ### `users`
 
-Use the existing Convex auth-backed user record and extend it as needed.
+Current user record responsibilities:
 
-Recommended fields:
+- auth-backed user identity
+- local-auth metadata such as `username`, `authProvider`, and `localAuthEnabled`
+- lightweight preferences such as `favoriteModelIds`
+- workspace usage counters
 
-- `name`
-- `image`
-- `email`
-- `createdAt`
-- `updatedAt`
-- `lastSeenAt`
-- `accessRevokedAt`
+Important constraint:
 
-Indexes:
+- Agentchat does not persist per-user default provider, model, or variant state in Convex
 
-- `by_email`
-
-Notes:
-
-- access remains controlled by auth plus allowlist, not by a client-supplied user id
-
-### `users.favoriteModelIds`
+### `chats`
 
 Purpose:
 
-- store the user’s favorite models for cross-client model selection
+- user-owned conversations bound to one agent
 
-Notes:
-
-- agent config supplies the defaults for new draft conversations
-- conversations persist their own `modelId` and `variantId`
-- we do not persist per-user default provider/model/variant state
-
-### `conversations`
-
-Purpose:
-
-- user-owned threads bound to exactly one agent
-
-Fields:
+Current durable fields include:
 
 - `userId`
+- `localId`
 - `agentId`
 - `title`
-- `titleSource`
-  - `"auto"` or `"manual"`
-- `provider`
-- `model`
-- `variant`
+- `modelId`
+- `variantId`
 - `settingsLockedAt`
-  - `null` until first message locks the settings
-- `lastMessageAt`
-  - `null` for empty conversations
+- `lastViewedAt`
 - `createdAt`
 - `updatedAt`
 
-Indexes:
+Key behavior:
 
-- `by_userId_and_agentId_and_updatedAt`
-- `by_userId_and_updatedAt`
-
-Notes:
-
-- conversations are hard-deleted
-- conversations store only `agentId`, not agent config snapshots
-- empty conversations are valid
+- conversations are user-scoped
+- conversations store the chosen model and variant for that conversation
+- those settings lock after the first message
 
 ### `messages`
 
 Purpose:
 
-- durable transcript rendered to users
+- durable user and assistant transcript rows
 
-Fields:
+Current message data includes:
 
-- `conversationId`
-- `userId`
 - `role`
-  - `"user" | "assistant" | "system"`
+- `kind`
 - `content`
+- `contextContent`
 - `status`
-  - `"draft" | "streaming" | "completed" | "interrupted" | "errored"`
 - `runId`
-  - optional, typically set for assistant messages
-- `createdAt`
-- `updatedAt`
-- `completedAt`
-  - optional
+- `runMessageIndex`
+- `modelId`
+- `variantId`
+- `reasoningEffort`
+- timestamps
 
-Indexes:
+Important behavior:
 
-- `by_conversationId_and_createdAt`
-- `by_userId_and_createdAt`
-- `by_runId`
-
-Notes:
-
-- partial assistant messages remain visible
-- assistant messages may be patched during streaming
+- assistant messages may start as drafts or streaming rows
+- partial assistant output remains visible
+- provider-native `assistant_status` rows are distinct from final `assistant_message` rows
 
 ### `runs`
 
 Purpose:
 
-- execution record for one assistant attempt triggered by a user message
+- one execution record per assistant attempt
 
-Fields:
+Current run data includes:
 
-- `conversationId`
-- `userId`
+- `externalId`
 - `provider`
 - `status`
-  - `"queued" | "starting" | "running" | "completed" | "interrupted" | "errored"`
 - `triggerMessageId`
-  - user message that initiated the run
 - `outputMessageId`
-  - optional assistant message record
 - `providerThreadId`
-  - optional provider thread/session id snapshot for debugging
 - `providerTurnId`
-  - optional provider turn/run id
 - `startedAt`
 - `completedAt`
-  - optional
 - `errorMessage`
-  - optional
-
-Indexes:
-
-- `by_conversationId_and_startedAt`
-- `by_userId_and_startedAt`
-- `by_status_and_startedAt`
 
 ### `run_events`
 
 Purpose:
 
-- append-only normalized event history for a run
+- append-only normalized runtime event history
 
-Fields:
+Current persisted kinds include:
 
-- `runId`
-- `conversationId`
-- `userId`
-- `sequence`
-- `kind`
-  - `"run_started"`
-  - `"message_delta"`
-  - `"message_completed"`
-  - `"run_completed"`
-  - `"run_interrupted"`
-  - `"run_failed"`
-  - `"approval_requested"`
-  - `"approval_resolved"`
-  - `"user_input_requested"`
-  - `"user_input_resolved"`
-  - `"provider_status"`
-- `messageId`
-  - optional
-- `textDelta`
-  - optional
-- `errorMessage`
-  - optional
-- `data`
-  - optional JSON string for structured payloads that do not deserve top-level fields
-- `createdAt`
-
-Indexes:
-
-- `by_runId_and_sequence`
-- `by_conversationId_and_createdAt`
-- `by_userId_and_createdAt`
-
-Notes:
-
-- do not persist raw provider noise blindly
-- coalesce text deltas before writing when needed
+- `run_started`
+- `message_started`
+- `message_delta`
+- `message_completed`
+- `run_completed`
+- `run_interrupted`
+- `run_failed`
+- `approval_requested`
+- `approval_resolved`
+- `user_input_requested`
+- `user_input_resolved`
+- `provider_status`
 
 ### `runtime_bindings`
 
 Purpose:
 
-- recoverable provider runtime metadata for a conversation
+- recoverable provider-runtime metadata for one conversation
 
-Fields:
+Current binding data includes:
 
-- `conversationId`
+- `chatId`
 - `userId`
 - `provider`
 - `status`
-  - `"idle" | "active" | "expired" | "errored"`
 - `providerThreadId`
-  - optional
 - `providerResumeToken`
-  - optional JSON string
 - `activeRunId`
-  - optional
 - `lastError`
-  - optional
 - `lastEventAt`
-  - optional
 - `expiresAt`
-  - optional
 - `updatedAt`
 
-Indexes:
-
-- `by_conversationId`
-- `by_provider_and_status`
-
-Notes:
+Important constraint:
 
 - only recoverable runtime state belongs here
-- live process handles do not belong here
+- live provider handles and live socket state stay in `apps/server`
 
-## Relationship Between Messages, Runs, And Run Events
+## Main Client-Facing Surfaces
 
-- a user message creates or triggers one run
-- a run emits many run events
-- a run usually produces one assistant message
-- partial assistant output is visible in `messages`
-- fine-grained runtime history lives in `run_events`
+Current client-facing Convex surfaces include:
 
-This is the chosen v1 model.
-
-## Public Convex API
-
-These functions are intended for clients:
-
-- `conversations.listByAgent`
-- `conversations.get`
-- `conversations.create`
-- `conversations.rename`
-- `conversations.remove`
-- `conversations.updateDraftSettings`
-  - only allowed before `settingsLockedAt`
-- `messages.listByConversation`
-- `userDefaults.getGlobal`
-- `userDefaults.setGlobal`
-- `userDefaults.getForAgent`
-- `userDefaults.setForAgent`
-- `runtime.createBackendSessionToken`
-
-Notes:
-
-- `create` may create an empty conversation
-- `updateDraftSettings` must reject updates after the first message locks settings
+- user queries and mutations in `users.ts` for:
+    - current user resolution
+    - favorite model preferences
+    - workspace reset and usage helpers
+- chat queries and mutations in `chats.ts`
+- message queries and mutations in `messages.ts`
+- run queries in `runs.ts`
+- runtime activity queries in `runtimeBindings.ts`
+- backend token issuance in `backendTokens.ts`
 
 ## Backend Ingress Boundary
 
-`apps/server` needs a trusted path to persist runtime state.
+`apps/server` persists runtime state through trusted ingress into Convex, then internal runtime mutations update:
 
-V1 recommendation:
+- runs
+- messages
+- run events
+- runtime bindings
 
-- expose backend-only HTTP ingress routes in `convex/http.ts`
-- secure them with a backend secret or signed service token
-- keep actual writes inside internal mutations and internal actions
-
-Suggested ingress endpoints:
-
-- `POST /runtime/run-started`
-- `POST /runtime/message-delta`
-- `POST /runtime/message-completed`
-- `POST /runtime/run-completed`
-- `POST /runtime/run-interrupted`
-- `POST /runtime/run-failed`
-- `POST /runtime/runtime-binding`
-
-These endpoints should validate payloads tightly and delegate to internal functions.
-
-## Internal Convex Functions
-
-These functions are intended for backend ingress, not direct clients:
-
-- `internal.conversations.lockSettingsIfNeeded`
-- `internal.messages.createUserMessage`
-- `internal.messages.upsertAssistantMessageChunk`
-- `internal.messages.completeAssistantMessage`
-- `internal.runs.create`
-- `internal.runs.complete`
-- `internal.runs.interrupt`
-- `internal.runs.fail`
-- `internal.runEvents.append`
-- `internal.runtimeBindings.upsert`
-- `internal.runtimeBindings.clearActiveRun`
-
-## Deletion Rules
-
-Conversation deletion is hard delete.
-
-When deleting a conversation:
-
-1. delete `run_events` in batches
-2. delete `runs` in batches
-3. delete `messages` in batches
-4. delete `runtime_bindings`
-5. delete the conversation
-
-Use bounded batch processing and scheduling if the transaction size grows too large.
-
-## Pagination Rules
-
-- message lists must paginate
-- conversation lists should paginate once counts justify it
-- run event queries should paginate by `sequence` or `createdAt`
-
-## Explicitly Out Of Scope
-
-- alternate local persistence adapters
-- provider process state inside Convex
-- soft deletion
+That keeps provider-runtime persistence server-owned while keeping Convex as the durable source of truth.

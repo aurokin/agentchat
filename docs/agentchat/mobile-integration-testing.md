@@ -2,6 +2,21 @@
 
 This document defines the supported mobile testing boundaries for Agentchat so we do not design workflows that the current host platform cannot run.
 
+## Fast Path
+
+If you just need the current recommendation on Linux:
+
+1. Use Android as the primary native automation target.
+2. Treat iPhone and iPad as manual-device paths.
+3. Use an EAS development build for reliable iPhone testing.
+4. Use the same LAN-reachable `apps/server` and Convex deployment for both Android and iOS.
+5. Use Expo Go on iPhone only when the installed Expo Go release supports this repo's Expo SDK.
+
+Current manual state:
+
+- the device matrix is validated on iPad, iPhone, and RedMagic Astra
+- remaining mobile work is polish and platform ergonomics, not runtime architecture
+
 ## Scope
 
 Agentchat mobile testing currently targets:
