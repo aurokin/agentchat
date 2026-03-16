@@ -618,7 +618,29 @@ Use this block when updating the plan after a commit or push:
 - Docs updated:
     - plan progress only in this milestone
 - Commit / push:
+    - commit: `1ab1ffb`
+    - push: `origin/master`
+- Next step:
+    - continue parity work by extracting and testing the mobile socket-event application path, which is now the largest remaining inline runtime state machine outside manual/browser flows
+
+### Update 2026-03-16
+
+- Phase: `Phase 1. Expand Live Runtime Confidence Coverage`
+- Status: `in_progress`
+- Landed:
+    - extracted pure mobile planners for run lifecycle, message lifecycle, and active-run connection error handling in the chat screen
+    - added direct mobile unit coverage for recovered `run.started`, active-run `connection.error`, and assistant-message completion streaming behavior
+    - rewired the mobile chat screen to use these planners so its socket-event state machine is substantially thinner and more testable
+- Refactors:
+    - mobile socket-event application now mirrors the web direction of using pure planners for deterministic runtime behavior
+- Tests added or updated:
+    - `apps/mobile/src/components/chat/__tests__/conversation-runtime-events.test.ts`
+    - `bun run --cwd apps/mobile typecheck`
+    - `bun run --cwd apps/mobile test:confidence`
+- Docs updated:
+    - plan progress only in this milestone
+- Commit / push:
     - commit: `pending`
     - push: `pending`
 - Next step:
-    - continue parity work by extracting and testing the mobile socket-event application path, which is now the largest remaining inline runtime state machine outside manual/browser flows
+    - choose the next non-manual Phase 1 target between operator/runtime confidence expansion and any remaining cross-client recovery gaps that still lack deterministic coverage

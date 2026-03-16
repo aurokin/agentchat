@@ -55,6 +55,11 @@ import {
     resolveMobileConversationRuntimeSync,
     runMobileConversationSend,
 } from "@/components/chat/conversation-runtime-controller";
+import {
+    planMobileConnectionError,
+    planMobileMessageLifecycleResolution,
+    planMobileRunLifecycleResolution,
+} from "@/components/chat/conversation-runtime-events";
 import { planMobileConversationRuntimeSync } from "@/components/chat/conversation-runtime-sync";
 
 const EMPTY_MESSAGES: Message[] = [];
@@ -347,19 +352,16 @@ export default function ChatScreen(): ReactElement {
             }
 
             if (event.type === "connection.error") {
-                const nextActiveRun = activeRunRef.current;
-                if (!nextActiveRun) {
+                const connectionErrorPlan = planMobileConnectionError({
+                    activeRun: activeRunRef.current,
+                    event,
+                });
+                if (connectionErrorPlan.type !== "connection.error") {
                     return;
                 }
 
-                setError({
-                    message: event.payload.message,
-                    isRetryable: true,
-                });
-                setRetryPayload({
-                    content: nextActiveRun.userContent,
-                    contextContent: nextActiveRun.userContent,
-                });
+                setError(connectionErrorPlan.error);
+                setRetryPayload(connectionErrorPlan.retryPayload);
                 setActiveRun(null);
                 setStreamingMessage(null);
                 setRecoveredRunNotice(false);
@@ -379,72 +381,95 @@ export default function ChatScreen(): ReactElement {
             }
 
             if (resolution.type === "run.started") {
-                setActiveRun(resolution.activeRun);
-                setIsLoading(true);
-                if (resolution.recovered) {
-                    setRecoveredRunNotice(pendingReconnectNoticeRef.current);
-                    pendingReconnectNoticeRef.current = false;
-                    if (resolution.streamingMessage) {
-                        setStreamingMessage(resolution.streamingMessage);
+                const runLifecyclePlan = planMobileRunLifecycleResolution({
+                    resolution,
+                    pendingReconnectNotice:
+                        pendingReconnectNoticeRef.current,
+                });
+                if (runLifecyclePlan.type !== "run.started") {
+                    return;
+                }
+
+                setActiveRun(runLifecyclePlan.activeRun);
+                setIsLoading(runLifecyclePlan.shouldSetLoading);
+                if (runLifecyclePlan.recoveredRunNotice !== null) {
+                    setRecoveredRunNotice(runLifecyclePlan.recoveredRunNotice);
+                    if (runLifecyclePlan.clearPendingReconnectNotice) {
+                        pendingReconnectNoticeRef.current = false;
+                    }
+                    if (runLifecyclePlan.streamingMessage) {
+                        setStreamingMessage(runLifecyclePlan.streamingMessage);
                     }
                 }
                 return;
             }
 
             if (resolution.type === "message.updated") {
-                setActiveRun(resolution.activeRun);
-                setStreamingMessage(resolution.streamingMessage);
+                const messageLifecyclePlan =
+                    planMobileMessageLifecycleResolution(resolution);
+                if (messageLifecyclePlan.type !== "message.updated") {
+                    return;
+                }
+
+                setActiveRun(messageLifecyclePlan.activeRun);
+                setStreamingMessage(messageLifecyclePlan.streamingMessage);
                 return;
             }
 
             if (resolution.type === "message.started") {
-                if (resolution.previousMessagePatch) {
+                const messageLifecyclePlan =
+                    planMobileMessageLifecycleResolution(resolution);
+                if (messageLifecyclePlan.type !== "message.started") {
+                    return;
+                }
+
+                if (messageLifecyclePlan.previousMessagePatch) {
                     patchMessage(
-                        resolution.previousMessagePatch.id,
+                        messageLifecyclePlan.previousMessagePatch.id,
                         currentChatRef.current?.id ??
-                            resolution.activeRun.conversationId,
+                            messageLifecyclePlan.activeRun.conversationId,
                         {
-                            kind: resolution.previousMessagePatch.kind,
+                            kind: messageLifecyclePlan.previousMessagePatch.kind,
                         },
                     );
                 }
-                insertMessage(resolution.message);
-                setActiveRun(resolution.activeRun);
-                setStreamingMessage(resolution.streamingMessage);
+                insertMessage(messageLifecyclePlan.insertedMessage);
+                setActiveRun(messageLifecyclePlan.activeRun);
+                setStreamingMessage(messageLifecyclePlan.streamingMessage);
                 return;
             }
 
             if (resolution.type === "message.completed") {
+                const messageLifecyclePlan =
+                    planMobileMessageLifecycleResolution(resolution);
+                if (messageLifecyclePlan.type !== "message.completed") {
+                    return;
+                }
+
                 patchMessage(
-                    resolution.messageId,
+                    messageLifecyclePlan.messagePatch.id,
                     currentChatRef.current?.id ??
-                        resolution.activeRun.conversationId,
-                    {
-                        content: resolution.finalContent,
-                        contextContent: resolution.finalContent,
-                        status: "completed",
-                    },
+                        messageLifecyclePlan.activeRun.conversationId,
+                    messageLifecyclePlan.messagePatch,
                 );
-                setActiveRun(resolution.activeRun);
-                if (
-                    resolution.messageId ===
-                    resolution.activeRun.assistantMessageId
-                ) {
-                    setStreamingMessage({
-                        id: resolution.messageId,
-                        content: resolution.finalContent,
-                    });
+                setActiveRun(messageLifecyclePlan.activeRun);
+                if (messageLifecyclePlan.streamingMessage) {
+                    setStreamingMessage(messageLifecyclePlan.streamingMessage);
                 }
                 return;
             }
 
             if (resolution.type === "run.completed") {
-                void persistAssistantMessage({
-                    messageId: resolution.activeRun.assistantMessageId,
-                    content: resolution.finalContent,
-                    status: "completed",
-                    runId: resolution.activeRun.runId,
-                }).finally(() => {
+                const runLifecyclePlan = planMobileRunLifecycleResolution({
+                    resolution,
+                    pendingReconnectNotice:
+                        pendingReconnectNoticeRef.current,
+                });
+                if (runLifecyclePlan.type !== "terminal") {
+                    return;
+                }
+
+                void persistAssistantMessage(runLifecyclePlan.persistMessage).finally(() => {
                     setActiveRun(null);
                     setStreamingMessage(null);
                     setRecoveredRunNotice(false);
@@ -454,12 +479,16 @@ export default function ChatScreen(): ReactElement {
             }
 
             if (resolution.type === "run.interrupted") {
-                void persistAssistantMessage({
-                    messageId: resolution.activeRun.assistantMessageId,
-                    content: resolution.finalContent,
-                    status: "interrupted",
-                    runId: resolution.activeRun.runId,
-                }).finally(() => {
+                const runLifecyclePlan = planMobileRunLifecycleResolution({
+                    resolution,
+                    pendingReconnectNotice:
+                        pendingReconnectNoticeRef.current,
+                });
+                if (runLifecyclePlan.type !== "terminal") {
+                    return;
+                }
+
+                void persistAssistantMessage(runLifecyclePlan.persistMessage).finally(() => {
                     setActiveRun(null);
                     setStreamingMessage(null);
                     setRecoveredRunNotice(false);
@@ -469,14 +498,18 @@ export default function ChatScreen(): ReactElement {
             }
 
             if (resolution.type === "run.failed") {
-                void persistAssistantMessage({
-                    messageId: resolution.activeRun.assistantMessageId,
-                    content: resolution.finalContent,
-                    status: "errored",
-                    runId: resolution.activeRun.runId,
-                }).finally(() => {
-                    setError(resolution.error);
-                    setRetryPayload(resolution.retryChat);
+                const runLifecyclePlan = planMobileRunLifecycleResolution({
+                    resolution,
+                    pendingReconnectNotice:
+                        pendingReconnectNoticeRef.current,
+                });
+                if (runLifecyclePlan.type !== "terminal") {
+                    return;
+                }
+
+                void persistAssistantMessage(runLifecyclePlan.persistMessage).finally(() => {
+                    setError(runLifecyclePlan.error);
+                    setRetryPayload(runLifecyclePlan.retryPayload);
                     setActiveRun(null);
                     setStreamingMessage(null);
                     setRecoveredRunNotice(false);
