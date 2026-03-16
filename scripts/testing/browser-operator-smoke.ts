@@ -6,36 +6,21 @@ import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 
 import { trimTrailingSlash } from "./lib";
+import {
+    resolveOperatorAuthProviderKind,
+    withOperatorAgentEnabled,
+    withOperatorProviderEnabled,
+    type OperatorSmokeConfig,
+} from "./operator-smoke-helpers";
 
 const DEFAULT_BASE_URL = "http://127.0.0.1:4040";
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_LOCAL_USERNAME = "smoke_1";
 const DEFAULT_LOCAL_PASSWORD = "smoke_1_password";
-type AuthProviderKind = "google" | "local";
 type Identity = {
     subject: string;
     email: string;
     name: string;
-};
-
-type AgentchatConfig = {
-    version: number;
-    auth: {
-        defaultProviderId?: string | null;
-        providers?: Array<{
-            id: string;
-            kind: AuthProviderKind;
-            enabled?: boolean;
-        }>;
-    };
-    providers: Array<{
-        id: string;
-        enabled: boolean;
-    }>;
-    agents: Array<{
-        id: string;
-        enabled: boolean;
-    }>;
 };
 
 function getRepoRoot(): string {
@@ -47,11 +32,11 @@ function getConfigPath(repoRoot: string): string {
     return path.join(repoRoot, "apps", "server", "agentchat.config.json");
 }
 
-function readConfig(configPath: string): AgentchatConfig {
-    return JSON.parse(readFileSync(configPath, "utf8")) as AgentchatConfig;
+function readConfig(configPath: string): OperatorSmokeConfig {
+    return JSON.parse(readFileSync(configPath, "utf8")) as OperatorSmokeConfig;
 }
 
-function writeConfig(configPath: string, config: AgentchatConfig): void {
+function writeConfig(configPath: string, config: OperatorSmokeConfig): void {
     writeFileSync(configPath, `${JSON.stringify(config, null, 4)}\n`, "utf8");
 }
 
@@ -59,18 +44,6 @@ function invariant(condition: unknown, message: string): asserts condition {
     if (!condition) {
         throw new Error(message);
     }
-}
-
-function readAuthProviderKind(config: AgentchatConfig): AuthProviderKind {
-    const providers = config.auth?.providers ?? [];
-    const defaultProviderId = config.auth?.defaultProviderId ?? null;
-    const activeProvider =
-        providers.find(
-            (provider) =>
-                provider.id === defaultProviderId && provider.enabled !== false,
-        ) ?? providers.find((provider) => provider.enabled !== false);
-
-    return activeProvider?.kind ?? "google";
 }
 
 async function assertWebReady(baseUrl: string): Promise<void> {
@@ -144,7 +117,7 @@ function runConvex<T>(params: {
 
 async function signInIfNeeded(
     page: import("playwright").Page,
-    authProviderKind: AuthProviderKind,
+    authProviderKind: "google" | "local",
     repoRoot: string,
 ): Promise<void> {
     if (authProviderKind === "google") {
@@ -180,8 +153,8 @@ async function main() {
     const repoRoot = getRepoRoot();
     const configPath = getConfigPath(repoRoot);
     const originalConfigText = readFileSync(configPath, "utf8");
-    const originalConfig = JSON.parse(originalConfigText) as AgentchatConfig;
-    const authProviderKind = readAuthProviderKind(originalConfig);
+    const originalConfig = JSON.parse(originalConfigText) as OperatorSmokeConfig;
+    const authProviderKind = resolveOperatorAuthProviderKind(originalConfig);
 
     await assertWebReady(baseUrl);
 
@@ -195,12 +168,11 @@ async function main() {
         await agentSelect.waitFor({ timeout: DEFAULT_TIMEOUT_MS });
         await waitForAgentOption(page, "agentchat-test");
 
-        const disableAgentConfig = structuredClone(originalConfig);
-        const agent = disableAgentConfig.agents.find(
-            (entry) => entry.id === "agentchat-test",
-        );
-        invariant(agent, "Missing agentchat-test in config.");
-        agent.enabled = false;
+        const disableAgentConfig = withOperatorAgentEnabled({
+            config: originalConfig,
+            agentId: "agentchat-test",
+            enabled: false,
+        });
         writeConfig(configPath, disableAgentConfig);
         await waitForReload();
         await page.reload({ waitUntil: "domcontentloaded" });
@@ -210,12 +182,11 @@ async function main() {
             "Disabled agentchat-test still appeared in the agent selector.",
         );
 
-        const disableProviderConfig = structuredClone(originalConfig);
-        const provider = disableProviderConfig.providers.find(
-            (entry) => entry.id === "codex-main",
-        );
-        invariant(provider, "Missing codex-main in config.");
-        provider.enabled = false;
+        const disableProviderConfig = withOperatorProviderEnabled({
+            config: originalConfig,
+            providerId: "codex-main",
+            enabled: false,
+        });
         writeConfig(configPath, disableProviderConfig);
         await waitForReload();
         await page.reload({ waitUntil: "domcontentloaded" });

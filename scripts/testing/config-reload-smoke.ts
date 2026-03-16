@@ -7,6 +7,8 @@ import {
     hasProviderDisappearedFromBootstrap,
     matchesResolvedFallbackDefaults,
     resolveFallbackDefaults,
+    withOperatorAgentEnabled,
+    withOperatorProviderEnabled,
     type OperatorAgentOptionsPayload as AgentOptionsPayload,
     type OperatorBootstrapPayload as BootstrapPayload,
     type OperatorSmokeConfig,
@@ -131,12 +133,11 @@ async function main() {
             `Expected ${agentId} to resolve ${providerId} before config reload smoke.`,
         );
 
-        const disableAgentConfig = structuredClone(originalConfig);
-        const disableAgentTarget = disableAgentConfig.agents.find(
-            (agent) => agent.id === agentId,
-        );
-        invariant(disableAgentTarget, `Missing agent ${agentId} in config.`);
-        disableAgentTarget.enabled = false;
+        const disableAgentConfig = withOperatorAgentEnabled({
+            config: originalConfig,
+            agentId,
+            enabled: false,
+        });
         await writeConfigAndPause(configPath, disableAgentConfig);
 
         await waitFor(
@@ -189,15 +190,11 @@ async function main() {
             },
         );
 
-        const disableProviderConfig = structuredClone(originalConfig);
-        const disableProviderTarget = disableProviderConfig.providers.find(
-            (provider) => provider.id === providerId,
-        );
-        invariant(
-            disableProviderTarget,
-            `Missing provider ${providerId} in config.`,
-        );
-        disableProviderTarget.enabled = false;
+        const disableProviderConfig = withOperatorProviderEnabled({
+            config: originalConfig,
+            providerId,
+            enabled: false,
+        });
         await writeConfigAndPause(configPath, disableProviderConfig);
 
         await waitFor(

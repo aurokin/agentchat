@@ -40,6 +40,7 @@ Recently completed and intentionally removed from the active backlog:
 - server doctor/auth diagnostics improvements and confidence coverage
 - direct server coverage for last-known-good config reload failure and recovery behavior
 - shared operator issue catalog wiring across config diagnostics, doctor mapping, and smoke helpers
+- shared browser/operator smoke helpers for auth-provider selection and config mutation paths
 
 Current Phase 1 focus:
 

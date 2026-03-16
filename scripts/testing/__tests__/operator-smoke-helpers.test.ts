@@ -8,7 +8,10 @@ import {
     hasProviderDisappearedFromBootstrap,
     isRestoredOperatorDiagnostics,
     matchesResolvedFallbackDefaults,
+    resolveOperatorAuthProviderKind,
     resolveFallbackDefaults,
+    withOperatorAgentEnabled,
+    withOperatorProviderEnabled,
 } from "../operator-smoke-helpers";
 
 describe("operator smoke helpers", () => {
@@ -77,6 +80,67 @@ describe("operator smoke helpers", () => {
                 providerId: "codex-main",
             }),
         ).toBe(true);
+    });
+
+    test("resolves the active operator auth provider kind with fallback", () => {
+        expect(
+            resolveOperatorAuthProviderKind({
+                auth: {
+                    defaultProviderId: "local-main",
+                    providers: [
+                        {
+                            id: "local-main",
+                            kind: "local",
+                            enabled: false,
+                        },
+                        {
+                            id: "google-main",
+                            kind: "google",
+                            enabled: true,
+                        },
+                    ],
+                },
+                providers: [],
+                agents: [],
+            }),
+        ).toBe("google");
+    });
+
+    test("toggles enabled flags through shared config mutation helpers", () => {
+        const initialConfig = {
+            providers: [
+                {
+                    id: "codex-main",
+                    enabled: true,
+                    models: [],
+                },
+            ],
+            agents: [
+                {
+                    id: "agent-1",
+                    enabled: true,
+                    providerIds: ["codex-main"],
+                    defaultProviderId: "codex-main",
+                },
+            ],
+        };
+
+        expect(
+            withOperatorAgentEnabled({
+                config: initialConfig,
+                agentId: "agent-1",
+                enabled: false,
+            }).agents[0]?.enabled,
+        ).toBe(false);
+        expect(
+            withOperatorProviderEnabled({
+                config: initialConfig,
+                providerId: "codex-main",
+                enabled: false,
+            }).providers[0]?.enabled,
+        ).toBe(false);
+        expect(initialConfig.agents[0]?.enabled).toBe(true);
+        expect(initialConfig.providers[0]?.enabled).toBe(true);
     });
 
     test("matches resolved fallback defaults exactly", () => {

@@ -25,7 +25,19 @@ export type OperatorSmokeAgent = {
     defaultVariant?: string;
 };
 
+export type OperatorAuthProviderKind = "google" | "local";
+
+export type OperatorSmokeAuthConfig = {
+    defaultProviderId?: string | null;
+    providers?: Array<{
+        id: string;
+        kind: OperatorAuthProviderKind;
+        enabled?: boolean;
+    }>;
+};
+
 export type OperatorSmokeConfig = {
+    auth?: OperatorSmokeAuthConfig;
     providers: OperatorSmokeProvider[];
     agents: OperatorSmokeAgent[];
 };
@@ -108,6 +120,48 @@ export function resolveFallbackDefaults(params: {
         defaultModel,
         defaultVariant,
     };
+}
+
+export function resolveOperatorAuthProviderKind(
+    config: OperatorSmokeConfig,
+): OperatorAuthProviderKind {
+    const providers = config.auth?.providers ?? [];
+    const defaultProviderId = config.auth?.defaultProviderId ?? null;
+    const activeProvider =
+        providers.find(
+            (provider) =>
+                provider.id === defaultProviderId && provider.enabled !== false,
+        ) ?? providers.find((provider) => provider.enabled !== false);
+
+    return activeProvider?.kind ?? "google";
+}
+
+export function withOperatorAgentEnabled(params: {
+    config: OperatorSmokeConfig;
+    agentId: string;
+    enabled: boolean;
+}): OperatorSmokeConfig {
+    const nextConfig = structuredClone(params.config);
+    const agent = nextConfig.agents.find(
+        (candidate) => candidate.id === params.agentId,
+    );
+    invariant(agent, `Missing agent ${params.agentId} in config.`);
+    agent.enabled = params.enabled;
+    return nextConfig;
+}
+
+export function withOperatorProviderEnabled(params: {
+    config: OperatorSmokeConfig;
+    providerId: string;
+    enabled: boolean;
+}): OperatorSmokeConfig {
+    const nextConfig = structuredClone(params.config);
+    const provider = nextConfig.providers.find(
+        (candidate) => candidate.id === params.providerId,
+    );
+    invariant(provider, `Missing provider ${params.providerId} in config.`);
+    provider.enabled = params.enabled;
+    return nextConfig;
 }
 
 export function hasAgentDisappearedFromBootstrap(
