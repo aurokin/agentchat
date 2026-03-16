@@ -1,0 +1,6 @@
+[test]
+# Scope root-level `bun test` to scripts only.
+# Workspace tests require per-workspace tsconfig path aliases (@/, @shared/)
+# that can't be resolved from the monorepo root.
+# Use `bun run test` to run the full suite across all workspaces.
+root = "./scripts"
