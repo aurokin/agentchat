@@ -50,6 +50,7 @@ Recently completed and intentionally removed from the active backlog:
 - web and mobile now clear transient retry/error/recovered UI state on conversation switches so one chat's local runtime state does not leak into the next chat
 - web now keys the socket subscription effect by conversation id rather than the whole chat object, avoiding resubscribe churn on title/model updates, and both clients clear leftover reconnect/interrupt flags on conversation switches
 - shared background runtime subscription helpers now back both clients' workspace-level socket subscriptions, with direct reconciliation and cleanup coverage
+- web and mobile now derive conversation runtime state through one shared helper, reducing drift in run-summary/runtime-binding interpretation while preserving existing client confidence coverage
 
 Current Phase 1 focus:
 
