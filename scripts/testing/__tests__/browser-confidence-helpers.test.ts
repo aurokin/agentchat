@@ -31,11 +31,17 @@ describe("parseBrowserConfidenceArgs", () => {
     });
 
     test("parses an explicit mode", () => {
-        expect(
-            parseBrowserConfidenceArgs(["--mode", "interrupt"]),
-        ).toEqual({
+        expect(parseBrowserConfidenceArgs(["--mode", "interrupt"])).toEqual({
             baseUrl: "http://127.0.0.1:4040",
             mode: "interrupt",
+            json: false,
+        });
+    });
+
+    test("parses the long-stream mode", () => {
+        expect(parseBrowserConfidenceArgs(["--mode", "long-stream"])).toEqual({
+            baseUrl: "http://127.0.0.1:4040",
+            mode: "long-stream",
             json: false,
         });
     });
@@ -61,9 +67,9 @@ describe("parseBrowserConfidenceArgs", () => {
     });
 
     test("rejects unsupported modes", () => {
-        expect(() =>
-            parseBrowserConfidenceArgs(["--mode", "broken"]),
-        ).toThrow("--mode must be smoke, interrupt, refresh, or full.");
+        expect(() => parseBrowserConfidenceArgs(["--mode", "broken"])).toThrow(
+            "--mode must be smoke, interrupt, refresh, long-stream, or full.",
+        );
     });
 });
 
@@ -73,6 +79,7 @@ describe("browser confidence reports", () => {
             { name: "smoke", status: "passed" },
             { name: "interrupt", status: "passed" },
             { name: "refresh", status: "passed" },
+            { name: "long-stream", status: "passed" },
         ]);
     });
 

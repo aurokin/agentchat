@@ -46,7 +46,7 @@ Based on the current repository state:
 
 ### Phase 1. Expand Live Runtime Confidence Coverage
 
-Status: `pending`
+Status: `in_progress`
 
 Goal:
 
@@ -309,3 +309,27 @@ Use this block when updating the plan after a commit or push:
 - Next step:
     - ...
 ```
+
+### Update 2026-03-16
+
+- Phase: `Phase 1. Expand Live Runtime Confidence Coverage`
+- Status: `in_progress`
+- Landed:
+    - roadmap and product docs were updated to match the shipped runtime/auth model
+    - the runtime-confidence implementation plan was added under `plans/`
+- Refactors:
+    - none yet in this phase
+- Tests added or updated:
+    - documentation integrity was rechecked after the roadmap/auth doc sweep
+- Docs updated:
+    - `README.md`
+    - `docs/agentchat/backend-api-spec.md`
+    - `docs/agentchat/manual-qa-checklist.md`
+    - `docs/agentchat/roadmap.md`
+    - `docs/agentchat/runtime-and-auth-plan.md`
+    - `docs/agentchat/testing-plan.md`
+- Commit / push:
+    - commit: `fbf1d6c`
+    - push: `origin/master`
+- Next step:
+    - land additional Phase 1 confidence coverage starting with the browser long-stream markdown scenario

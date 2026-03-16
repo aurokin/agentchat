@@ -3,7 +3,7 @@ import { mkdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { chromium, type Page } from "playwright";
+import { chromium, type Locator, type Page } from "playwright";
 
 import {
     buildBrowserConfidenceFailureReport,
@@ -110,7 +110,9 @@ function runConvex<T>(params: {
 
     if (result.status !== 0) {
         const stderr = `${result.stdout ?? ""}\n${result.stderr ?? ""}`.trim();
-        throw new Error(`Convex command failed for ${params.functionName}: ${stderr}`);
+        throw new Error(
+            `Convex command failed for ${params.functionName}: ${stderr}`,
+        );
     }
 
     const lines = (result.stdout ?? "")
@@ -128,7 +130,10 @@ function runConvex<T>(params: {
     return JSON.parse(lines.join("\n")) as T;
 }
 
-function runConvexReset(repoRoot: string, authProviderKind: AuthProviderKind): void {
+function runConvexReset(
+    repoRoot: string,
+    authProviderKind: AuthProviderKind,
+): void {
     if (authProviderKind === "google") {
         throw new Error(
             "Browser confidence is not scripted for Google auth. Use the local auth path for automated local browser checks.",
@@ -182,7 +187,9 @@ async function waitForAssistantMessage(
     page: Page,
     matcher: RegExp,
 ): Promise<string> {
-    const assistantMessages = page.locator('[data-testid^="message-assistant-"]');
+    const assistantMessages = page.locator(
+        '[data-testid^="message-assistant-"]',
+    );
     await assistantMessages.last().waitFor({ timeout: DEFAULT_TIMEOUT_MS });
 
     const deadline = Date.now() + DEFAULT_TIMEOUT_MS;
@@ -204,6 +211,39 @@ async function waitForAssistantMessage(
 
     throw new Error(
         `Timed out waiting for assistant message matching ${matcher}.`,
+    );
+}
+
+async function getLastAssistantMessage(page: Page): Promise<Locator> {
+    const assistantMessages = page.locator(
+        '[data-testid^="message-assistant-"]',
+    );
+    await assistantMessages.last().waitFor({ timeout: DEFAULT_TIMEOUT_MS });
+    const count = await assistantMessages.count();
+    invariant(count > 0, "Expected at least one assistant message.");
+    return assistantMessages.nth(count - 1);
+}
+
+async function waitForAssistantMessageLength(
+    page: Page,
+    minimumLength: number,
+): Promise<string> {
+    const deadline = Date.now() + DEFAULT_TIMEOUT_MS;
+    for (;;) {
+        const message = await getLastAssistantMessage(page);
+        const text = ((await message.textContent()) ?? "").trim();
+        if (text.length >= minimumLength) {
+            return text;
+        }
+
+        if (Date.now() >= deadline) {
+            break;
+        }
+        await page.waitForTimeout(250);
+    }
+
+    throw new Error(
+        `Timed out waiting for assistant message content to reach ${minimumLength} characters.`,
     );
 }
 
@@ -261,7 +301,10 @@ async function runSmoke(page: Page): Promise<void> {
         "Read src/math.ts and reply with only the result of add(2, 3).",
     );
     await assertComposerSettled(page);
-    const assistantText = await waitForAssistantMessage(page, /(^|[^0-9])5([^0-9]|$)/);
+    const assistantText = await waitForAssistantMessage(
+        page,
+        /(^|[^0-9])5([^0-9]|$)/,
+    );
     invariant(
         assistantText.includes("5"),
         `Unexpected smoke response: ${JSON.stringify(assistantText)}`,
@@ -343,7 +386,9 @@ async function waitForRecoverySignal(page: Page): Promise<boolean> {
     const failedBanner = page.getByTestId("runtime-failed-banner");
     const cancelButton = page.getByTestId("cancel-run-button");
     const sendButton = page.getByTestId("send-message-button");
-    const assistantMessages = page.locator('[data-testid^="message-assistant-"]');
+    const assistantMessages = page.locator(
+        '[data-testid^="message-assistant-"]',
+    );
 
     const deadline = Date.now() + DEFAULT_TIMEOUT_MS;
     for (;;) {
@@ -405,6 +450,69 @@ async function runRefresh(page: Page): Promise<void> {
     await assertComposerSettled(page);
 }
 
+async function runLongStream(page: Page): Promise<void> {
+    await selectAgent(page, "agentchat-workspace");
+    await startConversation(page);
+    await assertNoRecoveryBanner(page);
+    await sendPrompt(
+        page,
+        [
+            "Read notes.md but do not edit any files.",
+            "Reply in markdown only.",
+            "Use exactly these H2 headings: Overview, Priority Themes, Risks, Next Steps.",
+            "Under `## Priority Themes`, include at least three H3 subsections and at least twelve bullet items total grounded in the numbered improvement plan.",
+            "Under `## Risks`, include a short bullet list.",
+            "Under `## Next Steps`, include a five item markdown checklist.",
+            "Keep the response detailed enough that each section has a few sentences or bullets.",
+        ].join(" "),
+    );
+    await page.getByTestId("cancel-run-button").waitFor({
+        timeout: DEFAULT_TIMEOUT_MS,
+    });
+    await waitForAssistantMessageLength(page, 350);
+    await assertComposerSettled(page);
+
+    const lastAssistantMessage = await getLastAssistantMessage(page);
+    const headingTexts = (
+        await lastAssistantMessage.locator("h1, h2, h3").allTextContents()
+    )
+        .map((text) => text.trim())
+        .filter((text) => text.length > 0);
+    for (const heading of [
+        "Overview",
+        "Priority Themes",
+        "Risks",
+        "Next Steps",
+    ]) {
+        invariant(
+            headingTexts.includes(heading),
+            `Expected long-stream response to include heading ${heading}.`,
+        );
+    }
+
+    const subheadingCount = await lastAssistantMessage.locator("h3").count();
+    invariant(
+        subheadingCount >= 3,
+        `Expected at least three H3 subsections in the long-stream response, got ${subheadingCount}.`,
+    );
+
+    const listItemCount = await lastAssistantMessage.locator("li").count();
+    invariant(
+        listItemCount >= 12,
+        `Expected at least twelve list items in the long-stream response, got ${listItemCount}.`,
+    );
+
+    const checkboxCount = await lastAssistantMessage
+        .locator('input[type="checkbox"]')
+        .count();
+    invariant(
+        checkboxCount >= 3,
+        `Expected a markdown checklist in the long-stream response, got ${checkboxCount} checkboxes.`,
+    );
+
+    await assertNoRecoveryBanner(page);
+}
+
 async function captureScreenshot(
     page: Page,
     repoRoot: string,
@@ -438,7 +546,9 @@ async function runBrowserConfidence(
     const page = await browser.newPage();
 
     try {
-        await page.goto(`${args.baseUrl}/chat`, { waitUntil: "domcontentloaded" });
+        await page.goto(`${args.baseUrl}/chat`, {
+            waitUntil: "domcontentloaded",
+        });
         await signInIfNeeded(page, authProviderKind);
         await page.getByTestId("agent-select").waitFor({
             timeout: DEFAULT_TIMEOUT_MS,
@@ -452,6 +562,9 @@ async function runBrowserConfidence(
         }
         if (args.mode === "refresh" || args.mode === "full") {
             await runRefresh(page);
+        }
+        if (args.mode === "long-stream" || args.mode === "full") {
+            await runLongStream(page);
         }
 
         artifactPaths.push(
@@ -474,7 +587,9 @@ async function runBrowserConfidence(
                 `browser-confidence-${args.mode}-failure.png`,
             ).catch(() => ""),
         );
-        onFailureArtifacts(artifactPaths.filter((artifactPath) => artifactPath.length > 0));
+        onFailureArtifacts(
+            artifactPaths.filter((artifactPath) => artifactPath.length > 0),
+        );
         throw error;
     } finally {
         await browser.close();

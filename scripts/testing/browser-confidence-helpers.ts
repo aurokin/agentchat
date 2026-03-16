@@ -4,6 +4,7 @@ export type BrowserConfidenceMode =
     | "smoke"
     | "interrupt"
     | "refresh"
+    | "long-stream"
     | "full";
 export type BrowserConfidenceScenario = Exclude<BrowserConfidenceMode, "full">;
 export type BrowserConfidenceArgs = {
@@ -55,6 +56,7 @@ export function getBrowserConfidenceScenarios(
             { name: "smoke", status: "passed" },
             { name: "interrupt", status: "passed" },
             { name: "refresh", status: "passed" },
+            { name: "long-stream", status: "passed" },
         ];
     }
 
@@ -91,10 +93,11 @@ export function parseBrowserConfidenceArgs(
                 value !== "smoke" &&
                 value !== "interrupt" &&
                 value !== "refresh" &&
+                value !== "long-stream" &&
                 value !== "full"
             ) {
                 throw new Error(
-                    "--mode must be smoke, interrupt, refresh, or full.",
+                    "--mode must be smoke, interrupt, refresh, long-stream, or full.",
                 );
             }
             mode = value;
@@ -158,7 +161,9 @@ export function formatBrowserConfidenceText(
         return `[browser-confidence] failed (${report.issueCode}) in ${report.durationMs}ms: ${report.message}`;
     }
 
-    const scenarioList = report.scenarios.map((scenario) => scenario.name).join(", ");
+    const scenarioList = report.scenarios
+        .map((scenario) => scenario.name)
+        .join(", ");
     const artifactSummary =
         report.artifactPaths.length > 0
             ? ` artifacts=${report.artifactPaths.join(",")}`

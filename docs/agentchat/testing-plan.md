@@ -212,7 +212,7 @@ Current local browser path:
 
 - local auth with seeded users is the preferred browser-test path for local confidence work that does not specifically need the Google sign-in flow
 - use `bun run test:manual:web-browser-confidence` for the real local-auth web chat flow
-    - covers smoke, interrupt, and refresh flows
+    - covers smoke, interrupt, refresh, and long-stream markdown flows
     - asserts terminal runs restore the send button and clear stale stop state
     - asserts recovery banners stay absent on ordinary flows without a known reconnect
 - use `bun run test:manual:web-operator-smoke` for browser-visible config hot-reload checks

@@ -223,6 +223,8 @@ For machine-readable browser-confidence output with screenshot artifact paths:
 bun run test:manual:web-browser-confidence -- --json
 ```
 
+That browser-confidence command now covers the scripted local-auth smoke, interrupt, refresh, and long-stream markdown rendering path.
+
 Run those browser commands sequentially. The operator smoke command intentionally mutates `apps/server/agentchat.config.json` to validate hot reload behavior.
 
 For operator failure-path validation, also run:
@@ -260,8 +262,8 @@ Short version for this Linux environment:
 If bootstrap fails in the web app:
 
 - verify `NEXT_PUBLIC_AGENTCHAT_SERVER_URL`
-  - loopback values like `http://localhost:3030` or `http://127.0.0.1:3030` are valid for local development
-  - when opening the web app from another device on your LAN, the web client will automatically swap the loopback hostname for the browser's current hostname and keep the configured port
+    - loopback values like `http://localhost:3030` or `http://127.0.0.1:3030` are valid for local development
+    - when opening the web app from another device on your LAN, the web client will automatically swap the loopback hostname for the browser's current hostname and keep the configured port
 - verify `apps/server` is running
 - verify `agentchat.config.json` is valid
 

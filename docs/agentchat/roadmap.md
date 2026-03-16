@@ -86,10 +86,10 @@ This roadmap describes the current implementation state and the next major steps
 - Add browser-level end-to-end coverage for agent selection, chat send, interruption, refresh, and recovery
 - Keep explicit browser/runtime assertions that terminal runs restore the send button and clear any stale stop state
 - Keep explicit reconnect assertions so recovery banners only appear after a known disconnect and reconnect
-- Add long-stream rendering checks for assistant responses that naturally transition from progress narration into structured markdown
+- Keep long-stream rendering checks for assistant responses that naturally transition from progress narration into structured markdown
 - Add local LAN browser checks for dev-origin, bootstrap, and websocket reachability
 - Keep the local-auth browser path as the primary local web confidence path
-- Run `bun run test:manual:web-browser-confidence` for the real web smoke, cancel, and refresh flow
+- Run `bun run test:manual:web-browser-confidence` for the real web smoke, cancel, refresh, and long-stream markdown flow
 - Run `bun run test:manual:web-operator-smoke` for browser-visible agent/provider disable handling
 - Keep browser E2E work honest: do not add fake auth bypasses just to automate the chat flow
 - Build a manual QA checklist for real Codex-backed instances
