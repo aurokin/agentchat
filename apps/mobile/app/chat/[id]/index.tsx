@@ -241,6 +241,7 @@ export default function ChatScreen(): ReactElement {
             previousConversationIdRef.current !== null &&
             previousConversationIdRef.current !== currentConversationId
         ) {
+            pendingReconnectNoticeRef.current = false;
             setError(null);
             setRetryPayload(null);
             setRecoveredRunNotice(false);

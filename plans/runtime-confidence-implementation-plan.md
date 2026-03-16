@@ -48,6 +48,7 @@ Recently completed and intentionally removed from the active backlog:
 - shared socket coverage for explicit client close while a reconnect timer is pending, so background reconnects do not leak past teardown
 - shared conversation-scoped send gating so web and mobile ignore stale send settlements after a conversation switch, and web clears pending send state when the user switches away before run binding
 - web and mobile now clear transient retry/error/recovered UI state on conversation switches so one chat's local runtime state does not leak into the next chat
+- web now keys the socket subscription effect by conversation id rather than the whole chat object, avoiding resubscribe churn on title/model updates, and both clients clear leftover reconnect/interrupt flags on conversation switches
 
 Current Phase 1 focus:
 

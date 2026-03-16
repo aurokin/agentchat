@@ -162,6 +162,8 @@ export function useConversationRuntime({
             previousConversationIdRef.current !== null &&
             previousConversationIdRef.current !== currentConversationId
         ) {
+            pendingInterruptRef.current = false;
+            pendingReconnectNoticeRef.current = false;
             setError(null);
             setRetryChat(null);
             setRecoveredRunNotice(false);
@@ -408,7 +410,7 @@ export function useConversationRuntime({
                 },
             }) ?? undefined
         );
-    }, [currentChat, getBackendSessionToken, socketClient]);
+    }, [currentChat?.id, getBackendSessionToken, socketClient]);
 
     useEffect(() => {
         const syncPlan = planConversationRuntimeSync({
