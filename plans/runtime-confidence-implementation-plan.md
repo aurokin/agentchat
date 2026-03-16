@@ -38,6 +38,7 @@ Recently completed and intentionally removed from the active backlog:
 - mobile planner coverage for runtime sync, run lifecycle, message lifecycle, and active-run connection error handling
 - manual LAN browser-confidence command and supporting config/example files
 - server doctor/auth diagnostics improvements and confidence coverage
+- direct server coverage for last-known-good config reload failure and recovery behavior
 
 Current Phase 1 focus:
 
@@ -49,6 +50,7 @@ Current Phase 1 focus:
 Immediate next candidates:
 
 - add automated coverage around server/scripts operator confidence paths that are still only exercised manually
+- keep turning last-known-good reload semantics and operator remediation paths into deterministic server/script coverage
 - add deterministic coverage for any remaining runtime replay or cross-client ordering edge found during implementation
 - reassess whether Phase 1 is near exit criteria and Phase 2 should become the active workstream
 

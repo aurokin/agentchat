@@ -1,8 +1,9 @@
-import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { describe, expect, mock, test } from "bun:test";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
-import { parseConfig } from "../config.ts";
+import { ConfigStore, parseConfig } from "../config.ts";
 import { createFetchHandler } from "../http.ts";
 
 const exampleConfigPath = path.resolve(
@@ -14,6 +15,25 @@ const exampleConfigPath = path.resolve(
 const exampleConfig = parseConfig(
     JSON.parse(readFileSync(exampleConfigPath, "utf8")) as unknown,
 );
+
+function createTempConfigPath(): string {
+    const tempDir = mkdtempSync(path.join(os.tmpdir(), "agentchat-config-"));
+    return path.join(tempDir, "agentchat.config.json");
+}
+
+function withMutedConfigReloadLogs<T>(run: () => T): T {
+    const originalConsoleLog = console.log;
+    const originalConsoleError = console.error;
+    console.log = mock(() => undefined) as typeof console.log;
+    console.error = mock(() => undefined) as typeof console.error;
+
+    try {
+        return run();
+    } finally {
+        console.log = originalConsoleLog;
+        console.error = originalConsoleError;
+    }
+}
 
 describe("server config", () => {
     test("parses the example config", () => {
@@ -174,6 +194,70 @@ describe("server config", () => {
                     allowSignup: false,
                 },
             ],
+        });
+    });
+
+    test("keeps the last known good config when reloads fail and recovers cleanly", () => {
+        withMutedConfigReloadLogs(() => {
+            const configPath = createTempConfigPath();
+
+            try {
+                writeFileSync(
+                    configPath,
+                    `${JSON.stringify(exampleConfig, null, 2)}\n`,
+                    "utf8",
+                );
+
+                const store = new ConfigStore(configPath);
+                const initialLoadedAt = store.status.loadedAt;
+
+                const updatedConfig = structuredClone(exampleConfig);
+                updatedConfig.agents[0]!.name = "Reloaded Agent";
+                writeFileSync(
+                    configPath,
+                    `${JSON.stringify(updatedConfig, null, 2)}\n`,
+                    "utf8",
+                );
+
+                store.reloadNow(1_111);
+
+                expect(store.snapshot.agents[0]?.name).toBe("Reloaded Agent");
+                expect(store.status).toEqual({
+                    loadedAt: 1_111,
+                    lastReloadAttemptAt: 1_111,
+                    lastReloadError: null,
+                });
+
+                writeFileSync(configPath, "{\n", "utf8");
+
+                store.reloadNow(2_222);
+
+                expect(store.snapshot.agents[0]?.name).toBe("Reloaded Agent");
+                expect(store.status.loadedAt).toBe(1_111);
+                expect(store.status.lastReloadAttemptAt).toBe(2_222);
+                expect(store.status.lastReloadError).toBeString();
+                expect(store.status.lastReloadError).not.toBeNull();
+
+                const recoveredConfig = structuredClone(exampleConfig);
+                recoveredConfig.agents[0]!.name = "Recovered Agent";
+                writeFileSync(
+                    configPath,
+                    `${JSON.stringify(recoveredConfig, null, 2)}\n`,
+                    "utf8",
+                );
+
+                store.reloadNow(3_333);
+
+                expect(store.snapshot.agents[0]?.name).toBe("Recovered Agent");
+                expect(store.status).toEqual({
+                    loadedAt: 3_333,
+                    lastReloadAttemptAt: 3_333,
+                    lastReloadError: null,
+                });
+                expect(initialLoadedAt).not.toBe(1_111);
+            } finally {
+                rmSync(path.dirname(configPath), { recursive: true, force: true });
+            }
         });
     });
 });

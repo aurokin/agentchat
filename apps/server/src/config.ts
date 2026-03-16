@@ -277,31 +277,34 @@ export class ConfigStore {
         return this.#status;
     }
 
+    reloadNow(attemptedAt = Date.now()): void {
+        try {
+            this.#config = loadConfigFile(this.#configPath);
+            this.#status = {
+                loadedAt: attemptedAt,
+                lastReloadAttemptAt: attemptedAt,
+                lastReloadError: null,
+            };
+            console.log(
+                `[agentchat-server] reloaded config from ${this.#configPath}`,
+            );
+        } catch (error) {
+            this.#status = {
+                ...this.#status,
+                lastReloadAttemptAt: attemptedAt,
+                lastReloadError:
+                    error instanceof Error ? error.message : String(error),
+            };
+            console.error(
+                `[agentchat-server] failed to reload config from ${this.#configPath}; keeping last known good config`,
+                error,
+            );
+        }
+    }
+
     watch(): void {
         watch(this.#configPath, { persistent: false }, () => {
-            const attemptedAt = Date.now();
-            try {
-                this.#config = loadConfigFile(this.#configPath);
-                this.#status = {
-                    loadedAt: attemptedAt,
-                    lastReloadAttemptAt: attemptedAt,
-                    lastReloadError: null,
-                };
-                console.log(
-                    `[agentchat-server] reloaded config from ${this.#configPath}`,
-                );
-            } catch (error) {
-                this.#status = {
-                    ...this.#status,
-                    lastReloadAttemptAt: attemptedAt,
-                    lastReloadError:
-                        error instanceof Error ? error.message : String(error),
-                };
-                console.error(
-                    `[agentchat-server] failed to reload config from ${this.#configPath}; keeping last known good config`,
-                    error,
-                );
-            }
+            this.reloadNow();
         });
     }
 }
