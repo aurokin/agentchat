@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
     isConversationRuntimeSnapshotLive,
+    shouldClearPendingReconnectNoticeAfterRuntimeSync,
     synchronizeActiveRunWithRuntimeSnapshot,
     shouldResetActiveRunForRuntimeSnapshot,
     type ActiveRunState,
@@ -90,5 +91,23 @@ describe("conversation runtime helpers", () => {
                 activeRun: createActiveRun({ runId: null }),
             }),
         ).toEqual(createActiveRun());
+    });
+
+    test("keeps reconnect notices through a post-reset grace pass", () => {
+        expect(
+            shouldClearPendingReconnectNoticeAfterRuntimeSync({
+                shouldReset: true,
+                recoveredRun: null,
+                runtimeState: createRuntimeState({ phase: "idle" }),
+            }),
+        ).toBe(false);
+
+        expect(
+            shouldClearPendingReconnectNoticeAfterRuntimeSync({
+                shouldReset: false,
+                recoveredRun: createActiveRun(),
+                runtimeState: createRuntimeState({ phase: "recovering" }),
+            }),
+        ).toBe(true);
     });
 });

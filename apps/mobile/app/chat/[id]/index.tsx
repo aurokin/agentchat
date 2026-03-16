@@ -55,6 +55,7 @@ import {
     resolveMobileConversationRuntimeSync,
     runMobileConversationSend,
 } from "@/components/chat/conversation-runtime-controller";
+import { planMobileConversationRuntimeSync } from "@/components/chat/conversation-runtime-sync";
 
 const EMPTY_MESSAGES: Message[] = [];
 
@@ -505,8 +506,13 @@ export default function ChatScreen(): ReactElement {
             runtimeState,
             activeRun: activeRunRef.current,
         });
+        const syncPlan = planMobileConversationRuntimeSync({
+            syncResolution,
+            runtimeState,
+            pendingReconnectNotice: pendingReconnectNoticeRef.current,
+        });
 
-        if (syncResolution.shouldReset) {
+        if (syncPlan.shouldReset) {
             startTransition(() => {
                 setActiveRun(null);
                 setStreamingMessage(null);
@@ -515,13 +521,10 @@ export default function ChatScreen(): ReactElement {
             });
         }
 
-        const recoveredRun = syncResolution.recoveredRun;
+        const recoveredRun = syncPlan.recoveredRun;
 
         if (!recoveredRun) {
-            if (
-                runtimeState.phase !== "active" &&
-                runtimeState.phase !== "recovering"
-            ) {
+            if (syncPlan.clearPendingReconnectNotice) {
                 pendingReconnectNoticeRef.current = false;
             }
             return;
@@ -533,8 +536,10 @@ export default function ChatScreen(): ReactElement {
                 id: recoveredRun.assistantMessageId,
                 content: recoveredRun.content,
             });
-            setRecoveredRunNotice(pendingReconnectNoticeRef.current);
-            pendingReconnectNoticeRef.current = false;
+            setRecoveredRunNotice(syncPlan.recoveredRunNotice ?? false);
+            if (syncPlan.clearPendingReconnectNotice) {
+                pendingReconnectNoticeRef.current = false;
+            }
             setIsLoading(true);
         });
     }, [chatMessages, currentChat, hasLoadedMessages, runtimeState]);

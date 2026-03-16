@@ -594,7 +594,31 @@ Use this block when updating the plan after a commit or push:
 - Docs updated:
     - plan progress only in this milestone
 - Commit / push:
+    - commit: `e9ec3f5`
+    - push: `origin/master`
+- Next step:
+    - shift the next deterministic slice toward parity work, most likely mobile/shared recovery tests or a comparable extracted planner on the mobile runtime path
+
+### Update 2026-03-16
+
+- Phase: `Phase 1. Expand Live Runtime Confidence Coverage`
+- Status: `in_progress`
+- Landed:
+    - moved reconnect-notice clearing rules into `packages/shared` so web and mobile can follow the same runtime-sync semantics
+    - mobile chat runtime sync now keeps a pending reconnect notice through one post-reset grace pass instead of clearing it immediately
+    - added direct mobile planning coverage for recovered-run notice consumption and the post-reset grace-pass behavior
+- Refactors:
+    - extracted a mobile runtime-sync planning helper and rewired the mobile chat screen to use it
+- Tests added or updated:
+    - `packages/shared/src/core/__tests__/conversation-runtime.test.ts`
+    - `apps/mobile/src/components/chat/__tests__/conversation-runtime-sync.test.ts`
+    - `bun run --cwd packages/shared test`
+    - `bun run --cwd apps/mobile typecheck`
+    - `bun run --cwd apps/mobile test:confidence`
+- Docs updated:
+    - plan progress only in this milestone
+- Commit / push:
     - commit: `pending`
     - push: `pending`
 - Next step:
-    - shift the next deterministic slice toward parity work, most likely mobile/shared recovery tests or a comparable extracted planner on the mobile runtime path
+    - continue parity work by extracting and testing the mobile socket-event application path, which is now the largest remaining inline runtime state machine outside manual/browser flows

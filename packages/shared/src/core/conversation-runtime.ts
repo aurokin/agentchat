@@ -266,6 +266,21 @@ export function synchronizeActiveRunWithRuntimeSnapshot(params: {
     return null;
 }
 
+export function shouldClearPendingReconnectNoticeAfterRuntimeSync(params: {
+    shouldReset: boolean;
+    recoveredRun: ActiveRunState | null;
+    runtimeState: ConversationRuntimeSnapshot;
+}): boolean {
+    if (params.recoveredRun) {
+        return true;
+    }
+
+    return (
+        !params.shouldReset &&
+        !isConversationRuntimeSnapshotLive(params.runtimeState)
+    );
+}
+
 export function buildInterruptCommand(
     conversationId: string,
     createId: RuntimeIdFactory = generateId,
