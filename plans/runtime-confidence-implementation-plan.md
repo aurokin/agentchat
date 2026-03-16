@@ -550,7 +550,29 @@ Use this block when updating the plan after a commit or push:
 - Docs updated:
     - plan progress only in this milestone
 - Commit / push:
+    - commit: `74282a3`
+    - push: `origin/master`
+- Next step:
+    - choose between expanding the hook harness deeper into socket-event handling or switching back to a browser/manual reconnect flow that validates the same behavior end to end
+
+### Update 2026-03-16
+
+- Phase: `Phase 1. Expand Live Runtime Confidence Coverage`
+- Status: `in_progress`
+- Landed:
+    - extracted a pure run-lifecycle planner for the `useConversationRuntime` socket-event path, covering recovered `run.started` and terminal run handling
+    - added direct unit coverage for recovered reconnect notice consumption, flushed interrupt errors on `run.started`, and terminal failure cleanup planning
+    - removed an unreachable `connection.error` branch from the web hook after `tsc` confirmed it could never be produced by `resolveConversationSocketEvent`
+- Refactors:
+    - `useConversationRuntime` now delegates more of its socket-event state machine to `planConversationRunLifecycleResolution`
+- Tests added or updated:
+    - `apps/web/src/components/chat/__tests__/conversation-runtime-events.test.ts`
+    - `bun run --cwd apps/web typecheck`
+    - `bun run --cwd apps/web test:confidence`
+- Docs updated:
+    - plan progress only in this milestone
+- Commit / push:
     - commit: `pending`
     - push: `pending`
 - Next step:
-    - choose between expanding the hook harness deeper into socket-event handling or switching back to a browser/manual reconnect flow that validates the same behavior end to end
+    - keep deepening deterministic hook-level coverage, likely by extracting the remaining message event application path or by adding mobile/shared parity tests for the new recovery invariants

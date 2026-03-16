@@ -27,6 +27,7 @@ import {
     resolveConversationSocketEvent,
     runConversationSend,
 } from "./conversation-runtime-controller";
+import { planConversationRunLifecycleResolution } from "./conversation-runtime-events";
 import { planConversationRuntimeSync } from "./conversation-runtime-hook";
 
 type UseConversationRuntimeParams = {
@@ -197,7 +198,6 @@ export function useConversationRuntime({
             }
 
             if (resolution.type === "run.started") {
-                activeRunRef.current = resolution.activeRun;
                 const pendingInterruptError = flushPendingConversationInterrupt(
                     {
                         pendingInterrupt: pendingInterruptRef.current,
@@ -205,17 +205,32 @@ export function useConversationRuntime({
                         sendCommand: (command) => socketClient.send(command),
                     },
                 );
-                pendingInterruptRef.current = false;
-                if (pendingInterruptError) {
-                    setError(pendingInterruptError);
+                const runLifecyclePlan = planConversationRunLifecycleResolution({
+                    resolution,
+                    pendingReconnectNotice:
+                        pendingReconnectNoticeRef.current,
+                    pendingInterruptError,
+                });
+                if (runLifecyclePlan.type !== "run.started") {
+                    return;
                 }
-                if (resolution.recovered) {
+
+                activeRunRef.current = runLifecyclePlan.activeRun;
+                pendingInterruptRef.current = false;
+                if (runLifecyclePlan.error) {
+                    setError(runLifecyclePlan.error);
+                }
+                if (runLifecyclePlan.shouldSetSending) {
                     setSending(true);
-                    setRecoveredRunNotice(pendingReconnectNoticeRef.current);
-                    pendingReconnectNoticeRef.current = false;
-                    if (resolution.streamingMessage) {
+                    setRecoveredRunNotice(
+                        runLifecyclePlan.recoveredRunNotice ?? false,
+                    );
+                    if (runLifecyclePlan.clearPendingReconnectNotice) {
+                        pendingReconnectNoticeRef.current = false;
+                    }
+                    if (runLifecyclePlan.streamingMessage) {
                         queueStreamingMessageUpdate(
-                            resolution.streamingMessage,
+                            runLifecyclePlan.streamingMessage,
                         );
                     }
                 }
@@ -263,27 +278,44 @@ export function useConversationRuntime({
                 resolution.type === "run.completed" ||
                 resolution.type === "run.interrupted"
             ) {
+                const runLifecyclePlan = planConversationRunLifecycleResolution(
+                    {
+                        resolution,
+                        pendingReconnectNotice:
+                            pendingReconnectNoticeRef.current,
+                    },
+                );
+                if (runLifecyclePlan.type !== "terminal") {
+                    return;
+                }
                 pendingInterruptRef.current = false;
-                activeRunRef.current = resolution.activeRun;
+                activeRunRef.current = runLifecyclePlan.activeRun;
                 void persistActiveAssistantMessage(
-                    resolution.finalContent,
+                    runLifecyclePlan.persistFinalContent,
                 ).finally(() => {
                     clearActiveRun();
                 });
                 return;
             }
 
-            if (
-                resolution.type === "run.failed" ||
-                resolution.type === "connection.error"
-            ) {
+            if (resolution.type === "run.failed") {
+                const runLifecyclePlan = planConversationRunLifecycleResolution(
+                    {
+                        resolution,
+                        pendingReconnectNotice:
+                            pendingReconnectNoticeRef.current,
+                    },
+                );
+                if (runLifecyclePlan.type !== "terminal") {
+                    return;
+                }
                 pendingInterruptRef.current = false;
-                activeRunRef.current = resolution.activeRun;
+                activeRunRef.current = runLifecyclePlan.activeRun;
                 void persistActiveAssistantMessage(
-                    resolution.finalContent,
+                    runLifecyclePlan.persistFinalContent,
                 ).finally(() => {
-                    setError(resolution.error);
-                    setRetryChat(resolution.retryChat);
+                    setError(runLifecyclePlan.error);
+                    setRetryChat(runLifecyclePlan.retryChat);
                     clearActiveRun();
                 });
             }
