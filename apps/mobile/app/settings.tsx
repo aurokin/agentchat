@@ -22,6 +22,7 @@ import { useAgent } from "@/contexts/AgentContext";
 import { useModelContext } from "@/contexts/ModelContext";
 import { AgentSwitcher } from "@/components/chat/AgentSwitcher";
 import { buildAgentSettingsSummary } from "@/lib/settings-summary";
+import { resolveResponsiveLayout } from "@/lib/responsive-layout";
 import { TopBar } from "@/components/ui/TopBar";
 
 export default function SettingsScreen(): ReactElement {
@@ -41,6 +42,10 @@ export default function SettingsScreen(): ReactElement {
     const { colors, userTheme, setUserTheme } = useTheme();
     const { width: windowWidth, height: windowHeight } = useWindowDimensions();
     const styles = useMemo(() => createStyles(colors), [colors]);
+    const { useTabletLandscapeLayout } = resolveResponsiveLayout({
+        width: windowWidth,
+        height: windowHeight,
+    });
 
     const [isSigningIn, setIsSigningIn] = useState(false);
     const [localUsername, setLocalUsername] = useState("");
@@ -148,7 +153,6 @@ export default function SettingsScreen(): ReactElement {
         ],
     );
     const isGoogleButtonBusy = isAuthLoading || isSigningIn;
-    const isTwoPaneLayout = Math.min(windowWidth, windowHeight) >= 700;
     const settingsRailWidth = Math.max(256, Math.min(320, windowWidth * 0.28));
     const settingsContentMaxWidth = Math.max(
         620,
@@ -169,10 +173,10 @@ export default function SettingsScreen(): ReactElement {
                 <View
                     style={[
                         styles.settingsLayout,
-                        isTwoPaneLayout && styles.settingsLayoutTablet,
+                        useTabletLandscapeLayout && styles.settingsLayoutTablet,
                     ]}
                 >
-                    {isTwoPaneLayout && (
+                    {useTabletLandscapeLayout && (
                         <View
                             style={[
                                 styles.tabletRail,
@@ -228,7 +232,7 @@ export default function SettingsScreen(): ReactElement {
                     )}
 
                     <View style={styles.settingsMain}>
-                        {!isTwoPaneLayout && (
+                        {!useTabletLandscapeLayout && (
                             <TopBar
                                 eyebrow="Agentchat"
                                 title="Settings"
@@ -253,14 +257,14 @@ export default function SettingsScreen(): ReactElement {
                             style={styles.scrollContent}
                             contentContainerStyle={[
                                 styles.scrollContentContainer,
-                                isTwoPaneLayout &&
+                                useTabletLandscapeLayout &&
                                     styles.scrollContentContainerTablet,
                             ]}
                         >
                             <View
                                 style={[
                                     styles.sectionsColumn,
-                                    isTwoPaneLayout && {
+                                    useTabletLandscapeLayout && {
                                         maxWidth: settingsContentMaxWidth,
                                     },
                                 ]}

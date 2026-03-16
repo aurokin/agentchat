@@ -49,6 +49,7 @@ import { AgentSwitcher } from "@/components/chat/AgentSwitcher";
 import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { TopBar } from "@/components/ui/TopBar";
 import { consumePendingSharePayload } from "@/lib/share-intent/pending-share";
+import { resolveResponsiveLayout } from "@/lib/responsive-layout";
 import {
     interruptMobileConversationRun,
     resolveMobileConversationRuntimeSync,
@@ -117,8 +118,10 @@ export default function ChatScreen(): ReactElement {
     >({});
     const { width: windowWidth, height: windowHeight } = useWindowDimensions();
     const screenWidth = windowWidth;
-    const smallestSide = Math.min(windowWidth, windowHeight);
-    const isTwoPaneLayout = smallestSide >= 700;
+    const { useTabletLandscapeLayout } = resolveResponsiveLayout({
+        width: windowWidth,
+        height: windowHeight,
+    });
     const sidebarWidth = Math.max(280, Math.min(360, windowWidth * 0.32));
     const suppressInputRef = useRef(false);
     const currentChatRef = useRef<ChatSession | null>(currentChat);
@@ -178,10 +181,10 @@ export default function ChatScreen(): ReactElement {
     }, [chats.length, loadChats]);
 
     useEffect(() => {
-        if (!isTwoPaneLayout) return;
+        if (!useTabletLandscapeLayout) return;
         if (currentChat || chats.length === 0) return;
         router.replace(`/chat/${chats[0].id}`);
-    }, [chats, currentChat, isTwoPaneLayout, router]);
+    }, [chats, currentChat, useTabletLandscapeLayout, router]);
 
     useEffect(() => {
         return () => {
@@ -636,7 +639,7 @@ export default function ChatScreen(): ReactElement {
     const handleDeleteChat = async () => {
         const fallbackChatId = chats.find((chat) => chat.id !== chatId)?.id;
         const navigateAfterDelete = () => {
-            if (isTwoPaneLayout && fallbackChatId) {
+            if (useTabletLandscapeLayout && fallbackChatId) {
                 router.replace(`/chat/${fallbackChatId}`);
                 return;
             }
@@ -1048,7 +1051,7 @@ export default function ChatScreen(): ReactElement {
                 style={styles.container}
                 edges={["top", "left", "right"]}
             >
-                {isTwoPaneLayout ? (
+                {useTabletLandscapeLayout ? (
                     <View style={styles.tabletLayout}>
                         {renderTabletSidebar()}
                         <View style={styles.tabletThreadPaneLoading}>
@@ -1082,7 +1085,7 @@ export default function ChatScreen(): ReactElement {
                           : undefined
                 }
                 leftSlot={
-                    isTwoPaneLayout ? null : (
+                    useTabletLandscapeLayout ? null : (
                         <TouchableOpacity
                             onPress={() => router.replace("/")}
                             style={styles.iconButton}
@@ -1254,7 +1257,7 @@ export default function ChatScreen(): ReactElement {
 
     return (
         <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
-            {isTwoPaneLayout ? (
+            {useTabletLandscapeLayout ? (
                 <View style={styles.tabletLayout}>
                     {renderTabletSidebar()}
                     <View style={styles.tabletThreadPane}>{threadContent}</View>

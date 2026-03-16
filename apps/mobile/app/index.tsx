@@ -26,6 +26,7 @@ import { useAgent } from "@/contexts/AgentContext";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AgentSwitcher } from "@/components/chat/AgentSwitcher";
 import { getPreferredHomeChatId } from "@/lib/home-chat-route";
+import { resolveResponsiveLayout } from "@/lib/responsive-layout";
 import { TopBar } from "@/components/ui/TopBar";
 
 export default function HomeScreen(): React.ReactElement {
@@ -52,7 +53,10 @@ export default function HomeScreen(): React.ReactElement {
     const longPressTriggeredRef = useRef(false);
     const [headerHeight, setHeaderHeight] = useState<number | null>(null);
     const { width: windowWidth, height: windowHeight } = useWindowDimensions();
-    const isTwoPaneLayout = Math.min(windowWidth, windowHeight) >= 700;
+    const { useTabletLandscapeLayout } = resolveResponsiveLayout({
+        width: windowWidth,
+        height: windowHeight,
+    });
 
     useEffect(() => {
         if (isInitialized) {
@@ -61,7 +65,7 @@ export default function HomeScreen(): React.ReactElement {
     }, [isInitialized, loadChats]);
 
     useEffect(() => {
-        if (!isInitialized || !isTwoPaneLayout) return;
+        if (!isInitialized || !useTabletLandscapeLayout) return;
         if (isLoading || chats.length === 0) return;
         const preferredChatId = getPreferredHomeChatId({
             currentChatId: currentChat?.id ?? null,
@@ -74,7 +78,7 @@ export default function HomeScreen(): React.ReactElement {
         currentChat?.id,
         isInitialized,
         isLoading,
-        isTwoPaneLayout,
+        useTabletLandscapeLayout,
         router,
     ]);
 

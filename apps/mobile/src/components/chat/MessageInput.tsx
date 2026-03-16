@@ -21,6 +21,7 @@ import { VariantSelector } from "@/components/chat/VariantSelector";
 import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
 import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { resolveResponsiveLayout } from "@/lib/responsive-layout";
 
 interface MessageInputProps {
     inputText: string;
@@ -74,9 +75,12 @@ export function MessageInput({
     const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
     const inputRef = useRef<TextInput>(null);
     const bottomPadding = isKeyboardVisible ? 8 : 8 + insets.bottom;
-    const isTwoPaneLayout = Math.min(windowWidth, windowHeight) >= 700;
+    const { isTablet } = resolveResponsiveLayout({
+        width: windowWidth,
+        height: windowHeight,
+    });
     const composerMaxWidth = Math.max(640, Math.min(980, windowWidth - 40));
-    const composerConstraintStyle = isTwoPaneLayout
+    const composerConstraintStyle = isTablet
         ? {
               width: "100%" as const,
               maxWidth: composerMaxWidth,
@@ -143,13 +147,8 @@ export function MessageInput({
     );
 
     return (
-        <View
-            style={[
-                styles.container,
-                isTwoPaneLayout && styles.containerTablet,
-            ]}
-        >
-            {isTwoPaneLayout ? (
+        <View style={[styles.container, isTablet && styles.containerTablet]}>
+            {isTablet ? (
                 <View
                     style={[styles.controlsContainer, composerConstraintStyle]}
                 >
@@ -174,7 +173,7 @@ export function MessageInput({
                     ref={inputRef}
                     style={[
                         styles.textInput,
-                        isTwoPaneLayout && styles.textInputTablet,
+                        isTablet && styles.textInputTablet,
                     ]}
                     value={inputText}
                     onChangeText={onInputChange}
