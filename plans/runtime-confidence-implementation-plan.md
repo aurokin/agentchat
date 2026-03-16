@@ -411,7 +411,32 @@ Use this block when updating the plan after a commit or push:
     - `docs/agentchat/roadmap.md`
     - `docs/agentchat/testing-plan.md`
 - Commit / push:
+    - commit: `3e52254`
+    - push: `origin/master`
+- Next step:
+    - choose the next Phase 1 slice between broader LAN/browser runtime assertions and another deterministic cross-client recovery regression
+
+### Update 2026-03-16
+
+- Phase: `Phase 1. Expand Live Runtime Confidence Coverage`
+- Status: `in_progress`
+- Landed:
+    - shared runtime recovery now treats persisted `recovering` snapshots as resumable active runs instead of dropping them on client reload
+    - web runtime synchronization now restores the active run UI when the current chat reconnects into a persisted `recovering` state
+    - mobile runtime synchronization now restores the active run UI for the same persisted `recovering` state path
+- Refactors:
+    - kept the runtime recovery rule centralized in `packages/shared` so web and mobile continue to share the same active-run reconstruction logic
+- Tests added or updated:
+    - `apps/web/src/components/chat/__tests__/conversation-runtime-helpers.test.ts`
+    - `apps/web/src/components/chat/__tests__/conversation-runtime-controller.test.ts`
+    - `apps/mobile/src/components/chat/__tests__/conversation-runtime-controller.test.ts`
+    - `bun run --cwd packages/shared test`
+    - `bun run --cwd apps/web test:confidence`
+    - `bun run --cwd apps/mobile test:confidence`
+- Docs updated:
+    - plan progress only in this milestone
+- Commit / push:
     - commit: `pending`
     - push: `pending`
 - Next step:
-    - choose the next Phase 1 slice between broader LAN/browser runtime assertions and another deterministic cross-client recovery regression
+    - keep Phase 1 focused on another deterministic recovery invariant, most likely around stale run handoff or cross-client recovery after conversation switches

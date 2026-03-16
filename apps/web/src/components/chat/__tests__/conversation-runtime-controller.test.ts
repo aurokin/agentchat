@@ -693,6 +693,56 @@ describe("conversation runtime controller", () => {
         });
     });
 
+    test("recovers persisted recovering runtime state for the current chat", () => {
+        const messages: Message[] = [
+            {
+                id: "user-1",
+                sessionId: "chat-1",
+                role: "user",
+                content: "Recover me",
+                contextContent: "Recover me",
+                createdAt: 1,
+            },
+            {
+                id: "assistant-1",
+                sessionId: "chat-1",
+                role: "assistant",
+                content: "Recovering output",
+                contextContent: "Recovering output",
+                createdAt: 2,
+                runId: "run-1",
+            },
+        ];
+
+        expect(
+            resolveConversationRuntimeSync({
+                currentChat: createChat(),
+                isMessagesLoading: false,
+                messages,
+                runtimeState: {
+                    phase: "recovering",
+                    runId: "run-1",
+                    assistantMessageId: "assistant-1",
+                    provider: "codex-default",
+                    errorMessage: null,
+                    startedAt: 1,
+                    completedAt: null,
+                    lastEventAt: 2,
+                },
+                activeRun: null,
+            }),
+        ).toEqual({
+            shouldReset: false,
+            recoveredRun: {
+                conversationId: "chat-1",
+                assistantMessageId: "assistant-1",
+                userContent: "Recover me",
+                content: "Recovering output",
+                runId: "run-1",
+            },
+        });
+    });
+
     test("resets a stale local active run when persisted runtime state is no longer active", () => {
         expect(
             resolveConversationRuntimeSync({

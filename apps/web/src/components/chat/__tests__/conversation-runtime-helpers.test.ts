@@ -57,6 +57,11 @@ const activeRuntimeState: ConversationRuntimeState = {
     lastEventAt: 2,
 };
 
+const recoveringRuntimeState: ConversationRuntimeState = {
+    ...activeRuntimeState,
+    phase: "recovering",
+};
+
 describe("conversation runtime helpers", () => {
     test("recovers an active run from a socket run.started event", () => {
         expect(
@@ -81,6 +86,22 @@ describe("conversation runtime helpers", () => {
                 currentChat: createChat(),
                 messages: createMessages(),
                 runtimeState: activeRuntimeState,
+            }),
+        ).toEqual({
+            conversationId: "chat-1",
+            assistantMessageId: "assistant-1",
+            userContent: "First prompt",
+            content: "Partial answer",
+            runId: "run-1",
+        });
+    });
+
+    test("recovers a recovering run from persisted runtime state", () => {
+        expect(
+            createRecoveredActiveRunFromRuntimeState({
+                currentChat: createChat(),
+                messages: createMessages(),
+                runtimeState: recoveringRuntimeState,
             }),
         ).toEqual({
             conversationId: "chat-1",

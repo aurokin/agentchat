@@ -231,7 +231,8 @@ export function createRecoveredActiveRunFromRuntimeState(params: {
     runtimeState: ConversationRuntimeSnapshot;
 }): ActiveRunState | null {
     if (
-        params.runtimeState.phase !== "active" ||
+        (params.runtimeState.phase !== "active" &&
+            params.runtimeState.phase !== "recovering") ||
         !params.runtimeState.assistantMessageId
     ) {
         return null;

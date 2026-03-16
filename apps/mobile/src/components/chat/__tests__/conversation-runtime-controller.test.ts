@@ -166,4 +166,46 @@ describe("mobile conversation runtime controller", () => {
             recoveredRun: null,
         });
     });
+
+    test("recovers persisted recovering runtime state for the current chat", () => {
+        const resolution = resolveMobileConversationRuntimeSync({
+            currentChat: createChat(),
+            isMessagesLoading: false,
+            messages: [
+                createMessage({
+                    id: "user-1",
+                    role: "user",
+                    content: "hello",
+                    contextContent: "hello",
+                }),
+                createMessage({
+                    id: "assistant-1",
+                    role: "assistant",
+                    content: "Recovering output",
+                    contextContent: "Recovering output",
+                    runId: "run-1",
+                }),
+            ],
+            runtimeState: createRuntimeState({
+                phase: "recovering",
+                runId: "run-1",
+                assistantMessageId: "assistant-1",
+                provider: "codex-default",
+                startedAt: 1,
+                lastEventAt: 2,
+            }),
+            activeRun: null,
+        });
+
+        expect(resolution).toEqual({
+            shouldReset: false,
+            recoveredRun: {
+                conversationId: "chat-1",
+                assistantMessageId: "assistant-1",
+                userContent: "hello",
+                content: "Recovering output",
+                runId: "run-1",
+            },
+        });
+    });
 });
