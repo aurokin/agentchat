@@ -30,6 +30,10 @@ yarn-error.*
 .DS_Store
 *.pem
 
+# EAS local build credentials
+credentials.json
+credentials/
+
 # local env files
 .env*.local
 
