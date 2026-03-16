@@ -214,3 +214,56 @@ export function interruptMobileConversationRun(params: {
         };
     }
 }
+
+export type RequestMobileConversationInterruptResult = {
+    queued: boolean;
+    error: RuntimeErrorState | null;
+};
+
+export function requestMobileConversationInterrupt(params: {
+    activeRun: ActiveRunState | null;
+    isLoading: boolean;
+    queuePendingInterrupt: () => void;
+    sendCommand: (command: ReturnType<typeof buildInterruptCommand>) => void;
+}): RequestMobileConversationInterruptResult {
+    if (params.activeRun) {
+        return {
+            queued: false,
+            error: interruptMobileConversationRun({
+                activeRun: params.activeRun,
+                sendCommand: params.sendCommand,
+            }),
+        };
+    }
+
+    if (params.isLoading) {
+        params.queuePendingInterrupt();
+        return {
+            queued: true,
+            error: null,
+        };
+    }
+
+    return {
+        queued: false,
+        error: {
+            message: "No active run is available to interrupt yet.",
+            isRetryable: true,
+        },
+    };
+}
+
+export function flushPendingMobileConversationInterrupt(params: {
+    pendingInterrupt: boolean;
+    activeRun: ActiveRunState | null;
+    sendCommand: (command: ReturnType<typeof buildInterruptCommand>) => void;
+}): RuntimeErrorState | null {
+    if (!params.pendingInterrupt || !params.activeRun) {
+        return null;
+    }
+
+    return interruptMobileConversationRun({
+        activeRun: params.activeRun,
+        sendCommand: params.sendCommand,
+    });
+}

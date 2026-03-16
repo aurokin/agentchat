@@ -3,7 +3,9 @@ import type { ConversationSendCommand } from "@/lib/agentchat-socket";
 import type { ChatSession, Message } from "@shared/core/types";
 import { SupportedParameter, type ProviderModel } from "@shared/core/models";
 import {
+    flushPendingMobileConversationInterrupt,
     interruptMobileConversationRun,
+    requestMobileConversationInterrupt,
     resolveMobileConversationRuntimeSync,
     runMobileConversationSend,
 } from "../conversation-runtime-controller";
@@ -142,6 +144,50 @@ describe("mobile conversation runtime controller", () => {
             message: "cannot interrupt",
             isRetryable: true,
         });
+    });
+
+    test("queues an interrupt when send is in-flight before the run is bound", () => {
+        const calls: string[] = [];
+
+        expect(
+            requestMobileConversationInterrupt({
+                activeRun: null,
+                isLoading: true,
+                queuePendingInterrupt: () => {
+                    calls.push("queued");
+                },
+                sendCommand: () => {
+                    calls.push("sent");
+                },
+            }),
+        ).toEqual({
+            queued: true,
+            error: null,
+        });
+
+        expect(calls).toEqual(["queued"]);
+    });
+
+    test("flushes a queued mobile interrupt once the run is available", () => {
+        const commands: string[] = [];
+
+        expect(
+            flushPendingMobileConversationInterrupt({
+                pendingInterrupt: true,
+                activeRun: {
+                    conversationId: "chat-1",
+                    assistantMessageId: "assistant-1",
+                    userContent: "hello",
+                    content: "",
+                    runId: "run-1",
+                },
+                sendCommand: (command) => {
+                    commands.push(command.type);
+                },
+            }),
+        ).toBeNull();
+
+        expect(commands).toEqual(["conversation.interrupt"]);
     });
 
     test("resets a stale local active run when persisted runtime is terminal", () => {

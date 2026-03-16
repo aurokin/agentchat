@@ -22,6 +22,7 @@ export type MobileRunLifecyclePlan =
           type: "run.started";
           activeRun: ActiveRunState;
           shouldSetLoading: boolean;
+          error: RuntimeErrorState | null;
           recoveredRunNotice: boolean | null;
           clearPendingReconnectNotice: boolean;
           streamingMessage: StreamingMessageState | null;
@@ -94,12 +95,14 @@ export function planMobileConnectionError(params: {
 export function planMobileRunLifecycleResolution(params: {
     resolution: SocketEventResolution;
     pendingReconnectNotice: boolean;
+    pendingInterruptError?: RuntimeErrorState | null;
 }): MobileRunLifecyclePlan {
     if (params.resolution.type === "run.started") {
         return {
             type: "run.started",
             activeRun: params.resolution.activeRun,
             shouldSetLoading: true,
+            error: params.pendingInterruptError ?? null,
             recoveredRunNotice: params.resolution.recovered
                 ? params.pendingReconnectNotice
                 : null,

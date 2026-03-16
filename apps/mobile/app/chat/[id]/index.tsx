@@ -52,7 +52,9 @@ import { TopBar } from "@/components/ui/TopBar";
 import { consumePendingSharePayload } from "@/lib/share-intent/pending-share";
 import { resolveResponsiveLayout } from "@/lib/responsive-layout";
 import {
+    flushPendingMobileConversationInterrupt,
     interruptMobileConversationRun,
+    requestMobileConversationInterrupt,
     resolveMobileConversationRuntimeSync,
     runMobileConversationSend,
 } from "@/components/chat/conversation-runtime-controller";
@@ -136,6 +138,7 @@ export default function ChatScreen(): ReactElement {
     const chatMessagesRef = useRef<Message[]>(EMPTY_MESSAGES);
     const activeRunRef = useRef<ActiveRunState | null>(null);
     const pendingReconnectNoticeRef = useRef(false);
+    const pendingInterruptRef = useRef(false);
     const conversationSubscriptionCleanupRef = useRef<(() => void) | null>(
         null,
     );
@@ -241,6 +244,7 @@ export default function ChatScreen(): ReactElement {
             previousConversationIdRef.current !== null &&
             previousConversationIdRef.current !== currentConversationId
         ) {
+            pendingInterruptRef.current = false;
             pendingReconnectNoticeRef.current = false;
             setError(null);
             setRetryPayload(null);
@@ -398,17 +402,30 @@ export default function ChatScreen(): ReactElement {
             }
 
             if (resolution.type === "run.started") {
+                const pendingInterruptError =
+                    flushPendingMobileConversationInterrupt({
+                        pendingInterrupt: pendingInterruptRef.current,
+                        activeRun: resolution.activeRun,
+                        sendCommand: (command) => {
+                            socketClient.send(command);
+                        },
+                    });
                 const runLifecyclePlan = planMobileRunLifecycleResolution({
                     resolution,
                     pendingReconnectNotice:
                         pendingReconnectNoticeRef.current,
+                    pendingInterruptError,
                 });
                 if (runLifecyclePlan.type !== "run.started") {
                     return;
                 }
 
+                pendingInterruptRef.current = false;
                 setActiveRun(runLifecyclePlan.activeRun);
                 setIsLoading(runLifecyclePlan.shouldSetLoading);
+                if (runLifecyclePlan.error) {
+                    setError(runLifecyclePlan.error);
+                }
                 if (runLifecyclePlan.recoveredRunNotice !== null) {
                     setRecoveredRunNotice(runLifecyclePlan.recoveredRunNotice);
                     if (runLifecyclePlan.clearPendingReconnectNotice) {
@@ -486,6 +503,7 @@ export default function ChatScreen(): ReactElement {
                     return;
                 }
 
+                pendingInterruptRef.current = false;
                 void persistAssistantMessage(runLifecyclePlan.persistMessage).finally(() => {
                     setActiveRun(null);
                     setStreamingMessage(null);
@@ -505,6 +523,7 @@ export default function ChatScreen(): ReactElement {
                     return;
                 }
 
+                pendingInterruptRef.current = false;
                 void persistAssistantMessage(runLifecyclePlan.persistMessage).finally(() => {
                     setActiveRun(null);
                     setStreamingMessage(null);
@@ -524,6 +543,7 @@ export default function ChatScreen(): ReactElement {
                     return;
                 }
 
+                pendingInterruptRef.current = false;
                 void persistAssistantMessage(runLifecyclePlan.persistMessage).finally(() => {
                     setError(runLifecyclePlan.error);
                     setRetryPayload(runLifecyclePlan.retryPayload);
@@ -690,16 +710,20 @@ export default function ChatScreen(): ReactElement {
     };
 
     const handleCancel = useCallback(() => {
-        const interruptError = interruptMobileConversationRun({
+        const result = requestMobileConversationInterrupt({
             activeRun,
+            isLoading,
+            queuePendingInterrupt: () => {
+                pendingInterruptRef.current = true;
+            },
             sendCommand: (command) => {
                 socketClient.send(command);
             },
         });
-        if (interruptError) {
-            setError(interruptError);
+        if (result.error) {
+            setError(result.error);
         }
-    }, [activeRun, socketClient]);
+    }, [activeRun, isLoading, socketClient]);
 
     const handleDeleteChat = async () => {
         const fallbackChatId = chats.find((chat) => chat.id !== chatId)?.id;

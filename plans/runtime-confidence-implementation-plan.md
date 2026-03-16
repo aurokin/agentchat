@@ -51,6 +51,7 @@ Recently completed and intentionally removed from the active backlog:
 - web now keys the socket subscription effect by conversation id rather than the whole chat object, avoiding resubscribe churn on title/model updates, and both clients clear leftover reconnect/interrupt flags on conversation switches
 - shared background runtime subscription helpers now back both clients' workspace-level socket subscriptions, with direct reconciliation and cleanup coverage
 - web and mobile now derive conversation runtime state through one shared helper, reducing drift in run-summary/runtime-binding interpretation while preserving existing client confidence coverage
+- mobile now matches web on queued interrupt behavior during send-in-flight pre-bind windows, including flushed interrupt error handling once `run.started` arrives
 
 Current Phase 1 focus:
 

@@ -38,12 +38,54 @@ describe("mobile conversation runtime events", () => {
                 runId: "run-1",
             },
             shouldSetLoading: true,
+            error: null,
             recoveredRunNotice: true,
             clearPendingReconnectNotice: true,
             streamingMessage: {
                 id: "assistant-1",
                 content: "Recovered output",
             },
+        });
+    });
+
+    test("surfaces a flushed interrupt error on run.started", () => {
+        expect(
+            planMobileRunLifecycleResolution({
+                resolution: {
+                    type: "run.started",
+                    activeRun: {
+                        conversationId: "chat-1",
+                        assistantMessageId: "assistant-1",
+                        userContent: "hello",
+                        content: "",
+                        runId: "run-1",
+                    },
+                    recovered: false,
+                    streamingMessage: null,
+                },
+                pendingReconnectNotice: false,
+                pendingInterruptError: {
+                    message: "interrupt failed",
+                    isRetryable: true,
+                },
+            }),
+        ).toEqual({
+            type: "run.started",
+            activeRun: {
+                conversationId: "chat-1",
+                assistantMessageId: "assistant-1",
+                userContent: "hello",
+                content: "",
+                runId: "run-1",
+            },
+            shouldSetLoading: true,
+            error: {
+                message: "interrupt failed",
+                isRetryable: true,
+            },
+            recoveredRunNotice: null,
+            clearPendingReconnectNotice: false,
+            streamingMessage: null,
         });
     });
 
