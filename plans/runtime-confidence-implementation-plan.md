@@ -46,6 +46,7 @@ Recently completed and intentionally removed from the active backlog:
 - shared socket coverage for conversation unsubscribes that happen during reconnect gaps, so stale subscriptions are not replayed
 - shared socket coverage for conversation subscriptions requested before the first socket-ready event, so initial mounts replay correctly
 - shared socket coverage for explicit client close while a reconnect timer is pending, so background reconnects do not leak past teardown
+- shared conversation-scoped send gating so web and mobile ignore stale send settlements after a conversation switch, and web clears pending send state when the user switches away before run binding
 
 Current Phase 1 focus:
 

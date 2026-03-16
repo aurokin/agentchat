@@ -13,6 +13,10 @@ import {
 } from "@/lib/types";
 import { trimTrailingEmptyLines } from "@shared/core/text";
 import {
+    shouldApplyConversationScopedUpdate,
+    shouldResetPendingConversationSendOnConversationChange,
+} from "@shared/core/conversation-runtime";
+import {
     applyStreamingMessageOverlay,
     type ActiveRunState,
     type RetryChatState,
@@ -105,6 +109,7 @@ export function useConversationRuntime({
     const activeRunRef = useRef<ActiveRunState | null>(null);
     const pendingInterruptRef = useRef(false);
     const pendingReconnectNoticeRef = useRef(false);
+    const pendingSendConversationIdRef = useRef<string | null>(null);
     const currentChatRef = useRef<ChatSession | null>(null);
     const messagesRef = useRef<Message[]>([]);
 
@@ -151,6 +156,22 @@ export function useConversationRuntime({
     }, [currentChat]);
 
     useEffect(() => {
+        if (
+            !shouldResetPendingConversationSendOnConversationChange({
+                currentConversationId: currentChat?.id ?? null,
+                pendingSendConversationId:
+                    pendingSendConversationIdRef.current,
+                activeRun: activeRunRef.current,
+            })
+        ) {
+            return;
+        }
+
+        pendingSendConversationIdRef.current = null;
+        setSending(false);
+    }, [currentChat]);
+
+    useEffect(() => {
         messagesRef.current = messages;
     }, [messages]);
 
@@ -175,6 +196,7 @@ export function useConversationRuntime({
     const clearActiveRun = useCallback(() => {
         activeRunRef.current = null;
         pendingInterruptRef.current = false;
+        pendingSendConversationIdRef.current = null;
         clearStreamingMessage();
         setRecoveredRunNotice(false);
         setSending(false);
@@ -443,9 +465,8 @@ export function useConversationRuntime({
             setRetryChat(null);
             setRecoveredRunNotice(false);
             pendingInterruptRef.current = false;
+            pendingSendConversationIdRef.current = chatSnapshot.id;
             clearStreamingMessage();
-
-            let assistantMessageId: string | null = null;
 
             const result = await runConversationSend({
                 chat: chatSnapshot,
@@ -463,12 +484,21 @@ export function useConversationRuntime({
                 },
             });
 
+            pendingSendConversationIdRef.current = null;
+            if (
+                !shouldApplyConversationScopedUpdate({
+                    currentConversationId: currentChatRef.current?.id ?? null,
+                    targetConversationId: chatSnapshot.id,
+                })
+            ) {
+                return;
+            }
+
             if (result.status === "sent") {
                 activeRunRef.current = result.activeRun;
                 return;
             }
 
-            assistantMessageId = result.assistantMessageId;
             activeRunRef.current = null;
             setSending(false);
             clearStreamingMessage();

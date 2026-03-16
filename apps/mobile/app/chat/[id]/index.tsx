@@ -37,6 +37,7 @@ import {
     applyStreamingMessageOverlay,
     createRecoveredActiveRunFromRuntimeState,
     resolveConversationSocketEvent,
+    shouldApplyConversationScopedUpdate,
     type ActiveRunState,
     type RetryChatState,
     type RuntimeErrorState,
@@ -583,6 +584,7 @@ export default function ChatScreen(): ReactElement {
             return false;
         }
 
+        const startedConversationId = currentChat.id;
         const result = await runMobileConversationSend({
             chat: currentChat,
             messages: chatMessages,
@@ -613,6 +615,15 @@ export default function ChatScreen(): ReactElement {
                 },
             },
         });
+
+        if (
+            !shouldApplyConversationScopedUpdate({
+                currentConversationId: currentChatRef.current?.id ?? null,
+                targetConversationId: startedConversationId,
+            })
+        ) {
+            return false;
+        }
 
         if (result.status === "failed") {
             setError(result.error);

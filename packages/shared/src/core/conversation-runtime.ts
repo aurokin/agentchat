@@ -281,6 +281,25 @@ export function shouldClearPendingReconnectNoticeAfterRuntimeSync(params: {
     );
 }
 
+export function shouldApplyConversationScopedUpdate(params: {
+    currentConversationId: string | null;
+    targetConversationId: string;
+}): boolean {
+    return params.currentConversationId === params.targetConversationId;
+}
+
+export function shouldResetPendingConversationSendOnConversationChange(params: {
+    currentConversationId: string | null;
+    pendingSendConversationId: string | null;
+    activeRun: ActiveRunState | null;
+}): boolean {
+    if (!params.pendingSendConversationId || params.activeRun) {
+        return false;
+    }
+
+    return params.currentConversationId !== params.pendingSendConversationId;
+}
+
 export function buildInterruptCommand(
     conversationId: string,
     createId: RuntimeIdFactory = generateId,

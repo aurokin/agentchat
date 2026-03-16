@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import {
     isConversationRuntimeSnapshotLive,
+    shouldApplyConversationScopedUpdate,
     shouldClearPendingReconnectNoticeAfterRuntimeSync,
+    shouldResetPendingConversationSendOnConversationChange,
     synchronizeActiveRunWithRuntimeSnapshot,
     shouldResetActiveRunForRuntimeSnapshot,
     type ActiveRunState,
@@ -109,5 +111,47 @@ describe("conversation runtime helpers", () => {
                 runtimeState: createRuntimeState({ phase: "recovering" }),
             }),
         ).toBe(true);
+    });
+
+    test("applies conversation-scoped updates only for the current conversation", () => {
+        expect(
+            shouldApplyConversationScopedUpdate({
+                currentConversationId: "chat-1",
+                targetConversationId: "chat-1",
+            }),
+        ).toBe(true);
+
+        expect(
+            shouldApplyConversationScopedUpdate({
+                currentConversationId: "chat-2",
+                targetConversationId: "chat-1",
+            }),
+        ).toBe(false);
+    });
+
+    test("resets a pending send when the user switches away before the run is bound", () => {
+        expect(
+            shouldResetPendingConversationSendOnConversationChange({
+                currentConversationId: "chat-2",
+                pendingSendConversationId: "chat-1",
+                activeRun: null,
+            }),
+        ).toBe(true);
+
+        expect(
+            shouldResetPendingConversationSendOnConversationChange({
+                currentConversationId: "chat-1",
+                pendingSendConversationId: "chat-1",
+                activeRun: null,
+            }),
+        ).toBe(false);
+
+        expect(
+            shouldResetPendingConversationSendOnConversationChange({
+                currentConversationId: "chat-2",
+                pendingSendConversationId: "chat-1",
+                activeRun: createActiveRun(),
+            }),
+        ).toBe(false);
     });
 });
