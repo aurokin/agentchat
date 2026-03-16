@@ -43,6 +43,7 @@ Recently completed and intentionally removed from the active backlog:
 - shared browser/operator smoke helpers for auth-provider selection and config mutation paths
 - structured `/api/diagnostics` issue-code coverage for auth, provider, and agent operator failures
 - shared socket coverage for failed reconnect attempts that preserve the pending recovery signal until a real reconnect succeeds
+- shared socket coverage for conversation unsubscribes that happen during reconnect gaps, so stale subscriptions are not replayed
 
 Current Phase 1 focus:
 
