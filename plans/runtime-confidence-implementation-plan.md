@@ -329,39 +329,39 @@ Use this block when updating the plan after a commit or push:
     - `docs/agentchat/runtime-and-auth-plan.md`
     - `docs/agentchat/testing-plan.md`
 - Commit / push:
-  - commit: `fbf1d6c`
-  - push: `origin/master`
+    - commit: `fbf1d6c`
+    - push: `origin/master`
 - Next step:
-  - land additional Phase 1 confidence coverage starting with the browser long-stream markdown scenario
+    - land additional Phase 1 confidence coverage starting with the browser long-stream markdown scenario
 
 ### Update 2026-03-16
 
 - Phase: `Phase 1. Expand Live Runtime Confidence Coverage`
 - Status: `in_progress`
 - Landed:
-  - `web-browser-confidence` now includes a scripted `long-stream` scenario for local-auth browser confidence work
-  - the default `full` browser-confidence mode now covers smoke, interrupt, refresh, and long-stream markdown rendering
-  - runtime replay analysis now validates `previousMessageId` and `previousKind` across multi-message assistant transitions
-  - shared transcript text normalization now inserts paragraph breaks before markdown headings when prose runs into structured markdown
+    - `web-browser-confidence` now includes a scripted `long-stream` scenario for local-auth browser confidence work
+    - the default `full` browser-confidence mode now covers smoke, interrupt, refresh, and long-stream markdown rendering
+    - runtime replay analysis now validates `previousMessageId` and `previousKind` across multi-message assistant transitions
+    - shared transcript text normalization now inserts paragraph breaks before markdown headings when prose runs into structured markdown
 - Refactors:
-  - browser-confidence gained reusable helpers for locating the latest assistant message and waiting for streamed content length
-  - runtime replay validation now tracks prior message kinds instead of only message ids and content
+    - browser-confidence gained reusable helpers for locating the latest assistant message and waiting for streamed content length
+    - runtime replay validation now tracks prior message kinds instead of only message ids and content
 - Tests added or updated:
-  - `scripts/testing/__tests__/browser-confidence-helpers.test.ts`
-  - `scripts/testing/__tests__/runtime-replay-helpers.test.ts`
-  - `packages/shared/src/core/__tests__/text.test.ts`
-  - `bun run test:scripts`
-  - `bun run --cwd packages/shared test`
+    - `scripts/testing/__tests__/browser-confidence-helpers.test.ts`
+    - `scripts/testing/__tests__/runtime-replay-helpers.test.ts`
+    - `packages/shared/src/core/__tests__/text.test.ts`
+    - `bun run test:scripts`
+    - `bun run --cwd packages/shared test`
 - Docs updated:
-  - `docs/agentchat/operator-guide.md`
-  - `docs/agentchat/roadmap.md`
-  - `docs/agentchat/testing-plan.md`
+    - `docs/agentchat/operator-guide.md`
+    - `docs/agentchat/roadmap.md`
+    - `docs/agentchat/testing-plan.md`
 - Commit / push:
-  - commit: `e57aab4`
-  - push: `origin/master`
-  - commit: `ba14a13`
-  - push: `origin/master`
-  - commit: `d6990b5`
-  - push: `origin/master`
+    - commit: `e57aab4`
+    - push: `origin/master`
+    - commit: `ba14a13`
+    - push: `origin/master`
+    - commit: `d6990b5`
+    - push: `origin/master`
 - Next step:
-  - add the next Phase 1 confidence slice around LAN/browser reachability or another deterministic regression for cross-client recovery behavior
+    - add the next Phase 1 confidence slice around LAN/browser reachability or another deterministic regression for cross-client recovery behavior
