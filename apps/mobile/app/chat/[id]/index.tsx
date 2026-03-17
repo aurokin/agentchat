@@ -1637,9 +1637,9 @@ const createStyles = (colors: ThemeColors) =>
         },
         userMessage: {
             alignSelf: "flex-end",
-            backgroundColor: colors.accentSoft,
+            backgroundColor: colors.userBubble,
             borderWidth: 1,
-            borderColor: colors.accentBorder,
+            borderColor: colors.userBubbleBorder,
         },
         assistantMessage: {
             alignSelf: "flex-start",
@@ -1670,9 +1670,6 @@ const createStyles = (colors: ThemeColors) =>
         messageText: {
             fontSize: 16,
             lineHeight: 22,
-        },
-        userMessageText: {
-            color: colors.textOnAccent,
         },
         assistantMessageText: {
             color: colors.text,

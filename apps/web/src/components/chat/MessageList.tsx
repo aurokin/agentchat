@@ -298,7 +298,7 @@ function MessageItem({
                             className={cn(
                                 "p-5 prose prose-sm dark:prose-invert max-w-none",
                                 isUser
-                                    ? "bg-primary/20 border border-primary/30 text-left"
+                                    ? "bg-user-bubble border border-user-bubble-border text-left text-foreground-user prose-p:text-foreground-user prose-strong:text-foreground-user prose-headings:text-foreground-user"
                                     : isAssistantStatus
                                       ? "bg-muted/40 border border-border-accent/70 prose-headings:text-foreground prose-p:text-foreground prose-pre:bg-muted prose-pre:border prose-pre:border-border prose-code:text-primary"
                                       : "bg-background-elevated border border-border prose-headings:text-foreground prose-p:text-foreground prose-pre:bg-muted prose-pre:border prose-pre:border-border prose-code:text-primary",

@@ -9,7 +9,10 @@ export type ThemeColors = {
     textMuted: string;
     textSubtle: string;
     textFaint: string;
+    textUser: string;
     textOnAccent: string;
+    userBubble: string;
+    userBubbleBorder: string;
     accent: string;
     accentSoft: string;
     accentBorder: string;

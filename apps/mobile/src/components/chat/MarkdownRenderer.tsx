@@ -139,11 +139,13 @@ function createMarkdownStyles(
     const codeColor = colors.text;
     const linkColor = colors.link;
 
+    const textColor = isUser ? colors.textUser : colors.text;
+
     return {
         body: {
             fontSize: 16,
             lineHeight: 22,
-            color: colors.text,
+            color: textColor,
         },
         paragraph: {
             marginTop: 0,

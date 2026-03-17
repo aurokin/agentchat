@@ -38,6 +38,9 @@
     --color-error: var(--error);
     --color-error-soft: var(--error-soft);
 
+    --color-foreground-user: var(--foreground-user);
+    --color-user-bubble: var(--user-bubble);
+    --color-user-bubble-border: var(--user-bubble-border);
     --color-surface-subtle: var(--surface-subtle);
     --color-border-muted: var(--border-muted);
     --color-text-faint: var(--text-faint);
