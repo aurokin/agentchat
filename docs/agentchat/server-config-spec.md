@@ -10,7 +10,7 @@ The file is intended to be edited by humans. It configures:
 - globally configured providers
 - globally visible agents
 
-In v1, all agent visibility is global to all allowed users.
+Agent visibility is controlled per-agent via `defaultVisible` and `visibilityOverrides`.
 
 ## File Format
 
@@ -201,6 +201,8 @@ Example:
   "description": "Public website repository",
   "avatar": "/avatars/marketing-site.png",
   "enabled": true,
+  "defaultVisible": true,
+  "visibilityOverrides": [],
   "rootPath": "/srv/repos/marketing-site",
   "providerIds": ["codex-main"],
   "defaultProviderId": "codex-main",
@@ -233,6 +235,14 @@ Optional fields:
 - `description`
 - `avatar`
   - URL or absolute file path
+- `defaultVisible`
+  - boolean, defaults to `true`
+  - controls whether the agent appears in the agent list by default
+- `visibilityOverrides`
+  - array of usernames (local) or emails (Google) that get the **opposite** of `defaultVisible`
+  - if `defaultVisible: false`, listed users CAN see the agent
+  - if `defaultVisible: true`, listed users CANNOT see the agent
+  - defaults to `[]`
 - `defaultModel`
 - `defaultVariant`
 - `modelAllowlist`
@@ -242,9 +252,11 @@ Optional fields:
 - `tags`
 - `sortOrder`
 
-V1 behavior:
+Visibility behavior:
 
-- all enabled agents are visible to all allowed users
+- the `/api/bootstrap` endpoint accepts an optional backend session token
+- when a token is present, the server extracts the username and applies per-agent visibility rules
+- unauthenticated requests only see agents with `defaultVisible: true`
 - conversations store only `agentId`
 - agent config is resolved live from the current server config
 
@@ -267,7 +279,6 @@ When the backend exposes options to a client:
 
 ## Non-Goals For V1
 
-- per-agent user visibility
 - provider secrets inside the config file
 - UI-based config editing
 - remote config management

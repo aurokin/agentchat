@@ -55,6 +55,8 @@ function createConfig(): AgentchatConfig {
                 id: "agent-1",
                 name: "Agent 1",
                 enabled: true,
+                defaultVisible: true,
+                visibilityOverrides: [],
                 rootPath: "/tmp/agent-1",
                 providerIds: ["codex-default"],
                 defaultProviderId: "codex-default",

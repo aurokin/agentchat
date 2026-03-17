@@ -4,8 +4,11 @@ import React, {
     useContext,
     useEffect,
     useMemo,
+    useRef,
     useState,
 } from "react";
+import { useAction, useConvexAuth } from "convex/react";
+import { api } from "@convex/_generated/api";
 import {
     fetchAgentOptions,
     fetchBootstrap,
@@ -52,59 +55,91 @@ export function AgentProvider({
     const [loadingAgents, setLoadingAgents] = useState(false);
     const [loadingAgentOptions, setLoadingAgentOptions] = useState(false);
 
-    const refreshBootstrap = useCallback(async () => {
-        setLoadingAgents(true);
-        try {
-            const nextBootstrap = await fetchBootstrap();
-            setBootstrap(nextBootstrap);
+    const { isAuthenticated } = useConvexAuth();
+    const issueBackendToken = useAction(api.backendTokens.issue);
+    const backendTokenRef = useRef<string | null>(null);
 
-            const nextSelectedAgentId = resolveSelectedAgentId({
-                agents: nextBootstrap.agents,
-                storedAgentId: await getSelectedAgentId(),
-            });
+    const refreshBootstrap = useCallback(
+        async (token?: string | null) => {
+            setLoadingAgents(true);
+            try {
+                const nextBootstrap = await fetchBootstrap(token);
+                setBootstrap(nextBootstrap);
 
-            setSelectedAgentIdState(nextSelectedAgentId);
-            if (nextSelectedAgentId) {
-                await persistSelectedAgentId(nextSelectedAgentId);
-            } else {
-                await clearSelectedAgentId();
-            }
-        } catch (error) {
-            console.error("Failed to load Agentchat bootstrap:", error);
-            setBootstrap({
-                auth: {
-                    defaultProviderId: "google-main",
-                    requiresLogin: true,
-                    activeProvider: {
-                        id: "google-main",
-                        kind: "google",
-                        enabled: true,
-                        allowlistMode: "email",
-                        allowSignup: null,
-                    },
-                    providers: [
-                        {
+                const nextSelectedAgentId = resolveSelectedAgentId({
+                    agents: nextBootstrap.agents,
+                    storedAgentId: await getSelectedAgentId(),
+                });
+
+                setSelectedAgentIdState(nextSelectedAgentId);
+                if (nextSelectedAgentId) {
+                    await persistSelectedAgentId(nextSelectedAgentId);
+                } else {
+                    await clearSelectedAgentId();
+                }
+            } catch (error) {
+                console.error("Failed to load Agentchat bootstrap:", error);
+                setBootstrap({
+                    auth: {
+                        defaultProviderId: "google-main",
+                        requiresLogin: true,
+                        activeProvider: {
                             id: "google-main",
                             kind: "google",
                             enabled: true,
                             allowlistMode: "email",
                             allowSignup: null,
                         },
-                    ],
-                },
-                agents: [],
-                providers: [],
-            });
-            setSelectedAgentIdState(null);
-            await clearSelectedAgentId();
-        } finally {
-            setLoadingAgents(false);
-        }
-    }, []);
+                        providers: [
+                            {
+                                id: "google-main",
+                                kind: "google",
+                                enabled: true,
+                                allowlistMode: "email",
+                                allowSignup: null,
+                            },
+                        ],
+                    },
+                    agents: [],
+                    providers: [],
+                });
+                setSelectedAgentIdState(null);
+                await clearSelectedAgentId();
+            } finally {
+                setLoadingAgents(false);
+            }
+        },
+        [],
+    );
 
+    // Initial unauthenticated bootstrap (for auth config / login page)
     useEffect(() => {
         void refreshBootstrap();
     }, [refreshBootstrap]);
+
+    // Re-fetch bootstrap with backend token once authenticated
+    useEffect(() => {
+        if (!isAuthenticated) return;
+
+        let cancelled = false;
+        void (async () => {
+            try {
+                const result = await issueBackendToken({});
+                if (cancelled || !result) return;
+                backendTokenRef.current = (result as any).token;
+                await refreshBootstrap((result as any).token);
+            } catch (error) {
+                console.error(
+                    "Failed to issue backend token for bootstrap:",
+                    error,
+                );
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [isAuthenticated, issueBackendToken, refreshBootstrap]);
 
     const setSelectedAgentId = useCallback(
         async (agentId: string) => {
@@ -139,7 +174,7 @@ export function AgentProvider({
         let cancelled = false;
         setLoadingAgentOptions(true);
 
-        void fetchAgentOptions(selectedAgentId)
+        void fetchAgentOptions(selectedAgentId, backendTokenRef.current)
             .then((options) => {
                 if (cancelled) return;
                 setSelectedAgentOptions(options);
@@ -174,7 +209,8 @@ export function AgentProvider({
                 loadingAgentOptions,
                 bootstrap,
                 setSelectedAgentId,
-                refreshBootstrap,
+                refreshBootstrap: () =>
+                    refreshBootstrap(backendTokenRef.current),
             }}
         >
             {children}

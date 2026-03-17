@@ -110,6 +110,8 @@ function toBootstrapAgent(provider: ProviderConfig): AgentConfig {
         id: "__agentchat_provider_models__",
         name: "Agentchat Provider Models",
         enabled: true,
+        defaultVisible: true,
+        visibilityOverrides: [],
         rootPath: provider.codex.cwd ?? process.cwd(),
         providerIds: [provider.id],
         defaultProviderId: provider.id,

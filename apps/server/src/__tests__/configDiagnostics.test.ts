@@ -8,6 +8,8 @@ import {
     getAgentDiagnostics,
     getConfigDiagnostics,
     getProviderDiagnostics,
+    getVisibleAgents,
+    isAgentVisible,
     resolveAgentDefaults,
 } from "../configDiagnostics.ts";
 import type { AgentchatConfig } from "../config.ts";
@@ -95,6 +97,8 @@ function createConfig(): AgentchatConfig {
                 id: "agent-main",
                 name: "Main Agent",
                 enabled: true,
+                defaultVisible: true,
+                visibilityOverrides: [],
                 rootPath: agentRoot,
                 providerIds: ["codex-main", "codex-disabled"],
                 defaultProviderId: "codex-main",
@@ -175,6 +179,8 @@ describe("configDiagnostics", () => {
             id: "agent-broken",
             name: "Broken Agent",
             enabled: true,
+            defaultVisible: true,
+            visibilityOverrides: [],
             rootPath: "/missing/broken",
             providerIds: ["codex-disabled"],
             defaultProviderId: "codex-disabled",
@@ -238,5 +244,67 @@ describe("configDiagnostics", () => {
             activeProviderKind: null,
             issues: ["No enabled auth providers are configured."],
         });
+    });
+});
+
+describe("agent visibility", () => {
+    test("getVisibleAgents without username returns only defaultVisible agents", () => {
+        const config = createConfig();
+        config.agents[0]!.defaultVisible = false;
+
+        const agents = getVisibleAgents(config);
+        expect(agents).toEqual([]);
+    });
+
+    test("getVisibleAgents returns defaultVisible agents when no username", () => {
+        const config = createConfig();
+        config.agents[0]!.defaultVisible = true;
+
+        const agents = getVisibleAgents(config);
+        expect(agents).toHaveLength(1);
+        expect(agents[0]!.id).toBe("agent-main");
+    });
+
+    test("visibilityOverrides grants access to hidden agents", () => {
+        const config = createConfig();
+        config.agents[0]!.defaultVisible = false;
+        config.agents[0]!.visibilityOverrides = ["smoke_1", "smoke_2"];
+
+        expect(getVisibleAgents(config)).toEqual([]);
+        expect(getVisibleAgents(config, "smoke_1")).toHaveLength(1);
+        expect(getVisibleAgents(config, "smoke_2")).toHaveLength(1);
+        expect(getVisibleAgents(config, "other_user")).toEqual([]);
+    });
+
+    test("visibilityOverrides revokes access to visible agents", () => {
+        const config = createConfig();
+        config.agents[0]!.defaultVisible = true;
+        config.agents[0]!.visibilityOverrides = ["blocked_user"];
+
+        expect(getVisibleAgents(config)).toHaveLength(1);
+        expect(getVisibleAgents(config, "normal_user")).toHaveLength(1);
+        expect(getVisibleAgents(config, "blocked_user")).toEqual([]);
+    });
+
+    test("isAgentVisible returns false for disabled agents", () => {
+        const config = createConfig();
+        config.agents[0]!.enabled = false;
+
+        expect(isAgentVisible(config, "agent-main", null)).toBe(false);
+    });
+
+    test("isAgentVisible respects visibility overrides", () => {
+        const config = createConfig();
+        config.agents[0]!.defaultVisible = false;
+        config.agents[0]!.visibilityOverrides = ["auro"];
+
+        expect(isAgentVisible(config, "agent-main", null)).toBe(false);
+        expect(isAgentVisible(config, "agent-main", "auro")).toBe(true);
+        expect(isAgentVisible(config, "agent-main", "other")).toBe(false);
+    });
+
+    test("isAgentVisible returns false for nonexistent agents", () => {
+        const config = createConfig();
+        expect(isAgentVisible(config, "nonexistent", "auro")).toBe(false);
     });
 });

@@ -199,14 +199,39 @@ export function resolveAgentDefaults(
     };
 }
 
-export function getVisibleAgents(config: AgentchatConfig): AgentConfig[] {
+function isAgentVisibleToUser(
+    agent: AgentConfig,
+    username: string | null,
+): boolean {
+    if (username && agent.visibilityOverrides.includes(username)) {
+        return !agent.defaultVisible;
+    }
+    return agent.defaultVisible;
+}
+
+export function getVisibleAgents(
+    config: AgentchatConfig,
+    username?: string | null,
+): AgentConfig[] {
     return config.agents
         .filter(
             (agent) =>
                 agent.enabled &&
-                getAvailableProvidersForAgent(config, agent).length > 0,
+                getAvailableProvidersForAgent(config, agent).length > 0 &&
+                isAgentVisibleToUser(agent, username ?? null),
         )
         .sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+export function isAgentVisible(
+    config: AgentchatConfig,
+    agentId: string,
+    username: string | null,
+): boolean {
+    const agent = config.agents.find((a) => a.id === agentId);
+    if (!agent || !agent.enabled) return false;
+    if (getAvailableProvidersForAgent(config, agent).length === 0) return false;
+    return isAgentVisibleToUser(agent, username);
 }
 
 export function getProviderDiagnostics(

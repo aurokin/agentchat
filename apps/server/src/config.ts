@@ -114,6 +114,8 @@ const AgentSchema = z
         defaultProviderId: z.string().min(1),
         defaultModel: z.string().min(1).optional(),
         defaultVariant: z.string().min(1).optional(),
+        defaultVisible: z.boolean().default(true),
+        visibilityOverrides: z.array(z.string().min(1)).default([]),
         modelAllowlist: z.array(z.string()).default([]),
         variantAllowlist: z.array(z.string()).default([]),
         tags: z.array(z.string()).default([]),

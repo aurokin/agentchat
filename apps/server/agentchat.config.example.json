@@ -95,6 +95,8 @@
             "description": "Example workspace exposed through the Agentchat server.",
             "avatar": null,
             "enabled": true,
+            "defaultVisible": true,
+            "visibilityOverrides": [],
             "rootPath": "/srv/repos/example-agent",
             "providerIds": ["codex-main"],
             "defaultProviderId": "codex-main",

@@ -9,10 +9,13 @@ import type { CodexModelCatalog } from "./codexModelCatalog.ts";
 import {
     getConfigDiagnostics,
     getVisibleAgents,
+    isAgentVisible,
     resolveAgentDefaults,
 } from "./configDiagnostics.ts";
 import { buildDoctorIssues } from "./doctorReport.ts";
 import { getRuntimeEnvDiagnostics } from "./envDiagnostics.ts";
+import { getBackendTokenFromRequest } from "./backendAuth.ts";
+import { verifyBackendSessionToken } from "../../../packages/shared/src/core/backend-token";
 
 type HandlerDependencies = {
     getConfig(): AgentchatConfig;
@@ -180,6 +183,29 @@ function getProviderModelsFallback(
     };
 }
 
+const LOCAL_EMAIL_DOMAIN = "local.agentchat";
+
+async function tryGetUsernameFromRequest(
+    request: Request,
+): Promise<string | null> {
+    const token = getBackendTokenFromRequest(request);
+    if (!token) return null;
+
+    const secret = process.env.BACKEND_TOKEN_SECRET?.trim();
+    if (!secret) return null;
+
+    try {
+        const claims = await verifyBackendSessionToken({ token, secret });
+        const email = claims.email;
+        if (email.endsWith(`@${LOCAL_EMAIL_DOMAIN}`)) {
+            return email.slice(0, -(LOCAL_EMAIL_DOMAIN.length + 1));
+        }
+        return email;
+    } catch {
+        return null;
+    }
+}
+
 export function createFetchHandler(deps: HandlerDependencies) {
     return async function fetch(request: Request): Promise<Response> {
         const config = deps.getConfig();
@@ -225,6 +251,7 @@ export function createFetchHandler(deps: HandlerDependencies) {
         }
 
         if (request.method === "GET" && pathname === "/api/bootstrap") {
+            const username = await tryGetUsernameFromRequest(request);
             const activeAuthProvider = getActiveAuthProvider(config);
             return jsonResponse(request, {
                 auth: {
@@ -237,7 +264,7 @@ export function createFetchHandler(deps: HandlerDependencies) {
                     providers: config.auth.providers.map(toAuthProviderSummary),
                 },
                 providers: getVisibleProviders(config).map(toProviderSummary),
-                agents: getVisibleAgents(config).map((agent) => {
+                agents: getVisibleAgents(config, username).map((agent) => {
                     const resolvedDefaults = resolveAgentDefaults(
                         config,
                         agent,
@@ -279,10 +306,16 @@ export function createFetchHandler(deps: HandlerDependencies) {
             /^\/api\/agents\/([^/]+)\/options$/,
         );
         if (request.method === "GET" && agentOptionsMatch) {
-            const result = getAgentOptions(
-                config,
-                decodeURIComponent(agentOptionsMatch[1] ?? ""),
-            );
+            const agentId = decodeURIComponent(agentOptionsMatch[1] ?? "");
+            const optionsUsername = await tryGetUsernameFromRequest(request);
+            if (!isAgentVisible(config, agentId, optionsUsername)) {
+                return jsonResponse(
+                    request,
+                    { error: "Agent not found" },
+                    { status: 404 },
+                );
+            }
+            const result = getAgentOptions(config, agentId);
             if (!result) {
                 return jsonResponse(
                     request,

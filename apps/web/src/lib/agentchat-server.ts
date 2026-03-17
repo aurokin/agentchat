@@ -113,7 +113,10 @@ export function getAgentchatServerUrl(): string | null {
     return resolveBrowserReachableUrl(trimTrailingSlash(value));
 }
 
-async function fetchJson<T>(path: string): Promise<T> {
+async function fetchJson<T>(
+    path: string,
+    token?: string | null,
+): Promise<T> {
     const baseUrl = getAgentchatServerUrl();
     if (!baseUrl) {
         throw new Error(
@@ -121,11 +124,16 @@ async function fetchJson<T>(path: string): Promise<T> {
         );
     }
 
+    const headers: Record<string, string> = {
+        Accept: "application/json",
+    };
+    if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+    }
+
     const response = await fetch(`${baseUrl}${path}`, {
         method: "GET",
-        headers: {
-            Accept: "application/json",
-        },
+        headers,
         cache: "no-store",
     });
 
@@ -138,8 +146,10 @@ async function fetchJson<T>(path: string): Promise<T> {
     return (await response.json()) as T;
 }
 
-export async function fetchBootstrap(): Promise<BootstrapResponse> {
-    return await fetchJson<BootstrapResponse>("/api/bootstrap");
+export async function fetchBootstrap(
+    token?: string | null,
+): Promise<BootstrapResponse> {
+    return await fetchJson<BootstrapResponse>("/api/bootstrap", token);
 }
 
 export async function fetchProviderModels(
@@ -152,9 +162,11 @@ export async function fetchProviderModels(
 
 export async function fetchAgentOptions(
     agentId: string,
+    token?: string | null,
 ): Promise<AgentOptionsResponse> {
     return await fetchJson<AgentOptionsResponse>(
         `/api/agents/${encodeURIComponent(agentId)}/options`,
+        token,
     );
 }
 

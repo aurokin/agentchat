@@ -73,6 +73,8 @@ function createConfig(): AgentchatConfig {
                 description: "Primary manual test agent",
                 avatar: null,
                 enabled: true,
+                defaultVisible: true,
+                visibilityOverrides: [],
                 rootPath: "/srv/agents/visible",
                 providerIds: ["codex-main"],
                 defaultProviderId: "codex-main",
@@ -87,6 +89,8 @@ function createConfig(): AgentchatConfig {
                 id: "agent-disabled",
                 name: "Disabled Agent",
                 enabled: false,
+                defaultVisible: true,
+                visibilityOverrides: [],
                 rootPath: "/srv/agents/disabled",
                 providerIds: ["codex-main"],
                 defaultProviderId: "codex-main",
@@ -99,6 +103,8 @@ function createConfig(): AgentchatConfig {
                 id: "agent-fallback",
                 name: "Fallback Agent",
                 enabled: true,
+                defaultVisible: true,
+                visibilityOverrides: [],
                 rootPath: "/srv/agents/fallback",
                 providerIds: ["codex-disabled", "codex-main"],
                 defaultProviderId: "codex-disabled",
@@ -113,6 +119,8 @@ function createConfig(): AgentchatConfig {
                 id: "agent-no-provider",
                 name: "Broken Agent",
                 enabled: true,
+                defaultVisible: true,
+                visibilityOverrides: [],
                 rootPath: "/srv/agents/broken",
                 providerIds: ["codex-disabled"],
                 defaultProviderId: "codex-disabled",
@@ -126,6 +134,24 @@ function createConfig(): AgentchatConfig {
 }
 
 describe("createFetchHandler", () => {
+    test("excludes defaultVisible:false agents from unauthenticated bootstrap", async () => {
+        const config = createConfig();
+        config.agents[0]!.defaultVisible = false;
+        const fetchHandler = createFetchHandler({
+            getConfig: () => config,
+        });
+
+        const response = await fetchHandler(
+            new Request("http://localhost:3030/api/bootstrap"),
+        );
+        const body = (await response.json()) as {
+            agents: Array<{ id: string }>;
+        };
+
+        expect(response.status).toBe(200);
+        expect(body.agents.map((a) => a.id)).not.toContain("agent-visible");
+    });
+
     test("returns only enabled providers and agents from bootstrap", async () => {
         const fetchHandler = createFetchHandler({
             getConfig: () => createConfig(),

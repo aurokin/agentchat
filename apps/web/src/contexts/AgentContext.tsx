@@ -6,8 +6,12 @@ import React, {
     useContext,
     useEffect,
     useMemo,
+    useRef,
     useState,
 } from "react";
+import { useConvexAuth } from "convex/react";
+import { api } from "@convex/_generated/api";
+import type { FunctionReference } from "convex/server";
 
 import {
     fetchAgentOptions,
@@ -23,6 +27,13 @@ import {
 } from "@/lib/server-issues";
 import * as storage from "@/lib/storage";
 import { resolveSelectedAgentId } from "@/contexts/agent-helpers";
+import { useActionSafe } from "@/hooks/useConvexSafe";
+
+const convexApi = api as typeof api & {
+    backendTokens: {
+        issue: FunctionReference<"action">;
+    };
+};
 
 interface AgentContextType {
     agents: BootstrapAgent[];
@@ -57,66 +68,98 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
     const [agentOptionsIssue, setAgentOptionsIssue] =
         useState<AgentchatServerIssue | null>(null);
 
-    const refreshBootstrap = useCallback(async () => {
-        setLoadingAgents(true);
-        try {
-            const nextBootstrap = await fetchBootstrap();
-            setBootstrapIssue(null);
-            setBootstrap(nextBootstrap);
+    const { isAuthenticated } = useConvexAuth();
+    const issueBackendToken = useActionSafe(convexApi.backendTokens.issue);
+    const backendTokenRef = useRef<string | null>(null);
 
-            const nextSelectedAgentId = resolveSelectedAgentId({
-                agents: nextBootstrap.agents,
-                storedAgentId: storage.getSelectedAgentId(),
-            });
+    const refreshBootstrap = useCallback(
+        async (token?: string | null) => {
+            setLoadingAgents(true);
+            try {
+                const nextBootstrap = await fetchBootstrap(token);
+                setBootstrapIssue(null);
+                setBootstrap(nextBootstrap);
 
-            setSelectedAgentIdState(nextSelectedAgentId);
-            if (nextSelectedAgentId) {
-                storage.setSelectedAgentId(nextSelectedAgentId);
-            } else {
-                storage.clearSelectedAgentId();
-            }
-        } catch (error) {
-            console.error("Failed to load Agentchat bootstrap:", error);
-            setBootstrapIssue(
-                toAgentchatServerIssue({
-                    scope: "bootstrap",
-                    error,
-                }),
-            );
-            setBootstrap({
-                auth: {
-                    defaultProviderId: "google-main",
-                    requiresLogin: true,
-                    activeProvider: {
-                        id: "google-main",
-                        kind: "google",
-                        enabled: true,
-                        allowlistMode: "email",
-                        allowSignup: null,
-                    },
-                    providers: [
-                        {
+                const nextSelectedAgentId = resolveSelectedAgentId({
+                    agents: nextBootstrap.agents,
+                    storedAgentId: storage.getSelectedAgentId(),
+                });
+
+                setSelectedAgentIdState(nextSelectedAgentId);
+                if (nextSelectedAgentId) {
+                    storage.setSelectedAgentId(nextSelectedAgentId);
+                } else {
+                    storage.clearSelectedAgentId();
+                }
+            } catch (error) {
+                console.error("Failed to load Agentchat bootstrap:", error);
+                setBootstrapIssue(
+                    toAgentchatServerIssue({
+                        scope: "bootstrap",
+                        error,
+                    }),
+                );
+                setBootstrap({
+                    auth: {
+                        defaultProviderId: "google-main",
+                        requiresLogin: true,
+                        activeProvider: {
                             id: "google-main",
                             kind: "google",
                             enabled: true,
                             allowlistMode: "email",
                             allowSignup: null,
                         },
-                    ],
-                },
-                agents: [],
-                providers: [],
-            });
-            setSelectedAgentIdState(null);
-            storage.clearSelectedAgentId();
-        } finally {
-            setLoadingAgents(false);
-        }
-    }, []);
+                        providers: [
+                            {
+                                id: "google-main",
+                                kind: "google",
+                                enabled: true,
+                                allowlistMode: "email",
+                                allowSignup: null,
+                            },
+                        ],
+                    },
+                    agents: [],
+                    providers: [],
+                });
+                setSelectedAgentIdState(null);
+                storage.clearSelectedAgentId();
+            } finally {
+                setLoadingAgents(false);
+            }
+        },
+        [],
+    );
 
+    // Initial unauthenticated bootstrap (for auth config / login page)
     useEffect(() => {
         void refreshBootstrap();
     }, [refreshBootstrap]);
+
+    // Re-fetch bootstrap with backend token once authenticated
+    useEffect(() => {
+        if (!isAuthenticated) return;
+
+        let cancelled = false;
+        void (async () => {
+            try {
+                const result = await issueBackendToken({} as any);
+                if (cancelled || !result) return;
+                backendTokenRef.current = (result as any).token;
+                await refreshBootstrap((result as any).token);
+            } catch (error) {
+                console.error(
+                    "Failed to issue backend token for bootstrap:",
+                    error,
+                );
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [isAuthenticated, issueBackendToken, refreshBootstrap]);
 
     const setSelectedAgentId = useCallback(
         (agentId: string) => {
@@ -151,7 +194,7 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
         let cancelled = false;
         setLoadingAgentOptions(true);
 
-        void fetchAgentOptions(selectedAgentId)
+        void fetchAgentOptions(selectedAgentId, backendTokenRef.current)
             .then((options) => {
                 if (cancelled) return;
                 setAgentOptionsIssue(null);
@@ -195,7 +238,8 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
                 bootstrapIssue,
                 agentOptionsIssue,
                 setSelectedAgentId,
-                refreshBootstrap,
+                refreshBootstrap: () =>
+                    refreshBootstrap(backendTokenRef.current),
             }}
         >
             {children}
