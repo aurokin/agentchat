@@ -73,7 +73,9 @@ type ResolvedAgentDefaults = {
     allowedProviders: ProviderConfig[];
 };
 
-function getAuthDiagnostics(config: AgentchatConfig): ConfigDiagnostics["auth"] {
+function getAuthDiagnostics(
+    config: AgentchatConfig,
+): ConfigDiagnostics["auth"] {
     const enabledProviders = config.auth.providers.filter(
         (provider) => provider.enabled,
     );

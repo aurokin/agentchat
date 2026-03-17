@@ -46,8 +46,7 @@ type CachedProviderModels = ProviderModelsPayload & {
     expiresAtEpochMs: number;
 };
 
-const EMPTY_CATALOG_ERROR =
-    "Codex model catalog returned no visible models.";
+const EMPTY_CATALOG_ERROR = "Codex model catalog returned no visible models.";
 
 function toTitleCase(value: string): string {
     return value

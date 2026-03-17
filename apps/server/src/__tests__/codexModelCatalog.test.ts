@@ -239,7 +239,8 @@ describe("CodexModelCatalog", () => {
 
     test("fetches every model/list page and normalizes variants once per model", async () => {
         const request = mock(async (_method: string, params: unknown) => {
-            const cursor = (params as { cursor?: string | null }).cursor ?? null;
+            const cursor =
+                (params as { cursor?: string | null }).cursor ?? null;
             if (cursor === null) {
                 return {
                     data: [
@@ -270,7 +271,9 @@ describe("CodexModelCatalog", () => {
                         id: "hidden-model",
                         displayName: "Hidden Model",
                         hidden: true,
-                        supportedReasoningEfforts: [{ reasoningEffort: "high" }],
+                        supportedReasoningEfforts: [
+                            { reasoningEffort: "high" },
+                        ],
                     },
                 ],
                 nextCursor: null,
@@ -371,7 +374,7 @@ describe("CodexModelCatalog", () => {
             providerId: "codex-main",
             ok: false,
             modelCount: 0,
-                error: "connection refused",
+            error: "connection refused",
         });
     });
 

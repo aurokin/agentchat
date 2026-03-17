@@ -256,7 +256,10 @@ describe("server config", () => {
                 });
                 expect(initialLoadedAt).not.toBe(1_111);
             } finally {
-                rmSync(path.dirname(configPath), { recursive: true, force: true });
+                rmSync(path.dirname(configPath), {
+                    recursive: true,
+                    force: true,
+                });
             }
         });
     });
