@@ -154,6 +154,37 @@ describe("settings helpers", () => {
         ).toBe("high");
     });
 
+    test("selects agent default model when current model is null (agent switch)", () => {
+        expect(
+            selectScopedDefaultModel({
+                models,
+                currentModelId: null,
+                agentDefaultModel: "codex/model-a",
+            }),
+        ).toBe("codex/model-a");
+    });
+
+    test("selects agent default variant when current variant is null (agent switch)", () => {
+        expect(
+            selectScopedDefaultVariant({
+                model: models[0],
+                currentVariantId: null,
+                agentDefaultVariantId: "high",
+            }),
+        ).toBe("high");
+    });
+
+    test("selects agent default provider when current provider is null (agent switch)", () => {
+        expect(
+            selectScopedDefaultProvider({
+                models,
+                currentProviderId: null,
+                selectedModelId: null,
+                agentDefaultProviderId: "codex",
+            }),
+        ).toBe("codex");
+    });
+
     test("returns model variants or an empty list", () => {
         expect(
             getVariantsForModel(models[0]).map((variant) => variant.id),

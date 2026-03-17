@@ -5,6 +5,7 @@ import React, {
     useCallback,
     useEffect,
     useMemo,
+    useRef,
     type ReactNode,
 } from "react";
 import { useMutation, useQuery } from "convex/react";
@@ -314,23 +315,28 @@ export function ModelProvider({
         setFavoriteModelsState(preferences.favoriteModelIds);
     }, [preferences]);
 
+    const prevAgentIdRef = useRef(selectedAgentId);
+
     useEffect(() => {
+        const agentChanged = prevAgentIdRef.current !== selectedAgentId;
+        prevAgentIdRef.current = selectedAgentId;
+
         const nextSelectedModel = selectScopedDefaultModel({
             models,
-            currentModelId: selectedModel,
+            currentModelId: agentChanged ? null : selectedModel,
             agentDefaultModel,
         });
         const nextSelectedModelEntry =
             agentModels.find((model) => model.id === nextSelectedModel) ?? null;
         const nextSelectedProvider = selectScopedDefaultProvider({
             models: agentModels,
-            currentProviderId: selectedProviderId,
+            currentProviderId: agentChanged ? null : selectedProviderId,
             selectedModelId: nextSelectedModel,
             agentDefaultProviderId,
         });
         const nextSelectedVariant = selectScopedDefaultVariant({
             model: nextSelectedModelEntry,
-            currentVariantId: selectedVariantId,
+            currentVariantId: agentChanged ? null : selectedVariantId,
             agentDefaultVariantId,
         });
 
@@ -349,6 +355,7 @@ export function ModelProvider({
         agentDefaultVariantId,
         agentModels,
         models,
+        selectedAgentId,
         selectedModel,
         selectedProviderId,
         selectedVariantId,

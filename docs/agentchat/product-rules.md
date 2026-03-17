@@ -30,9 +30,9 @@ This document records user-facing rules and product decisions that should remain
 ## Provider, Model, And Variant Selection
 
 - Providers are configured by the backend server, not by end users.
-- Provider choice must happen before the first message in a conversation.
-- Model choice must happen before the first message in a conversation.
-- Variant choice must happen before the first message in a conversation.
+- Every new conversation must start with the agent's configured default provider, model, and variant.
+- Previous user selections must not carry over to new conversations or across agent switches.
+- The user may change provider, model, or variant before the first message in a conversation.
 - Provider, model, and variant are locked once the first message is sent.
 - Available models and variants are defined by the selected provider.
 - Web search should not be exposed as a user toggle.
