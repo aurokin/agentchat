@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { query } from "./_generated/server";
 import { isOwner } from "./lib/authz";
 import { requireWorkspaceUser } from "./lib/subscription";
+import type { RunStatus } from "../../shared/src/core/types";
 
 const MAX_RUNS_PER_CHAT = 10;
 const MAX_RUN_EVENTS_PER_RUN = 200;
@@ -9,13 +10,7 @@ const MAX_RUN_EVENTS_PER_RUN = 200;
 type RunSummary = {
     externalId: string;
     provider: string;
-    status:
-        | "queued"
-        | "starting"
-        | "running"
-        | "completed"
-        | "interrupted"
-        | "errored";
+    status: RunStatus;
     errorMessage: string | null;
     startedAt: number;
     completedAt: number | null;

@@ -27,6 +27,7 @@ type ActiveTurn = {
     nextSequence: number;
     lastPersistedContent: string;
     pendingDeltaFlush: ReturnType<typeof setTimeout> | null;
+    inFlightDeltaFlush: Promise<void> | null;
     pendingMessageStartPersistence: Promise<void> | null;
     reject: (error: Error) => void;
     resolve: () => void;
@@ -246,6 +247,7 @@ export class CodexRuntimeManager {
                 nextSequence: 3,
                 lastPersistedContent: "",
                 pendingDeltaFlush: null,
+                inFlightDeltaFlush: null,
                 pendingMessageStartPersistence: null,
                 reject,
                 resolve,
@@ -1128,6 +1130,7 @@ export class CodexRuntimeManager {
         );
 
         this.cancelPendingMessageDelta(activeTurn);
+        await activeTurn.inFlightDeltaFlush;
         await activeTurn.pendingMessageStartPersistence;
 
         const sequence = activeTurn.nextSequence;
@@ -1279,11 +1282,20 @@ export class CodexRuntimeManager {
 
         activeTurn.pendingDeltaFlush = setTimeout(() => {
             activeTurn.pendingDeltaFlush = null;
-            void this.flushMessageDelta(runtime, activeTurn).catch((error) => {
+            const flushPromise = this.flushMessageDelta(
+                runtime,
+                activeTurn,
+            ).catch((error) => {
                 console.error(
                     "[agentchat-server] failed to persist message delta",
                     error,
                 );
+            });
+            activeTurn.inFlightDeltaFlush = flushPromise;
+            void flushPromise.finally(() => {
+                if (activeTurn.inFlightDeltaFlush === flushPromise) {
+                    activeTurn.inFlightDeltaFlush = null;
+                }
             });
         }, 250);
     }

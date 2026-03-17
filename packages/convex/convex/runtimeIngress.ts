@@ -6,15 +6,12 @@ import {
     type QueryCtx,
 } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
+import {
+    type RunStatus,
+    isTerminalRunStatus,
+} from "../../shared/src/core/types";
 
 type RuntimeStatus = "idle" | "active" | "expired" | "errored";
-type RunStatus =
-    | "queued"
-    | "starting"
-    | "running"
-    | "completed"
-    | "interrupted"
-    | "errored";
 type MessageStatus =
     | "draft"
     | "streaming"
@@ -460,6 +457,10 @@ export const messageStarted = internalMutation({
             throw new Error("Run not found");
         }
 
+        if (isTerminalRunStatus(run.status)) {
+            return;
+        }
+
         const previousMessage = await updateAssistantMessage(ctx, {
             userId: args.userId,
             localId: args.previousAssistantMessageLocalId,
@@ -585,6 +586,13 @@ export const messageDelta = internalMutation({
         const run = await getRunByExternalId(ctx, args.externalRunId);
         if (!run) {
             throw new Error("Run not found");
+        }
+
+        // Guard: if the run already reached a terminal state (e.g. runCompleted
+        // raced ahead of this delta), skip the mutation so we don't revert the
+        // message to "streaming" or the runtime binding to "active".
+        if (isTerminalRunStatus(run.status)) {
+            return;
         }
 
         const assistantMessage = await updateAssistantMessage(ctx, {
@@ -797,11 +805,7 @@ export const recoverStaleRun = internalMutation({
         if (run.chatId !== chat._id) {
             throw new Error("Run does not belong to conversation");
         }
-        if (
-            run.status !== "queued" &&
-            run.status !== "starting" &&
-            run.status !== "running"
-        ) {
+        if (isTerminalRunStatus(run.status)) {
             return;
         }
 

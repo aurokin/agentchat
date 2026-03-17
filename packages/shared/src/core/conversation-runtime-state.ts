@@ -1,15 +1,9 @@
-import type { Message } from "./types";
+import { type Message, type RunStatus, RunStatus as RS } from "./types";
 
 export interface ChatRunSummaryLike {
     externalId: string;
     provider: string;
-    status:
-        | "queued"
-        | "starting"
-        | "running"
-        | "completed"
-        | "interrupted"
-        | "errored";
+    status: RunStatus;
     errorMessage: string | null;
     startedAt: number;
     completedAt: number | null;
@@ -80,9 +74,9 @@ export function deriveConversationRuntimeState(params: {
     }
 
     if (
-        latestRun.status === "running" ||
-        latestRun.status === "queued" ||
-        latestRun.status === "starting"
+        latestRun.status === RS.Running ||
+        latestRun.status === RS.Queued ||
+        latestRun.status === RS.Starting
     ) {
         if (params.runtimeBinding !== undefined) {
             if (
@@ -125,7 +119,7 @@ export function deriveConversationRuntimeState(params: {
         };
     }
 
-    if (latestRun.status === "errored") {
+    if (latestRun.status === RS.Errored) {
         return {
             phase: "failed",
             runId: latestRun.externalId,
@@ -138,7 +132,7 @@ export function deriveConversationRuntimeState(params: {
         };
     }
 
-    if (latestRun.status === "interrupted") {
+    if (latestRun.status === RS.Interrupted) {
         return {
             phase: "interrupted",
             runId: latestRun.externalId,

@@ -1,3 +1,22 @@
+export const RunStatus = {
+    Queued: "queued",
+    Starting: "starting",
+    Running: "running",
+    Completed: "completed",
+    Interrupted: "interrupted",
+    Errored: "errored",
+} as const;
+
+export type RunStatus = (typeof RunStatus)[keyof typeof RunStatus];
+
+export function isTerminalRunStatus(status: RunStatus): boolean {
+    return (
+        status === RunStatus.Completed ||
+        status === RunStatus.Interrupted ||
+        status === RunStatus.Errored
+    );
+}
+
 export type ReasoningEffort =
     | "xhigh"
     | "high"
