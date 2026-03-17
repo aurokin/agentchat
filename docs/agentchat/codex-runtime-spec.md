@@ -221,10 +221,12 @@ Each run should log enough information to debug runtime issues:
 
 ## Future Compatibility
 
-This lifecycle spec is written so OpenCode can fit later.
+This lifecycle spec is written so other runtimes can fit alongside Codex.
 
-To preserve that:
+Planned runtimes: Pi, OpenCode, Claude Code. See the [Provider-Agent Merge Plan](../../plans/provider-agent-merge-plan.md) for how the config model evolves, and the individual runtime specs for protocol details.
 
-- keep the provider adapter interface generic
+To preserve compatibility:
+
+- keep the runtime adapter interface generic via the `KindRuntime` abstraction
 - do not bake Codex thread names into domain models
-- treat `providerThreadId` as provider-owned state behind a generic binding
+- treat `providerThreadId` as runtime-owned state behind a generic binding

@@ -17,11 +17,11 @@ An agent is an operator-defined workspace on the server with a configured provid
 ## Principles
 
 - Self-hosted first: design for people running Agentchat on their own servers.
-- Operator controlled: providers, agents, and access are configured by the deployment owner.
-- Agent first: the selected agent determines which conversations the user sees.
+- Operator controlled: agents, runtimes, and access are configured by the deployment owner.
+- Agent first: the selected agent determines which conversations the user sees. The runtime is an implementation detail of the agent, not a user-facing concept.
 - Convex authoritative: conversation history and auth live in Convex.
-- Provider abstraction: the backend API should not hardcode Codex into the product model.
-- Codex first: v1 ships with Codex support only, while leaving room for OpenCode later.
+- Runtime abstraction: the backend API should not hardcode any specific runtime into the product model.
+- Multi-runtime: support multiple runtime kinds (Codex, Pi, OpenCode, Claude Code) through a common `KindRuntime` interface.
 - Realtime by default: users should see live streaming output over WebSocket.
 - Simplicity over knobs: remove product complexity that only existed for the earlier hosted product model.
 
@@ -38,8 +38,8 @@ An agent is an operator-defined workspace on the server with a configured provid
 
 ## Terminology
 
-- Provider: a backend runtime integration such as Codex or OpenCode.
-- Agent: an operator-defined workspace and runtime configuration exposed to users.
+- Runtime: a backend integration with a coding agent such as Codex, Pi, OpenCode, or Claude Code. Each runtime kind manages its own LLM provider connections internally.
+- Agent: an operator-defined workspace with an inline runtime configuration, exposed to users. The agent is the primary unit users interact with.
 - Conversation: a user-owned thread bound to exactly one agent.
 - Run: one assistant execution started from a user message.
-- Runtime binding: persisted metadata that lets the backend reconnect a conversation to its provider runtime.
+- Runtime binding: persisted metadata that lets the backend reconnect a conversation to its runtime.

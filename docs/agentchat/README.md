@@ -27,6 +27,13 @@ It exists for both humans and agents:
 - [Mobile Follow-Up](./mobile-followup.md)
 - [Mobile Integration Testing](./mobile-integration-testing.md)
 
+## Multi-Runtime Specs
+
+- [Provider-Agent Merge Plan](../../plans/provider-agent-merge-plan.md)
+- [Pi Runtime Spec](./pi-runtime-spec.md)
+- [OpenCode Runtime Spec](./opencode-runtime-spec.md)
+- [Claude Code Runtime Spec](./claude-code-runtime-spec.md)
+
 ## Scope
 
 These docs describe the active Agentchat direction:
@@ -35,7 +42,7 @@ These docs describe the active Agentchat direction:
 - Convex-managed access through provider-oriented Google and local-user auth
 - Conversations stored in Convex
 - An instance-local backend server
-- A provider abstraction currently focused on Codex
+- A runtime abstraction currently focused on Codex, with Pi, OpenCode, and Claude Code planned
 - Agent-centric UX where conversations are bound to the selected agent
 
 If another document elsewhere in the repo conflicts with these docs, treat this directory as the source of truth.

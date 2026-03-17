@@ -22,7 +22,7 @@ Responsibilities:
 - authenticate as a concrete Convex user
 - select an agent
 - create or open conversations for that agent
-- choose provider, model, and variant before the first message when the draft is still unlocked
+- choose model and variant before the first message when the draft is still unlocked
 - open authenticated backend WebSocket connections using short-lived backend tokens minted from Convex auth
 - render streamed runtime events plus persisted conversation history
 - subscribe to active conversations without owning execution
@@ -49,17 +49,25 @@ Responsibilities:
 - persist normalized runtime state back into Convex
 - keep transient live-runtime state in memory
 
-### Provider Layer
+### Runtime Layer
 
-Current provider focus:
+Current runtime focus:
 
-- Codex only
+- Codex (active, production)
+
+Planned runtimes:
+
+- Pi (stdin/stdout RPC, nearest to Codex pattern)
+- OpenCode (HTTP REST API server)
+- Claude Code (subprocess per turn, CLI binary)
 
 Responsibilities:
 
-- hide provider-specific protocol details behind backend-owned runtime behavior
-- translate provider events into Agentchat runtime events
+- hide runtime-specific protocol details behind backend-owned runtime behavior
+- translate runtime events into Agentchat runtime events
 - expose normalized model and variant metadata to the backend
+
+Each runtime kind manages its own LLM provider connections internally. The runtime is an implementation detail of the agent, not a separate user-facing concept. See [Provider-Agent Merge Plan](../../plans/provider-agent-merge-plan.md) for the transition from the current provider-agent separation to the merged model.
 
 ## Runtime Model
 
@@ -86,13 +94,13 @@ Current runtime behavior:
 2. The client loads visible agents and provider metadata from `apps/server`.
 3. The user selects an agent.
 4. The user creates or opens a conversation for that agent.
-5. The user may choose provider, model, and variant while the conversation is still unlocked.
+5. The user may choose model and variant while the conversation is still unlocked.
 
 ### First Message
 
 1. The user sends the first message.
-2. The conversation locks its provider, model, and variant.
-3. `apps/server` resolves the latest valid agent and provider config.
+2. The conversation locks its model and variant.
+3. `apps/server` resolves the latest valid agent config and its inline runtime.
 4. `apps/server` starts or resumes the provider runtime.
 5. `apps/server` streams normalized events to subscribed clients.
 6. `apps/server` persists normalized runtime state into Convex.
@@ -129,6 +137,7 @@ Current runtime behavior:
 - every accepted request resolves to a concrete Convex user
 - runtime state must remain user-scoped end to end
 - conversations are agent-scoped
-- provider, model, and variant lock after the first message
+- model and variant lock after the first message
+- the runtime kind is fixed by the agent and never changes for a conversation
 - operator config changes still apply because the backend resolves the latest valid config on each run
-- the product model stays provider-agnostic even though Codex is the only current provider
+- the product model stays runtime-agnostic through the `KindRuntime` interface

@@ -28,4 +28,4 @@ Read this file before making any changes in this repository.
 - Build for the self-hosted, agent-centric architecture that is already in progress.
 - Do not reintroduce hosted-product assumptions, billing, analytics, attachments, or browser-local data modes.
 - Treat Convex as the current source of truth for auth, conversations, runs, and runtime bindings.
-- Treat `apps/server` as the provider/runtime layer, with Codex as the only active provider target in this phase. Do not spend implementation effort on additional providers until Codex is highly confident end to end.
+- Treat `apps/server` as the runtime layer. Codex is the current active runtime. Pi, OpenCode, and Claude Code are planned. The runtime is an implementation detail of each agent, not a separate user-facing concept. See `plans/provider-agent-merge-plan.md` for the transition plan and `docs/agentchat/roadmap.md` for sequencing.

@@ -27,21 +27,21 @@ This document records user-facing rules and product decisions that should remain
 - Selecting an agent can open or create an empty conversation shell, but it must not start a provider runtime session by itself.
 - A provider runtime session is created or resumed only when the user sends the first message in that conversation.
 
-## Provider, Model, And Variant Selection
+## Model And Variant Selection
 
-- Providers are configured by the backend server, not by end users.
-- Every new conversation must start with the agent's configured default provider, model, and variant.
+- The runtime is an implementation detail of the agent, not a user-facing concept. Users do not select a provider or runtime.
+- Every new conversation must start with the agent's configured default model and variant.
 - Previous user selections must not carry over to new conversations or across agent switches.
-- The user may change provider, model, or variant before the first message in a conversation.
-- Provider, model, and variant are locked once the first message is sent.
-- Available models and variants are defined by the selected provider.
+- The user may change model or variant before the first message in a conversation.
+- Model and variant are locked once the first message is sent.
+- Available models and variants are defined by the agent's runtime.
 - Web search should not be exposed as a user toggle.
 
 ## Server Configuration Behavior
 
 - Conversations always adopt the latest server configuration for their agent.
-- If a provider is disabled or reconfigured by the operator, existing conversations must adapt to that change.
-- Users should not be able to change provider, model, or variant mid-conversation even though operator changes still apply.
+- If a runtime is disabled or reconfigured by the operator, existing conversations must adapt to that change.
+- Users should not be able to change model or variant mid-conversation even though operator changes still apply.
 
 ## Runtime Behavior
 
@@ -69,6 +69,5 @@ This document records user-facing rules and product decisions that should remain
 
 - Attachments
 - Conversation branching
-- Provider approval UX
+- Approval UX beyond auto-approve
 - Admin interface for managing agents
-- Additional providers beyond Codex
