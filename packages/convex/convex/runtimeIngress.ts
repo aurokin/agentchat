@@ -180,9 +180,10 @@ async function upsertRuntimeBinding(
         lastError: args.lastError,
         lastEventAt: args.lastEventAt,
         expiresAt: args.expiresAt,
-        workspaceMode: args.workspaceMode,
-        workspaceRootPath: args.workspaceRootPath,
-        workspaceCwd: args.workspaceCwd,
+        workspaceMode: args.workspaceMode ?? existing?.workspaceMode,
+        workspaceRootPath:
+            args.workspaceRootPath ?? existing?.workspaceRootPath,
+        workspaceCwd: args.workspaceCwd ?? existing?.workspaceCwd,
         updatedAt: args.updatedAt,
     };
 
@@ -561,6 +562,9 @@ export const readRuntimeBinding = internalQuery({
             lastError: binding.lastError,
             lastEventAt: binding.lastEventAt,
             expiresAt: binding.expiresAt,
+            workspaceMode: binding.workspaceMode,
+            workspaceRootPath: binding.workspaceRootPath,
+            workspaceCwd: binding.workspaceCwd,
             updatedAt: binding.updatedAt,
         };
     },
