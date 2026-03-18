@@ -1295,4 +1295,151 @@ describe("CodexRuntimeManager", () => {
             readFileSync(path.join(sandboxPath, "version.txt"), "utf8"),
         ).toBe("second");
     });
+
+    test("does not resume persisted threads after resetting a copied workspace", async () => {
+        const sandboxRoot = makeTempDir("sandbox");
+        const firstRoot = makeTempDir("agent-root-a");
+        const secondRoot = makeTempDir("agent-root-b");
+        writeFileSync(path.join(firstRoot, "version.txt"), "first");
+        writeFileSync(path.join(secondRoot, "version.txt"), "second");
+
+        const config = createConfig();
+        config.sandboxRoot = sandboxRoot;
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath: firstRoot,
+            workspaceMode: "copy-on-conversation",
+        };
+
+        const workspaceManager = new WorkspaceManager({
+            getConfig: () => config,
+        });
+        const persistence = createPersistence(null);
+        let bindingThreadId: string | null = null;
+        persistence.readRuntimeBinding = async (payload) => {
+            persistence.readRuntimeBindingCalls.push(payload);
+            if (!bindingThreadId) {
+                return null;
+            }
+
+            return {
+                provider: "codex-default",
+                status: "idle" as const,
+                providerThreadId: bindingThreadId,
+                providerResumeToken: null,
+                activeRunId: null,
+                lastError: null,
+                lastEventAt: null,
+                expiresAt: null,
+                updatedAt: Date.now(),
+            };
+        };
+
+        const clients: FakeCodexClient[] = [];
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            workspaceManager,
+            createClient: () => {
+                const client = new FakeCodexClient();
+                clients.push(client);
+                return client;
+            },
+        });
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        bindingThreadId = "thread-stale";
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath: secondRoot,
+        };
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        expect(clients).toHaveLength(2);
+        expect(clients[1]?.requests.map((request) => request.method)).toEqual([
+            "thread/start",
+            "turn/start",
+        ]);
+    });
+
+    test("recycles copied runtimes when sandboxRoot changes", async () => {
+        const firstSandboxRoot = makeTempDir("sandbox-a");
+        const secondSandboxRoot = makeTempDir("sandbox-b");
+        const agentRoot = makeTempDir("agent-root");
+        writeFileSync(path.join(agentRoot, "version.txt"), "shared");
+
+        const config = createConfig();
+        config.sandboxRoot = firstSandboxRoot;
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath: agentRoot,
+            workspaceMode: "copy-on-conversation",
+        };
+
+        const workspaceManager = new WorkspaceManager({
+            getConfig: () => config,
+        });
+        const sandboxesUsed: string[] = [];
+        const clients: FakeCodexClient[] = [];
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: createPersistence(
+                null,
+            ) as unknown as RuntimePersistenceClient,
+            workspaceManager,
+            createClient: (params) => {
+                sandboxesUsed.push(params.agent.rootPath);
+                const client = new FakeCodexClient();
+                clients.push(client);
+                return client;
+            },
+        });
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        const firstSandboxPath = sandboxesUsed[0];
+        if (!firstSandboxPath) {
+            throw new Error("Expected the first sandbox path");
+        }
+
+        config.sandboxRoot = secondSandboxRoot;
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        const secondSandboxPath = sandboxesUsed[1];
+        if (!secondSandboxPath) {
+            throw new Error("Expected the second sandbox path");
+        }
+
+        expect(clients).toHaveLength(2);
+        expect(clients[0]?.stopped).toBe(true);
+        expect(secondSandboxPath).not.toBe(firstSandboxPath);
+        expect(secondSandboxPath).toBe(
+            path.join(secondSandboxRoot, "agent-1", "user-1", "chat-1"),
+        );
+        expect(existsSync(firstSandboxPath)).toBe(false);
+        expect(existsSync(secondSandboxPath)).toBe(true);
+    });
 });

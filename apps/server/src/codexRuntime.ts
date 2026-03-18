@@ -647,21 +647,34 @@ export class CodexRuntimeManager {
             params.userId,
             params.command.payload.conversationId,
         );
+        const desiredCwd = getDesiredRuntimeCwd({
+            workspaceManager: this.workspaceManager,
+            agent: resources.agent,
+            userId: params.userId,
+            conversationId: params.command.payload.conversationId,
+        });
         const existing = this.runtimes.get(key);
+        let shouldResetConversationState = false;
         if (existing) {
-            if (shouldRecycleRuntime(existing, resources)) {
-                const shouldResetWorkspace =
-                    this.workspaceManager &&
-                    existing.agent.workspaceMode === "copy-on-conversation" &&
-                    shouldResetCopiedWorkspace(existing, resources);
+            if (shouldRecycleRuntime(existing, resources, desiredCwd)) {
+                shouldResetConversationState = shouldResetRuntimeState(
+                    existing,
+                    resources,
+                    desiredCwd,
+                );
                 existing.client.stop();
                 this.runtimes.delete(key);
-                if (shouldResetWorkspace) {
-                    await this.workspaceManager.deleteWorkspace(
-                        existing.agent.id,
-                        params.userId,
-                        params.command.payload.conversationId,
-                    );
+                if (
+                    this.workspaceManager &&
+                    existing.agent.workspaceMode === "copy-on-conversation" &&
+                    shouldResetConversationState
+                ) {
+                    await this.workspaceManager.deleteWorkspacePath({
+                        targetPath: existing.cwd,
+                        agentId: existing.agent.id,
+                        userId: params.userId,
+                        conversationId: params.command.payload.conversationId,
+                    });
                 }
             } else {
                 existing.agent = resources.agent;
@@ -684,10 +697,12 @@ export class CodexRuntimeManager {
             agent: { ...resources.agent, rootPath: cwd },
         });
         await client.initialize();
-        const persistedBinding = await this.persistence.readRuntimeBinding({
-            userId: params.userId,
-            conversationLocalId: params.command.payload.conversationId,
-        });
+        const persistedBinding = shouldResetConversationState
+            ? null
+            : await this.persistence.readRuntimeBinding({
+                  userId: params.userId,
+                  conversationLocalId: params.command.payload.conversationId,
+              });
         const { threadId, isNew } = await this.openThread({
             client,
             resources,
@@ -1485,6 +1500,7 @@ function resolveRuntimeResources(
 function shouldRecycleRuntime(
     runtime: ConversationRuntime,
     resources: ResolvedRuntimeResources,
+    desiredCwd: string,
 ): boolean {
     if (runtime.agent.id !== resources.agent.id) {
         return true;
@@ -1495,6 +1511,10 @@ function shouldRecycleRuntime(
     }
 
     if (runtime.agent.workspaceMode !== resources.agent.workspaceMode) {
+        return true;
+    }
+
+    if (runtime.cwd !== desiredCwd) {
         return true;
     }
 
@@ -1512,13 +1532,35 @@ function shouldRecycleRuntime(
     );
 }
 
-function shouldResetCopiedWorkspace(
+function shouldResetRuntimeState(
     runtime: ConversationRuntime,
     resources: ResolvedRuntimeResources,
+    desiredCwd: string,
 ): boolean {
     return (
         runtime.agent.id !== resources.agent.id ||
         runtime.agent.rootPath !== resources.agent.rootPath ||
-        runtime.agent.workspaceMode !== resources.agent.workspaceMode
+        runtime.agent.workspaceMode !== resources.agent.workspaceMode ||
+        runtime.cwd !== desiredCwd
+    );
+}
+
+function getDesiredRuntimeCwd(params: {
+    workspaceManager: WorkspaceManager | null;
+    agent: AgentConfig;
+    userId: string;
+    conversationId: string;
+}): string {
+    if (
+        !params.workspaceManager ||
+        params.agent.workspaceMode !== "copy-on-conversation"
+    ) {
+        return params.agent.rootPath;
+    }
+
+    return params.workspaceManager.getWorkspacePath(
+        params.agent.id,
+        params.userId,
+        params.conversationId,
     );
 }

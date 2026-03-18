@@ -63,6 +63,14 @@ export class WorkspaceManager {
         }
     }
 
+    getWorkspacePath(
+        agentId: string,
+        userId: string,
+        conversationId: string,
+    ): string {
+        return this.sandboxPath(agentId, userId, conversationId);
+    }
+
     /**
      * Deletes the sandbox directory for a conversation.
      * Only operates on paths strictly under sandboxRoot. Never touches rootPath.
@@ -73,7 +81,7 @@ export class WorkspaceManager {
         conversationId: string,
     ): Promise<void> {
         const config = this.getConfig();
-        const target = this.sandboxPath(agentId, userId, conversationId);
+        const target = this.getWorkspacePath(agentId, userId, conversationId);
 
         if (!this.isSafeSandboxTarget(config.sandboxRoot, target)) {
             console.error(
@@ -82,11 +90,42 @@ export class WorkspaceManager {
             return;
         }
 
+        await this.deleteWorkspacePath({
+            targetPath: target,
+            agentId,
+            userId,
+            conversationId,
+        });
+    }
+
+    async deleteWorkspacePath(params: {
+        targetPath: string;
+        agentId: string;
+        userId: string;
+        conversationId: string;
+    }): Promise<void> {
+        const target = path.resolve(params.targetPath);
+        if (
+            !this.hasExpectedWorkspaceTail(
+                target,
+                params.agentId,
+                params.userId,
+                params.conversationId,
+            )
+        ) {
+            console.error(
+                `[agentchat-server] refused to delete workspace with unexpected path tail: ${target}`,
+            );
+            return;
+        }
+
+        const config = this.getConfig();
         // Never delete any agent rootPath
         for (const agent of config.agents) {
+            const resolvedRootPath = path.resolve(agent.rootPath);
             if (
-                target === agent.rootPath ||
-                agent.rootPath.startsWith(target + path.sep)
+                target === resolvedRootPath ||
+                resolvedRootPath.startsWith(target + path.sep)
             ) {
                 console.error(
                     `[agentchat-server] refused to delete workspace that overlaps agent rootPath: ${target}`,
@@ -202,6 +241,28 @@ export class WorkspaceManager {
             `[agentchat-server] created sandbox workspace: ${sandboxPath}`,
         );
         return sandboxPath;
+    }
+
+    private hasExpectedWorkspaceTail(
+        targetPath: string,
+        agentId: string,
+        userId: string,
+        conversationId: string,
+    ): boolean {
+        const segments = path
+            .resolve(targetPath)
+            .split(path.sep)
+            .filter(Boolean);
+        if (segments.length < 3) {
+            return false;
+        }
+
+        const tail = segments.slice(-3);
+        return (
+            tail[0] === agentId &&
+            tail[1] === userId &&
+            tail[2] === conversationId
+        );
     }
 
     /**
