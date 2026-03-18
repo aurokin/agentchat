@@ -124,18 +124,18 @@ const RECONCILE_INTERVAL_MS = 10 * 60 * 1000;
 async function runReconciliation(): Promise<void> {
     try {
         const entries = await runtimePersistence.listAllChatLocalIds();
-        // Build composite keys so reconciliation can distinguish
-        // sandboxes belonging to different users with the same localId.
+        // Build composite keys so reconciliation can distinguish sandboxes
+        // across agents, users, and client-supplied localIds.
         const activeKeys = new Set<string>();
         for (const entry of entries) {
-            activeKeys.add(`${entry.userId}:${entry.localId}`);
+            activeKeys.add(`${entry.agentId}:${entry.userId}:${entry.localId}`);
         }
-        // Include conversation IDs from live runtimes to avoid deleting
-        // sandboxes for in-progress sessions not yet persisted to Convex.
+        // Include live runtimes to avoid deleting sandboxes for in-progress
+        // sessions not yet persisted to Convex.
         for (const key of runtimeManager.getActiveConversationKeys()) {
             activeKeys.add(key);
         }
-        workspaceManager.reconcile(activeKeys);
+        await workspaceManager.reconcile(activeKeys);
     } catch (error) {
         console.error(
             "[agentchat-server] workspace reconciliation failed:",

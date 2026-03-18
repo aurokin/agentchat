@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { cp, mkdir, rm } from "node:fs/promises";
 import path from "node:path";
 
@@ -16,6 +16,10 @@ function assertSafePathSegment(label: string, value: string): void {
 
 export class WorkspaceManager {
     private readonly getConfig: () => AgentchatConfig;
+    private readonly pendingWorkspaceCreations = new Map<
+        string,
+        Promise<string>
+    >();
 
     constructor(params: { getConfig: () => AgentchatConfig }) {
         this.getConfig = params.getConfig;
@@ -36,36 +40,38 @@ export class WorkspaceManager {
         }
 
         const sandboxPath = this.sandboxPath(agent.id, userId, conversationId);
-        if (!existsSync(sandboxPath)) {
-            await mkdir(sandboxPath, { recursive: true });
-            try {
-                await cp(agent.rootPath, sandboxPath, { recursive: true });
-            } catch (error) {
-                // Clean up the partially created directory so the next
-                // attempt starts fresh rather than reusing a broken copy.
-                try {
-                    await rm(sandboxPath, { recursive: true, force: true });
-                } catch {
-                    // best-effort cleanup
-                }
-                throw error;
-            }
-            console.log(
-                `[agentchat-server] created sandbox workspace: ${sandboxPath}`,
-            );
+        if (existsSync(sandboxPath)) {
+            return sandboxPath;
         }
-        return sandboxPath;
+
+        const creationKey = this.activeWorkspaceKey(
+            agent.id,
+            userId,
+            conversationId,
+        );
+        const pendingCreation = this.pendingWorkspaceCreations.get(creationKey);
+        if (pendingCreation) {
+            return await pendingCreation;
+        }
+
+        const creation = this.createWorkspace(agent.rootPath, sandboxPath);
+        this.pendingWorkspaceCreations.set(creationKey, creation);
+        try {
+            return await creation;
+        } finally {
+            this.pendingWorkspaceCreations.delete(creationKey);
+        }
     }
 
     /**
      * Deletes the sandbox directory for a conversation.
      * Only operates on paths strictly under sandboxRoot. Never touches rootPath.
      */
-    deleteWorkspace(
+    async deleteWorkspace(
         agentId: string,
         userId: string,
         conversationId: string,
-    ): void {
+    ): Promise<void> {
         const config = this.getConfig();
         const target = this.sandboxPath(agentId, userId, conversationId);
 
@@ -78,7 +84,10 @@ export class WorkspaceManager {
 
         // Never delete any agent rootPath
         for (const agent of config.agents) {
-            if (target === agent.rootPath || agent.rootPath.startsWith(target + path.sep)) {
+            if (
+                target === agent.rootPath ||
+                agent.rootPath.startsWith(target + path.sep)
+            ) {
                 console.error(
                     `[agentchat-server] refused to delete workspace that overlaps agent rootPath: ${target}`,
                 );
@@ -87,7 +96,7 @@ export class WorkspaceManager {
         }
 
         if (existsSync(target)) {
-            rmSync(target, { recursive: true, force: true });
+            await rm(target, { recursive: true, force: true });
             console.log(
                 `[agentchat-server] deleted sandbox workspace: ${target}`,
             );
@@ -98,7 +107,7 @@ export class WorkspaceManager {
      * Removes sandbox directories whose userId:conversationId key is not in the
      * active set. Call on startup and periodically as a safety net.
      */
-    reconcile(activeKeys: Set<string>): void {
+    async reconcile(activeKeys: Set<string>): Promise<void> {
         const config = this.getConfig();
         const { sandboxRoot } = config;
 
@@ -132,11 +141,15 @@ export class WorkspaceManager {
                 }
 
                 for (const convDir of convDirs) {
-                    const key = `${userDir}:${convDir}`;
+                    const key = this.activeWorkspaceKey(
+                        agentDir,
+                        userDir,
+                        convDir,
+                    );
                     if (!activeKeys.has(key)) {
                         const target = path.join(userPath, convDir);
                         if (this.isSafeSandboxTarget(sandboxRoot, target)) {
-                            rmSync(target, { recursive: true, force: true });
+                            await rm(target, { recursive: true, force: true });
                             console.log(
                                 `[agentchat-server] reconcile: removed orphaned sandbox: ${target}`,
                             );
@@ -160,14 +173,42 @@ export class WorkspaceManager {
         return path.join(sandboxRoot, agentId, userId, conversationId);
     }
 
+    private activeWorkspaceKey(
+        agentId: string,
+        userId: string,
+        conversationId: string,
+    ): string {
+        return `${agentId}:${userId}:${conversationId}`;
+    }
+
+    private async createWorkspace(
+        sourcePath: string,
+        sandboxPath: string,
+    ): Promise<string> {
+        await mkdir(sandboxPath, { recursive: true });
+        try {
+            await cp(sourcePath, sandboxPath, { recursive: true });
+        } catch (error) {
+            // Clean up the partially created directory so the next
+            // attempt starts fresh rather than reusing a broken copy.
+            try {
+                await rm(sandboxPath, { recursive: true, force: true });
+            } catch {
+                // best-effort cleanup
+            }
+            throw error;
+        }
+        console.log(
+            `[agentchat-server] created sandbox workspace: ${sandboxPath}`,
+        );
+        return sandboxPath;
+    }
+
     /**
      * Validates a target path is exactly 3 levels deep under sandboxRoot.
      * Structure: <sandboxRoot>/<agentId>/<userId>/<conversationId>
      */
-    private isSafeSandboxTarget(
-        sandboxRoot: string,
-        target: string,
-    ): boolean {
+    private isSafeSandboxTarget(sandboxRoot: string, target: string): boolean {
         const resolved = path.resolve(target);
         const resolvedRoot = path.resolve(sandboxRoot);
 

@@ -303,13 +303,13 @@ describe("websocketSession", () => {
         expect(
             runtimeManager.deleteConversationWorkspace,
         ).toHaveBeenCalledTimes(1);
-        expect(
-            runtimeManager.deleteConversationWorkspace,
-        ).toHaveBeenCalledWith({
-            userId: "user-1",
-            conversationId: "chat-1",
-            agentId: "agent-1",
-        });
+        expect(runtimeManager.deleteConversationWorkspace).toHaveBeenCalledWith(
+            {
+                userId: "user-1",
+                conversationId: "chat-1",
+                agentId: "agent-1",
+            },
+        );
     });
 
     test("cleans up runtime subscriptions on socket close", () => {

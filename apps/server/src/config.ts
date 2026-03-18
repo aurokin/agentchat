@@ -271,8 +271,11 @@ function normalizeAuthConfig(
 const DEFAULT_SANDBOX_ROOT = path.join(os.homedir(), ".agentchat", "sandboxes");
 
 export function parseConfig(input: unknown): AgentchatConfig {
-    const { sandboxRoot: rawSandboxRoot, auth, ...rest } =
-        AgentchatConfigInputSchema.parse(input);
+    const {
+        sandboxRoot: rawSandboxRoot,
+        auth,
+        ...rest
+    } = AgentchatConfigInputSchema.parse(input);
     return {
         ...rest,
         auth: normalizeAuthConfig(auth),

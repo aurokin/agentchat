@@ -503,11 +503,13 @@ export class CodexRuntimeManager {
         this.pendingSubscriptions.delete(key);
 
         // Delete the sandbox workspace if workspace manager is configured
-        this.workspaceManager?.deleteWorkspace(
-            params.agentId,
-            params.userId,
-            params.conversationId,
-        );
+        if (this.workspaceManager) {
+            await this.workspaceManager.deleteWorkspace(
+                params.agentId,
+                params.userId,
+                params.conversationId,
+            );
+        }
     }
 
     subscribe(params: {
@@ -570,12 +572,14 @@ export class CodexRuntimeManager {
     }
 
     /**
-     * Returns composite userId:conversationId keys for all live runtimes.
+     * Returns composite agentId:userId:conversationId keys for all live runtimes.
      */
     getActiveConversationKeys(): Set<string> {
         const keys = new Set<string>();
         for (const runtime of this.runtimes.values()) {
-            keys.add(`${runtime.userId}:${runtime.conversationId}`);
+            keys.add(
+                `${runtime.agentId}:${runtime.userId}:${runtime.conversationId}`,
+            );
         }
         return keys;
     }

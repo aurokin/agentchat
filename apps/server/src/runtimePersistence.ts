@@ -87,10 +87,11 @@ export class RuntimePersistenceClient {
     }
 
     async listAllChatLocalIds(): Promise<
-        Array<{ userId: string; localId: string }>
+        Array<{ agentId: string; userId: string; localId: string }>
     > {
         const response = await this.post("/runtime/chat-local-ids", {});
         return (await response.json()) as Array<{
+            agentId: string;
             userId: string;
             localId: string;
         }>;

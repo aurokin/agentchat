@@ -32,6 +32,7 @@ import {
     useWorkspace,
 } from "@/contexts/WorkspaceContext";
 import { useAgent } from "@/contexts/AgentContext";
+import { useActionSafe } from "@/hooks/useConvexSafe";
 import { getDefaultModelForAgent } from "@/contexts/agent-helpers";
 import {
     filterChatsForAgent,
@@ -97,6 +98,9 @@ const ChatContext = createContext<ChatContextType | null>(null);
 const CLOUD_CHAT_PAGE_SIZE = 50;
 
 const convexApi = api as typeof api & {
+    backendTokens: {
+        issue: FunctionReference<"action">;
+    };
     runs: {
         listByChat: FunctionReference<"query">;
     };
@@ -112,6 +116,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     const { isWorkspaceReady, isConvexAvailable, workspaceUserId } =
         useWorkspace();
     const { selectedAgentId, selectedAgent, loadingAgents } = useAgent();
+    const issueBackendSessionToken = useActionSafe(
+        convexApi.backendTokens.issue,
+    );
     const [chats, setChats] = useState<ChatSession[]>([]);
     const [currentChat, setCurrentChat] = useState<ChatSession | null>(null);
     const [messages, setMessages] = useState<Message[]>([]);
@@ -127,6 +134,16 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     } | null>(null);
     const pendingChatIdsRef = useRef<Set<string>>(new Set());
     const pendingMessageIdsRef = useRef<Set<string>>(new Set());
+    const getBackendSessionToken = useCallback(async () => {
+        const result = await issueBackendSessionToken({});
+        if (!result || typeof result.token !== "string") {
+            throw new Error(
+                "Unable to create an authenticated Agentchat server session.",
+            );
+        }
+
+        return result.token;
+    }, [issueBackendSessionToken]);
 
     const isWorkspaceActive = isConvexAvailable && isWorkspaceReady;
     const currentChatId = currentChat?.id ?? null;
@@ -565,6 +582,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 void getSharedAgentchatSocketClient().notifyConversationDeleted(
                     chatId,
                     deletedChat.agentId,
+                    getBackendSessionToken,
                 );
             }
 
@@ -574,7 +592,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 setIsMessagesLoading(false);
             }
         },
-        [chats, currentChat, persistenceAdapter],
+        [chats, currentChat, getBackendSessionToken, persistenceAdapter],
     );
 
     const updateChat = useCallback(

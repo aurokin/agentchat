@@ -410,6 +410,48 @@ describe("agentchat socket helpers", () => {
         expect(FakeWebSocket.instances).toHaveLength(0);
     });
 
+    test("connects conversation.delete with a caller-provided token issuer", async () => {
+        globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
+
+        const client = new AgentchatSocketClient({
+            getWebSocketUrl: () => "ws://localhost:3030/ws",
+            createId: () => "id-1",
+            notConfiguredMessage: "missing",
+        });
+
+        const deletePromise = client.notifyConversationDeleted(
+            "chat-1",
+            "agent-1",
+            async () => "token-1",
+        );
+        await Promise.resolve();
+
+        const socket = FakeWebSocket.instances[0];
+        if (!socket) {
+            throw new Error("Expected a websocket connection");
+        }
+
+        socket.emitOpen();
+        socket.emitEvent({
+            type: "connection.ready",
+            payload: {
+                user: {
+                    sub: "sub-1",
+                    userId: "user-1",
+                    email: "user@example.com",
+                },
+                transport: "websocket",
+            },
+        });
+        await deletePromise;
+
+        expect(
+            socket.sentMessages.some((message) =>
+                message.includes('"type":"conversation.delete"'),
+            ),
+        ).toBe(true);
+    });
+
     test("does not replay subscriptions that were removed during a reconnect gap", async () => {
         globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
 
