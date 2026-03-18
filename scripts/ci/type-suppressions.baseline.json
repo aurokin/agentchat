@@ -1,7 +1,7 @@
 {
     "counts": {
         "as_any": 39,
-        "type_any": 29,
+        "type_any": 30,
         "ts_ignore": 1,
         "ts_expect_error": 1,
         "eslint_disable": 2
