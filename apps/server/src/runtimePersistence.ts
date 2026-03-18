@@ -91,6 +91,14 @@ export class RuntimePersistenceClient {
         return (await response.json()) as string[];
     }
 
+    async chatExists(userId: string, localId: string): Promise<boolean> {
+        const response = await this.post("/runtime/chat-exists", {
+            userId,
+            localId,
+        });
+        return (await response.json()) as boolean;
+    }
+
     private async post(
         path: string,
         payload: RuntimeEventPayload,

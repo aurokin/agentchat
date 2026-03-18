@@ -438,11 +438,11 @@ export class CodexRuntimeManager {
         });
     }
 
-    deleteConversationWorkspace(params: {
+    async deleteConversationWorkspace(params: {
         userId: string;
         conversationId: string;
         agentId: string;
-    }): void {
+    }): Promise<void> {
         const config = this.getConfig();
         const agent = config.agents.find(
             (a) => a.id === params.agentId && a.enabled,
@@ -450,6 +450,26 @@ export class CodexRuntimeManager {
         if (!agent) {
             console.warn(
                 `[agentchat-server] conversation.delete: unknown or disabled agent '${params.agentId}'; ignoring`,
+            );
+            return;
+        }
+
+        // Verify the chat no longer exists in Convex before deleting
+        try {
+            const stillExists = await this.persistence.chatExists(
+                params.userId,
+                params.conversationId,
+            );
+            if (stillExists) {
+                console.warn(
+                    `[agentchat-server] conversation.delete: chat still exists in Convex for ${params.conversationId}; ignoring`,
+                );
+                return;
+            }
+        } catch (error) {
+            console.error(
+                `[agentchat-server] conversation.delete: failed to verify chat deletion in Convex; ignoring`,
+                error,
             );
             return;
         }

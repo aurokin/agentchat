@@ -201,8 +201,8 @@ const AgentchatConfigInputSchema = z
             const resolvedRootPath = path.resolve(agent.rootPath);
             if (
                 resolvedSandboxRoot === resolvedRootPath ||
-                resolvedSandboxRoot.startsWith(resolvedRootPath + "/") ||
-                resolvedRootPath.startsWith(resolvedSandboxRoot + "/")
+                resolvedSandboxRoot.startsWith(resolvedRootPath + path.sep) ||
+                resolvedRootPath.startsWith(resolvedSandboxRoot + path.sep)
             ) {
                 const effectiveSandboxRoot =
                     config.sandboxRoot ?? DEFAULT_SANDBOX_ROOT;

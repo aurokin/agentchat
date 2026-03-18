@@ -77,7 +77,7 @@ export class WorkspaceManager {
 
         // Never delete any agent rootPath
         for (const agent of config.agents) {
-            if (target === agent.rootPath || agent.rootPath.startsWith(target + "/")) {
+            if (target === agent.rootPath || agent.rootPath.startsWith(target + path.sep)) {
                 console.error(
                     `[agentchat-server] refused to delete workspace that overlaps agent rootPath: ${target}`,
                 );
@@ -169,7 +169,7 @@ export class WorkspaceManager {
         const resolved = path.resolve(target);
         const resolvedRoot = path.resolve(sandboxRoot);
 
-        if (!resolved.startsWith(resolvedRoot + "/")) {
+        if (!resolved.startsWith(resolvedRoot + path.sep)) {
             return false;
         }
 

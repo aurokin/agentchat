@@ -21,7 +21,7 @@ function createRuntimeManager() {
         unsubscribe: mock(() => undefined),
         interrupt: mock(async () => undefined),
         sendMessage: mock(async () => undefined),
-        deleteConversationWorkspace: mock(() => undefined),
+        deleteConversationWorkspace: mock(async () => undefined),
     };
 }
 

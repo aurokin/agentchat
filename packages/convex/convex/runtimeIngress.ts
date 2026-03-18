@@ -54,7 +54,7 @@ async function getChatByLocalId(
 }
 
 async function findChatByLocalId(
-    ctx: RuntimeMutationCtx,
+    ctx: RuntimeMutationCtx | RuntimeQueryCtx,
     args: { userId: Id<"users">; localId: string },
 ): Promise<Doc<"chats"> | null> {
     const chat = await ctx.db
@@ -858,6 +858,21 @@ export const listAllChatLocalIds = internalQuery({
         }
 
         return ids;
+    },
+});
+
+/**
+ * Returns whether a chat with the given localId exists for the user.
+ * Used by the server to verify conversation.delete before removing sandboxes.
+ */
+export const chatExistsByLocalId = internalQuery({
+    args: {
+        userId: v.id("users"),
+        localId: v.string(),
+    },
+    handler: async (ctx, args): Promise<boolean> => {
+        const chat = await findChatByLocalId(ctx, args);
+        return chat !== null;
     },
 });
 
