@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import type { AgentchatConfig, AgentConfig, ProviderConfig } from "./config.ts";
 import {
     CodexAppServerClient,
@@ -14,6 +16,7 @@ import type {
     PersistedRuntimeBinding,
     RuntimePersistenceClient,
 } from "./runtimePersistence.ts";
+import { getSandboxUserPathSegment } from "./sandboxPaths.ts";
 import type { WorkspaceManager } from "./workspaceManager.ts";
 
 type ActiveTurn = {
@@ -580,7 +583,7 @@ export class CodexRuntimeManager {
         const keys = new Set<string>();
         for (const runtime of this.runtimes.values()) {
             keys.add(
-                `${runtime.agentId}:${runtime.userId}:${runtime.conversationId}`,
+                `${runtime.agentId}:${getSandboxUserPathSegment(runtime.userId)}:${runtime.conversationId}`,
             );
         }
         return keys;
@@ -672,6 +675,9 @@ export class CodexRuntimeManager {
                     shouldResetConversationState
                 ) {
                     await this.workspaceManager.deleteWorkspacePath({
+                        sandboxRoot: path.dirname(
+                            path.dirname(path.dirname(existing.cwd)),
+                        ),
                         targetPath: existing.cwd,
                         agentId: existing.agent.id,
                         userId: params.userId,

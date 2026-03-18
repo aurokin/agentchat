@@ -149,6 +149,36 @@ describe("WorkspaceManager", () => {
             ).toBe("export {}");
         });
 
+        test("encodes filesystem-unsafe user ids in sandbox paths", async () => {
+            const sandboxRoot = makeTempDir("sandbox");
+            const rootPath = makeTempDir("agent-root");
+            writeFileSync(path.join(rootPath, "README.md"), "hello");
+
+            const agent = makeAgent({
+                id: "my-agent",
+                rootPath,
+                workspaceMode: "copy-on-conversation",
+            });
+            const manager = createWorkspaceManager(() =>
+                makeConfig({ sandboxRoot }),
+            );
+
+            const result = await manager.ensureWorkspace(
+                agent,
+                "users:abc123",
+                "conv-123",
+            );
+
+            expect(result).toBe(
+                path.join(
+                    sandboxRoot,
+                    "my-agent",
+                    "~dXNlcnM6YWJjMTIz",
+                    "conv-123",
+                ),
+            );
+        });
+
         test("is idempotent — does not overwrite existing sandbox", async () => {
             const sandboxRoot = makeTempDir("sandbox");
             const rootPath = makeTempDir("agent-root");
@@ -346,7 +376,9 @@ describe("WorkspaceManager", () => {
             ).rejects.toThrow(/Unsafe conversationId/);
             await expect(
                 manager.ensureWorkspace(agent, "../evil", "conv-1"),
-            ).rejects.toThrow(/Unsafe userId/);
+            ).resolves.toBe(
+                path.join(sandboxRoot, agent.id, "~Li4vZXZpbA", "conv-1"),
+            );
             await expect(
                 manager.ensureWorkspace(agent, "user-1", ""),
             ).rejects.toThrow(/Unsafe conversationId/);
@@ -534,6 +566,29 @@ describe("WorkspaceManager", () => {
             await manager.deleteWorkspace(agentId, userId, convId);
             // Should NOT have been deleted because it's the agent's rootPath
             expect(existsSync(nestedRoot)).toBe(true);
+        });
+
+        test("refuses to delete workspaces through symlinked ancestors", async () => {
+            const sandboxRoot = makeTempDir("sandbox");
+            const outsideDir = makeTempDir("outside");
+            const targetPath = path.join(outsideDir, "conv");
+            mkdirSync(targetPath, { recursive: true });
+            writeFileSync(path.join(targetPath, "important.txt"), "keep");
+            mkdirSync(path.join(sandboxRoot, "agent-a"), { recursive: true });
+            symlinkSync(
+                outsideDir,
+                path.join(sandboxRoot, "agent-a", "user-1"),
+            );
+
+            const manager = createWorkspaceManager(() =>
+                makeConfig({ sandboxRoot }),
+            );
+
+            await manager.deleteWorkspace("agent-a", "user-1", "conv");
+
+            expect(existsSync(path.join(targetPath, "important.txt"))).toBe(
+                true,
+            );
         });
 
         test("is a no-op for non-existent directories", async () => {

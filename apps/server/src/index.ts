@@ -7,6 +7,7 @@ import { CodexModelCatalog } from "./codexModelCatalog.ts";
 import { CodexRuntimeManager } from "./codexRuntime.ts";
 import { createFetchHandler } from "./http.ts";
 import { RuntimePersistenceClient } from "./runtimePersistence.ts";
+import { getSandboxUserPathSegment } from "./sandboxPaths.ts";
 import {
     getSandboxRootsRegistryPath,
     WorkspaceManager,
@@ -132,7 +133,9 @@ async function runReconciliation(): Promise<void> {
         // across agents, users, and client-supplied localIds.
         const activeKeys = new Set<string>();
         for (const entry of entries) {
-            activeKeys.add(`${entry.agentId}:${entry.userId}:${entry.localId}`);
+            activeKeys.add(
+                `${entry.agentId}:${getSandboxUserPathSegment(entry.userId)}:${entry.localId}`,
+            );
         }
         // Include live runtimes to avoid deleting sandboxes for in-progress
         // sessions not yet persisted to Convex.

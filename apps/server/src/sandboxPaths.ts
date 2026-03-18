@@ -24,6 +24,20 @@ export function assertSafePathSegment(label: string, value: string): void {
     }
 }
 
+export function getSandboxUserPathSegment(userId: string): string {
+    if (userId.length === 0) {
+        throw new Error(
+            `Unsafe userId for sandbox path: ${JSON.stringify(userId)}`,
+        );
+    }
+
+    if (isSafePathSegment(userId)) {
+        return userId;
+    }
+
+    return `~${Buffer.from(userId, "utf8").toString("base64url")}`;
+}
+
 export function getSandboxWorkspacePath(params: {
     sandboxRoot: string;
     agentId: string;
@@ -31,13 +45,12 @@ export function getSandboxWorkspacePath(params: {
     conversationId: string;
 }): string {
     assertSafePathSegment("agentId", params.agentId);
-    assertSafePathSegment("userId", params.userId);
     assertSafePathSegment("conversationId", params.conversationId);
 
     return path.join(
         path.resolve(params.sandboxRoot),
         params.agentId,
-        params.userId,
+        getSandboxUserPathSegment(params.userId),
         params.conversationId,
     );
 }

@@ -1,6 +1,7 @@
 import {
     existsSync,
     mkdirSync,
+    realpathSync,
     readFileSync,
     readdirSync,
     writeFileSync,
@@ -10,7 +11,10 @@ import os from "node:os";
 import path from "node:path";
 
 import type { AgentchatConfig, AgentConfig } from "./config.ts";
-import { getSandboxWorkspacePath } from "./sandboxPaths.ts";
+import {
+    getSandboxUserPathSegment,
+    getSandboxWorkspacePath,
+} from "./sandboxPaths.ts";
 
 const DEFAULT_SANDBOX_ROOTS_REGISTRY_PATH = path.join(
     os.tmpdir(),
@@ -79,6 +83,7 @@ export class WorkspaceManager {
 
             const recreation = (async () => {
                 await this.deleteWorkspacePath({
+                    sandboxRoot: this.getConfig().sandboxRoot,
                     targetPath: sandboxPath,
                     agentId: agent.id,
                     userId,
@@ -148,14 +153,8 @@ export class WorkspaceManager {
                 conversationId,
             );
 
-            if (!this.isSafeSandboxTarget(sandboxRoot, target)) {
-                console.error(
-                    `[agentchat-server] refused to delete workspace outside sandboxRoot: ${target}`,
-                );
-                continue;
-            }
-
             await this.deleteWorkspacePath({
+                sandboxRoot,
                 targetPath: target,
                 agentId,
                 userId,
@@ -165,6 +164,7 @@ export class WorkspaceManager {
     }
 
     async deleteWorkspacePath(params: {
+        sandboxRoot: string;
         targetPath: string;
         agentId: string;
         userId: string;
@@ -200,12 +200,19 @@ export class WorkspaceManager {
             }
         }
 
-        if (existsSync(target)) {
-            await rm(target, { recursive: true, force: true });
-            console.log(
-                `[agentchat-server] deleted sandbox workspace: ${target}`,
-            );
+        if (!existsSync(target)) {
+            return;
         }
+
+        if (!(await this.isSafeSandboxTarget(params.sandboxRoot, target))) {
+            console.error(
+                `[agentchat-server] refused to delete workspace outside sandboxRoot: ${target}`,
+            );
+            return;
+        }
+
+        await rm(target, { recursive: true, force: true });
+        console.log(`[agentchat-server] deleted sandbox workspace: ${target}`);
     }
 
     /**
@@ -251,13 +258,22 @@ export class WorkspaceManager {
                         );
                         if (!activeKeys.has(key)) {
                             const target = path.join(userPath, convDir);
-                            if (this.isSafeSandboxTarget(sandboxRoot, target)) {
+                            if (
+                                await this.isSafeSandboxTarget(
+                                    sandboxRoot,
+                                    target,
+                                )
+                            ) {
                                 await rm(target, {
                                     recursive: true,
                                     force: true,
                                 });
                                 console.log(
                                     `[agentchat-server] reconcile: removed orphaned sandbox: ${target}`,
+                                );
+                            } else {
+                                console.error(
+                                    `[agentchat-server] reconcile: refused to delete sandbox outside sandboxRoot: ${target}`,
                                 );
                             }
                         }
@@ -285,7 +301,7 @@ export class WorkspaceManager {
         userId: string,
         conversationId: string,
     ): string {
-        return `${agentId}:${userId}:${conversationId}`;
+        return `${agentId}:${getSandboxUserPathSegment(userId)}:${conversationId}`;
     }
 
     private async createWorkspace(
@@ -470,7 +486,7 @@ export class WorkspaceManager {
         const tail = segments.slice(-3);
         return (
             tail[0] === agentId &&
-            tail[1] === userId &&
+            tail[1] === getSandboxUserPathSegment(userId) &&
             tail[2] === conversationId
         );
     }
@@ -479,7 +495,14 @@ export class WorkspaceManager {
      * Validates a target path is exactly 3 levels deep under sandboxRoot.
      * Structure: <sandboxRoot>/<agentId>/<userId>/<conversationId>
      */
-    private isSafeSandboxTarget(sandboxRoot: string, target: string): boolean {
+    private async isSafeSandboxTarget(
+        sandboxRoot: string,
+        target: string,
+    ): Promise<boolean> {
+        if (!existsSync(target)) {
+            return false;
+        }
+
         const resolved = path.resolve(target);
         const resolvedRoot = path.resolve(sandboxRoot);
 
@@ -490,6 +513,19 @@ export class WorkspaceManager {
         // Must be exactly <sandboxRoot>/<agentId>/<userId>/<conversationId>
         const relative = path.relative(resolvedRoot, resolved);
         const segments = relative.split(path.sep).filter(Boolean);
-        return segments.length === 3;
+        if (segments.length !== 3) {
+            return false;
+        }
+
+        try {
+            const realTarget = realpathSync(target);
+            const realRoot = realpathSync(sandboxRoot);
+            return (
+                realTarget === realRoot ||
+                realTarget.startsWith(realRoot + path.sep)
+            );
+        } catch {
+            return false;
+        }
     }
 }
