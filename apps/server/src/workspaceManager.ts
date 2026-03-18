@@ -5,15 +5,16 @@ import {
     readdirSync,
     writeFileSync,
 } from "node:fs";
-import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 
 import type { AgentchatConfig, AgentConfig } from "./config.ts";
 import { getSandboxWorkspacePath } from "./sandboxPaths.ts";
 
 const DEFAULT_SANDBOX_ROOTS_REGISTRY_PATH = path.join(
-    process.cwd(),
-    ".agentchat",
+    os.tmpdir(),
+    "agentchat",
     "sandbox-roots.json",
 );
 
@@ -291,6 +292,10 @@ export class WorkspaceManager {
         sourcePath: string,
         sandboxPath: string,
     ): Promise<string> {
+        await this.assertWorkspaceSourceHasNoSymlinks(
+            path.resolve(sourcePath),
+            path.resolve(sourcePath),
+        );
         await mkdir(sandboxPath, { recursive: true });
         try {
             await cp(sourcePath, sandboxPath, { recursive: true });
@@ -311,6 +316,31 @@ export class WorkspaceManager {
             `[agentchat-server] created sandbox workspace: ${sandboxPath}`,
         );
         return sandboxPath;
+    }
+
+    private async assertWorkspaceSourceHasNoSymlinks(
+        sourceRootPath: string,
+        currentPath: string,
+    ): Promise<void> {
+        const entries = await readdir(currentPath, {
+            withFileTypes: true,
+        });
+
+        for (const entry of entries) {
+            const entryPath = path.join(currentPath, entry.name);
+            if (entry.isSymbolicLink()) {
+                throw new Error(
+                    `Sandbox workspace source contains symlink: ${path.relative(sourceRootPath, entryPath)}`,
+                );
+            }
+
+            if (entry.isDirectory()) {
+                await this.assertWorkspaceSourceHasNoSymlinks(
+                    sourceRootPath,
+                    entryPath,
+                );
+            }
+        }
     }
 
     private async readWorkspaceMetadata(

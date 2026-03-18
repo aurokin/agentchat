@@ -3,6 +3,7 @@ import {
     mkdirSync,
     mkdtempSync,
     rmSync,
+    symlinkSync,
     writeFileSync,
     readFileSync,
 } from "node:fs";
@@ -382,6 +383,33 @@ describe("WorkspaceManager", () => {
                 "conv-1",
             );
             expect(existsSync(sandboxPath)).toBe(false);
+        });
+
+        test("rejects source trees containing symlinks", async () => {
+            const sandboxRoot = makeTempDir("sandbox");
+            const rootPath = makeTempDir("agent-root");
+            const outsideDir = makeTempDir("outside");
+            const targetPath = path.join(outsideDir, "shared.txt");
+            writeFileSync(targetPath, "shared");
+            symlinkSync(targetPath, path.join(rootPath, "linked.txt"));
+
+            const agent = makeAgent({
+                id: "my-agent",
+                rootPath,
+                workspaceMode: "copy-on-conversation",
+            });
+            const manager = createWorkspaceManager(() =>
+                makeConfig({ sandboxRoot }),
+            );
+
+            await expect(
+                manager.ensureWorkspace(agent, "user-1", "conv-1"),
+            ).rejects.toThrow(/contains symlink/);
+            expect(
+                existsSync(
+                    path.join(sandboxRoot, "my-agent", "user-1", "conv-1"),
+                ),
+            ).toBe(false);
         });
     });
 

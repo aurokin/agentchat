@@ -247,6 +247,56 @@ describe("server config", () => {
         ).toThrow(/safe filesystem path segment/);
     });
 
+    test("rejects agent ids with Windows-reserved names or characters", () => {
+        expect(() =>
+            parseConfig({
+                version: 1,
+                auth: {
+                    defaultProviderId: "local-main",
+                    providers: [
+                        {
+                            id: "local-main",
+                            kind: "local",
+                            enabled: true,
+                            allowSignup: false,
+                        },
+                    ],
+                },
+                providers: exampleConfig.providers,
+                agents: [
+                    {
+                        ...exampleConfig.agents[0],
+                        id: "frontend:api",
+                    },
+                ],
+            }),
+        ).toThrow(/safe filesystem path segment/);
+
+        expect(() =>
+            parseConfig({
+                version: 1,
+                auth: {
+                    defaultProviderId: "local-main",
+                    providers: [
+                        {
+                            id: "local-main",
+                            kind: "local",
+                            enabled: true,
+                            allowSignup: false,
+                        },
+                    ],
+                },
+                providers: exampleConfig.providers,
+                agents: [
+                    {
+                        ...exampleConfig.agents[0],
+                        id: "CON",
+                    },
+                ],
+            }),
+        ).toThrow(/safe filesystem path segment/);
+    });
+
     test("rejects config where sandboxRoot overlaps an agent rootPath for copy-on-conversation", () => {
         expect(() =>
             parseConfig({
