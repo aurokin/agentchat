@@ -70,7 +70,7 @@ describe("runtime ingress", () => {
             workspaceCwd: "/sandboxes/agent-a/user/chat",
             updatedAt: 100,
         }));
-        const query: any = mock((table: string) => {
+        const query = (table: string) => {
             if (table === "chats") {
                 return {
                     withIndex: mock(() => ({ unique: chatUnique })),
@@ -80,7 +80,7 @@ describe("runtime ingress", () => {
             return {
                 withIndex: mock(() => ({ unique: bindingUnique })),
             };
-        });
+        };
         const ctx = {
             db: {
                 query,
@@ -142,7 +142,7 @@ describe("runtime ingress", () => {
             workspaceCwd: "/sandboxes/agent-a/user/chat",
             updatedAt: 456,
         }));
-        const query: any = mock((table: string) => {
+        const query = (table: string) => {
             if (table === "chats") {
                 return {
                     withIndex: mock(() => ({
@@ -156,7 +156,7 @@ describe("runtime ingress", () => {
                     unique: bindingUnique,
                 })),
             };
-        });
+        };
         const ctx = {
             db: {
                 query,
