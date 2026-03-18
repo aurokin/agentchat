@@ -166,6 +166,61 @@ describe("server config", () => {
         });
     });
 
+    test("defaults sandboxRoot to ~/.agentchat/sandboxes when not specified", () => {
+        const config = parseConfig({
+            version: 1,
+            auth: {
+                defaultProviderId: "google-main",
+                providers: [
+                    {
+                        id: "google-main",
+                        kind: "google",
+                        enabled: true,
+                        allowlistMode: "email",
+                        allowedEmails: ["operator@example.com"],
+                        allowedDomains: [],
+                        googleHostedDomain: null,
+                    },
+                ],
+            },
+            providers: exampleConfig.providers,
+            agents: exampleConfig.agents,
+        });
+
+        expect(config.sandboxRoot).toBe(
+            path.join(os.homedir(), ".agentchat", "sandboxes"),
+        );
+    });
+
+    test("uses explicit sandboxRoot when specified", () => {
+        const config = parseConfig({
+            version: 1,
+            sandboxRoot: "/custom/sandbox/path",
+            auth: {
+                defaultProviderId: "google-main",
+                providers: [
+                    {
+                        id: "google-main",
+                        kind: "google",
+                        enabled: true,
+                        allowlistMode: "email",
+                        allowedEmails: ["operator@example.com"],
+                        allowedDomains: [],
+                        googleHostedDomain: null,
+                    },
+                ],
+            },
+            providers: exampleConfig.providers,
+            agents: exampleConfig.agents,
+        });
+
+        expect(config.sandboxRoot).toBe("/custom/sandbox/path");
+    });
+
+    test("defaults workspaceMode to shared when not specified", () => {
+        expect(exampleConfig.agents[0]?.workspaceMode).toBe("shared");
+    });
+
     test("parses local auth config", () => {
         const config = parseConfig({
             version: 1,

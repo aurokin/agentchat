@@ -6,6 +6,7 @@ import type { AgentchatConfig } from "../config.ts";
 function createConfig(): AgentchatConfig {
     return {
         version: 1,
+        sandboxRoot: "/tmp/agentchat-sandboxes",
         auth: {
             defaultProviderId: "google-main",
             providers: [
@@ -84,6 +85,7 @@ function createConfig(): AgentchatConfig {
                 variantAllowlist: [],
                 tags: ["smoke"],
                 sortOrder: 20,
+                workspaceMode: "shared",
             },
             {
                 id: "agent-disabled",
@@ -98,6 +100,7 @@ function createConfig(): AgentchatConfig {
                 variantAllowlist: [],
                 tags: [],
                 sortOrder: 10,
+                workspaceMode: "shared",
             },
             {
                 id: "agent-fallback",
@@ -114,6 +117,7 @@ function createConfig(): AgentchatConfig {
                 variantAllowlist: [],
                 tags: [],
                 sortOrder: 30,
+                workspaceMode: "shared",
             },
             {
                 id: "agent-no-provider",
@@ -128,6 +132,7 @@ function createConfig(): AgentchatConfig {
                 variantAllowlist: [],
                 tags: [],
                 sortOrder: 40,
+                workspaceMode: "shared",
             },
         ],
     };

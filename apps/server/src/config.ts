@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, watch } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -120,6 +121,9 @@ const AgentSchema = z
         variantAllowlist: z.array(z.string()).default([]),
         tags: z.array(z.string()).default([]),
         sortOrder: z.number().int().default(0),
+        workspaceMode: z
+            .enum(["shared", "copy-on-conversation"])
+            .default("shared"),
     })
     .superRefine((agent, ctx) => {
         if (!path.isAbsolute(agent.rootPath)) {
@@ -141,10 +145,18 @@ const AgentchatConfigInputSchema = z
     .object({
         version: z.literal(1),
         auth: z.union([ProviderAuthConfigSchema, LegacyAuthConfigSchema]),
+        sandboxRoot: z.string().min(1).optional(),
         providers: z.array(CodexProviderSchema),
         agents: z.array(AgentSchema),
     })
     .superRefine((config, ctx) => {
+        if (config.sandboxRoot && !path.isAbsolute(config.sandboxRoot)) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: `sandboxRoot must be an absolute path.`,
+            });
+        }
+
         const providerIds = new Set<string>();
         for (const provider of config.providers) {
             if (providerIds.has(provider.id)) {
@@ -188,9 +200,10 @@ export type AuthProviderConfig = z.infer<typeof AuthProviderSchema>;
 export type AuthConfig = z.infer<typeof ProviderAuthConfigSchema>;
 export type AgentchatConfig = Omit<
     z.infer<typeof AgentchatConfigInputSchema>,
-    "auth"
+    "auth" | "sandboxRoot"
 > & {
     auth: AuthConfig;
+    sandboxRoot: string;
 };
 export type AgentConfig = AgentchatConfig["agents"][number];
 export type ProviderConfig = AgentchatConfig["providers"][number];
@@ -237,11 +250,15 @@ function normalizeAuthConfig(
     };
 }
 
+const DEFAULT_SANDBOX_ROOT = path.join(os.homedir(), ".agentchat", "sandboxes");
+
 export function parseConfig(input: unknown): AgentchatConfig {
-    const parsed = AgentchatConfigInputSchema.parse(input);
+    const { sandboxRoot: rawSandboxRoot, auth, ...rest } =
+        AgentchatConfigInputSchema.parse(input);
     return {
-        ...parsed,
-        auth: normalizeAuthConfig(parsed.auth),
+        ...rest,
+        auth: normalizeAuthConfig(auth),
+        sandboxRoot: rawSandboxRoot ?? DEFAULT_SANDBOX_ROOT,
     };
 }
 

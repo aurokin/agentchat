@@ -834,6 +834,24 @@ export const recoverStaleRun = internalMutation({
     },
 });
 
+/**
+ * Returns all chat localIds in the workspace. Used by the server for
+ * sandbox workspace reconciliation (pruning orphaned directories).
+ */
+export const listAllChatLocalIds = internalQuery({
+    args: {},
+    handler: async (ctx): Promise<string[]> => {
+        const chats = await ctx.db.query("chats").collect();
+        const localIds: string[] = [];
+        for (const chat of chats) {
+            if (chat.localId) {
+                localIds.push(chat.localId);
+            }
+        }
+        return localIds;
+    },
+});
+
 export const runtimeBinding = internalMutation({
     args: {
         userId: v.id("users"),

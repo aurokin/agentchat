@@ -21,6 +21,7 @@ function createRuntimeManager() {
         unsubscribe: mock(() => undefined),
         interrupt: mock(async () => undefined),
         sendMessage: mock(async () => undefined),
+        deleteConversationWorkspace: mock(() => undefined),
     };
 }
 
@@ -279,6 +280,36 @@ describe("websocketSession", () => {
         expect(sendJson).toHaveBeenCalledWith(
             expect.stringContaining("runtime failed"),
         );
+    });
+
+    test("routes delete commands to runtimeManager.deleteConversationWorkspace", async () => {
+        const runtimeManager = createRuntimeManager();
+
+        await handleConnectedSocketMessage({
+            runtimeManager,
+            session,
+            connectionId: "socket-1",
+            rawMessage: JSON.stringify({
+                id: "cmd-del",
+                type: "conversation.delete",
+                payload: {
+                    conversationId: "chat-1",
+                    agentId: "agent-1",
+                },
+            }),
+            sendJson: () => undefined,
+        });
+
+        expect(
+            runtimeManager.deleteConversationWorkspace,
+        ).toHaveBeenCalledTimes(1);
+        expect(
+            runtimeManager.deleteConversationWorkspace,
+        ).toHaveBeenCalledWith({
+            userId: "user-1",
+            conversationId: "chat-1",
+            agentId: "agent-1",
+        });
     });
 
     test("cleans up runtime subscriptions on socket close", () => {

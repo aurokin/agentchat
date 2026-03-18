@@ -109,6 +109,42 @@ describe("socket protocol parsing", () => {
         ).toThrow("Invalid send payload");
     });
 
+    test("parses delete commands", () => {
+        expect(
+            parseClientCommand(
+                JSON.stringify({
+                    id: "cmd-6",
+                    type: "conversation.delete",
+                    payload: {
+                        conversationId: "chat-1",
+                        agentId: "agent-1",
+                    },
+                }),
+            ),
+        ).toEqual({
+            id: "cmd-6",
+            type: "conversation.delete",
+            payload: {
+                conversationId: "chat-1",
+                agentId: "agent-1",
+            },
+        });
+    });
+
+    test("rejects delete commands with missing agentId", () => {
+        expect(() =>
+            parseClientCommand(
+                JSON.stringify({
+                    id: "cmd-7",
+                    type: "conversation.delete",
+                    payload: {
+                        conversationId: "chat-1",
+                    },
+                }),
+            ),
+        ).toThrow("Invalid delete payload");
+    });
+
     test("rejects unsupported command types", () => {
         expect(() =>
             parseClientCommand(

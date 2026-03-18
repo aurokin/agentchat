@@ -7,6 +7,7 @@ import { CodexModelCatalog } from "./codexModelCatalog.ts";
 import { CodexRuntimeManager } from "./codexRuntime.ts";
 import { createFetchHandler } from "./http.ts";
 import { RuntimePersistenceClient } from "./runtimePersistence.ts";
+import { WorkspaceManager } from "./workspaceManager.ts";
 import {
     handleConnectedSocketMessage,
     handleSocketClose,
@@ -19,9 +20,13 @@ const runtimePersistence = new RuntimePersistenceClient();
 const modelCatalog = new CodexModelCatalog({
     getConfig: () => configStore.snapshot,
 });
+const workspaceManager = new WorkspaceManager({
+    getConfig: () => configStore.snapshot,
+});
 const runtimeManager = new CodexRuntimeManager({
     getConfig: () => configStore.snapshot,
     persistence: runtimePersistence,
+    workspaceManager,
 });
 
 type WebSocketData = {
@@ -111,3 +116,22 @@ console.log(
     `[agentchat-server] listening on http://${server.hostname}:${server.port}`,
 );
 console.log(`[agentchat-server] using config ${configStore.path}`);
+
+// Sandbox workspace reconciliation — prune orphaned directories on startup
+// and every 10 minutes. Best-effort; failures are logged and ignored.
+const RECONCILE_INTERVAL_MS = 10 * 60 * 1000;
+
+async function runReconciliation(): Promise<void> {
+    try {
+        const localIds = await runtimePersistence.listAllChatLocalIds();
+        workspaceManager.reconcile(new Set(localIds));
+    } catch (error) {
+        console.error(
+            "[agentchat-server] workspace reconciliation failed:",
+            error,
+        );
+    }
+}
+
+void runReconciliation();
+setInterval(() => void runReconciliation(), RECONCILE_INTERVAL_MS);

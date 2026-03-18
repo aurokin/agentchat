@@ -86,6 +86,11 @@ export class RuntimePersistenceClient {
         return result;
     }
 
+    async listAllChatLocalIds(): Promise<string[]> {
+        const response = await this.post("/runtime/chat-local-ids", {});
+        return (await response.json()) as string[];
+    }
+
     private async post(
         path: string,
         payload: RuntimeEventPayload,

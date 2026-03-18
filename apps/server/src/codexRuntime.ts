@@ -14,6 +14,7 @@ import type {
     PersistedRuntimeBinding,
     RuntimePersistenceClient,
 } from "./runtimePersistence.ts";
+import type { WorkspaceManager } from "./workspaceManager.ts";
 
 type ActiveTurn = {
     runId: string;
@@ -41,6 +42,7 @@ type ConversationRuntime = {
     modelId: string;
     provider: ProviderConfig;
     agent: AgentConfig;
+    cwd: string;
     client: CodexClient;
     threadId: string;
     activeTurn: ActiveTurn | null;
@@ -179,17 +181,20 @@ export class CodexRuntimeManager {
     private readonly getConfig: () => AgentchatConfig;
     private readonly persistence: RuntimePersistenceClient;
     private readonly createClient: CreateCodexClient;
+    private readonly workspaceManager: WorkspaceManager | null;
 
     constructor(params: {
         getConfig: () => AgentchatConfig;
         persistence: RuntimePersistenceClient;
         createClient?: CreateCodexClient;
+        workspaceManager?: WorkspaceManager;
     }) {
         this.getConfig = params.getConfig;
         this.persistence = params.persistence;
         this.createClient =
             params.createClient ??
             ((clientParams) => new CodexAppServerClient(clientParams));
+        this.workspaceManager = params.workspaceManager ?? null;
     }
 
     async sendMessage(params: {
@@ -293,7 +298,7 @@ export class CodexRuntimeManager {
                         {
                             threadId: runtime.threadId,
                             input: [{ type: "text", text: inputText }],
-                            cwd: runtime.agent.rootPath,
+                            cwd: runtime.cwd,
                             approvalPolicy: "never",
                             sandboxPolicy: {
                                 type: "dangerFullAccess",
@@ -433,6 +438,30 @@ export class CodexRuntimeManager {
         });
     }
 
+    deleteConversationWorkspace(params: {
+        userId: string;
+        conversationId: string;
+        agentId: string;
+    }): void {
+        // Tear down any active runtime for this conversation
+        const key = getRuntimeKey(params.userId, params.conversationId);
+        const runtime = this.runtimes.get(key);
+        if (runtime) {
+            if (runtime.idleTimer) {
+                clearTimeout(runtime.idleTimer);
+            }
+            runtime.client.stop();
+            this.runtimes.delete(key);
+        }
+        this.pendingSubscriptions.delete(key);
+
+        // Delete the sandbox workspace if workspace manager is configured
+        this.workspaceManager?.deleteWorkspace(
+            params.agentId,
+            params.conversationId,
+        );
+    }
+
     subscribe(params: {
         userId: string;
         conversationId: string;
@@ -568,9 +597,16 @@ export class CodexRuntimeManager {
             }
         }
 
+        const cwd = this.workspaceManager
+            ? this.workspaceManager.ensureWorkspace(
+                  resources.agent,
+                  params.command.payload.conversationId,
+              )
+            : resources.agent.rootPath;
+
         const client = this.createClient({
             provider: resources.provider,
-            agent: resources.agent,
+            agent: { ...resources.agent, rootPath: cwd },
         });
         await client.initialize();
         const persistedBinding = await this.persistence.readRuntimeBinding({
@@ -582,6 +618,7 @@ export class CodexRuntimeManager {
             resources,
             binding: persistedBinding,
             modelId: params.command.payload.modelId,
+            cwd,
         });
 
         const runtime: ConversationRuntime = {
@@ -592,6 +629,7 @@ export class CodexRuntimeManager {
             modelId: params.command.payload.modelId,
             provider: resources.provider,
             agent: resources.agent,
+            cwd,
             client,
             threadId,
             activeTurn: null,
@@ -742,10 +780,11 @@ export class CodexRuntimeManager {
         resources: ResolvedRuntimeResources;
         binding: PersistedRuntimeBinding | null;
         modelId: string;
+        cwd?: string;
     }): Promise<{ threadId: string; isNew: boolean }> {
         const threadOpenParams = {
             model: params.modelId,
-            cwd: params.resources.agent.rootPath,
+            cwd: params.cwd ?? params.resources.agent.rootPath,
             approvalPolicy: "never",
             sandbox: "danger-full-access",
             personality: "pragmatic",
@@ -1377,6 +1416,10 @@ function shouldRecycleRuntime(
     }
 
     if (runtime.agent.rootPath !== resources.agent.rootPath) {
+        return true;
+    }
+
+    if (runtime.agent.workspaceMode !== resources.agent.workspaceMode) {
         return true;
     }
 

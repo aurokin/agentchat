@@ -38,6 +38,7 @@ import {
 import { useModelContext } from "@/contexts/ModelContext";
 import { deriveConversationRuntimeState } from "@/contexts/runtime-helpers";
 import { useAgent } from "@/contexts/AgentContext";
+import { getSharedAgentchatSocketClient } from "@/lib/agentchat-socket";
 
 interface ChatContextValue {
     chats: ChatSession[];
@@ -520,7 +521,16 @@ export function ChatProvider({
 
     const deleteChat = useCallback(
         async (chatId: string) => {
+            const deletedChat = chats.find((c) => c.id === chatId) ?? null;
+
             await adapter.deleteChat(chatId);
+
+            if (deletedChat) {
+                getSharedAgentchatSocketClient().notifyConversationDeleted(
+                    chatId,
+                    deletedChat.agentId,
+                );
+            }
 
             setChats((prev) => prev.filter((c) => c.id !== chatId));
             setCurrentChat((prev) => (prev?.id === chatId ? null : prev));
@@ -533,15 +543,23 @@ export function ChatProvider({
                 await clearSelectedChatId(selectedAgentId);
             }
         },
-        [adapter, selectedAgentId],
+        [adapter, chats, selectedAgentId],
     );
 
     const deleteChats = useCallback(
         async (chatIds: string[]) => {
             if (chatIds.length === 0) return;
 
+            const socketClient = getSharedAgentchatSocketClient();
             for (const chatId of chatIds) {
+                const chat = chats.find((c) => c.id === chatId) ?? null;
                 await adapter.deleteChat(chatId);
+                if (chat) {
+                    socketClient.notifyConversationDeleted(
+                        chatId,
+                        chat.agentId,
+                    );
+                }
             }
 
             const chatIdSet = new Set(chatIds);
@@ -564,7 +582,7 @@ export function ChatProvider({
                 await clearSelectedChatId(selectedAgentId);
             }
         },
-        [adapter, selectedAgentId],
+        [adapter, chats, selectedAgentId],
     );
 
     const updateChat = useCallback(

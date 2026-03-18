@@ -11,6 +11,7 @@ import {
 function createConfig(): AgentchatConfig {
     return {
         version: 1,
+        sandboxRoot: "/tmp/agentchat-sandboxes",
         auth: {
             defaultProviderId: "google-main",
             providers: [
@@ -64,6 +65,7 @@ function createConfig(): AgentchatConfig {
                 variantAllowlist: [],
                 tags: [],
                 sortOrder: 0,
+                workspaceMode: "shared",
             },
         ],
     };

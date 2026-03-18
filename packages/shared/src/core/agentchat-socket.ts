@@ -34,10 +34,20 @@ export interface ConversationSubscriptionCommand {
     };
 }
 
+export interface ConversationDeleteCommand {
+    id: string;
+    type: "conversation.delete";
+    payload: {
+        conversationId: string;
+        agentId: string;
+    };
+}
+
 export type AgentchatSocketCommand =
     | ConversationSendCommand
     | ConversationInterruptCommand
-    | ConversationSubscriptionCommand;
+    | ConversationSubscriptionCommand
+    | ConversationDeleteCommand;
 
 export type AgentchatSocketEvent =
     | {
@@ -222,6 +232,24 @@ export class AgentchatSocketClient {
         }
 
         this.socket.send(JSON.stringify(command));
+    }
+
+    /**
+     * Best-effort notification to the server that a conversation was deleted,
+     * so it can clean up any sandbox workspace. Silently ignored if not connected.
+     */
+    notifyConversationDeleted(conversationId: string, agentId: string): void {
+        if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+            return;
+        }
+
+        this.socket.send(
+            JSON.stringify({
+                id: this.options.createId(),
+                type: "conversation.delete",
+                payload: { conversationId, agentId },
+            } satisfies ConversationDeleteCommand),
+        );
     }
 
     close(): void {

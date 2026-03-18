@@ -351,6 +351,65 @@ describe("agentchat socket helpers", () => {
         );
     });
 
+    test("sends conversation.delete notification when connected", async () => {
+        globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
+
+        const client = new AgentchatSocketClient({
+            getWebSocketUrl: () => "ws://localhost:3030/ws",
+            createId: () => "id-1",
+            notConfiguredMessage: "missing",
+        });
+
+        const connectPromise = client.ensureConnected(async () => "token-1");
+        await Promise.resolve();
+        const socket = FakeWebSocket.instances[0];
+        if (!socket) {
+            throw new Error("Expected a websocket connection");
+        }
+        socket.emitOpen();
+        socket.emitEvent({
+            type: "connection.ready",
+            payload: {
+                user: {
+                    sub: "sub-1",
+                    userId: "user-1",
+                    email: "user@example.com",
+                },
+                transport: "websocket",
+            },
+        });
+        await connectPromise;
+
+        client.notifyConversationDeleted("chat-1", "agent-1");
+
+        const deleteMessages = socket.sentMessages.filter((message) =>
+            message.includes('"type":"conversation.delete"'),
+        );
+        expect(deleteMessages).toHaveLength(1);
+
+        const parsed = JSON.parse(deleteMessages[0]!) as {
+            type: string;
+            payload: { conversationId: string; agentId: string };
+        };
+        expect(parsed.payload.conversationId).toBe("chat-1");
+        expect(parsed.payload.agentId).toBe("agent-1");
+    });
+
+    test("silently ignores conversation.delete when not connected", () => {
+        globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
+
+        const client = new AgentchatSocketClient({
+            getWebSocketUrl: () => "ws://localhost:3030/ws",
+            createId: () => "id-1",
+            notConfiguredMessage: "missing",
+        });
+
+        // Should not throw even when no socket exists
+        client.notifyConversationDeleted("chat-1", "agent-1");
+
+        expect(FakeWebSocket.instances).toHaveLength(0);
+    });
+
     test("does not replay subscriptions that were removed during a reconnect gap", async () => {
         globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
 

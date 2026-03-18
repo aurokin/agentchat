@@ -32,6 +32,11 @@ export type RuntimeManagerLike = {
         >;
         sendEvent: (event: ServerEvent) => void;
     }): Promise<void>;
+    deleteConversationWorkspace(params: {
+        userId: string;
+        conversationId: string;
+        agentId: string;
+    }): void;
 };
 
 function toServerEventJson(event: ServerEvent): string {
@@ -118,6 +123,15 @@ export async function handleConnectedSocketMessage(params: {
             await params.runtimeManager.interrupt({
                 userId: params.session.userId,
                 conversationId: command.payload.conversationId,
+            });
+            return;
+        }
+
+        if (command.type === "conversation.delete") {
+            params.runtimeManager.deleteConversationWorkspace({
+                userId: params.session.userId,
+                conversationId: command.payload.conversationId,
+                agentId: command.payload.agentId,
             });
             return;
         }

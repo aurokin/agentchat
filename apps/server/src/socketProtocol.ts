@@ -34,10 +34,20 @@ export interface ConversationSubscribeCommand {
     };
 }
 
+export interface ConversationDeleteCommand {
+    id: string;
+    type: "conversation.delete";
+    payload: {
+        conversationId: string;
+        agentId: string;
+    };
+}
+
 export type ClientCommand =
     | ConversationSendCommand
     | ConversationInterruptCommand
-    | ConversationSubscribeCommand;
+    | ConversationSubscribeCommand
+    | ConversationDeleteCommand;
 
 export interface ServerEvent {
     type:
@@ -112,6 +122,25 @@ export function parseClientCommand(raw: string): ClientCommand {
         return {
             id: command.id,
             type: "conversation.interrupt",
+            payload,
+        };
+    }
+
+    if (command.type === "conversation.delete") {
+        const payload = command.payload as
+            | ConversationDeleteCommand["payload"]
+            | undefined;
+        if (
+            !payload ||
+            typeof payload.conversationId !== "string" ||
+            typeof payload.agentId !== "string"
+        ) {
+            throw new Error("Invalid delete payload");
+        }
+
+        return {
+            id: command.id,
+            type: "conversation.delete",
             payload,
         };
     }

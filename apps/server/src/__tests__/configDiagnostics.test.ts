@@ -31,6 +31,7 @@ function createConfig(): AgentchatConfig {
 
     return {
         version: 1,
+        sandboxRoot: "/tmp/agentchat-sandboxes",
         auth: {
             defaultProviderId: "google-main",
             providers: [
@@ -108,6 +109,7 @@ function createConfig(): AgentchatConfig {
                 variantAllowlist: [],
                 tags: [],
                 sortOrder: 10,
+                workspaceMode: "shared",
             },
         ],
     };
@@ -188,6 +190,7 @@ describe("configDiagnostics", () => {
             variantAllowlist: [],
             tags: [],
             sortOrder: 20,
+            workspaceMode: "shared",
         });
 
         const diagnostics = getConfigDiagnostics(config);

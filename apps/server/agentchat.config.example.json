@@ -104,6 +104,7 @@
             "defaultVariant": "low",
             "modelAllowlist": [],
             "variantAllowlist": [],
+            "workspaceMode": "shared",
             "tags": ["example"],
             "sortOrder": 10
         }

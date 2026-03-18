@@ -39,6 +39,7 @@ import {
 } from "@/contexts/chat-helpers";
 import { deriveConversationRuntimeState } from "@/contexts/runtime-helpers";
 import * as storage from "@/lib/storage";
+import { getSharedAgentchatSocketClient } from "@/lib/agentchat-socket";
 import { v4 as uuid } from "uuid";
 
 interface ChatContextType {
@@ -549,16 +550,22 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
     const deleteChat = useCallback(
         async (chatId: string) => {
-            await persistenceAdapter.deleteChat(chatId);
-            setChats((prev) => prev.filter((c) => c.id !== chatId));
-
             const deletedChat =
                 currentChat?.id === chatId
                     ? currentChat
                     : (chats.find((candidate) => candidate.id === chatId) ??
                       null);
+
+            await persistenceAdapter.deleteChat(chatId);
+            setChats((prev) => prev.filter((c) => c.id !== chatId));
+
             if (deletedChat) {
                 storage.clearSelectedChatId(deletedChat.agentId);
+                // Notify the server so it can clean up any sandbox workspace
+                getSharedAgentchatSocketClient().notifyConversationDeleted(
+                    chatId,
+                    deletedChat.agentId,
+                );
             }
 
             if (currentChat?.id === chatId) {

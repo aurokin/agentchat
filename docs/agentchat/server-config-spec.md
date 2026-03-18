@@ -27,11 +27,22 @@ Future support for YAML or TOML is allowed, but JSON is the only format specifie
 ```json
 {
   "version": 1,
+  "sandboxRoot": "/data/agentchat/sandboxes",
   "auth": {},
   "providers": [],
   "agents": []
 }
 ```
+
+## `sandboxRoot`
+
+Optional top-level string. Absolute path to the directory where per-conversation workspace copies are stored.
+
+Default: `~/.agentchat/sandboxes`
+
+Sandbox directory structure: `<sandboxRoot>/<agentId>/<conversationId>/`
+
+This field is only meaningful when at least one agent uses `workspaceMode: "copy-on-conversation"`. Agents using `workspaceMode: "shared"` ignore the sandbox root entirely.
 
 ## Validation Rules
 
@@ -251,6 +262,9 @@ Optional fields:
   - empty means provider default availability
 - `tags`
 - `sortOrder`
+- `workspaceMode`
+  - `"shared"` (default) — the provider operates directly against `rootPath`
+  - `"copy-on-conversation"` — the server copies `rootPath` into a per-conversation sandbox under `sandboxRoot` on first message; the copy is deleted when the conversation is deleted
 
 Visibility behavior:
 
