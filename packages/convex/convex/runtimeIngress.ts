@@ -837,12 +837,27 @@ export const recoverStaleRun = internalMutation({
 /**
  * Returns all chat localIds in the workspace. Used by the server for
  * sandbox workspace reconciliation (pruning orphaned directories).
+ * Paginates to avoid materializing the full chats table at once.
  */
 export const listAllChatLocalIds = internalQuery({
     args: {},
     handler: async (ctx): Promise<string[]> => {
-        const chats = await ctx.db.query("chats").collect();
-        return chats.map((chat) => chat.localId ?? chat._id);
+        const ids: string[] = [];
+        let cursor: string | null = null;
+        let isDone = false;
+
+        while (!isDone) {
+            const page = await ctx.db
+                .query("chats")
+                .paginate({ numItems: 1_000, cursor });
+            for (const chat of page.page) {
+                ids.push(chat.localId ?? chat._id);
+            }
+            isDone = page.isDone;
+            cursor = page.continueCursor;
+        }
+
+        return ids;
     },
 });
 

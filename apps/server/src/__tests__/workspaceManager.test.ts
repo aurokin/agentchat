@@ -169,6 +169,58 @@ describe("WorkspaceManager", () => {
                 "original",
             );
         });
+
+        test("rejects path-traversal in conversationId", () => {
+            const sandboxRoot = makeTempDir("sandbox");
+            const rootPath = makeTempDir("agent-root");
+            const agent = makeAgent({
+                id: "my-agent",
+                rootPath,
+                workspaceMode: "copy-on-conversation",
+            });
+            const manager = new WorkspaceManager({
+                getConfig: () => makeConfig({ sandboxRoot }),
+            });
+
+            expect(() =>
+                manager.ensureWorkspace(agent, "user-1", "../../../tmp/evil"),
+            ).toThrow(/Unsafe conversationId/);
+            expect(() =>
+                manager.ensureWorkspace(agent, "user-1", ".."),
+            ).toThrow(/Unsafe conversationId/);
+            expect(() =>
+                manager.ensureWorkspace(agent, "../evil", "conv-1"),
+            ).toThrow(/Unsafe userId/);
+            expect(() =>
+                manager.ensureWorkspace(agent, "user-1", ""),
+            ).toThrow(/Unsafe conversationId/);
+        });
+
+        test("cleans up partial sandbox when copy fails", () => {
+            const sandboxRoot = makeTempDir("sandbox");
+            // Use a non-existent rootPath so cpSync will fail
+            const agent = makeAgent({
+                id: "my-agent",
+                rootPath: "/nonexistent/source/path",
+                workspaceMode: "copy-on-conversation",
+            });
+            const manager = new WorkspaceManager({
+                getConfig: () => makeConfig({ sandboxRoot }),
+            });
+
+            expect(() =>
+                manager.ensureWorkspace(agent, "user-1", "conv-1"),
+            ).toThrow();
+
+            // The partial directory should have been cleaned up
+            const sandboxPath = path.join(
+                sandboxRoot,
+                "my-agent",
+                "user-1",
+                "conv-1",
+            );
+            expect(existsSync(sandboxPath)).toBe(false);
+        });
     });
 
     describe("deleteWorkspace", () => {
@@ -194,7 +246,7 @@ describe("WorkspaceManager", () => {
             expect(existsSync(workspace)).toBe(false);
         });
 
-        test("refuses to delete paths outside sandboxRoot", () => {
+        test("refuses to delete paths with traversal segments", () => {
             const sandboxRoot = makeTempDir("sandbox");
             const outsideDir = makeTempDir("outside");
             writeFileSync(path.join(outsideDir, "important.txt"), "keep");
@@ -203,8 +255,10 @@ describe("WorkspaceManager", () => {
                 getConfig: () => makeConfig({ sandboxRoot }),
             });
 
-            // Try to trick it with path traversal
-            manager.deleteWorkspace("../../" + path.basename(outsideDir), "user", "");
+            // Path traversal is rejected by segment validation
+            expect(() =>
+                manager.deleteWorkspace("../../" + path.basename(outsideDir), "user", "x"),
+            ).toThrow(/Unsafe agentId/);
             expect(existsSync(outsideDir)).toBe(true);
         });
 

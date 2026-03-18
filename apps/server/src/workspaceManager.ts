@@ -3,6 +3,16 @@ import path from "node:path";
 
 import type { AgentchatConfig, AgentConfig } from "./config.ts";
 
+const UNSAFE_SEGMENT_PATTERN = /[/\\\0]|^\.\.$/;
+
+function assertSafePathSegment(label: string, value: string): void {
+    if (!value || UNSAFE_SEGMENT_PATTERN.test(value)) {
+        throw new Error(
+            `Unsafe ${label} for sandbox path: ${JSON.stringify(value)}`,
+        );
+    }
+}
+
 export class WorkspaceManager {
     private readonly getConfig: () => AgentchatConfig;
 
@@ -27,7 +37,18 @@ export class WorkspaceManager {
         const sandboxPath = this.sandboxPath(agent.id, userId, conversationId);
         if (!existsSync(sandboxPath)) {
             mkdirSync(sandboxPath, { recursive: true });
-            cpSync(agent.rootPath, sandboxPath, { recursive: true });
+            try {
+                cpSync(agent.rootPath, sandboxPath, { recursive: true });
+            } catch (error) {
+                // Clean up the partially created directory so the next
+                // attempt starts fresh rather than reusing a broken copy.
+                try {
+                    rmSync(sandboxPath, { recursive: true, force: true });
+                } catch {
+                    // best-effort cleanup
+                }
+                throw error;
+            }
             console.log(
                 `[agentchat-server] created sandbox workspace: ${sandboxPath}`,
             );
@@ -129,6 +150,10 @@ export class WorkspaceManager {
         userId: string,
         conversationId: string,
     ): string {
+        assertSafePathSegment("agentId", agentId);
+        assertSafePathSegment("userId", userId);
+        assertSafePathSegment("conversationId", conversationId);
+
         const { sandboxRoot } = this.getConfig();
         return path.join(sandboxRoot, agentId, userId, conversationId);
     }
