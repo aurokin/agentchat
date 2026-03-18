@@ -3,7 +3,7 @@ import path from "node:path";
 
 import type { AgentchatConfig, AgentConfig } from "./config.ts";
 
-const UNSAFE_SEGMENT_PATTERN = /[/\\\0]|^\.\.$/;
+const UNSAFE_SEGMENT_PATTERN = /[/\\\0]|^\.\.?$/;
 
 function assertSafePathSegment(label: string, value: string): void {
     if (!value || UNSAFE_SEGMENT_PATTERN.test(value)) {

@@ -175,9 +175,9 @@ const AgentchatConfigInputSchema = z
             }
         }
 
-        const resolvedSandboxRoot = config.sandboxRoot
-            ? path.resolve(config.sandboxRoot)
-            : null;
+        const resolvedSandboxRoot = path.resolve(
+            config.sandboxRoot ?? DEFAULT_SANDBOX_ROOT,
+        );
 
         const agentIds = new Set<string>();
         for (const agent of config.agents) {
@@ -198,18 +198,18 @@ const AgentchatConfigInputSchema = z
                 }
             }
 
-            if (resolvedSandboxRoot) {
-                const resolvedRootPath = path.resolve(agent.rootPath);
-                if (
-                    resolvedSandboxRoot === resolvedRootPath ||
-                    resolvedSandboxRoot.startsWith(resolvedRootPath + "/") ||
-                    resolvedRootPath.startsWith(resolvedSandboxRoot + "/")
-                ) {
-                    ctx.addIssue({
-                        code: z.ZodIssueCode.custom,
-                        message: `Agent '${agent.id}' rootPath '${agent.rootPath}' overlaps with sandboxRoot '${config.sandboxRoot}'. These must be disjoint to prevent recursive copies and accidental deletions.`,
-                    });
-                }
+            const resolvedRootPath = path.resolve(agent.rootPath);
+            if (
+                resolvedSandboxRoot === resolvedRootPath ||
+                resolvedSandboxRoot.startsWith(resolvedRootPath + "/") ||
+                resolvedRootPath.startsWith(resolvedSandboxRoot + "/")
+            ) {
+                const effectiveSandboxRoot =
+                    config.sandboxRoot ?? DEFAULT_SANDBOX_ROOT;
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: `Agent '${agent.id}' rootPath '${agent.rootPath}' overlaps with sandboxRoot '${effectiveSandboxRoot}'. These must be disjoint to prevent recursive copies and accidental deletions.`,
+                });
             }
         }
     });

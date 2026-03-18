@@ -189,6 +189,9 @@ describe("WorkspaceManager", () => {
                 manager.ensureWorkspace(agent, "user-1", ".."),
             ).toThrow(/Unsafe conversationId/);
             expect(() =>
+                manager.ensureWorkspace(agent, "user-1", "."),
+            ).toThrow(/Unsafe conversationId/);
+            expect(() =>
                 manager.ensureWorkspace(agent, "../evil", "conv-1"),
             ).toThrow(/Unsafe userId/);
             expect(() =>

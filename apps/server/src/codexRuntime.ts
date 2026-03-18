@@ -466,6 +466,14 @@ export class CodexRuntimeManager {
 
         // Tear down any active runtime for this conversation
         if (runtime) {
+            // Settle any in-flight turn so the awaiting sendMessage() resolves
+            if (runtime.activeTurn) {
+                this.cancelPendingMessageDelta(runtime.activeTurn);
+                runtime.activeTurn.reject(
+                    new Error("Conversation deleted during active turn."),
+                );
+                runtime.activeTurn = null;
+            }
             if (runtime.idleTimer) {
                 clearTimeout(runtime.idleTimer);
             }

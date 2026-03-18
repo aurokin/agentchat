@@ -277,6 +277,34 @@ describe("server config", () => {
         ).toThrow(/overlaps with sandboxRoot/);
     });
 
+    test("rejects agent rootPath overlapping the implicit default sandboxRoot", () => {
+        // Agent rooted at ~/.agentchat contains the default sandboxRoot (~/.agentchat/sandboxes)
+        expect(() =>
+            parseConfig({
+                version: 1,
+                auth: {
+                    defaultProviderId: "local-main",
+                    providers: [
+                        {
+                            id: "local-main",
+                            kind: "local",
+                            enabled: true,
+                            allowSignup: false,
+                        },
+                    ],
+                },
+                providers: exampleConfig.providers,
+                agents: [
+                    {
+                        ...exampleConfig.agents[0],
+                        rootPath: path.join(os.homedir(), ".agentchat"),
+                        workspaceMode: "copy-on-conversation",
+                    },
+                ],
+            }),
+        ).toThrow(/overlaps with sandboxRoot/);
+    });
+
     test("parses local auth config", () => {
         const config = parseConfig({
             version: 1,
