@@ -206,6 +206,30 @@ describe("RuntimePersistenceClient", () => {
         ]);
     });
 
+    test("posts agent-aware chat existence checks", async () => {
+        const fetchMock = mock(async () => Response.json(true));
+        globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+        const client = new RuntimePersistenceClient();
+        const result = await client.chatExists("user-1", "agent-1", "chat-1");
+
+        expect(result).toBe(true);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        const fetchCalls = fetchMock.mock.calls as unknown as Array<
+            [string | URL, RequestInit?]
+        >;
+        expect(fetchCalls[0]?.[0]).toBe(
+            "https://agentchat.convex.site/runtime/chat-exists",
+        );
+        expect(fetchCalls[0]?.[1]?.body).toBe(
+            JSON.stringify({
+                userId: "user-1",
+                agentId: "agent-1",
+                localId: "chat-1",
+            }),
+        );
+    });
+
     test("surfaces non-200 ingress responses", async () => {
         const fetchMock = mock(async () => {
             return new Response("bad request", { status: 400 });

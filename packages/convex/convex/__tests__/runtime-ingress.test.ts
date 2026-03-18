@@ -1,6 +1,7 @@
 import { describe, expect, mock, test } from "bun:test";
 
 import {
+    chatExistsByLocalId,
     listAllChatLocalIds,
     readRuntimeBinding,
     runtimeBinding,
@@ -240,5 +241,45 @@ describe("runtime ingress", () => {
             numItems: 1_000,
             cursor: null,
         });
+    });
+
+    test("checks chat existence against both agentId and localId", async () => {
+        const collect = mock(async () => [
+            {
+                _id: "chats:1",
+                agentId: "agent-a",
+                userId: "users:test",
+                localId: "chat-1",
+            },
+            {
+                _id: "chats:2",
+                agentId: "agent-b",
+                userId: "users:test",
+                localId: "chat-1",
+            },
+        ]);
+        const withIndex = mock(() => ({ collect }));
+        const query = mock(() => ({ withIndex }));
+        const ctx = {
+            db: {
+                query,
+            },
+        };
+
+        await expect(
+            runHandler(chatExistsByLocalId as unknown as HandlerExport, ctx, {
+                userId: "users:test",
+                agentId: "agent-b",
+                localId: "chat-1",
+            }),
+        ).resolves.toBe(true);
+
+        await expect(
+            runHandler(chatExistsByLocalId as unknown as HandlerExport, ctx, {
+                userId: "users:test",
+                agentId: "agent-c",
+                localId: "chat-1",
+            }),
+        ).resolves.toBe(false);
     });
 });

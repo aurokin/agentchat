@@ -11,7 +11,10 @@ import path from "node:path";
 
 import { afterEach, describe, expect, test } from "bun:test";
 
-import { WorkspaceManager } from "../workspaceManager.ts";
+import {
+    getSandboxRootsRegistryPath,
+    WorkspaceManager,
+} from "../workspaceManager.ts";
 import type { AgentchatConfig, AgentConfig } from "../config.ts";
 
 const tempRoots: string[] = [];
@@ -83,6 +86,15 @@ afterEach(() => {
 });
 
 describe("WorkspaceManager", () => {
+    test("scopes the default sandbox root registry path by config path", () => {
+        expect(
+            getSandboxRootsRegistryPath("/tmp/agentchat/dev.config.json"),
+        ).toBe("/tmp/agentchat/.dev.config.json.sandbox-roots.json");
+        expect(
+            getSandboxRootsRegistryPath("/tmp/agentchat/staging.config.json"),
+        ).toBe("/tmp/agentchat/.staging.config.json.sandbox-roots.json");
+    });
+
     describe("ensureWorkspace", () => {
         test("returns rootPath directly for shared mode agents", async () => {
             const sandboxRoot = makeTempDir("sandbox");
@@ -347,9 +359,9 @@ describe("WorkspaceManager", () => {
                 rootPath: "/nonexistent/source/path",
                 workspaceMode: "copy-on-conversation",
             });
-            const manager = new WorkspaceManager({
-                getConfig: () => makeConfig({ sandboxRoot }),
-            });
+            const manager = createWorkspaceManager(() =>
+                makeConfig({ sandboxRoot }),
+            );
 
             await expect(
                 manager.ensureWorkspace(agent, "user-1", "conv-1"),

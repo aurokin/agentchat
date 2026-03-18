@@ -7,7 +7,10 @@ import { CodexModelCatalog } from "./codexModelCatalog.ts";
 import { CodexRuntimeManager } from "./codexRuntime.ts";
 import { createFetchHandler } from "./http.ts";
 import { RuntimePersistenceClient } from "./runtimePersistence.ts";
-import { WorkspaceManager } from "./workspaceManager.ts";
+import {
+    getSandboxRootsRegistryPath,
+    WorkspaceManager,
+} from "./workspaceManager.ts";
 import {
     handleConnectedSocketMessage,
     handleSocketClose,
@@ -22,6 +25,7 @@ const modelCatalog = new CodexModelCatalog({
 });
 const workspaceManager = new WorkspaceManager({
     getConfig: () => configStore.snapshot,
+    rootsRegistryPath: getSandboxRootsRegistryPath(configStore.path),
 });
 const runtimeManager = new CodexRuntimeManager({
     getConfig: () => configStore.snapshot,

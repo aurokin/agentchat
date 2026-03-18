@@ -885,11 +885,17 @@ export const listAllChatLocalIds = internalQuery({
 export const chatExistsByLocalId = internalQuery({
     args: {
         userId: v.id("users"),
+        agentId: v.string(),
         localId: v.string(),
     },
     handler: async (ctx, args): Promise<boolean> => {
-        const chat = await findChatByLocalId(ctx, args);
-        return chat !== null;
+        const chats = await ctx.db
+            .query("chats")
+            .withIndex("by_local_id", (q) =>
+                q.eq("userId", args.userId).eq("localId", args.localId),
+            )
+            .collect();
+        return chats.some((chat) => chat.agentId === args.agentId);
     },
 });
 

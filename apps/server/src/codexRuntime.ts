@@ -459,6 +459,7 @@ export class CodexRuntimeManager {
         try {
             const stillExists = await this.persistence.chatExists(
                 params.userId,
+                params.agentId,
                 params.conversationId,
             );
             if (stillExists) {
@@ -1582,6 +1583,15 @@ function shouldResetPersistedRuntimeBinding(
     binding: PersistedRuntimeBinding,
     desired: RuntimeWorkspaceIdentity,
 ): boolean {
+    if (
+        desired.workspaceMode === "shared" &&
+        binding.workspaceMode === undefined &&
+        binding.workspaceRootPath === undefined &&
+        binding.workspaceCwd === undefined
+    ) {
+        return false;
+    }
+
     return (
         binding.workspaceMode !== desired.workspaceMode ||
         binding.workspaceRootPath !== desired.workspaceRootPath ||

@@ -211,6 +211,7 @@ function createPersistence(
         }>,
         chatExistsCalls: [] as Array<{
             userId: string;
+            agentId: string;
             localId: string;
         }>,
         runtimeBindingCalls: [] as Array<Record<string, unknown>>,
@@ -244,8 +245,8 @@ function createPersistence(
                 updatedAt: Date.now(),
             };
         },
-        async chatExists(userId: string, localId: string) {
-            this.chatExistsCalls.push({ userId, localId });
+        async chatExists(userId: string, agentId: string, localId: string) {
+            this.chatExistsCalls.push({ userId, localId, agentId });
             return false;
         },
         async runtimeBinding(payload: Record<string, unknown>) {
@@ -419,6 +420,34 @@ describe("CodexRuntimeManager", () => {
             "message.started",
             "message.completed",
             "run.completed",
+        ]);
+    });
+
+    test("resumes legacy shared bindings without persisted workspace metadata", async () => {
+        const config = createConfig();
+        const persistence = createPersistence({
+            provider: "codex-default",
+            providerThreadId: "thread-existing",
+        });
+        const fakeClient = new FakeCodexClient({
+            resumedThreadId: "thread-existing",
+        });
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: () => fakeClient,
+        });
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        expect(fakeClient.requests.map((request) => request.method)).toEqual([
+            "thread/resume",
+            "turn/start",
         ]);
     });
 
@@ -1653,6 +1682,7 @@ describe("CodexRuntimeManager", () => {
         expect(persistence.chatExistsCalls).toEqual([
             {
                 userId: "user-1",
+                agentId: "agent-1",
                 localId: "chat-1",
             },
         ]);

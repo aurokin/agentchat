@@ -6,17 +6,25 @@ import {
     writeFileSync,
 } from "node:fs";
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 
 import type { AgentchatConfig, AgentConfig } from "./config.ts";
 import { getSandboxWorkspacePath } from "./sandboxPaths.ts";
 
 const DEFAULT_SANDBOX_ROOTS_REGISTRY_PATH = path.join(
-    os.homedir(),
+    process.cwd(),
     ".agentchat",
     "sandbox-roots.json",
 );
+
+export function getSandboxRootsRegistryPath(configPath: string): string {
+    const resolvedConfigPath = path.resolve(configPath);
+    const configBasename = path.basename(resolvedConfigPath);
+    return path.join(
+        path.dirname(resolvedConfigPath),
+        `.${configBasename}.sandbox-roots.json`,
+    );
+}
 
 export class WorkspaceManager {
     private readonly getConfig: () => AgentchatConfig;

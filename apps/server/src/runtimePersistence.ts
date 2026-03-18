@@ -121,9 +121,14 @@ export class RuntimePersistenceClient {
         return entries;
     }
 
-    async chatExists(userId: string, localId: string): Promise<boolean> {
+    async chatExists(
+        userId: string,
+        agentId: string,
+        localId: string,
+    ): Promise<boolean> {
         const response = await this.post("/runtime/chat-exists", {
             userId,
+            agentId,
             localId,
         });
         return (await response.json()) as boolean;
