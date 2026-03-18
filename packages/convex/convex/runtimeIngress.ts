@@ -162,6 +162,9 @@ async function upsertRuntimeBinding(
         lastError: string | null;
         lastEventAt: number | null;
         expiresAt: number | null;
+        workspaceMode?: "shared" | "copy-on-conversation";
+        workspaceRootPath?: string;
+        workspaceCwd?: string;
         updatedAt: number;
     },
 ): Promise<void> {
@@ -177,6 +180,9 @@ async function upsertRuntimeBinding(
         lastError: args.lastError,
         lastEventAt: args.lastEventAt,
         expiresAt: args.expiresAt,
+        workspaceMode: args.workspaceMode,
+        workspaceRootPath: args.workspaceRootPath,
+        workspaceCwd: args.workspaceCwd,
         updatedAt: args.updatedAt,
     };
 
@@ -898,6 +904,11 @@ export const runtimeBinding = internalMutation({
         lastError: v.union(v.string(), v.null()),
         lastEventAt: v.union(v.number(), v.null()),
         expiresAt: v.union(v.number(), v.null()),
+        workspaceMode: v.optional(
+            v.union(v.literal("shared"), v.literal("copy-on-conversation")),
+        ),
+        workspaceRootPath: v.optional(v.string()),
+        workspaceCwd: v.optional(v.string()),
         updatedAt: v.number(),
     },
     handler: async (ctx, args) => {
@@ -920,6 +931,9 @@ export const runtimeBinding = internalMutation({
             lastError: args.lastError,
             lastEventAt: args.lastEventAt,
             expiresAt: args.expiresAt,
+            workspaceMode: args.workspaceMode,
+            workspaceRootPath: args.workspaceRootPath,
+            workspaceCwd: args.workspaceCwd,
             updatedAt: args.updatedAt,
         });
 

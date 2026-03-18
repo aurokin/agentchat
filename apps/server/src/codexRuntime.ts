@@ -61,6 +61,12 @@ type ResolvedRuntimeResources = {
     provider: ProviderConfig;
 };
 
+type RuntimeWorkspaceIdentity = {
+    workspaceMode: "shared" | "copy-on-conversation";
+    workspaceRootPath: string;
+    workspaceCwd: string;
+};
+
 function invariant(condition: unknown, message: string): asserts condition {
     if (!condition) {
         throw new Error(message);
@@ -283,6 +289,9 @@ export class CodexRuntimeManager {
                         lastError: null,
                         lastEventAt: startedAt,
                         expiresAt: null,
+                        workspaceMode: runtime.agent.workspaceMode,
+                        workspaceRootPath: runtime.agent.rootPath,
+                        workspaceCwd: runtime.cwd,
                         updatedAt: startedAt,
                     });
 
@@ -383,6 +392,9 @@ export class CodexRuntimeManager {
                             lastError: errorMessage,
                             lastEventAt: Date.now(),
                             expiresAt: null,
+                            workspaceMode: runtime.agent.workspaceMode,
+                            workspaceRootPath: runtime.agent.rootPath,
+                            workspaceCwd: runtime.cwd,
                             updatedAt: Date.now(),
                         })
                         .catch((persistError) => {
@@ -684,29 +696,44 @@ export class CodexRuntimeManager {
             }
         }
 
-        const cwd = this.workspaceManager
-            ? await this.workspaceManager.ensureWorkspace(
+        const workspaceState = this.workspaceManager
+            ? await this.workspaceManager.ensureWorkspaceState(
                   resources.agent,
                   params.userId,
                   params.command.payload.conversationId,
               )
-            : resources.agent.rootPath;
+            : { path: resources.agent.rootPath, wasReset: false };
+        const cwd = workspaceState.path;
+        const workspaceIdentity = getRuntimeWorkspaceIdentity(
+            resources.agent,
+            cwd,
+        );
 
         const client = this.createClient({
             provider: resources.provider,
             agent: { ...resources.agent, rootPath: cwd },
         });
         await client.initialize();
-        const persistedBinding = shouldResetConversationState
-            ? null
-            : await this.persistence.readRuntimeBinding({
-                  userId: params.userId,
-                  conversationLocalId: params.command.payload.conversationId,
-              });
+        const persistedBinding =
+            shouldResetConversationState || workspaceState.wasReset
+                ? null
+                : await this.persistence.readRuntimeBinding({
+                      userId: params.userId,
+                      conversationLocalId:
+                          params.command.payload.conversationId,
+                  });
+        const resumableBinding =
+            persistedBinding &&
+            !shouldResetPersistedRuntimeBinding(
+                persistedBinding,
+                workspaceIdentity,
+            )
+                ? persistedBinding
+                : null;
         const { threadId, isNew } = await this.openThread({
             client,
             resources,
-            binding: persistedBinding,
+            binding: resumableBinding,
             modelId: params.command.payload.modelId,
             cwd,
         });
@@ -989,6 +1016,9 @@ export class CodexRuntimeManager {
                 lastError: error.message,
                 lastEventAt: Date.now(),
                 expiresAt: null,
+                workspaceMode: runtime.agent.workspaceMode,
+                workspaceRootPath: runtime.agent.rootPath,
+                workspaceCwd: runtime.cwd,
                 updatedAt: Date.now(),
             })
             .catch((persistError) => {
@@ -1385,6 +1415,9 @@ export class CodexRuntimeManager {
                     lastError: null,
                     lastEventAt: Date.now(),
                     expiresAt: Date.now(),
+                    workspaceMode: runtime.agent.workspaceMode,
+                    workspaceRootPath: runtime.agent.rootPath,
+                    workspaceCwd: runtime.cwd,
                     updatedAt: Date.now(),
                 })
                 .catch((error) => {
@@ -1542,6 +1575,28 @@ function shouldResetRuntimeState(
         runtime.agent.rootPath !== resources.agent.rootPath ||
         runtime.agent.workspaceMode !== resources.agent.workspaceMode ||
         runtime.cwd !== desiredCwd
+    );
+}
+
+function getRuntimeWorkspaceIdentity(
+    agent: AgentConfig,
+    cwd: string,
+): RuntimeWorkspaceIdentity {
+    return {
+        workspaceMode: agent.workspaceMode,
+        workspaceRootPath: agent.rootPath,
+        workspaceCwd: cwd,
+    };
+}
+
+function shouldResetPersistedRuntimeBinding(
+    binding: PersistedRuntimeBinding,
+    desired: RuntimeWorkspaceIdentity,
+): boolean {
+    return (
+        binding.workspaceMode !== desired.workspaceMode ||
+        binding.workspaceRootPath !== desired.workspaceRootPath ||
+        binding.workspaceCwd !== desired.workspaceCwd
     );
 }
 

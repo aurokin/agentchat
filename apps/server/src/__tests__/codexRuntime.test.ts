@@ -199,6 +199,9 @@ function createPersistence(
         providerThreadId: string | null;
         status?: "idle" | "active" | "expired" | "errored";
         activeRunId?: string | null;
+        workspaceMode?: "shared" | "copy-on-conversation";
+        workspaceRootPath?: string;
+        workspaceCwd?: string;
     } | null,
 ) {
     return {
@@ -231,6 +234,9 @@ function createPersistence(
                 lastError: null,
                 lastEventAt: null,
                 expiresAt: null,
+                workspaceMode: binding.workspaceMode,
+                workspaceRootPath: binding.workspaceRootPath,
+                workspaceCwd: binding.workspaceCwd,
                 updatedAt: Date.now(),
             };
         },
@@ -345,6 +351,9 @@ describe("CodexRuntimeManager", () => {
         const persistence = createPersistence({
             provider: "codex-default",
             providerThreadId: "thread-existing",
+            workspaceMode: "shared",
+            workspaceRootPath: config.agents[0]!.rootPath,
+            workspaceCwd: config.agents[0]!.rootPath,
         });
         const fakeClient = new FakeCodexClient({
             resumedThreadId: "thread-existing",
@@ -432,6 +441,9 @@ describe("CodexRuntimeManager", () => {
         const persistence = createPersistence({
             provider: "codex-default",
             providerThreadId: "thread-stale",
+            workspaceMode: "shared",
+            workspaceRootPath: config.agents[0]!.rootPath,
+            workspaceCwd: config.agents[0]!.rootPath,
         });
         const fakeClient = new FakeCodexClient({
             resumeError: new Error("thread/resume failed: thread not found"),
@@ -474,6 +486,9 @@ describe("CodexRuntimeManager", () => {
         const persistence = createPersistence({
             provider: "codex-default",
             providerThreadId: "thread-stale",
+            workspaceMode: "shared",
+            workspaceRootPath: config.agents[0]!.rootPath,
+            workspaceCwd: config.agents[0]!.rootPath,
         });
         const fakeClient = new FakeCodexClient({
             resumeError: new Error(
@@ -1331,6 +1346,9 @@ describe("CodexRuntimeManager", () => {
                 lastError: null,
                 lastEventAt: null,
                 expiresAt: null,
+                workspaceMode: undefined,
+                workspaceRootPath: undefined,
+                workspaceCwd: undefined,
                 updatedAt: Date.now(),
             };
         };
@@ -1441,5 +1459,115 @@ describe("CodexRuntimeManager", () => {
         );
         expect(existsSync(firstSandboxPath)).toBe(false);
         expect(existsSync(secondSandboxPath)).toBe(true);
+    });
+
+    test("does not resume persisted threads after reopening a shared runtime with a changed rootPath", async () => {
+        const firstRoot = makeTempDir("agent-root-a");
+        const secondRoot = makeTempDir("agent-root-b");
+
+        const config = createConfig();
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath: secondRoot,
+            workspaceMode: "shared",
+        };
+
+        const persistence = createPersistence({
+            provider: "codex-default",
+            status: "idle",
+            providerThreadId: "thread-stale",
+            workspaceMode: "shared",
+            workspaceRootPath: firstRoot,
+            workspaceCwd: firstRoot,
+        });
+        const clients: FakeCodexClient[] = [];
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: () => {
+                const client = new FakeCodexClient();
+                clients.push(client);
+                return client;
+            },
+        });
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        expect(clients).toHaveLength(1);
+        expect(clients[0]?.requests.map((request) => request.method)).toEqual([
+            "thread/start",
+            "turn/start",
+        ]);
+    });
+
+    test("does not resume persisted threads after reopening a copied runtime with a changed rootPath", async () => {
+        const sandboxRoot = makeTempDir("sandbox");
+        const firstRoot = makeTempDir("agent-root-a");
+        const secondRoot = makeTempDir("agent-root-b");
+        writeFileSync(path.join(firstRoot, "version.txt"), "first");
+        writeFileSync(path.join(secondRoot, "version.txt"), "second");
+
+        const config = createConfig();
+        config.sandboxRoot = sandboxRoot;
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath: firstRoot,
+            workspaceMode: "copy-on-conversation",
+        };
+
+        const workspaceManager = new WorkspaceManager({
+            getConfig: () => config,
+        });
+        const initialWorkspace = await workspaceManager.ensureWorkspace(
+            config.agents[0]!,
+            "user-1",
+            "chat-1",
+        );
+
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath: secondRoot,
+        };
+
+        const persistence = createPersistence({
+            provider: "codex-default",
+            status: "idle",
+            providerThreadId: "thread-stale",
+            workspaceMode: "copy-on-conversation",
+            workspaceRootPath: firstRoot,
+            workspaceCwd: initialWorkspace,
+        });
+        const clients: FakeCodexClient[] = [];
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            workspaceManager,
+            createClient: () => {
+                const client = new FakeCodexClient();
+                clients.push(client);
+                return client;
+            },
+        });
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        expect(clients).toHaveLength(1);
+        expect(clients[0]?.requests.map((request) => request.method)).toEqual([
+            "thread/start",
+            "turn/start",
+        ]);
+        expect(
+            readFileSync(path.join(initialWorkspace, "version.txt"), "utf8"),
+        ).toBe("second");
     });
 });

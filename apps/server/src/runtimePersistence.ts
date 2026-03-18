@@ -9,6 +9,9 @@ export type PersistedRuntimeBinding = {
     lastError: string | null;
     lastEventAt: number | null;
     expiresAt: number | null;
+    workspaceMode?: "shared" | "copy-on-conversation";
+    workspaceRootPath?: string;
+    workspaceCwd?: string;
     updatedAt: number;
 };
 

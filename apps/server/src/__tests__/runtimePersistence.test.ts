@@ -102,6 +102,9 @@ describe("RuntimePersistenceClient", () => {
                 lastError: null,
                 lastEventAt: 1,
                 expiresAt: null,
+                workspaceMode: "copy-on-conversation",
+                workspaceRootPath: "/tmp/agent",
+                workspaceCwd: "/tmp/sandbox/chat-1",
                 updatedAt: 2,
             });
         });
@@ -116,6 +119,9 @@ describe("RuntimePersistenceClient", () => {
         expect(result).toMatchObject({
             provider: "codex-main",
             activeRunId: "run-1",
+            workspaceMode: "copy-on-conversation",
+            workspaceRootPath: "/tmp/agent",
+            workspaceCwd: "/tmp/sandbox/chat-1",
         });
         expect(fetchMock).toHaveBeenCalledTimes(1);
     });

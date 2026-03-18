@@ -1,5 +1,5 @@
 import { existsSync, readdirSync } from "node:fs";
-import { cp, mkdir, rm } from "node:fs/promises";
+import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import type { AgentchatConfig, AgentConfig } from "./config.ts";
@@ -18,6 +18,62 @@ export class WorkspaceManager {
         this.rememberSandboxRoot(this.getConfig().sandboxRoot);
     }
 
+    async ensureWorkspaceState(
+        agent: AgentConfig,
+        userId: string,
+        conversationId: string,
+    ): Promise<{ path: string; wasReset: boolean }> {
+        if (agent.workspaceMode === "shared") {
+            return { path: agent.rootPath, wasReset: false };
+        }
+
+        const creationKey = this.activeWorkspaceKey(
+            agent.id,
+            userId,
+            conversationId,
+        );
+        const pendingCreation = this.pendingWorkspaceCreations.get(creationKey);
+        if (pendingCreation) {
+            return { path: await pendingCreation, wasReset: false };
+        }
+
+        const sandboxPath = this.sandboxPath(agent.id, userId, conversationId);
+        if (existsSync(sandboxPath)) {
+            const metadata = await this.readWorkspaceMetadata(sandboxPath);
+            if (
+                metadata &&
+                metadata.sourceRootPath === path.resolve(agent.rootPath)
+            ) {
+                return { path: sandboxPath, wasReset: false };
+            }
+
+            const recreation = (async () => {
+                await this.deleteWorkspacePath({
+                    targetPath: sandboxPath,
+                    agentId: agent.id,
+                    userId,
+                    conversationId,
+                });
+
+                return await this.createWorkspace(agent.rootPath, sandboxPath);
+            })();
+            this.pendingWorkspaceCreations.set(creationKey, recreation);
+            try {
+                return { path: await recreation, wasReset: true };
+            } finally {
+                this.pendingWorkspaceCreations.delete(creationKey);
+            }
+        }
+
+        const creation = this.createWorkspace(agent.rootPath, sandboxPath);
+        this.pendingWorkspaceCreations.set(creationKey, creation);
+        try {
+            return { path: await creation, wasReset: false };
+        } finally {
+            this.pendingWorkspaceCreations.delete(creationKey);
+        }
+    }
+
     /**
      * Returns the working directory for a conversation.
      * - shared mode: returns the agent's rootPath directly
@@ -28,32 +84,8 @@ export class WorkspaceManager {
         userId: string,
         conversationId: string,
     ): Promise<string> {
-        if (agent.workspaceMode === "shared") {
-            return agent.rootPath;
-        }
-
-        const creationKey = this.activeWorkspaceKey(
-            agent.id,
-            userId,
-            conversationId,
-        );
-        const pendingCreation = this.pendingWorkspaceCreations.get(creationKey);
-        if (pendingCreation) {
-            return await pendingCreation;
-        }
-
-        const sandboxPath = this.sandboxPath(agent.id, userId, conversationId);
-        if (existsSync(sandboxPath)) {
-            return sandboxPath;
-        }
-
-        const creation = this.createWorkspace(agent.rootPath, sandboxPath);
-        this.pendingWorkspaceCreations.set(creationKey, creation);
-        try {
-            return await creation;
-        } finally {
-            this.pendingWorkspaceCreations.delete(creationKey);
-        }
+        return (await this.ensureWorkspaceState(agent, userId, conversationId))
+            .path;
     }
 
     getWorkspacePath(
@@ -233,6 +265,9 @@ export class WorkspaceManager {
         await mkdir(sandboxPath, { recursive: true });
         try {
             await cp(sourcePath, sandboxPath, { recursive: true });
+            await this.writeWorkspaceMetadata(sandboxPath, {
+                sourceRootPath: path.resolve(sourcePath),
+            });
         } catch (error) {
             // Clean up the partially created directory so the next
             // attempt starts fresh rather than reusing a broken copy.
@@ -247,6 +282,37 @@ export class WorkspaceManager {
             `[agentchat-server] created sandbox workspace: ${sandboxPath}`,
         );
         return sandboxPath;
+    }
+
+    private async readWorkspaceMetadata(
+        sandboxPath: string,
+    ): Promise<{ sourceRootPath: string } | null> {
+        try {
+            const raw = await readFile(
+                path.join(sandboxPath, ".agentchat-sandbox.json"),
+                "utf8",
+            );
+            const parsed = JSON.parse(raw) as { sourceRootPath?: unknown };
+            if (typeof parsed.sourceRootPath !== "string") {
+                return null;
+            }
+            return {
+                sourceRootPath: path.resolve(parsed.sourceRootPath),
+            };
+        } catch {
+            return null;
+        }
+    }
+
+    private async writeWorkspaceMetadata(
+        sandboxPath: string,
+        metadata: { sourceRootPath: string },
+    ): Promise<void> {
+        await writeFile(
+            path.join(sandboxPath, ".agentchat-sandbox.json"),
+            `${JSON.stringify(metadata, null, 2)}\n`,
+            "utf8",
+        );
     }
 
     private sandboxPathForRoot(

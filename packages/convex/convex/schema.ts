@@ -161,6 +161,11 @@ export default defineSchema({
         lastError: v.union(v.string(), v.null()),
         lastEventAt: v.union(v.number(), v.null()),
         expiresAt: v.union(v.number(), v.null()),
+        workspaceMode: v.optional(
+            v.union(v.literal("shared"), v.literal("copy-on-conversation")),
+        ),
+        workspaceRootPath: v.optional(v.string()),
+        workspaceCwd: v.optional(v.string()),
         updatedAt: v.number(),
     })
         .index("by_chatId", ["chatId"])

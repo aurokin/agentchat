@@ -161,6 +161,44 @@ describe("WorkspaceManager", () => {
             );
         });
 
+        test("refreshes an existing copied sandbox when the agent rootPath changes", async () => {
+            const sandboxRoot = makeTempDir("sandbox");
+            const firstRoot = makeTempDir("agent-root-a");
+            const secondRoot = makeTempDir("agent-root-b");
+            writeFileSync(path.join(firstRoot, "file.txt"), "first");
+            writeFileSync(path.join(secondRoot, "file.txt"), "second");
+
+            const agent = makeAgent({
+                id: "my-agent",
+                rootPath: firstRoot,
+                workspaceMode: "copy-on-conversation",
+            });
+            const manager = new WorkspaceManager({
+                getConfig: () => makeConfig({ sandboxRoot }),
+            });
+
+            const first = await manager.ensureWorkspaceState(
+                agent,
+                "user-1",
+                "conv-1",
+            );
+            expect(first.wasReset).toBe(false);
+            expect(
+                readFileSync(path.join(first.path, "file.txt"), "utf8"),
+            ).toBe("first");
+
+            const second = await manager.ensureWorkspaceState(
+                { ...agent, rootPath: secondRoot },
+                "user-1",
+                "conv-1",
+            );
+            expect(second.wasReset).toBe(true);
+            expect(second.path).toBe(first.path);
+            expect(
+                readFileSync(path.join(second.path, "file.txt"), "utf8"),
+            ).toBe("second");
+        });
+
         test("serializes concurrent initial sandbox creation per conversation", async () => {
             const sandboxRoot = makeTempDir("sandbox");
             const rootPath = makeTempDir("agent-root");
