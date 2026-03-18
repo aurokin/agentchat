@@ -657,7 +657,7 @@ export class CodexRuntimeManager {
         }
 
         const cwd = this.workspaceManager
-            ? this.workspaceManager.ensureWorkspace(
+            ? await this.workspaceManager.ensureWorkspace(
                   resources.agent,
                   params.userId,
                   params.command.payload.conversationId,

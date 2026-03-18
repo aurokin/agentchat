@@ -242,13 +242,15 @@ export class AgentchatSocketClient {
     async notifyConversationDeleted(
         conversationId: string,
         agentId: string,
+        tokenIssuer?: (() => Promise<string>) | null,
     ): Promise<void> {
+        const effectiveTokenIssuer = tokenIssuer ?? this.tokenIssuer;
         if (
             (!this.socket || this.socket.readyState !== WebSocket.OPEN) &&
-            this.tokenIssuer
+            effectiveTokenIssuer
         ) {
             try {
-                await this.ensureConnected(this.tokenIssuer);
+                await this.ensureConnected(effectiveTokenIssuer);
             } catch {
                 return;
             }

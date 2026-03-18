@@ -65,7 +65,7 @@ afterEach(() => {
 
 describe("WorkspaceManager", () => {
     describe("ensureWorkspace", () => {
-        test("returns rootPath directly for shared mode agents", () => {
+        test("returns rootPath directly for shared mode agents", async () => {
             const sandboxRoot = makeTempDir("sandbox");
             const agent = makeAgent({
                 rootPath: "/some/path",
@@ -75,11 +75,11 @@ describe("WorkspaceManager", () => {
                 getConfig: () => makeConfig({ sandboxRoot }),
             });
 
-            const result = manager.ensureWorkspace(agent, "user-1", "conv-1");
+            const result = await manager.ensureWorkspace(agent, "user-1", "conv-1");
             expect(result).toBe("/some/path");
         });
 
-        test("copies rootPath to sandbox for copy-on-conversation mode", () => {
+        test("copies rootPath to sandbox for copy-on-conversation mode", async () => {
             const sandboxRoot = makeTempDir("sandbox");
             const rootPath = makeTempDir("agent-root");
             writeFileSync(path.join(rootPath, "README.md"), "hello");
@@ -95,7 +95,7 @@ describe("WorkspaceManager", () => {
                 getConfig: () => makeConfig({ sandboxRoot }),
             });
 
-            const result = manager.ensureWorkspace(agent, "user-1", "conv-123");
+            const result = await manager.ensureWorkspace(agent, "user-1", "conv-123");
 
             expect(result).toBe(
                 path.join(sandboxRoot, "my-agent", "user-1", "conv-123"),
@@ -109,7 +109,7 @@ describe("WorkspaceManager", () => {
             ).toBe("export {}");
         });
 
-        test("is idempotent — does not overwrite existing sandbox", () => {
+        test("is idempotent — does not overwrite existing sandbox", async () => {
             const sandboxRoot = makeTempDir("sandbox");
             const rootPath = makeTempDir("agent-root");
             writeFileSync(path.join(rootPath, "file.txt"), "original");
@@ -123,14 +123,14 @@ describe("WorkspaceManager", () => {
                 getConfig: () => makeConfig({ sandboxRoot }),
             });
 
-            const first = manager.ensureWorkspace(agent, "user-1", "conv-1");
+            const first = await manager.ensureWorkspace(agent, "user-1", "conv-1");
             // Modify the sandbox copy
             writeFileSync(path.join(first, "file.txt"), "modified");
 
             // Change the source
             writeFileSync(path.join(rootPath, "file.txt"), "updated-source");
 
-            const second = manager.ensureWorkspace(agent, "user-1", "conv-1");
+            const second = await manager.ensureWorkspace(agent, "user-1", "conv-1");
             expect(second).toBe(first);
             // Should keep the modified version, not re-copy
             expect(readFileSync(path.join(second, "file.txt"), "utf8")).toBe(
@@ -138,7 +138,7 @@ describe("WorkspaceManager", () => {
             );
         });
 
-        test("isolates sandboxes between different users", () => {
+        test("isolates sandboxes between different users", async () => {
             const sandboxRoot = makeTempDir("sandbox");
             const rootPath = makeTempDir("agent-root");
             writeFileSync(path.join(rootPath, "file.txt"), "original");
@@ -152,8 +152,8 @@ describe("WorkspaceManager", () => {
                 getConfig: () => makeConfig({ sandboxRoot }),
             });
 
-            const pathA = manager.ensureWorkspace(agent, "user-a", "conv-1");
-            const pathB = manager.ensureWorkspace(agent, "user-b", "conv-1");
+            const pathA = await manager.ensureWorkspace(agent, "user-a", "conv-1");
+            const pathB = await manager.ensureWorkspace(agent, "user-b", "conv-1");
 
             expect(pathA).not.toBe(pathB);
             expect(pathA).toBe(
@@ -170,7 +170,7 @@ describe("WorkspaceManager", () => {
             );
         });
 
-        test("rejects path-traversal in conversationId", () => {
+        test("rejects path-traversal in conversationId", async () => {
             const sandboxRoot = makeTempDir("sandbox");
             const rootPath = makeTempDir("agent-root");
             const agent = makeAgent({
@@ -182,26 +182,26 @@ describe("WorkspaceManager", () => {
                 getConfig: () => makeConfig({ sandboxRoot }),
             });
 
-            expect(() =>
+            expect(
                 manager.ensureWorkspace(agent, "user-1", "../../../tmp/evil"),
-            ).toThrow(/Unsafe conversationId/);
-            expect(() =>
+            ).rejects.toThrow(/Unsafe conversationId/);
+            expect(
                 manager.ensureWorkspace(agent, "user-1", ".."),
-            ).toThrow(/Unsafe conversationId/);
-            expect(() =>
+            ).rejects.toThrow(/Unsafe conversationId/);
+            expect(
                 manager.ensureWorkspace(agent, "user-1", "."),
-            ).toThrow(/Unsafe conversationId/);
-            expect(() =>
+            ).rejects.toThrow(/Unsafe conversationId/);
+            expect(
                 manager.ensureWorkspace(agent, "../evil", "conv-1"),
-            ).toThrow(/Unsafe userId/);
-            expect(() =>
+            ).rejects.toThrow(/Unsafe userId/);
+            expect(
                 manager.ensureWorkspace(agent, "user-1", ""),
-            ).toThrow(/Unsafe conversationId/);
+            ).rejects.toThrow(/Unsafe conversationId/);
         });
 
-        test("cleans up partial sandbox when copy fails", () => {
+        test("cleans up partial sandbox when copy fails", async () => {
             const sandboxRoot = makeTempDir("sandbox");
-            // Use a non-existent rootPath so cpSync will fail
+            // Use a non-existent rootPath so cp will fail
             const agent = makeAgent({
                 id: "my-agent",
                 rootPath: "/nonexistent/source/path",
@@ -211,9 +211,16 @@ describe("WorkspaceManager", () => {
                 getConfig: () => makeConfig({ sandboxRoot }),
             });
 
-            expect(() =>
+            expect(
                 manager.ensureWorkspace(agent, "user-1", "conv-1"),
-            ).toThrow();
+            ).rejects.toThrow();
+
+            // Wait for the promise to settle so cleanup runs
+            try {
+                await manager.ensureWorkspace(agent, "user-1", "conv-1");
+            } catch {
+                // expected
+            }
 
             // The partial directory should have been cleaned up
             const sandboxPath = path.join(
@@ -227,7 +234,7 @@ describe("WorkspaceManager", () => {
     });
 
     describe("deleteWorkspace", () => {
-        test("removes a sandbox directory", () => {
+        test("removes a sandbox directory", async () => {
             const sandboxRoot = makeTempDir("sandbox");
             const rootPath = makeTempDir("agent-root");
             writeFileSync(path.join(rootPath, "file.txt"), "data");
@@ -242,7 +249,7 @@ describe("WorkspaceManager", () => {
                 getConfig: () => config,
             });
 
-            const workspace = manager.ensureWorkspace(agent, "user-1", "conv-1");
+            const workspace = await manager.ensureWorkspace(agent, "user-1", "conv-1");
             expect(existsSync(workspace)).toBe(true);
 
             manager.deleteWorkspace("my-agent", "user-1", "conv-1");
@@ -302,7 +309,7 @@ describe("WorkspaceManager", () => {
     });
 
     describe("reconcile", () => {
-        test("removes sandbox directories not in the active set", () => {
+        test("removes sandbox directories not in the active set", async () => {
             const sandboxRoot = makeTempDir("sandbox");
             const rootPath = makeTempDir("agent-root");
             writeFileSync(path.join(rootPath, "f.txt"), "x");
@@ -317,8 +324,8 @@ describe("WorkspaceManager", () => {
                 getConfig: () => config,
             });
 
-            manager.ensureWorkspace(agent, "user-1", "conv-keep");
-            manager.ensureWorkspace(agent, "user-1", "conv-remove");
+            await manager.ensureWorkspace(agent, "user-1", "conv-keep");
+            await manager.ensureWorkspace(agent, "user-1", "conv-remove");
 
             const keepPath = path.join(sandboxRoot, "agent-a", "user-1", "conv-keep");
             const removePath = path.join(

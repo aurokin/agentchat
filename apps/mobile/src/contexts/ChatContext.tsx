@@ -39,6 +39,7 @@ import { useModelContext } from "@/contexts/ModelContext";
 import { deriveConversationRuntimeState } from "@/contexts/runtime-helpers";
 import { useAgent } from "@/contexts/AgentContext";
 import { getSharedAgentchatSocketClient } from "@/lib/agentchat-socket";
+import { useAuthContext } from "@/lib/convex/AuthContext";
 
 interface ChatContextValue {
     chats: ChatSession[];
@@ -114,6 +115,7 @@ export function ChatProvider({
     const [isLoading, setIsLoading] = useState(false);
     const [isMessagesLoading, setIsMessagesLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const { getBackendSessionToken } = useAuthContext();
     const { defaultAgentId, selectedModel, selectedVariantId, models } =
         useModelContext();
     const { selectedAgentId } = useAgent();
@@ -529,6 +531,7 @@ export function ChatProvider({
                 await getSharedAgentchatSocketClient().notifyConversationDeleted(
                     chatId,
                     deletedChat.agentId,
+                    getBackendSessionToken,
                 );
             }
 
@@ -543,7 +546,7 @@ export function ChatProvider({
                 await clearSelectedChatId(selectedAgentId);
             }
         },
-        [adapter, chats, selectedAgentId],
+        [adapter, chats, selectedAgentId, getBackendSessionToken],
     );
 
     const deleteChats = useCallback(
@@ -558,6 +561,7 @@ export function ChatProvider({
                     await socketClient.notifyConversationDeleted(
                         chatId,
                         chat.agentId,
+                        getBackendSessionToken,
                     );
                 }
             }
@@ -582,7 +586,7 @@ export function ChatProvider({
                 await clearSelectedChatId(selectedAgentId);
             }
         },
-        [adapter, chats, selectedAgentId],
+        [adapter, chats, selectedAgentId, getBackendSessionToken],
     );
 
     const updateChat = useCallback(

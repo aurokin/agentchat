@@ -1,4 +1,5 @@
-import { cpSync, existsSync, mkdirSync, rmSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, rmSync } from "node:fs";
+import { cp, mkdir, rm } from "node:fs/promises";
 import path from "node:path";
 
 import type { AgentchatConfig, AgentConfig } from "./config.ts";
@@ -25,25 +26,25 @@ export class WorkspaceManager {
      * - shared mode: returns the agent's rootPath directly
      * - copy-on-conversation mode: returns a sandbox path, creating the copy if needed
      */
-    ensureWorkspace(
+    async ensureWorkspace(
         agent: AgentConfig,
         userId: string,
         conversationId: string,
-    ): string {
+    ): Promise<string> {
         if (agent.workspaceMode === "shared") {
             return agent.rootPath;
         }
 
         const sandboxPath = this.sandboxPath(agent.id, userId, conversationId);
         if (!existsSync(sandboxPath)) {
-            mkdirSync(sandboxPath, { recursive: true });
+            await mkdir(sandboxPath, { recursive: true });
             try {
-                cpSync(agent.rootPath, sandboxPath, { recursive: true });
+                await cp(agent.rootPath, sandboxPath, { recursive: true });
             } catch (error) {
                 // Clean up the partially created directory so the next
                 // attempt starts fresh rather than reusing a broken copy.
                 try {
-                    rmSync(sandboxPath, { recursive: true, force: true });
+                    await rm(sandboxPath, { recursive: true, force: true });
                 } catch {
                     // best-effort cleanup
                 }
