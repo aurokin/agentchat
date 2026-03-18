@@ -15,12 +15,16 @@ export class WorkspaceManager {
      * - shared mode: returns the agent's rootPath directly
      * - copy-on-conversation mode: returns a sandbox path, creating the copy if needed
      */
-    ensureWorkspace(agent: AgentConfig, conversationId: string): string {
+    ensureWorkspace(
+        agent: AgentConfig,
+        userId: string,
+        conversationId: string,
+    ): string {
         if (agent.workspaceMode === "shared") {
             return agent.rootPath;
         }
 
-        const sandboxPath = this.sandboxPath(agent.id, conversationId);
+        const sandboxPath = this.sandboxPath(agent.id, userId, conversationId);
         if (!existsSync(sandboxPath)) {
             mkdirSync(sandboxPath, { recursive: true });
             cpSync(agent.rootPath, sandboxPath, { recursive: true });
@@ -35,9 +39,13 @@ export class WorkspaceManager {
      * Deletes the sandbox directory for a conversation.
      * Only operates on paths strictly under sandboxRoot. Never touches rootPath.
      */
-    deleteWorkspace(agentId: string, conversationId: string): void {
+    deleteWorkspace(
+        agentId: string,
+        userId: string,
+        conversationId: string,
+    ): void {
         const config = this.getConfig();
-        const target = this.sandboxPath(agentId, conversationId);
+        const target = this.sandboxPath(agentId, userId, conversationId);
 
         if (!this.isSafeSandboxTarget(config.sandboxRoot, target)) {
             console.error(
@@ -85,34 +93,49 @@ export class WorkspaceManager {
 
         for (const agentDir of agentDirs) {
             const agentPath = path.join(sandboxRoot, agentDir);
-            let convDirs: string[];
+            let userDirs: string[];
             try {
-                convDirs = readdirSync(agentPath);
+                userDirs = readdirSync(agentPath);
             } catch {
                 continue;
             }
 
-            for (const convDir of convDirs) {
-                if (!activeConversationIds.has(convDir)) {
-                    const target = path.join(agentPath, convDir);
-                    if (this.isSafeSandboxTarget(sandboxRoot, target)) {
-                        rmSync(target, { recursive: true, force: true });
-                        console.log(
-                            `[agentchat-server] reconcile: removed orphaned sandbox: ${target}`,
-                        );
+            for (const userDir of userDirs) {
+                const userPath = path.join(agentPath, userDir);
+                let convDirs: string[];
+                try {
+                    convDirs = readdirSync(userPath);
+                } catch {
+                    continue;
+                }
+
+                for (const convDir of convDirs) {
+                    if (!activeConversationIds.has(convDir)) {
+                        const target = path.join(userPath, convDir);
+                        if (this.isSafeSandboxTarget(sandboxRoot, target)) {
+                            rmSync(target, { recursive: true, force: true });
+                            console.log(
+                                `[agentchat-server] reconcile: removed orphaned sandbox: ${target}`,
+                            );
+                        }
                     }
                 }
             }
         }
     }
 
-    private sandboxPath(agentId: string, conversationId: string): string {
+    private sandboxPath(
+        agentId: string,
+        userId: string,
+        conversationId: string,
+    ): string {
         const { sandboxRoot } = this.getConfig();
-        return path.join(sandboxRoot, agentId, conversationId);
+        return path.join(sandboxRoot, agentId, userId, conversationId);
     }
 
     /**
-     * Validates a target path is exactly 2 levels deep under sandboxRoot.
+     * Validates a target path is exactly 3 levels deep under sandboxRoot.
+     * Structure: <sandboxRoot>/<agentId>/<userId>/<conversationId>
      */
     private isSafeSandboxTarget(
         sandboxRoot: string,
@@ -125,9 +148,9 @@ export class WorkspaceManager {
             return false;
         }
 
-        // Must be exactly <sandboxRoot>/<agentId>/<conversationId>
+        // Must be exactly <sandboxRoot>/<agentId>/<userId>/<conversationId>
         const relative = path.relative(resolvedRoot, resolved);
         const segments = relative.split(path.sep).filter(Boolean);
-        return segments.length === 2;
+        return segments.length === 3;
     }
 }

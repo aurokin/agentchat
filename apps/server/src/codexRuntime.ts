@@ -458,6 +458,7 @@ export class CodexRuntimeManager {
         // Delete the sandbox workspace if workspace manager is configured
         this.workspaceManager?.deleteWorkspace(
             params.agentId,
+            params.userId,
             params.conversationId,
         );
     }
@@ -519,6 +520,17 @@ export class CodexRuntimeManager {
                 }),
             );
         }
+    }
+
+    /**
+     * Returns the set of conversationIds for all live runtimes.
+     */
+    getActiveConversationIds(): Set<string> {
+        const ids = new Set<string>();
+        for (const runtime of this.runtimes.values()) {
+            ids.add(runtime.conversationId);
+        }
+        return ids;
     }
 
     unsubscribe(params: {
@@ -600,6 +612,7 @@ export class CodexRuntimeManager {
         const cwd = this.workspaceManager
             ? this.workspaceManager.ensureWorkspace(
                   resources.agent,
+                  params.userId,
                   params.command.payload.conversationId,
               )
             : resources.agent.rootPath;

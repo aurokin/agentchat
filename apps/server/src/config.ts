@@ -175,6 +175,10 @@ const AgentchatConfigInputSchema = z
             }
         }
 
+        const resolvedSandboxRoot = config.sandboxRoot
+            ? path.resolve(config.sandboxRoot)
+            : null;
+
         const agentIds = new Set<string>();
         for (const agent of config.agents) {
             if (agentIds.has(agent.id)) {
@@ -190,6 +194,23 @@ const AgentchatConfigInputSchema = z
                     ctx.addIssue({
                         code: z.ZodIssueCode.custom,
                         message: `Agent '${agent.id}' references unknown provider '${providerId}'.`,
+                    });
+                }
+            }
+
+            if (
+                resolvedSandboxRoot &&
+                agent.workspaceMode === "copy-on-conversation"
+            ) {
+                const resolvedRootPath = path.resolve(agent.rootPath);
+                if (
+                    resolvedSandboxRoot === resolvedRootPath ||
+                    resolvedSandboxRoot.startsWith(resolvedRootPath + "/") ||
+                    resolvedRootPath.startsWith(resolvedSandboxRoot + "/")
+                ) {
+                    ctx.addIssue({
+                        code: z.ZodIssueCode.custom,
+                        message: `Agent '${agent.id}' rootPath '${agent.rootPath}' overlaps with sandboxRoot '${config.sandboxRoot}'. These must be disjoint to prevent recursive copies and accidental deletions.`,
                     });
                 }
             }

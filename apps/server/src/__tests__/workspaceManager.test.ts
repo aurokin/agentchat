@@ -75,7 +75,7 @@ describe("WorkspaceManager", () => {
                 getConfig: () => makeConfig({ sandboxRoot }),
             });
 
-            const result = manager.ensureWorkspace(agent, "conv-1");
+            const result = manager.ensureWorkspace(agent, "user-1", "conv-1");
             expect(result).toBe("/some/path");
         });
 
@@ -95,10 +95,10 @@ describe("WorkspaceManager", () => {
                 getConfig: () => makeConfig({ sandboxRoot }),
             });
 
-            const result = manager.ensureWorkspace(agent, "conv-123");
+            const result = manager.ensureWorkspace(agent, "user-1", "conv-123");
 
             expect(result).toBe(
-                path.join(sandboxRoot, "my-agent", "conv-123"),
+                path.join(sandboxRoot, "my-agent", "user-1", "conv-123"),
             );
             expect(existsSync(result)).toBe(true);
             expect(
@@ -123,18 +123,50 @@ describe("WorkspaceManager", () => {
                 getConfig: () => makeConfig({ sandboxRoot }),
             });
 
-            const first = manager.ensureWorkspace(agent, "conv-1");
+            const first = manager.ensureWorkspace(agent, "user-1", "conv-1");
             // Modify the sandbox copy
             writeFileSync(path.join(first, "file.txt"), "modified");
 
             // Change the source
             writeFileSync(path.join(rootPath, "file.txt"), "updated-source");
 
-            const second = manager.ensureWorkspace(agent, "conv-1");
+            const second = manager.ensureWorkspace(agent, "user-1", "conv-1");
             expect(second).toBe(first);
             // Should keep the modified version, not re-copy
             expect(readFileSync(path.join(second, "file.txt"), "utf8")).toBe(
                 "modified",
+            );
+        });
+
+        test("isolates sandboxes between different users", () => {
+            const sandboxRoot = makeTempDir("sandbox");
+            const rootPath = makeTempDir("agent-root");
+            writeFileSync(path.join(rootPath, "file.txt"), "original");
+
+            const agent = makeAgent({
+                id: "my-agent",
+                rootPath,
+                workspaceMode: "copy-on-conversation",
+            });
+            const manager = new WorkspaceManager({
+                getConfig: () => makeConfig({ sandboxRoot }),
+            });
+
+            const pathA = manager.ensureWorkspace(agent, "user-a", "conv-1");
+            const pathB = manager.ensureWorkspace(agent, "user-b", "conv-1");
+
+            expect(pathA).not.toBe(pathB);
+            expect(pathA).toBe(
+                path.join(sandboxRoot, "my-agent", "user-a", "conv-1"),
+            );
+            expect(pathB).toBe(
+                path.join(sandboxRoot, "my-agent", "user-b", "conv-1"),
+            );
+
+            // Modifications in one user's sandbox don't affect the other
+            writeFileSync(path.join(pathA, "file.txt"), "user-a-change");
+            expect(readFileSync(path.join(pathB, "file.txt"), "utf8")).toBe(
+                "original",
             );
         });
     });
@@ -155,10 +187,10 @@ describe("WorkspaceManager", () => {
                 getConfig: () => config,
             });
 
-            const workspace = manager.ensureWorkspace(agent, "conv-1");
+            const workspace = manager.ensureWorkspace(agent, "user-1", "conv-1");
             expect(existsSync(workspace)).toBe(true);
 
-            manager.deleteWorkspace("my-agent", "conv-1");
+            manager.deleteWorkspace("my-agent", "user-1", "conv-1");
             expect(existsSync(workspace)).toBe(false);
         });
 
@@ -172,19 +204,18 @@ describe("WorkspaceManager", () => {
             });
 
             // Try to trick it with path traversal
-            manager.deleteWorkspace("../../" + path.basename(outsideDir), "");
+            manager.deleteWorkspace("../../" + path.basename(outsideDir), "user", "");
             expect(existsSync(outsideDir)).toBe(true);
         });
 
         test("refuses to delete agent rootPath", () => {
             const sandboxRoot = makeTempDir("sandbox");
-            const rootPath = makeTempDir("agent-root");
-            writeFileSync(path.join(rootPath, "file.txt"), "keep");
 
             // Construct a config where rootPath happens to be under sandboxRoot
             const agentId = "nested";
+            const userId = "user";
             const convId = "conv";
-            const nestedRoot = path.join(sandboxRoot, agentId, convId);
+            const nestedRoot = path.join(sandboxRoot, agentId, userId, convId);
             mkdirSync(nestedRoot, { recursive: true });
             writeFileSync(path.join(nestedRoot, "file.txt"), "keep");
 
@@ -197,7 +228,7 @@ describe("WorkspaceManager", () => {
                 getConfig: () => makeConfig({ sandboxRoot, agents: [agent] }),
             });
 
-            manager.deleteWorkspace(agentId, convId);
+            manager.deleteWorkspace(agentId, userId, convId);
             // Should NOT have been deleted because it's the agent's rootPath
             expect(existsSync(nestedRoot)).toBe(true);
         });
@@ -209,7 +240,7 @@ describe("WorkspaceManager", () => {
             });
 
             // Should not throw
-            manager.deleteWorkspace("agent-1", "conv-nonexistent");
+            manager.deleteWorkspace("agent-1", "user-1", "conv-nonexistent");
         });
     });
 
@@ -229,13 +260,14 @@ describe("WorkspaceManager", () => {
                 getConfig: () => config,
             });
 
-            manager.ensureWorkspace(agent, "conv-keep");
-            manager.ensureWorkspace(agent, "conv-remove");
+            manager.ensureWorkspace(agent, "user-1", "conv-keep");
+            manager.ensureWorkspace(agent, "user-1", "conv-remove");
 
-            const keepPath = path.join(sandboxRoot, "agent-a", "conv-keep");
+            const keepPath = path.join(sandboxRoot, "agent-a", "user-1", "conv-keep");
             const removePath = path.join(
                 sandboxRoot,
                 "agent-a",
+                "user-1",
                 "conv-remove",
             );
             expect(existsSync(keepPath)).toBe(true);

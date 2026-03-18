@@ -221,6 +221,62 @@ describe("server config", () => {
         expect(exampleConfig.agents[0]?.workspaceMode).toBe("shared");
     });
 
+    test("rejects config where sandboxRoot overlaps an agent rootPath for copy-on-conversation", () => {
+        expect(() =>
+            parseConfig({
+                version: 1,
+                sandboxRoot: "/projects/my-app/sandboxes",
+                auth: {
+                    defaultProviderId: "local-main",
+                    providers: [
+                        {
+                            id: "local-main",
+                            kind: "local",
+                            enabled: true,
+                            allowSignup: false,
+                        },
+                    ],
+                },
+                providers: exampleConfig.providers,
+                agents: [
+                    {
+                        ...exampleConfig.agents[0],
+                        rootPath: "/projects/my-app",
+                        workspaceMode: "copy-on-conversation",
+                    },
+                ],
+            }),
+        ).toThrow(/overlaps with sandboxRoot/);
+    });
+
+    test("allows sandboxRoot inside rootPath for shared-mode agents", () => {
+        const config = parseConfig({
+            version: 1,
+            sandboxRoot: "/projects/my-app/sandboxes",
+            auth: {
+                defaultProviderId: "local-main",
+                providers: [
+                    {
+                        id: "local-main",
+                        kind: "local",
+                        enabled: true,
+                        allowSignup: false,
+                    },
+                ],
+            },
+            providers: exampleConfig.providers,
+            agents: [
+                {
+                    ...exampleConfig.agents[0],
+                    rootPath: "/projects/my-app",
+                    workspaceMode: "shared",
+                },
+            ],
+        });
+
+        expect(config.sandboxRoot).toBe("/projects/my-app/sandboxes");
+    });
+
     test("parses local auth config", () => {
         const config = parseConfig({
             version: 1,
