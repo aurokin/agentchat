@@ -528,7 +528,7 @@ export function ChatProvider({
             await adapter.deleteChat(chatId);
 
             if (deletedChat) {
-                await getSharedAgentchatSocketClient().notifyConversationDeleted(
+                void getSharedAgentchatSocketClient().notifyConversationDeleted(
                     chatId,
                     deletedChat.agentId,
                     getBackendSessionToken,
@@ -558,7 +558,7 @@ export function ChatProvider({
                 const chat = chats.find((c) => c.id === chatId) ?? null;
                 await adapter.deleteChat(chatId);
                 if (chat) {
-                    await socketClient.notifyConversationDeleted(
+                    void socketClient.notifyConversationDeleted(
                         chatId,
                         chat.agentId,
                         getBackendSessionToken,

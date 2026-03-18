@@ -350,6 +350,39 @@ describe("WorkspaceManager", () => {
             expect(existsSync(workspace)).toBe(false);
         });
 
+        test("removes copied workspaces created under an older sandboxRoot", async () => {
+            const firstSandboxRoot = makeTempDir("sandbox-a");
+            const secondSandboxRoot = makeTempDir("sandbox-b");
+            const rootPath = makeTempDir("agent-root");
+            writeFileSync(path.join(rootPath, "file.txt"), "data");
+
+            const agent = makeAgent({
+                id: "my-agent",
+                rootPath,
+                workspaceMode: "copy-on-conversation",
+            });
+            const config = makeConfig({
+                sandboxRoot: firstSandboxRoot,
+                agents: [agent],
+            });
+            const manager = new WorkspaceManager({
+                getConfig: () => config,
+            });
+
+            const originalWorkspace = await manager.ensureWorkspace(
+                agent,
+                "user-1",
+                "conv-1",
+            );
+            expect(existsSync(originalWorkspace)).toBe(true);
+
+            config.sandboxRoot = secondSandboxRoot;
+
+            await manager.deleteWorkspace("my-agent", "user-1", "conv-1");
+
+            expect(existsSync(originalWorkspace)).toBe(false);
+        });
+
         test("refuses to delete paths with traversal segments", async () => {
             const sandboxRoot = makeTempDir("sandbox");
             const outsideDir = makeTempDir("outside");

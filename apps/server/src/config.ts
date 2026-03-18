@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { z } from "zod";
+import { isSafePathSegment } from "./sandboxPaths.ts";
 
 const GoogleAuthProviderSchema = z.object({
     id: z.string().min(1),
@@ -130,6 +131,13 @@ const AgentSchema = z
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
                 message: `Agent '${agent.id}' rootPath must be absolute.`,
+            });
+        }
+
+        if (!isSafePathSegment(agent.id)) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: `Agent '${agent.id}' id must be a safe filesystem path segment.`,
             });
         }
 

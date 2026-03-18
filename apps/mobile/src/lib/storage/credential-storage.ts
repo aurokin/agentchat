@@ -1,8 +1,4 @@
-import {
-    getItemAsync,
-    setItemAsync,
-    deleteItemAsync,
-} from "./secure-store";
+import { getItemAsync, setItemAsync, deleteItemAsync } from "./secure-store";
 
 const CREDENTIAL_KEYS = {
     AUTH_TOKEN: "agentchat-auth-token",

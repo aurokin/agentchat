@@ -221,6 +221,32 @@ describe("server config", () => {
         expect(exampleConfig.agents[0]?.workspaceMode).toBe("shared");
     });
 
+    test("rejects agent ids that are unsafe filesystem path segments", () => {
+        expect(() =>
+            parseConfig({
+                version: 1,
+                auth: {
+                    defaultProviderId: "local-main",
+                    providers: [
+                        {
+                            id: "local-main",
+                            kind: "local",
+                            enabled: true,
+                            allowSignup: false,
+                        },
+                    ],
+                },
+                providers: exampleConfig.providers,
+                agents: [
+                    {
+                        ...exampleConfig.agents[0],
+                        id: "team/frontend",
+                    },
+                ],
+            }),
+        ).toThrow(/safe filesystem path segment/);
+    });
+
     test("rejects config where sandboxRoot overlaps an agent rootPath for copy-on-conversation", () => {
         expect(() =>
             parseConfig({

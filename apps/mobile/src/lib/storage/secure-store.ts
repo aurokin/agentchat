@@ -3,9 +3,19 @@
 // platform-specific issues with named export interception on Linux).
 
 interface SecureStoreApi {
-    getItemAsync(key: string, options?: Record<string, unknown>): Promise<string | null>;
-    setItemAsync(key: string, value: string, options?: Record<string, unknown>): Promise<void>;
-    deleteItemAsync(key: string, options?: Record<string, unknown>): Promise<void>;
+    getItemAsync(
+        key: string,
+        options?: Record<string, unknown>,
+    ): Promise<string | null>;
+    setItemAsync(
+        key: string,
+        value: string,
+        options?: Record<string, unknown>,
+    ): Promise<void>;
+    deleteItemAsync(
+        key: string,
+        options?: Record<string, unknown>,
+    ): Promise<void>;
 }
 
 let impl: SecureStoreApi | null = null;
