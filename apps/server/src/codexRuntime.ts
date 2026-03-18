@@ -570,14 +570,14 @@ export class CodexRuntimeManager {
     }
 
     /**
-     * Returns the set of conversationIds for all live runtimes.
+     * Returns composite userId:conversationId keys for all live runtimes.
      */
-    getActiveConversationIds(): Set<string> {
-        const ids = new Set<string>();
+    getActiveConversationKeys(): Set<string> {
+        const keys = new Set<string>();
         for (const runtime of this.runtimes.values()) {
-            ids.add(runtime.conversationId);
+            keys.add(`${runtime.userId}:${runtime.conversationId}`);
         }
-        return ids;
+        return keys;
     }
 
     unsubscribe(params: {

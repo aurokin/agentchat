@@ -94,10 +94,10 @@ export class WorkspaceManager {
     }
 
     /**
-     * Removes sandbox directories whose conversationId is not in the active set.
-     * Call on startup and periodically as a safety net.
+     * Removes sandbox directories whose userId:conversationId key is not in the
+     * active set. Call on startup and periodically as a safety net.
      */
-    reconcile(activeConversationIds: Set<string>): void {
+    reconcile(activeKeys: Set<string>): void {
         const config = this.getConfig();
         const { sandboxRoot } = config;
 
@@ -131,7 +131,8 @@ export class WorkspaceManager {
                 }
 
                 for (const convDir of convDirs) {
-                    if (!activeConversationIds.has(convDir)) {
+                    const key = `${userDir}:${convDir}`;
+                    if (!activeKeys.has(key)) {
                         const target = path.join(userPath, convDir);
                         if (this.isSafeSandboxTarget(sandboxRoot, target)) {
                             rmSync(target, { recursive: true, force: true });

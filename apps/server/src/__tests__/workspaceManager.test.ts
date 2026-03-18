@@ -330,7 +330,7 @@ describe("WorkspaceManager", () => {
             expect(existsSync(keepPath)).toBe(true);
             expect(existsSync(removePath)).toBe(true);
 
-            manager.reconcile(new Set(["conv-keep"]));
+            manager.reconcile(new Set(["user-1:conv-keep"]));
 
             expect(existsSync(keepPath)).toBe(true);
             expect(existsSync(removePath)).toBe(false);

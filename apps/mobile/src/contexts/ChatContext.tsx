@@ -526,7 +526,7 @@ export function ChatProvider({
             await adapter.deleteChat(chatId);
 
             if (deletedChat) {
-                getSharedAgentchatSocketClient().notifyConversationDeleted(
+                await getSharedAgentchatSocketClient().notifyConversationDeleted(
                     chatId,
                     deletedChat.agentId,
                 );
@@ -555,7 +555,7 @@ export function ChatProvider({
                 const chat = chats.find((c) => c.id === chatId) ?? null;
                 await adapter.deleteChat(chatId);
                 if (chat) {
-                    socketClient.notifyConversationDeleted(
+                    await socketClient.notifyConversationDeleted(
                         chatId,
                         chat.agentId,
                     );

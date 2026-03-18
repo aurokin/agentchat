@@ -562,7 +562,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             if (deletedChat) {
                 storage.clearSelectedChatId(deletedChat.agentId);
                 // Notify the server so it can clean up any sandbox workspace
-                getSharedAgentchatSocketClient().notifyConversationDeleted(
+                void getSharedAgentchatSocketClient().notifyConversationDeleted(
                     chatId,
                     deletedChat.agentId,
                 );

@@ -835,14 +835,16 @@ export const recoverStaleRun = internalMutation({
 });
 
 /**
- * Returns all chat localIds in the workspace. Used by the server for
- * sandbox workspace reconciliation (pruning orphaned directories).
+ * Returns all chat userId+localId pairs in the workspace. Used by the server
+ * for sandbox workspace reconciliation (pruning orphaned directories).
  * Paginates to avoid materializing the full chats table at once.
  */
 export const listAllChatLocalIds = internalQuery({
     args: {},
-    handler: async (ctx): Promise<string[]> => {
-        const ids: string[] = [];
+    handler: async (
+        ctx,
+    ): Promise<Array<{ userId: string; localId: string }>> => {
+        const entries: Array<{ userId: string; localId: string }> = [];
         let cursor: string | null = null;
         let isDone = false;
 
@@ -851,13 +853,16 @@ export const listAllChatLocalIds = internalQuery({
                 .query("chats")
                 .paginate({ numItems: 1_000, cursor });
             for (const chat of page.page) {
-                ids.push(chat.localId ?? chat._id);
+                entries.push({
+                    userId: chat.userId,
+                    localId: chat.localId ?? chat._id,
+                });
             }
             isDone = page.isDone;
             cursor = page.continueCursor;
         }
 
-        return ids;
+        return entries;
     },
 });
 

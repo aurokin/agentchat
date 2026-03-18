@@ -236,9 +236,24 @@ export class AgentchatSocketClient {
 
     /**
      * Best-effort notification to the server that a conversation was deleted,
-     * so it can clean up any sandbox workspace. Silently ignored if not connected.
+     * so it can clean up any sandbox workspace. Connects first if needed
+     * and a token issuer is available; otherwise silently ignored.
      */
-    notifyConversationDeleted(conversationId: string, agentId: string): void {
+    async notifyConversationDeleted(
+        conversationId: string,
+        agentId: string,
+    ): Promise<void> {
+        if (
+            (!this.socket || this.socket.readyState !== WebSocket.OPEN) &&
+            this.tokenIssuer
+        ) {
+            try {
+                await this.ensureConnected(this.tokenIssuer);
+            } catch {
+                return;
+            }
+        }
+
         if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
             return;
         }

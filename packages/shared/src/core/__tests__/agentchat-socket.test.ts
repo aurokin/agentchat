@@ -380,7 +380,7 @@ describe("agentchat socket helpers", () => {
         });
         await connectPromise;
 
-        client.notifyConversationDeleted("chat-1", "agent-1");
+        await client.notifyConversationDeleted("chat-1", "agent-1");
 
         const deleteMessages = socket.sentMessages.filter((message) =>
             message.includes('"type":"conversation.delete"'),
@@ -395,7 +395,7 @@ describe("agentchat socket helpers", () => {
         expect(parsed.payload.agentId).toBe("agent-1");
     });
 
-    test("silently ignores conversation.delete when not connected", () => {
+    test("silently ignores conversation.delete when not connected and no token issuer", async () => {
         globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
 
         const client = new AgentchatSocketClient({
@@ -404,8 +404,8 @@ describe("agentchat socket helpers", () => {
             notConfiguredMessage: "missing",
         });
 
-        // Should not throw even when no socket exists
-        client.notifyConversationDeleted("chat-1", "agent-1");
+        // Should not throw even when no socket exists and no tokenIssuer
+        await client.notifyConversationDeleted("chat-1", "agent-1");
 
         expect(FakeWebSocket.instances).toHaveLength(0);
     });
