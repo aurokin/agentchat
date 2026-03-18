@@ -209,6 +209,10 @@ function createPersistence(
             userId: string;
             conversationLocalId: string;
         }>,
+        chatExistsCalls: [] as Array<{
+            userId: string;
+            localId: string;
+        }>,
         runtimeBindingCalls: [] as Array<Record<string, unknown>>,
         runStartedCalls: [] as Array<Record<string, unknown>>,
         messageStartedCalls: [] as Array<Record<string, unknown>>,
@@ -240,6 +244,10 @@ function createPersistence(
                 updatedAt: Date.now(),
             };
         },
+        async chatExists(userId: string, localId: string) {
+            this.chatExistsCalls.push({ userId, localId });
+            return false;
+        },
         async runtimeBinding(payload: Record<string, unknown>) {
             this.runtimeBindingCalls.push(payload);
         },
@@ -265,6 +273,18 @@ function createPersistence(
             this.recoverStaleRunCalls.push(payload);
         },
     };
+}
+
+function createWorkspaceManager(
+    getConfig: () => AgentchatConfig,
+): WorkspaceManager {
+    return new WorkspaceManager({
+        getConfig,
+        rootsRegistryPath: path.join(
+            makeTempDir("sandbox-roots-registry"),
+            "sandbox-roots.json",
+        ),
+    });
 }
 
 function createCommand() {
@@ -1260,9 +1280,7 @@ describe("CodexRuntimeManager", () => {
             workspaceMode: "copy-on-conversation",
         };
 
-        const workspaceManager = new WorkspaceManager({
-            getConfig: () => config,
-        });
+        const workspaceManager = createWorkspaceManager(() => config);
         const persistence = createPersistence(null);
         const sandboxesUsed: string[] = [];
         const manager = new CodexRuntimeManager({
@@ -1326,9 +1344,7 @@ describe("CodexRuntimeManager", () => {
             workspaceMode: "copy-on-conversation",
         };
 
-        const workspaceManager = new WorkspaceManager({
-            getConfig: () => config,
-        });
+        const workspaceManager = createWorkspaceManager(() => config);
         const persistence = createPersistence(null);
         let bindingThreadId: string | null = null;
         persistence.readRuntimeBinding = async (payload) => {
@@ -1406,9 +1422,7 @@ describe("CodexRuntimeManager", () => {
             workspaceMode: "copy-on-conversation",
         };
 
-        const workspaceManager = new WorkspaceManager({
-            getConfig: () => config,
-        });
+        const workspaceManager = createWorkspaceManager(() => config);
         const sandboxesUsed: string[] = [];
         const clients: FakeCodexClient[] = [];
         const manager = new CodexRuntimeManager({
@@ -1520,9 +1534,7 @@ describe("CodexRuntimeManager", () => {
             workspaceMode: "copy-on-conversation",
         };
 
-        const workspaceManager = new WorkspaceManager({
-            getConfig: () => config,
-        });
+        const workspaceManager = createWorkspaceManager(() => config);
         const initialWorkspace = await workspaceManager.ensureWorkspace(
             config.agents[0]!,
             "user-1",
@@ -1569,5 +1581,80 @@ describe("CodexRuntimeManager", () => {
         expect(
             readFileSync(path.join(initialWorkspace, "version.txt"), "utf8"),
         ).toBe("second");
+    });
+
+    test("deletes copied workspaces even after the agent is disabled", async () => {
+        const sandboxRoot = makeTempDir("sandbox");
+        const agentRoot = makeTempDir("agent-root");
+        writeFileSync(path.join(agentRoot, "version.txt"), "first");
+
+        const config = createConfig();
+        config.sandboxRoot = sandboxRoot;
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath: agentRoot,
+            workspaceMode: "copy-on-conversation",
+        };
+
+        const workspaceManager = createWorkspaceManager(() => config);
+        const persistence = createPersistence(null);
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            workspaceManager,
+        });
+        const workspacePath = await workspaceManager.ensureWorkspace(
+            config.agents[0]!,
+            "user-1",
+            "chat-1",
+        );
+        const client = new FakeCodexClient();
+        let rejectedMessage: string | null = null;
+
+        (
+            manager as unknown as {
+                runtimes: Map<string, Record<string, unknown>>;
+            }
+        ).runtimes.set("user-1:chat-1", {
+            agentId: "agent-1",
+            activeTurn: {
+                pendingDeltaFlush: null,
+                reject: (error: Error) => {
+                    rejectedMessage = error.message;
+                },
+            },
+            idleTimer: null,
+            client,
+        });
+
+        expect(existsSync(workspacePath)).toBe(true);
+
+        config.agents[0] = {
+            ...config.agents[0]!,
+            enabled: false,
+        };
+
+        await manager.deleteConversationWorkspace({
+            userId: "user-1",
+            conversationId: "chat-1",
+            agentId: "agent-1",
+        });
+
+        if (rejectedMessage === null) {
+            throw new Error("Expected the active turn to be rejected.");
+        }
+        if (rejectedMessage !== "Conversation deleted during active turn.") {
+            throw new Error(
+                `Expected active turn rejection, received ${String(rejectedMessage)}`,
+            );
+        }
+        expect(client.stopped).toBe(true);
+        expect(existsSync(workspacePath)).toBe(false);
+        expect(persistence.chatExistsCalls).toEqual([
+            {
+                userId: "user-1",
+                localId: "chat-1",
+            },
+        ]);
     });
 });

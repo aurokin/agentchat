@@ -139,6 +139,73 @@ describe("RuntimePersistenceClient", () => {
         expect(result).toBeNull();
     });
 
+    test("paginates chat local ids until the ingress reports completion", async () => {
+        const fetchMock = mock(
+            async (_url: string | URL, init?: RequestInit) => {
+                const body = JSON.parse(String(init?.body ?? "{}")) as {
+                    cursor?: string | null;
+                };
+
+                if (body.cursor === null) {
+                    return Response.json({
+                        entries: [
+                            {
+                                agentId: "agent-1",
+                                userId: "user-1",
+                                localId: "chat-1",
+                            },
+                        ],
+                        continueCursor: "cursor-2",
+                        isDone: false,
+                    });
+                }
+
+                return Response.json({
+                    entries: [
+                        {
+                            agentId: "agent-2",
+                            userId: "user-2",
+                            localId: "chat-2",
+                        },
+                    ],
+                    continueCursor: "cursor-3",
+                    isDone: true,
+                });
+            },
+        );
+        globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+        const client = new RuntimePersistenceClient();
+        const result = await client.listAllChatLocalIds();
+
+        expect(result).toEqual([
+            {
+                agentId: "agent-1",
+                userId: "user-1",
+                localId: "chat-1",
+            },
+            {
+                agentId: "agent-2",
+                userId: "user-2",
+                localId: "chat-2",
+            },
+        ]);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+        const fetchCalls = fetchMock.mock.calls as unknown as Array<
+            [string | URL, RequestInit?]
+        >;
+        expect(fetchCalls[0]?.[0]).toBe(
+            "https://agentchat.convex.site/runtime/chat-local-ids",
+        );
+        expect(fetchCalls[1]?.[0]).toBe(
+            "https://agentchat.convex.site/runtime/chat-local-ids",
+        );
+        expect(fetchCalls.map(([, init]) => init?.body)).toEqual([
+            JSON.stringify({ cursor: null }),
+            JSON.stringify({ cursor: "cursor-2" }),
+        ]);
+    });
+
     test("surfaces non-200 ingress responses", async () => {
         const fetchMock = mock(async () => {
             return new Response("bad request", { status: 400 });

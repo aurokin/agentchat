@@ -64,6 +64,18 @@ function makeConfig(overrides: {
     };
 }
 
+function createWorkspaceManager(
+    getConfig: () => AgentchatConfig,
+): WorkspaceManager {
+    return new WorkspaceManager({
+        getConfig,
+        rootsRegistryPath: path.join(
+            makeTempDir("sandbox-roots-registry"),
+            "sandbox-roots.json",
+        ),
+    });
+}
+
 afterEach(() => {
     for (const tempRoot of tempRoots.splice(0)) {
         rmSync(tempRoot, { force: true, recursive: true });
@@ -78,9 +90,9 @@ describe("WorkspaceManager", () => {
                 rootPath: "/some/path",
                 workspaceMode: "shared",
             });
-            const manager = new WorkspaceManager({
-                getConfig: () => makeConfig({ sandboxRoot }),
-            });
+            const manager = createWorkspaceManager(() =>
+                makeConfig({ sandboxRoot }),
+            );
 
             const result = await manager.ensureWorkspace(
                 agent,
@@ -102,9 +114,9 @@ describe("WorkspaceManager", () => {
                 rootPath,
                 workspaceMode: "copy-on-conversation",
             });
-            const manager = new WorkspaceManager({
-                getConfig: () => makeConfig({ sandboxRoot }),
-            });
+            const manager = createWorkspaceManager(() =>
+                makeConfig({ sandboxRoot }),
+            );
 
             const result = await manager.ensureWorkspace(
                 agent,
@@ -134,9 +146,9 @@ describe("WorkspaceManager", () => {
                 rootPath,
                 workspaceMode: "copy-on-conversation",
             });
-            const manager = new WorkspaceManager({
-                getConfig: () => makeConfig({ sandboxRoot }),
-            });
+            const manager = createWorkspaceManager(() =>
+                makeConfig({ sandboxRoot }),
+            );
 
             const first = await manager.ensureWorkspace(
                 agent,
@@ -173,9 +185,9 @@ describe("WorkspaceManager", () => {
                 rootPath: firstRoot,
                 workspaceMode: "copy-on-conversation",
             });
-            const manager = new WorkspaceManager({
-                getConfig: () => makeConfig({ sandboxRoot }),
-            });
+            const manager = createWorkspaceManager(() =>
+                makeConfig({ sandboxRoot }),
+            );
 
             const first = await manager.ensureWorkspaceState(
                 agent,
@@ -207,9 +219,9 @@ describe("WorkspaceManager", () => {
                 rootPath,
                 workspaceMode: "copy-on-conversation",
             });
-            const manager = new WorkspaceManager({
-                getConfig: () => makeConfig({ sandboxRoot }),
-            });
+            const manager = createWorkspaceManager(() =>
+                makeConfig({ sandboxRoot }),
+            );
 
             let createCalls = 0;
             let releaseCreation: () => void = () => undefined;
@@ -268,9 +280,9 @@ describe("WorkspaceManager", () => {
                 rootPath,
                 workspaceMode: "copy-on-conversation",
             });
-            const manager = new WorkspaceManager({
-                getConfig: () => makeConfig({ sandboxRoot }),
-            });
+            const manager = createWorkspaceManager(() =>
+                makeConfig({ sandboxRoot }),
+            );
 
             const pathA = await manager.ensureWorkspace(
                 agent,
@@ -306,9 +318,9 @@ describe("WorkspaceManager", () => {
                 rootPath,
                 workspaceMode: "copy-on-conversation",
             });
-            const manager = new WorkspaceManager({
-                getConfig: () => makeConfig({ sandboxRoot }),
-            });
+            const manager = createWorkspaceManager(() =>
+                makeConfig({ sandboxRoot }),
+            );
 
             await expect(
                 manager.ensureWorkspace(agent, "user-1", "../../../tmp/evil"),
@@ -373,9 +385,7 @@ describe("WorkspaceManager", () => {
                 workspaceMode: "copy-on-conversation",
             });
             const config = makeConfig({ sandboxRoot, agents: [agent] });
-            const manager = new WorkspaceManager({
-                getConfig: () => config,
-            });
+            const manager = createWorkspaceManager(() => config);
 
             const workspace = await manager.ensureWorkspace(
                 agent,
@@ -403,8 +413,13 @@ describe("WorkspaceManager", () => {
                 sandboxRoot: firstSandboxRoot,
                 agents: [agent],
             });
+            const rootsRegistryPath = path.join(
+                makeTempDir("sandbox-roots-registry"),
+                "sandbox-roots.json",
+            );
             const manager = new WorkspaceManager({
                 getConfig: () => config,
+                rootsRegistryPath,
             });
 
             const originalWorkspace = await manager.ensureWorkspace(
@@ -416,9 +431,24 @@ describe("WorkspaceManager", () => {
 
             config.sandboxRoot = secondSandboxRoot;
 
-            await manager.deleteWorkspace("my-agent", "user-1", "conv-1");
+            const restartedManager = new WorkspaceManager({
+                getConfig: () => config,
+                rootsRegistryPath,
+            });
+
+            await restartedManager.deleteWorkspace(
+                "my-agent",
+                "user-1",
+                "conv-1",
+            );
 
             expect(existsSync(originalWorkspace)).toBe(false);
+            expect(JSON.parse(readFileSync(rootsRegistryPath, "utf8"))).toEqual(
+                expect.arrayContaining([
+                    path.resolve(firstSandboxRoot),
+                    path.resolve(secondSandboxRoot),
+                ]),
+            );
         });
 
         test("refuses to delete paths with traversal segments", async () => {
@@ -426,9 +456,9 @@ describe("WorkspaceManager", () => {
             const outsideDir = makeTempDir("outside");
             writeFileSync(path.join(outsideDir, "important.txt"), "keep");
 
-            const manager = new WorkspaceManager({
-                getConfig: () => makeConfig({ sandboxRoot }),
-            });
+            const manager = createWorkspaceManager(() =>
+                makeConfig({ sandboxRoot }),
+            );
 
             // Path traversal is rejected by segment validation
             await expect(
@@ -457,9 +487,9 @@ describe("WorkspaceManager", () => {
                 rootPath: nestedRoot,
                 workspaceMode: "shared",
             });
-            const manager = new WorkspaceManager({
-                getConfig: () => makeConfig({ sandboxRoot, agents: [agent] }),
-            });
+            const manager = createWorkspaceManager(() =>
+                makeConfig({ sandboxRoot, agents: [agent] }),
+            );
 
             await manager.deleteWorkspace(agentId, userId, convId);
             // Should NOT have been deleted because it's the agent's rootPath
@@ -468,9 +498,9 @@ describe("WorkspaceManager", () => {
 
         test("is a no-op for non-existent directories", async () => {
             const sandboxRoot = makeTempDir("sandbox");
-            const manager = new WorkspaceManager({
-                getConfig: () => makeConfig({ sandboxRoot }),
-            });
+            const manager = createWorkspaceManager(() =>
+                makeConfig({ sandboxRoot }),
+            );
 
             // Should not throw
             await manager.deleteWorkspace(
@@ -493,9 +523,7 @@ describe("WorkspaceManager", () => {
                 workspaceMode: "copy-on-conversation",
             });
             const config = makeConfig({ sandboxRoot, agents: [agent] });
-            const manager = new WorkspaceManager({
-                getConfig: () => config,
-            });
+            const manager = createWorkspaceManager(() => config);
 
             await manager.ensureWorkspace(agent, "user-1", "conv-keep");
             await manager.ensureWorkspace(agent, "user-1", "conv-remove");
@@ -538,10 +566,9 @@ describe("WorkspaceManager", () => {
                 rootPath: rootB,
                 workspaceMode: "copy-on-conversation",
             });
-            const manager = new WorkspaceManager({
-                getConfig: () =>
-                    makeConfig({ sandboxRoot, agents: [agentA, agentB] }),
-            });
+            const manager = createWorkspaceManager(() =>
+                makeConfig({ sandboxRoot, agents: [agentA, agentB] }),
+            );
 
             await manager.ensureWorkspace(agentA, "user-1", "conv-1");
             await manager.ensureWorkspace(agentB, "user-1", "conv-1");
@@ -566,13 +593,55 @@ describe("WorkspaceManager", () => {
         });
 
         test("is a no-op when sandboxRoot does not exist", async () => {
-            const manager = new WorkspaceManager({
-                getConfig: () =>
-                    makeConfig({ sandboxRoot: "/nonexistent/path" }),
-            });
+            const manager = createWorkspaceManager(() =>
+                makeConfig({ sandboxRoot: "/nonexistent/path" }),
+            );
 
             // Should not throw
             await manager.reconcile(new Set());
+        });
+
+        test("removes orphaned workspaces from an older sandboxRoot after restart", async () => {
+            const firstSandboxRoot = makeTempDir("sandbox-a");
+            const secondSandboxRoot = makeTempDir("sandbox-b");
+            const rootPath = makeTempDir("agent-root");
+            const rootsRegistryPath = path.join(
+                makeTempDir("sandbox-roots-registry"),
+                "sandbox-roots.json",
+            );
+            writeFileSync(path.join(rootPath, "file.txt"), "data");
+
+            const agent = makeAgent({
+                id: "agent-a",
+                rootPath,
+                workspaceMode: "copy-on-conversation",
+            });
+            const config = makeConfig({
+                sandboxRoot: firstSandboxRoot,
+                agents: [agent],
+            });
+            const manager = new WorkspaceManager({
+                getConfig: () => config,
+                rootsRegistryPath,
+            });
+
+            const originalWorkspace = await manager.ensureWorkspace(
+                agent,
+                "user-1",
+                "conv-1",
+            );
+            expect(existsSync(originalWorkspace)).toBe(true);
+
+            config.sandboxRoot = secondSandboxRoot;
+
+            const restartedManager = new WorkspaceManager({
+                getConfig: () => config,
+                rootsRegistryPath,
+            });
+
+            await restartedManager.reconcile(new Set());
+
+            expect(existsSync(originalWorkspace)).toBe(false);
         });
     });
 });

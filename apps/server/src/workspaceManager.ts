@@ -1,20 +1,41 @@
-import { existsSync, readdirSync } from "node:fs";
+import {
+    existsSync,
+    mkdirSync,
+    readFileSync,
+    readdirSync,
+    writeFileSync,
+} from "node:fs";
 import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 
 import type { AgentchatConfig, AgentConfig } from "./config.ts";
 import { getSandboxWorkspacePath } from "./sandboxPaths.ts";
 
+const DEFAULT_SANDBOX_ROOTS_REGISTRY_PATH = path.join(
+    os.homedir(),
+    ".agentchat",
+    "sandbox-roots.json",
+);
+
 export class WorkspaceManager {
     private readonly getConfig: () => AgentchatConfig;
+    private readonly rootsRegistryPath: string;
     private readonly pendingWorkspaceCreations = new Map<
         string,
         Promise<string>
     >();
     private readonly knownSandboxRoots = new Set<string>();
 
-    constructor(params: { getConfig: () => AgentchatConfig }) {
+    constructor(params: {
+        getConfig: () => AgentchatConfig;
+        rootsRegistryPath?: string;
+    }) {
         this.getConfig = params.getConfig;
+        this.rootsRegistryPath = path.resolve(
+            params.rootsRegistryPath ?? DEFAULT_SANDBOX_ROOTS_REGISTRY_PATH,
+        );
+        this.loadKnownSandboxRoots();
         this.rememberSandboxRoot(this.getConfig().sandboxRoot);
     }
 
@@ -331,12 +352,67 @@ export class WorkspaceManager {
     }
 
     private rememberSandboxRoot(sandboxRoot: string): void {
-        this.knownSandboxRoots.add(path.resolve(sandboxRoot));
+        const resolvedRoot = path.resolve(sandboxRoot);
+        if (this.knownSandboxRoots.has(resolvedRoot)) {
+            return;
+        }
+
+        this.knownSandboxRoots.add(resolvedRoot);
+        this.persistKnownSandboxRoots();
     }
 
     private getKnownSandboxRoots(): string[] {
         this.rememberSandboxRoot(this.getConfig().sandboxRoot);
         return [...this.knownSandboxRoots];
+    }
+
+    private loadKnownSandboxRoots(): void {
+        if (!existsSync(this.rootsRegistryPath)) {
+            return;
+        }
+
+        try {
+            const raw = readFileSync(this.rootsRegistryPath, "utf8");
+            const parsed = JSON.parse(raw) as unknown;
+            if (!Array.isArray(parsed)) {
+                return;
+            }
+
+            for (const value of parsed) {
+                if (typeof value === "string" && value.length > 0) {
+                    this.knownSandboxRoots.add(path.resolve(value));
+                }
+            }
+        } catch (error) {
+            console.error(
+                `[agentchat-server] failed to load sandbox root registry from ${this.rootsRegistryPath}:`,
+                error,
+            );
+        }
+    }
+
+    private persistKnownSandboxRoots(): void {
+        try {
+            mkdirSync(path.dirname(this.rootsRegistryPath), {
+                recursive: true,
+            });
+            writeFileSync(
+                this.rootsRegistryPath,
+                `${JSON.stringify(
+                    [...this.knownSandboxRoots].sort((left, right) =>
+                        left.localeCompare(right),
+                    ),
+                    null,
+                    2,
+                )}\n`,
+                "utf8",
+            );
+        } catch (error) {
+            console.error(
+                `[agentchat-server] failed to persist sandbox root registry to ${this.rootsRegistryPath}:`,
+                error,
+            );
+        }
     }
 
     private hasExpectedWorkspaceTail(

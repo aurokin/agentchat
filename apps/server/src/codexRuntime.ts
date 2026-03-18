@@ -455,17 +455,6 @@ export class CodexRuntimeManager {
         conversationId: string;
         agentId: string;
     }): Promise<void> {
-        const config = this.getConfig();
-        const agent = config.agents.find(
-            (a) => a.id === params.agentId && a.enabled,
-        );
-        if (!agent) {
-            console.warn(
-                `[agentchat-server] conversation.delete: unknown or disabled agent '${params.agentId}'; ignoring`,
-            );
-            return;
-        }
-
         // Verify the chat no longer exists in Convex before deleting
         try {
             const stillExists = await this.persistence.chatExists(

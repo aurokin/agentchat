@@ -92,12 +92,33 @@ export class RuntimePersistenceClient {
     async listAllChatLocalIds(): Promise<
         Array<{ agentId: string; userId: string; localId: string }>
     > {
-        const response = await this.post("/runtime/chat-local-ids", {});
-        return (await response.json()) as Array<{
+        const entries: Array<{
             agentId: string;
             userId: string;
             localId: string;
-        }>;
+        }> = [];
+        let cursor: string | null = null;
+        let isDone = false;
+
+        while (!isDone) {
+            const response = await this.post("/runtime/chat-local-ids", {
+                cursor,
+            });
+            const page = (await response.json()) as {
+                entries: Array<{
+                    agentId: string;
+                    userId: string;
+                    localId: string;
+                }>;
+                continueCursor: string;
+                isDone: boolean;
+            };
+            entries.push(...page.entries);
+            cursor = page.continueCursor;
+            isDone = page.isDone;
+        }
+
+        return entries;
     }
 
     async chatExists(userId: string, localId: string): Promise<boolean> {

@@ -845,39 +845,36 @@ export const recoverStaleRun = internalMutation({
 });
 
 /**
- * Returns all chat agentId+userId+localId tuples in the workspace. Used by the
- * server for sandbox workspace reconciliation (pruning orphaned directories).
- * Paginates to avoid materializing the full chats table at once.
+ * Returns one page of chat agentId+userId+localId tuples. Used by the server
+ * for sandbox workspace reconciliation (pruning orphaned directories).
  */
 export const listAllChatLocalIds = internalQuery({
-    args: {},
+    args: {
+        cursor: v.union(v.string(), v.null()),
+    },
     handler: async (
         ctx,
-    ): Promise<Array<{ agentId: string; userId: string; localId: string }>> => {
-        const entries: Array<{
-            agentId: string;
-            userId: string;
-            localId: string;
-        }> = [];
-        let cursor: string | null = null;
-        let isDone = false;
+        args,
+    ): Promise<{
+        entries: Array<{ agentId: string; userId: string; localId: string }>;
+        continueCursor: string;
+        isDone: boolean;
+    }> => {
+        const page = await ctx.db
+            .query("chats")
+            .paginate({ numItems: 1_000, cursor: args.cursor });
 
-        while (!isDone) {
-            const page = await ctx.db
-                .query("chats")
-                .paginate({ numItems: 1_000, cursor });
-            for (const chat of page.page) {
-                entries.push({
-                    agentId: chat.agentId,
-                    userId: chat.userId,
-                    localId: chat.localId ?? chat._id,
-                });
-            }
-            isDone = page.isDone;
-            cursor = page.continueCursor;
-        }
+        const entries = page.page.map((chat) => ({
+            agentId: chat.agentId,
+            userId: chat.userId,
+            localId: chat.localId ?? chat._id,
+        }));
 
-        return entries;
+        return {
+            entries,
+            continueCursor: page.continueCursor,
+            isDone: page.isDone,
+        };
     },
 });
 

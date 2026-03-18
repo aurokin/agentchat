@@ -1,6 +1,10 @@
 import { describe, expect, mock, test } from "bun:test";
 
-import { readRuntimeBinding, runtimeBinding } from "../runtimeIngress";
+import {
+    listAllChatLocalIds,
+    readRuntimeBinding,
+    runtimeBinding,
+} from "../runtimeIngress";
 
 type HandlerExport = {
     _handler: (ctx: unknown, args: unknown) => Promise<unknown>;
@@ -181,6 +185,60 @@ describe("runtime ingress", () => {
             workspaceRootPath: "/repos/agent-a",
             workspaceCwd: "/sandboxes/agent-a/user/chat",
             updatedAt: 456,
+        });
+    });
+
+    test("returns paginated chat local ids without materializing the full table", async () => {
+        const paginate = mock(async () => ({
+            page: [
+                {
+                    _id: "chats:1",
+                    agentId: "agent-1",
+                    userId: "users:test",
+                    localId: "chat-1",
+                },
+                {
+                    _id: "chats:2",
+                    agentId: "agent-2",
+                    userId: "users:test-2",
+                    localId: null,
+                },
+            ],
+            continueCursor: "cursor-2",
+            isDone: false,
+        }));
+        const query = mock(() => ({ paginate }));
+        const ctx = {
+            db: {
+                query,
+            },
+        };
+
+        await expect(
+            runHandler(listAllChatLocalIds as unknown as HandlerExport, ctx, {
+                cursor: null,
+            }),
+        ).resolves.toEqual({
+            entries: [
+                {
+                    agentId: "agent-1",
+                    userId: "users:test",
+                    localId: "chat-1",
+                },
+                {
+                    agentId: "agent-2",
+                    userId: "users:test-2",
+                    localId: "chats:2",
+                },
+            ],
+            continueCursor: "cursor-2",
+            isDone: false,
+        });
+
+        expect(query).toHaveBeenCalledWith("chats");
+        expect(paginate).toHaveBeenCalledWith({
+            numItems: 1_000,
+            cursor: null,
         });
     });
 });
