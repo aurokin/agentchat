@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 
+import { __setStore } from "../secure-store";
+
 const store = new Map<string, string>();
 
 const getItemAsync = mock(async (key: string) => {
@@ -9,10 +11,11 @@ const setItemAsync = mock(async (key: string, value: string) => {
     store.set(key, value);
 });
 
-await mock.module("expo-secure-store", () => ({
+__setStore({
     getItemAsync,
     setItemAsync,
-}));
+    deleteItemAsync: mock(async () => undefined),
+});
 
 const storage = await import("../sync-storage");
 

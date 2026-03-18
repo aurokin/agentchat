@@ -119,6 +119,7 @@ function toBootstrapAgent(provider: ProviderConfig): AgentConfig {
         variantAllowlist: [],
         tags: [],
         sortOrder: 0,
+        workspaceMode: "shared",
     };
 }
 
