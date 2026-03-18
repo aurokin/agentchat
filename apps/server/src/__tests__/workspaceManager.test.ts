@@ -194,16 +194,22 @@ describe("WorkspaceManager", () => {
                 }
             ).createWorkspace = async (_sourcePath, targetPath) => {
                 createCalls += 1;
-                await creationGate;
                 mkdirSync(targetPath, { recursive: true });
+                await creationGate;
                 writeFileSync(path.join(targetPath, "file.txt"), "ready");
                 return targetPath;
             };
 
             const first = manager.ensureWorkspace(agent, "user-1", "conv-1");
             const second = manager.ensureWorkspace(agent, "user-1", "conv-1");
+            let secondResolved = false;
+            void second.then(() => {
+                secondResolved = true;
+            });
 
             expect(createCalls).toBe(1);
+            await Bun.sleep(0);
+            expect(secondResolved).toBe(false);
 
             releaseCreation();
 

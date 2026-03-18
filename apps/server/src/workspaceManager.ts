@@ -39,11 +39,6 @@ export class WorkspaceManager {
             return agent.rootPath;
         }
 
-        const sandboxPath = this.sandboxPath(agent.id, userId, conversationId);
-        if (existsSync(sandboxPath)) {
-            return sandboxPath;
-        }
-
         const creationKey = this.activeWorkspaceKey(
             agent.id,
             userId,
@@ -52,6 +47,11 @@ export class WorkspaceManager {
         const pendingCreation = this.pendingWorkspaceCreations.get(creationKey);
         if (pendingCreation) {
             return await pendingCreation;
+        }
+
+        const sandboxPath = this.sandboxPath(agent.id, userId, conversationId);
+        if (existsSync(sandboxPath)) {
+            return sandboxPath;
         }
 
         const creation = this.createWorkspace(agent.rootPath, sandboxPath);

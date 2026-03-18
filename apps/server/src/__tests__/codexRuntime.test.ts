@@ -1,12 +1,37 @@
-import { describe, expect, test } from "bun:test";
+import {
+    existsSync,
+    mkdtempSync,
+    readFileSync,
+    rmSync,
+    writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+
+import { afterEach, describe, expect, test } from "bun:test";
 
 import type { AgentchatConfig } from "../config.ts";
 import type { RuntimePersistenceClient } from "../runtimePersistence.ts";
+import { WorkspaceManager } from "../workspaceManager.ts";
 import {
     buildInitialTurnText,
     CodexRuntimeManager,
     isRecoverableThreadResumeError,
 } from "../codexRuntime.ts";
+
+const tempRoots: string[] = [];
+
+function makeTempDir(name: string): string {
+    const dir = mkdtempSync(path.join(tmpdir(), `${name}-`));
+    tempRoots.push(dir);
+    return dir;
+}
+
+afterEach(() => {
+    for (const tempRoot of tempRoots.splice(0)) {
+        rmSync(tempRoot, { force: true, recursive: true });
+    }
+});
 
 function createConfig(): AgentchatConfig {
     return {
@@ -1203,5 +1228,71 @@ describe("CodexRuntimeManager", () => {
         expect(clients).toHaveLength(2);
         expect(clients[0]?.stopped).toBe(true);
         expect(clients[1]?.stopped).toBe(false);
+    });
+
+    test("rebuilds copied workspaces when the agent rootPath changes in config", async () => {
+        const sandboxRoot = makeTempDir("sandbox");
+        const firstRoot = makeTempDir("agent-root-a");
+        const secondRoot = makeTempDir("agent-root-b");
+        writeFileSync(path.join(firstRoot, "version.txt"), "first");
+        writeFileSync(path.join(secondRoot, "version.txt"), "second");
+
+        const config = createConfig();
+        config.sandboxRoot = sandboxRoot;
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath: firstRoot,
+            workspaceMode: "copy-on-conversation",
+        };
+
+        const workspaceManager = new WorkspaceManager({
+            getConfig: () => config,
+        });
+        const persistence = createPersistence(null);
+        const sandboxesUsed: string[] = [];
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            workspaceManager,
+            createClient: (params) => {
+                sandboxesUsed.push(params.agent.rootPath);
+                return new FakeCodexClient();
+            },
+        });
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        const sandboxPath = sandboxesUsed[0];
+        if (!sandboxPath) {
+            throw new Error("Expected the first sandbox path");
+        }
+
+        expect(existsSync(sandboxPath)).toBe(true);
+        expect(
+            readFileSync(path.join(sandboxPath, "version.txt"), "utf8"),
+        ).toBe("first");
+
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath: secondRoot,
+        };
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        expect(sandboxesUsed).toHaveLength(2);
+        expect(sandboxesUsed[1]).toBe(sandboxPath);
+        expect(
+            readFileSync(path.join(sandboxPath, "version.txt"), "utf8"),
+        ).toBe("second");
     });
 });

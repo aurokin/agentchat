@@ -650,8 +650,19 @@ export class CodexRuntimeManager {
         const existing = this.runtimes.get(key);
         if (existing) {
             if (shouldRecycleRuntime(existing, resources)) {
+                const shouldResetWorkspace =
+                    this.workspaceManager &&
+                    existing.agent.workspaceMode === "copy-on-conversation" &&
+                    shouldResetCopiedWorkspace(existing, resources);
                 existing.client.stop();
                 this.runtimes.delete(key);
+                if (shouldResetWorkspace) {
+                    await this.workspaceManager.deleteWorkspace(
+                        existing.agent.id,
+                        params.userId,
+                        params.command.payload.conversationId,
+                    );
+                }
             } else {
                 existing.agent = resources.agent;
                 existing.provider = resources.provider;
@@ -1498,5 +1509,16 @@ function shouldRecycleRuntime(
         JSON.stringify(runtime.provider.codex.baseEnv) !==
             JSON.stringify(resources.provider.codex.baseEnv) ||
         runtime.provider.codex.cwd !== resources.provider.codex.cwd
+    );
+}
+
+function shouldResetCopiedWorkspace(
+    runtime: ConversationRuntime,
+    resources: ResolvedRuntimeResources,
+): boolean {
+    return (
+        runtime.agent.id !== resources.agent.id ||
+        runtime.agent.rootPath !== resources.agent.rootPath ||
+        runtime.agent.workspaceMode !== resources.agent.workspaceMode
     );
 }
