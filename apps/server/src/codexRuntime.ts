@@ -443,9 +443,28 @@ export class CodexRuntimeManager {
         conversationId: string;
         agentId: string;
     }): void {
-        // Tear down any active runtime for this conversation
+        const config = this.getConfig();
+        const agent = config.agents.find(
+            (a) => a.id === params.agentId && a.enabled,
+        );
+        if (!agent) {
+            console.warn(
+                `[agentchat-server] conversation.delete: unknown or disabled agent '${params.agentId}'; ignoring`,
+            );
+            return;
+        }
+
+        // If there's a live runtime, verify the agentId matches before tearing down
         const key = getRuntimeKey(params.userId, params.conversationId);
         const runtime = this.runtimes.get(key);
+        if (runtime && runtime.agentId !== params.agentId) {
+            console.warn(
+                `[agentchat-server] conversation.delete: agentId mismatch (runtime=${runtime.agentId}, request=${params.agentId}); ignoring`,
+            );
+            return;
+        }
+
+        // Tear down any active runtime for this conversation
         if (runtime) {
             if (runtime.idleTimer) {
                 clearTimeout(runtime.idleTimer);

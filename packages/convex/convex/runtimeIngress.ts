@@ -842,13 +842,7 @@ export const listAllChatLocalIds = internalQuery({
     args: {},
     handler: async (ctx): Promise<string[]> => {
         const chats = await ctx.db.query("chats").collect();
-        const localIds: string[] = [];
-        for (const chat of chats) {
-            if (chat.localId) {
-                localIds.push(chat.localId);
-            }
-        }
-        return localIds;
+        return chats.map((chat) => chat.localId ?? chat._id);
     },
 });
 

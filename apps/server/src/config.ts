@@ -198,10 +198,7 @@ const AgentchatConfigInputSchema = z
                 }
             }
 
-            if (
-                resolvedSandboxRoot &&
-                agent.workspaceMode === "copy-on-conversation"
-            ) {
+            if (resolvedSandboxRoot) {
                 const resolvedRootPath = path.resolve(agent.rootPath);
                 if (
                     resolvedSandboxRoot === resolvedRootPath ||

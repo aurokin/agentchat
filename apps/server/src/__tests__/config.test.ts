@@ -249,32 +249,32 @@ describe("server config", () => {
         ).toThrow(/overlaps with sandboxRoot/);
     });
 
-    test("allows sandboxRoot inside rootPath for shared-mode agents", () => {
-        const config = parseConfig({
-            version: 1,
-            sandboxRoot: "/projects/my-app/sandboxes",
-            auth: {
-                defaultProviderId: "local-main",
-                providers: [
+    test("rejects config where sandboxRoot overlaps a shared-mode agent rootPath", () => {
+        expect(() =>
+            parseConfig({
+                version: 1,
+                sandboxRoot: "/projects/my-app/sandboxes",
+                auth: {
+                    defaultProviderId: "local-main",
+                    providers: [
+                        {
+                            id: "local-main",
+                            kind: "local",
+                            enabled: true,
+                            allowSignup: false,
+                        },
+                    ],
+                },
+                providers: exampleConfig.providers,
+                agents: [
                     {
-                        id: "local-main",
-                        kind: "local",
-                        enabled: true,
-                        allowSignup: false,
+                        ...exampleConfig.agents[0],
+                        rootPath: "/projects/my-app",
+                        workspaceMode: "shared",
                     },
                 ],
-            },
-            providers: exampleConfig.providers,
-            agents: [
-                {
-                    ...exampleConfig.agents[0],
-                    rootPath: "/projects/my-app",
-                    workspaceMode: "shared",
-                },
-            ],
-        });
-
-        expect(config.sandboxRoot).toBe("/projects/my-app/sandboxes");
+            }),
+        ).toThrow(/overlaps with sandboxRoot/);
     });
 
     test("parses local auth config", () => {
