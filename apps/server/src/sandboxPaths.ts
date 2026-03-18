@@ -24,18 +24,28 @@ export function assertSafePathSegment(label: string, value: string): void {
     }
 }
 
-export function getSandboxUserPathSegment(userId: string): string {
-    if (userId.length === 0) {
+function encodeSandboxPathSegment(label: string, value: string): string {
+    if (value.length === 0) {
         throw new Error(
-            `Unsafe userId for sandbox path: ${JSON.stringify(userId)}`,
+            `Unsafe ${label} for sandbox path: ${JSON.stringify(value)}`,
         );
     }
 
-    if (isSafePathSegment(userId)) {
-        return userId;
+    if (isSafePathSegment(value)) {
+        return value;
     }
 
-    return `~${Buffer.from(userId, "utf8").toString("base64url")}`;
+    return `~${Buffer.from(value, "utf8").toString("base64url")}`;
+}
+
+export function getSandboxUserPathSegment(userId: string): string {
+    return encodeSandboxPathSegment("userId", userId);
+}
+
+export function getSandboxConversationPathSegment(
+    conversationId: string,
+): string {
+    return encodeSandboxPathSegment("conversationId", conversationId);
 }
 
 export function getSandboxWorkspacePath(params: {
@@ -45,12 +55,11 @@ export function getSandboxWorkspacePath(params: {
     conversationId: string;
 }): string {
     assertSafePathSegment("agentId", params.agentId);
-    assertSafePathSegment("conversationId", params.conversationId);
 
     return path.join(
         path.resolve(params.sandboxRoot),
         params.agentId,
         getSandboxUserPathSegment(params.userId),
-        params.conversationId,
+        getSandboxConversationPathSegment(params.conversationId),
     );
 }

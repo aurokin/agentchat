@@ -16,7 +16,10 @@ import type {
     PersistedRuntimeBinding,
     RuntimePersistenceClient,
 } from "./runtimePersistence.ts";
-import { getSandboxUserPathSegment } from "./sandboxPaths.ts";
+import {
+    getSandboxConversationPathSegment,
+    getSandboxUserPathSegment,
+} from "./sandboxPaths.ts";
 import type { WorkspaceManager } from "./workspaceManager.ts";
 
 type ActiveTurn = {
@@ -583,7 +586,7 @@ export class CodexRuntimeManager {
         const keys = new Set<string>();
         for (const runtime of this.runtimes.values()) {
             keys.add(
-                `${runtime.agentId}:${getSandboxUserPathSegment(runtime.userId)}:${runtime.conversationId}`,
+                `${runtime.agentId}:${getSandboxUserPathSegment(runtime.userId)}:${getSandboxConversationPathSegment(runtime.conversationId)}`,
             );
         }
         return keys;

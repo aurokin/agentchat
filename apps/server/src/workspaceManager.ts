@@ -12,6 +12,7 @@ import path from "node:path";
 
 import type { AgentchatConfig, AgentConfig } from "./config.ts";
 import {
+    getSandboxConversationPathSegment,
     getSandboxUserPathSegment,
     getSandboxWorkspacePath,
 } from "./sandboxPaths.ts";
@@ -301,7 +302,7 @@ export class WorkspaceManager {
         userId: string,
         conversationId: string,
     ): string {
-        return `${agentId}:${getSandboxUserPathSegment(userId)}:${conversationId}`;
+        return `${agentId}:${getSandboxUserPathSegment(userId)}:${getSandboxConversationPathSegment(conversationId)}`;
     }
 
     private async createWorkspace(
@@ -487,7 +488,7 @@ export class WorkspaceManager {
         return (
             tail[0] === agentId &&
             tail[1] === getSandboxUserPathSegment(userId) &&
-            tail[2] === conversationId
+            tail[2] === getSandboxConversationPathSegment(conversationId)
         );
     }
 

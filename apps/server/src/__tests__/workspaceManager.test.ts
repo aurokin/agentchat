@@ -353,7 +353,7 @@ describe("WorkspaceManager", () => {
             );
         });
 
-        test("rejects path-traversal in conversationId", async () => {
+        test("encodes filesystem-unsafe conversation ids", async () => {
             const sandboxRoot = makeTempDir("sandbox");
             const rootPath = makeTempDir("agent-root");
             const agent = makeAgent({
@@ -367,13 +367,30 @@ describe("WorkspaceManager", () => {
 
             await expect(
                 manager.ensureWorkspace(agent, "user-1", "../../../tmp/evil"),
-            ).rejects.toThrow(/Unsafe conversationId/);
+            ).resolves.toBe(
+                path.join(
+                    sandboxRoot,
+                    agent.id,
+                    "user-1",
+                    "~Li4vLi4vLi4vdG1wL2V2aWw",
+                ),
+            );
             await expect(
                 manager.ensureWorkspace(agent, "user-1", ".."),
-            ).rejects.toThrow(/Unsafe conversationId/);
+            ).resolves.toBe(path.join(sandboxRoot, agent.id, "user-1", "~Li4"));
             await expect(
                 manager.ensureWorkspace(agent, "user-1", "."),
-            ).rejects.toThrow(/Unsafe conversationId/);
+            ).resolves.toBe(path.join(sandboxRoot, agent.id, "user-1", "~Lg"));
+            await expect(
+                manager.ensureWorkspace(agent, "user-1", "conversations:123"),
+            ).resolves.toBe(
+                path.join(
+                    sandboxRoot,
+                    agent.id,
+                    "user-1",
+                    "~Y29udmVyc2F0aW9uczoxMjM",
+                ),
+            );
             await expect(
                 manager.ensureWorkspace(agent, "../evil", "conv-1"),
             ).resolves.toBe(

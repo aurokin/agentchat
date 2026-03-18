@@ -7,7 +7,10 @@ import { CodexModelCatalog } from "./codexModelCatalog.ts";
 import { CodexRuntimeManager } from "./codexRuntime.ts";
 import { createFetchHandler } from "./http.ts";
 import { RuntimePersistenceClient } from "./runtimePersistence.ts";
-import { getSandboxUserPathSegment } from "./sandboxPaths.ts";
+import {
+    getSandboxConversationPathSegment,
+    getSandboxUserPathSegment,
+} from "./sandboxPaths.ts";
 import {
     getSandboxRootsRegistryPath,
     WorkspaceManager,
@@ -134,7 +137,7 @@ async function runReconciliation(): Promise<void> {
         const activeKeys = new Set<string>();
         for (const entry of entries) {
             activeKeys.add(
-                `${entry.agentId}:${getSandboxUserPathSegment(entry.userId)}:${entry.localId}`,
+                `${entry.agentId}:${getSandboxUserPathSegment(entry.userId)}:${getSandboxConversationPathSegment(entry.localId)}`,
             );
         }
         // Include live runtimes to avoid deleting sandboxes for in-progress

@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
     assertSafePathSegment,
+    getSandboxConversationPathSegment,
     getSandboxUserPathSegment,
     getSandboxWorkspacePath,
     isSafePathSegment,
@@ -29,15 +30,24 @@ describe("sandbox paths", () => {
         );
     });
 
-    test("rejects unsafe conversation ids when building sandbox paths", () => {
-        expect(() =>
+    test("encodes unsafe conversation ids when building sandbox paths", () => {
+        expect(getSandboxConversationPathSegment("frontend:api")).toBe(
+            "~ZnJvbnRlbmQ6YXBp",
+        );
+        expect(getSandboxConversationPathSegment("../chat")).toBe(
+            "~Li4vY2hhdA",
+        );
+        expect(() => getSandboxConversationPathSegment("")).toThrow(
+            /Unsafe conversationId/,
+        );
+        expect(
             getSandboxWorkspacePath({
                 sandboxRoot: "/tmp/sandboxes",
                 agentId: "agent-1",
                 userId: "user-1",
                 conversationId: "frontend:api",
             }),
-        ).toThrow(/Unsafe conversationId/);
+        ).toBe("/tmp/sandboxes/agent-1/user-1/~ZnJvbnRlbmQ6YXBp");
     });
 
     test("encodes Convex-style user ids for filesystem paths", () => {
