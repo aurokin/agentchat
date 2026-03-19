@@ -9,6 +9,7 @@ import {
     writeFileSync,
 } from "node:fs";
 import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 
 import type { AgentchatConfig, AgentConfig } from "./config.ts";
@@ -38,16 +39,23 @@ export function getSandboxStateRootPath(sandboxRoot: string): string {
     return path.join(path.resolve(sandboxRoot), SANDBOX_STATE_DIRECTORY_NAME);
 }
 
-export function getSandboxRootsRegistryPath(
-    configPath: string,
-    sandboxRoot: string,
-): string {
+function getDefaultAgentchatStateBasePath(): string {
+    const xdgStateHome = process.env.XDG_STATE_HOME?.trim();
+    if (xdgStateHome) {
+        return path.join(xdgStateHome, "agentchat");
+    }
+
+    return path.join(os.homedir(), ".local", "state", "agentchat");
+}
+
+export function getSandboxRootsRegistryPath(configPath: string): string {
     const resolvedConfigPath = path.resolve(configPath);
     const configBasename = sanitizeStateFileComponent(
         path.basename(resolvedConfigPath),
     );
     return path.join(
-        getSandboxStateRootPath(sandboxRoot),
+        getDefaultAgentchatStateBasePath(),
+        SANDBOX_STATE_DIRECTORY_NAME,
         SANDBOX_ROOTS_REGISTRY_DIRECTORY_NAME,
         `${configBasename}-${getStableStateKey(resolvedConfigPath)}.json`,
     );
@@ -80,10 +88,7 @@ export class WorkspaceManager {
             (() =>
                 path.resolve(
                     params.rootsRegistryPath ??
-                        getSandboxRootsRegistryPath(
-                            "default",
-                            this.getConfig().sandboxRoot,
-                        ),
+                        getSandboxRootsRegistryPath("default"),
                 ));
         this.loadKnownSandboxRoots();
         this.rememberSandboxRoot(this.getConfig().sandboxRoot);

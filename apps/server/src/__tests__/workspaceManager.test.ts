@@ -90,32 +90,37 @@ afterEach(() => {
 });
 
 describe("WorkspaceManager", () => {
-    test("scopes the sandbox root registry path by config path within sandbox state", () => {
-        const sandboxRoot = "/tmp/agentchat-sandboxes";
-        const stateDir = path.join(
-            sandboxRoot,
-            ".agentchat-state",
-            "sandbox-roots",
-        );
-        const devPath = getSandboxRootsRegistryPath(
-            "/tmp/agentchat/dev.config.json",
-            sandboxRoot,
-        );
-        const stagingPath = getSandboxRootsRegistryPath(
-            "/tmp/agentchat/staging.config.json",
-            sandboxRoot,
-        );
-
-        expect(path.dirname(devPath)).toBe(stateDir);
-        expect(path.dirname(stagingPath)).toBe(stateDir);
-        expect(devPath).not.toBe(stagingPath);
-        expect(devPath).toStartWith("/tmp/agentchat-sandboxes/");
-        expect(
-            getSandboxRootsRegistryPath(
+    test("scopes the sandbox root registry path by config path in stable state", () => {
+        const originalXdgStateHome = process.env.XDG_STATE_HOME;
+        try {
+            process.env.XDG_STATE_HOME = "/tmp/agentchat-state-home";
+            const devPath = getSandboxRootsRegistryPath(
                 "/tmp/agentchat/dev.config.json",
-                sandboxRoot,
-            ),
-        ).toBe(devPath);
+            );
+            const stagingPath = getSandboxRootsRegistryPath(
+                "/tmp/agentchat/staging.config.json",
+            );
+            const stateDir = path.join(
+                "/tmp/agentchat-state-home",
+                "agentchat",
+                ".agentchat-state",
+                "sandbox-roots",
+            );
+
+            expect(path.dirname(devPath)).toBe(stateDir);
+            expect(path.dirname(stagingPath)).toBe(stateDir);
+            expect(devPath).not.toBe(stagingPath);
+            expect(devPath).toStartWith("/tmp/agentchat-state-home/");
+            expect(
+                getSandboxRootsRegistryPath("/tmp/agentchat/dev.config.json"),
+            ).toBe(devPath);
+        } finally {
+            if (originalXdgStateHome === undefined) {
+                delete process.env.XDG_STATE_HOME;
+            } else {
+                process.env.XDG_STATE_HOME = originalXdgStateHome;
+            }
+        }
     });
 
     describe("ensureWorkspace", () => {

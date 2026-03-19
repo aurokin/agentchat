@@ -34,11 +34,7 @@ const modelCatalog = new CodexModelCatalog({
 });
 const workspaceManager = new WorkspaceManager({
     getConfig: () => configStore.snapshot,
-    getRootsRegistryPath: () =>
-        getSandboxRootsRegistryPath(
-            configStore.path,
-            configStore.snapshot.sandboxRoot,
-        ),
+    getRootsRegistryPath: () => getSandboxRootsRegistryPath(configStore.path),
 });
 const runtimeManager = new CodexRuntimeManager({
     getConfig: () => configStore.snapshot,

@@ -31,7 +31,7 @@ function encodeSandboxPathSegment(label: string, value: string): string {
         );
     }
 
-    if (isSafePathSegment(value)) {
+    if (isSafePathSegment(value) && !value.startsWith("~")) {
         return value;
     }
 

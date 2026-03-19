@@ -50,6 +50,15 @@ describe("sandbox paths", () => {
         ).toBe("/tmp/sandboxes/agent-1/user-1/~ZnJvbnRlbmQ6YXBp");
     });
 
+    test("encodes leading tildes to keep sandbox path encoding injective", () => {
+        expect(getSandboxConversationPathSegment("..")).toBe("~Li4");
+        expect(getSandboxConversationPathSegment("~Li4")).toBe("~fkxpNA");
+        expect(getSandboxConversationPathSegment("~Li4")).not.toBe(
+            getSandboxConversationPathSegment(".."),
+        );
+        expect(getSandboxUserPathSegment("~user")).toBe("~fnVzZXI");
+    });
+
     test("encodes Convex-style user ids for filesystem paths", () => {
         expect(getSandboxUserPathSegment("users:abc123")).toBe(
             "~dXNlcnM6YWJjMTIz",
