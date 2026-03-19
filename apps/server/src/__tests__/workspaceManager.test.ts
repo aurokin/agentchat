@@ -366,6 +366,7 @@ describe("WorkspaceManager", () => {
                 secondResolved = true;
             });
 
+            await Bun.sleep(0);
             expect(createCalls).toBe(1);
             await Bun.sleep(0);
             expect(secondResolved).toBe(false);
@@ -530,6 +531,7 @@ describe("WorkspaceManager", () => {
         test("refuses to reuse unmanaged existing directories without metadata", async () => {
             const sandboxRoot = makeTempDir("sandbox");
             const rootPath = makeTempDir("agent-root");
+            const otherRoot = makeTempDir("other-root");
             const sandboxPath = path.join(
                 sandboxRoot,
                 "my-agent",
@@ -538,6 +540,81 @@ describe("WorkspaceManager", () => {
             );
             mkdirSync(sandboxPath, { recursive: true });
             writeFileSync(path.join(sandboxPath, "file.txt"), "unmanaged");
+            writeFileSync(path.join(rootPath, "file.txt"), "source");
+            writeFileSync(path.join(otherRoot, "file.txt"), "other");
+
+            const agent = makeAgent({
+                id: "my-agent",
+                rootPath,
+                workspaceMode: "copy-on-conversation",
+            });
+            const manager = createWorkspaceManager(() =>
+                makeConfig({ sandboxRoot }),
+            );
+            await manager.ensureWorkspace(
+                makeAgent({
+                    id: "other-agent",
+                    rootPath: otherRoot,
+                    workspaceMode: "copy-on-conversation",
+                }),
+                "user-1",
+                "conv-other",
+            );
+
+            await expect(
+                manager.ensureWorkspace(agent, "user-1", "conv-1"),
+            ).rejects.toThrow(/without metadata/);
+            expect(
+                readFileSync(path.join(sandboxPath, "file.txt"), "utf8"),
+            ).toBe("unmanaged");
+        });
+
+        test("recreates copied workspaces when their metadata state is wiped", async () => {
+            const sandboxRoot = makeTempDir("sandbox");
+            const rootPath = makeTempDir("agent-root");
+            const rootsRegistryPath = path.join(
+                makeTempDir("sandbox-roots-registry"),
+                "sandbox-roots.json",
+            );
+            writeFileSync(path.join(rootPath, "file.txt"), "source");
+
+            const agent = makeAgent({
+                id: "my-agent",
+                rootPath,
+                workspaceMode: "copy-on-conversation",
+            });
+            const manager = new WorkspaceManager({
+                getConfig: () => makeConfig({ sandboxRoot }),
+                rootsRegistryPath,
+            });
+
+            const workspace = await manager.ensureWorkspace(
+                agent,
+                "user-1",
+                "conv-1",
+            );
+            writeFileSync(path.join(workspace, "file.txt"), "stale");
+            rmSync(getWorkspaceMetadataRootPath(rootsRegistryPath), {
+                force: true,
+                recursive: true,
+            });
+
+            const workspaceState = await manager.ensureWorkspaceState(
+                agent,
+                "user-1",
+                "conv-1",
+            );
+
+            expect(workspaceState.path).toBe(workspace);
+            expect(workspaceState.wasReset).toBe(true);
+            expect(readFileSync(path.join(workspace, "file.txt"), "utf8")).toBe(
+                "source",
+            );
+        });
+
+        test("reports reset when recreating a missing copied workspace from metadata", async () => {
+            const sandboxRoot = makeTempDir("sandbox");
+            const rootPath = makeTempDir("agent-root");
             writeFileSync(path.join(rootPath, "file.txt"), "source");
 
             const agent = makeAgent({
@@ -549,12 +626,24 @@ describe("WorkspaceManager", () => {
                 makeConfig({ sandboxRoot }),
             );
 
-            await expect(
-                manager.ensureWorkspace(agent, "user-1", "conv-1"),
-            ).rejects.toThrow(/without metadata/);
-            expect(
-                readFileSync(path.join(sandboxPath, "file.txt"), "utf8"),
-            ).toBe("unmanaged");
+            const workspace = await manager.ensureWorkspace(
+                agent,
+                "user-1",
+                "conv-1",
+            );
+            rmSync(workspace, { force: true, recursive: true });
+
+            const workspaceState = await manager.ensureWorkspaceState(
+                agent,
+                "user-1",
+                "conv-1",
+            );
+
+            expect(workspaceState.path).toBe(workspace);
+            expect(workspaceState.wasReset).toBe(true);
+            expect(readFileSync(path.join(workspace, "file.txt"), "utf8")).toBe(
+                "source",
+            );
         });
     });
 

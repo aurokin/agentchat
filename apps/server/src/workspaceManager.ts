@@ -69,7 +69,7 @@ export class WorkspaceManager {
     private readonly workspaceMetadataRootPath: string;
     private readonly pendingWorkspaceCreations = new Map<
         string,
-        Promise<string>
+        Promise<{ path: string; wasReset: boolean }>
     >();
     private readonly knownSandboxRoots = new Set<string>();
 
@@ -104,7 +104,7 @@ export class WorkspaceManager {
         );
         const pendingCreation = this.pendingWorkspaceCreations.get(creationKey);
         if (pendingCreation) {
-            return { path: await pendingCreation, wasReset: false };
+            return await pendingCreation;
         }
 
         const sandboxPath = this.sandboxPath(agent.id, userId, conversationId);
@@ -126,7 +126,19 @@ export class WorkspaceManager {
                 return { path: sandboxPath, wasReset: false };
             }
 
-            if (!metadata) {
+            const canRecoverMissingMetadata =
+                !metadata &&
+                !this.hasManagedWorkspaces() &&
+                (await this.isReusableWorkspaceTarget(
+                    this.getConfig().sandboxRoot,
+                    sandboxPath,
+                    [
+                        agent.id,
+                        getSandboxUserPathSegment(userId),
+                        getSandboxConversationPathSegment(conversationId),
+                    ],
+                ));
+            if (!metadata && !canRecoverMissingMetadata) {
                 throw new Error(
                     `Refusing to reuse unmanaged sandbox path without metadata: ${sandboxPath}`,
                 );
@@ -141,22 +153,40 @@ export class WorkspaceManager {
                         getSandboxUserPathSegment(userId),
                         getSandboxConversationPathSegment(conversationId),
                     ],
+                    allowMissingMetadata: canRecoverMissingMetadata,
                 });
+                if (existsSync(sandboxPath)) {
+                    throw new Error(
+                        `Failed to reset sandbox workspace before recreating it: ${sandboxPath}`,
+                    );
+                }
 
-                return await this.createWorkspace(agent.rootPath, sandboxPath);
+                return {
+                    path: await this.createWorkspace(
+                        agent.rootPath,
+                        sandboxPath,
+                    ),
+                    wasReset: true,
+                };
             })();
             this.pendingWorkspaceCreations.set(creationKey, recreation);
             try {
-                return { path: await recreation, wasReset: true };
+                return await recreation;
             } finally {
                 this.pendingWorkspaceCreations.delete(creationKey);
             }
         }
 
-        const creation = this.createWorkspace(agent.rootPath, sandboxPath);
+        const creation = (async () => {
+            const metadata = await this.readWorkspaceMetadata(sandboxPath);
+            return {
+                path: await this.createWorkspace(agent.rootPath, sandboxPath),
+                wasReset: metadata !== null,
+            };
+        })();
         this.pendingWorkspaceCreations.set(creationKey, creation);
         try {
-            return { path: await creation, wasReset: false };
+            return await creation;
         } finally {
             this.pendingWorkspaceCreations.delete(creationKey);
         }
@@ -238,6 +268,7 @@ export class WorkspaceManager {
         sandboxRoot: string;
         targetPath: string;
         expectedTailSegments: [string, string, string];
+        allowMissingMetadata?: boolean;
     }): Promise<void> {
         const target = path.resolve(params.targetPath);
         if (
@@ -265,7 +296,10 @@ export class WorkspaceManager {
             return;
         }
 
-        if (!(await this.hasManagedWorkspaceMetadata(target))) {
+        if (
+            !params.allowMissingMetadata &&
+            !(await this.hasManagedWorkspaceMetadata(target))
+        ) {
             console.error(
                 `[agentchat-server] refused to delete workspace without sandbox metadata: ${target}`,
             );

@@ -1648,6 +1648,65 @@ describe("CodexRuntimeManager", () => {
         ).toBe("second");
     });
 
+    test("does not resume persisted threads after a copied workspace is recreated", async () => {
+        const sandboxRoot = makeTempDir("sandbox");
+        const agentRoot = makeTempDir("agent-root");
+        writeFileSync(path.join(agentRoot, "version.txt"), "shared");
+
+        const config = createConfig();
+        config.sandboxRoot = sandboxRoot;
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath: agentRoot,
+            workspaceMode: "copy-on-conversation",
+        };
+
+        const workspaceManager = createWorkspaceManager(() => config);
+        const initialWorkspace = await workspaceManager.ensureWorkspace(
+            config.agents[0]!,
+            "user-1",
+            "chat-1",
+        );
+        rmSync(initialWorkspace, { force: true, recursive: true });
+
+        const persistence = createPersistence({
+            provider: "codex-default",
+            status: "idle",
+            providerThreadId: "thread-stale",
+            workspaceMode: "copy-on-conversation",
+            workspaceRootPath: agentRoot,
+            workspaceCwd: initialWorkspace,
+        });
+        const clients: FakeCodexClient[] = [];
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            workspaceManager,
+            createClient: () => {
+                const client = new FakeCodexClient();
+                clients.push(client);
+                return client;
+            },
+        });
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        expect(clients).toHaveLength(1);
+        expect(clients[0]?.requests.map((request) => request.method)).toEqual([
+            "thread/start",
+            "turn/start",
+        ]);
+        expect(existsSync(initialWorkspace)).toBe(true);
+        expect(
+            readFileSync(path.join(initialWorkspace, "version.txt"), "utf8"),
+        ).toBe("shared");
+    });
+
     test("deletes copied workspaces even after the agent is disabled", async () => {
         const sandboxRoot = makeTempDir("sandbox");
         const agentRoot = makeTempDir("agent-root");
