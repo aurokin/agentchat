@@ -1,5 +1,6 @@
 import {
     existsSync,
+    lstatSync,
     mkdirSync,
     mkdtempSync,
     readdirSync,
@@ -280,6 +281,43 @@ describe("WorkspaceManager", () => {
             expect(
                 readFileSync(path.join(second.path, "file.txt"), "utf8"),
             ).toBe("second");
+        });
+
+        test("recreates an existing copied sandbox when the target becomes a symlink", async () => {
+            const sandboxRoot = makeTempDir("sandbox");
+            const rootPath = makeTempDir("agent-root");
+            const outsideDir = makeTempDir("outside");
+            writeFileSync(path.join(rootPath, "file.txt"), "safe");
+            writeFileSync(path.join(outsideDir, "file.txt"), "outside");
+
+            const agent = makeAgent({
+                id: "my-agent",
+                rootPath,
+                workspaceMode: "copy-on-conversation",
+            });
+            const manager = createWorkspaceManager(() =>
+                makeConfig({ sandboxRoot }),
+            );
+
+            const first = await manager.ensureWorkspaceState(
+                agent,
+                "user-1",
+                "conv-1",
+            );
+            rmSync(first.path, { recursive: true, force: true });
+            symlinkSync(outsideDir, first.path);
+
+            const second = await manager.ensureWorkspaceState(
+                agent,
+                "user-1",
+                "conv-1",
+            );
+
+            expect(second.wasReset).toBe(true);
+            expect(lstatSync(second.path).isSymbolicLink()).toBe(false);
+            expect(
+                readFileSync(path.join(second.path, "file.txt"), "utf8"),
+            ).toBe("safe");
         });
 
         test("serializes concurrent initial sandbox creation per conversation", async () => {
@@ -782,6 +820,43 @@ describe("WorkspaceManager", () => {
             await restartedManager.reconcile(new Set());
 
             expect(existsSync(originalWorkspace)).toBe(false);
+        });
+
+        test("refuses to remove orphaned workspaces that overlap an agent rootPath", async () => {
+            const sandboxRoot = makeTempDir("sandbox");
+            const rootPath = makeTempDir("agent-root");
+            writeFileSync(path.join(rootPath, "file.txt"), "data");
+
+            const copiedAgent = makeAgent({
+                id: "agent-a",
+                rootPath,
+                workspaceMode: "copy-on-conversation",
+            });
+            const config = makeConfig({
+                sandboxRoot,
+                agents: [copiedAgent],
+            });
+            const manager = createWorkspaceManager(() => config);
+
+            const workspace = await manager.ensureWorkspace(
+                copiedAgent,
+                "user-1",
+                "conv-1",
+            );
+            expect(existsSync(workspace)).toBe(true);
+
+            config.agents = [
+                copiedAgent,
+                makeAgent({
+                    id: "shared-agent",
+                    rootPath: workspace,
+                    workspaceMode: "shared",
+                }),
+            ];
+
+            await manager.reconcile(new Set());
+
+            expect(existsSync(workspace)).toBe(true);
         });
     });
 });

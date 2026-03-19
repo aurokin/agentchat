@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import {
     existsSync,
+    lstatSync,
     mkdirSync,
     realpathSync,
     readFileSync,
@@ -110,18 +111,29 @@ export class WorkspaceManager {
             const metadata = await this.readWorkspaceMetadata(sandboxPath);
             if (
                 metadata &&
-                metadata.sourceRootPath === path.resolve(agent.rootPath)
+                metadata.sourceRootPath === path.resolve(agent.rootPath) &&
+                (await this.isReusableWorkspaceTarget(
+                    this.getConfig().sandboxRoot,
+                    sandboxPath,
+                    [
+                        agent.id,
+                        getSandboxUserPathSegment(userId),
+                        getSandboxConversationPathSegment(conversationId),
+                    ],
+                ))
             ) {
                 return { path: sandboxPath, wasReset: false };
             }
 
             const recreation = (async () => {
-                await this.deleteWorkspacePath({
+                await this.deleteWorkspacePathBySegments({
                     sandboxRoot: this.getConfig().sandboxRoot,
                     targetPath: sandboxPath,
-                    agentId: agent.id,
-                    userId,
-                    conversationId,
+                    expectedTailSegments: [
+                        agent.id,
+                        getSandboxUserPathSegment(userId),
+                        getSandboxConversationPathSegment(conversationId),
+                    ],
                 });
 
                 return await this.createWorkspace(agent.rootPath, sandboxPath);
@@ -204,14 +216,25 @@ export class WorkspaceManager {
         userId: string;
         conversationId: string;
     }): Promise<void> {
+        await this.deleteWorkspacePathBySegments({
+            sandboxRoot: params.sandboxRoot,
+            targetPath: params.targetPath,
+            expectedTailSegments: [
+                params.agentId,
+                getSandboxUserPathSegment(params.userId),
+                getSandboxConversationPathSegment(params.conversationId),
+            ],
+        });
+    }
+
+    private async deleteWorkspacePathBySegments(params: {
+        sandboxRoot: string;
+        targetPath: string;
+        expectedTailSegments: [string, string, string];
+    }): Promise<void> {
         const target = path.resolve(params.targetPath);
         if (
-            !this.hasExpectedWorkspaceTail(
-                target,
-                params.agentId,
-                params.userId,
-                params.conversationId,
-            )
+            !this.hasExpectedWorkspaceTail(target, params.expectedTailSegments)
         ) {
             console.error(
                 `[agentchat-server] refused to delete workspace with unexpected path tail: ${target}`,
@@ -294,23 +317,18 @@ export class WorkspaceManager {
                         );
                         if (!activeKeys.has(key)) {
                             const target = path.join(userPath, convDir);
-                            if (
-                                await this.isSafeSandboxTarget(
-                                    sandboxRoot,
-                                    target,
-                                )
-                            ) {
-                                await rm(target, {
-                                    recursive: true,
-                                    force: true,
-                                });
-                                await this.deleteWorkspaceMetadata(target);
+                            await this.deleteWorkspacePathBySegments({
+                                sandboxRoot,
+                                targetPath: target,
+                                expectedTailSegments: [
+                                    agentDir,
+                                    userDir,
+                                    convDir,
+                                ],
+                            });
+                            if (!existsSync(target)) {
                                 console.log(
                                     `[agentchat-server] reconcile: removed orphaned sandbox: ${target}`,
-                                );
-                            } else {
-                                console.error(
-                                    `[agentchat-server] reconcile: refused to delete sandbox outside sandboxRoot: ${target}`,
                                 );
                             }
                         }
@@ -524,9 +542,7 @@ export class WorkspaceManager {
 
     private hasExpectedWorkspaceTail(
         targetPath: string,
-        agentId: string,
-        userId: string,
-        conversationId: string,
+        expectedTailSegments: [string, string, string],
     ): boolean {
         const segments = path
             .resolve(targetPath)
@@ -537,11 +553,34 @@ export class WorkspaceManager {
         }
 
         const tail = segments.slice(-3);
-        return (
-            tail[0] === agentId &&
-            tail[1] === getSandboxUserPathSegment(userId) &&
-            tail[2] === getSandboxConversationPathSegment(conversationId)
+        return tail.every(
+            (segment, index) => segment === expectedTailSegments[index],
         );
+    }
+
+    private async isReusableWorkspaceTarget(
+        sandboxRoot: string,
+        target: string,
+        expectedTailSegments: [string, string, string],
+    ): Promise<boolean> {
+        if (!existsSync(target)) {
+            return false;
+        }
+
+        if (!this.hasExpectedWorkspaceTail(target, expectedTailSegments)) {
+            return false;
+        }
+
+        if (!(await this.isSafeSandboxTarget(sandboxRoot, target))) {
+            return false;
+        }
+
+        try {
+            const entry = lstatSync(target);
+            return entry.isDirectory() && !entry.isSymbolicLink();
+        } catch {
+            return false;
+        }
     }
 
     /**
@@ -571,11 +610,11 @@ export class WorkspaceManager {
         }
 
         try {
-            const realTarget = realpathSync(target);
             const realRoot = realpathSync(sandboxRoot);
+            const realParent = realpathSync(path.dirname(target));
             return (
-                realTarget === realRoot ||
-                realTarget.startsWith(realRoot + path.sep)
+                realParent === realRoot ||
+                realParent.startsWith(realRoot + path.sep)
             );
         } catch {
             return false;
