@@ -202,6 +202,7 @@ function createPersistence(
         workspaceMode?: "shared" | "copy-on-conversation";
         workspaceRootPath?: string;
         workspaceCwd?: string;
+        updatedAt?: number;
     } | null,
 ) {
     return {
@@ -242,7 +243,7 @@ function createPersistence(
                 workspaceMode: binding.workspaceMode,
                 workspaceRootPath: binding.workspaceRootPath,
                 workspaceCwd: binding.workspaceCwd,
-                updatedAt: Date.now(),
+                updatedAt: binding.updatedAt ?? Date.now(),
             };
         },
         async chatExists(userId: string, agentId: string, localId: string) {
@@ -425,6 +426,8 @@ describe("CodexRuntimeManager", () => {
 
     test("resumes legacy shared bindings without persisted workspace metadata", async () => {
         const config = createConfig();
+        const configPath = path.join(makeTempDir("config"), "agentchat.json");
+        writeFileSync(configPath, JSON.stringify({ version: 1 }));
         const persistence = createPersistence({
             provider: "codex-default",
             providerThreadId: "thread-existing",
@@ -436,6 +439,7 @@ describe("CodexRuntimeManager", () => {
             getConfig: () => config,
             persistence: persistence as unknown as RuntimePersistenceClient,
             createClient: () => fakeClient,
+            configPath,
         });
 
         await manager.sendMessage({
@@ -447,6 +451,38 @@ describe("CodexRuntimeManager", () => {
 
         expect(fakeClient.requests.map((request) => request.method)).toEqual([
             "thread/resume",
+            "turn/start",
+        ]);
+    });
+
+    test("does not resume legacy shared bindings after the config changes", async () => {
+        const config = createConfig();
+        const configPath = path.join(makeTempDir("config"), "agentchat.json");
+        writeFileSync(configPath, JSON.stringify({ version: 1 }));
+        const persistence = createPersistence({
+            provider: "codex-default",
+            providerThreadId: "thread-existing",
+            updatedAt: Date.now() - 60_000,
+        });
+        const fakeClient = new FakeCodexClient({
+            startedThreadId: "thread-new",
+        });
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: () => fakeClient,
+            configPath,
+        });
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        expect(fakeClient.requests.map((request) => request.method)).toEqual([
+            "thread/start",
             "turn/start",
         ]);
     });

@@ -16,6 +16,10 @@ import {
     WorkspaceManager,
 } from "./workspaceManager.ts";
 import {
+    filterPersistedWorkspaceEntries,
+    getCopyOnConversationAgentIds,
+} from "./workspaceReconciliation.ts";
+import {
     handleConnectedSocketMessage,
     handleSocketClose,
     type BackendSession,
@@ -35,6 +39,7 @@ const runtimeManager = new CodexRuntimeManager({
     getConfig: () => configStore.snapshot,
     persistence: runtimePersistence,
     workspaceManager,
+    configPath: configStore.path,
 });
 
 type WebSocketData = {
@@ -132,10 +137,16 @@ const RECONCILE_INTERVAL_MS = 10 * 60 * 1000;
 async function runReconciliation(): Promise<void> {
     try {
         const entries = await runtimePersistence.listAllChatLocalIds();
+        const copyOnConversationAgentIds = getCopyOnConversationAgentIds(
+            configStore.snapshot.agents,
+        );
         // Build composite keys so reconciliation can distinguish sandboxes
         // across agents, users, and client-supplied localIds.
         const activeKeys = new Set<string>();
-        for (const entry of entries) {
+        for (const entry of filterPersistedWorkspaceEntries(
+            entries,
+            copyOnConversationAgentIds,
+        )) {
             activeKeys.add(
                 `${entry.agentId}:${getSandboxUserPathSegment(entry.userId)}:${getSandboxConversationPathSegment(entry.localId)}`,
             );

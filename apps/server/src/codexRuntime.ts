@@ -1,4 +1,5 @@
 import path from "node:path";
+import { statSync } from "node:fs";
 
 import type { AgentchatConfig, AgentConfig, ProviderConfig } from "./config.ts";
 import {
@@ -194,12 +195,14 @@ export class CodexRuntimeManager {
     private readonly persistence: RuntimePersistenceClient;
     private readonly createClient: CreateCodexClient;
     private readonly workspaceManager: WorkspaceManager | null;
+    private readonly configPath: string | null;
 
     constructor(params: {
         getConfig: () => AgentchatConfig;
         persistence: RuntimePersistenceClient;
         createClient?: CreateCodexClient;
         workspaceManager?: WorkspaceManager;
+        configPath?: string;
     }) {
         this.getConfig = params.getConfig;
         this.persistence = params.persistence;
@@ -207,6 +210,7 @@ export class CodexRuntimeManager {
             params.createClient ??
             ((clientParams) => new CodexAppServerClient(clientParams));
         this.workspaceManager = params.workspaceManager ?? null;
+        this.configPath = params.configPath ?? null;
     }
 
     async sendMessage(params: {
@@ -584,11 +588,15 @@ export class CodexRuntimeManager {
     }
 
     /**
-     * Returns composite agentId:userId:conversationId keys for all live runtimes.
+     * Returns composite agentId:userId:conversationId keys for live copied
+     * workspaces that should be preserved during reconciliation.
      */
     getActiveConversationKeys(): Set<string> {
         const keys = new Set<string>();
         for (const runtime of this.runtimes.values()) {
+            if (runtime.agent.workspaceMode !== "copy-on-conversation") {
+                continue;
+            }
             keys.add(
                 `${runtime.agentId}:${getSandboxUserPathSegment(runtime.userId)}:${getSandboxConversationPathSegment(runtime.conversationId)}`,
             );
@@ -730,6 +738,7 @@ export class CodexRuntimeManager {
             !shouldResetPersistedRuntimeBinding(
                 persistedBinding,
                 workspaceIdentity,
+                this.canReuseLegacySharedBinding(persistedBinding),
             )
                 ? persistedBinding
                 : null;
@@ -1496,6 +1505,20 @@ export class CodexRuntimeManager {
             createdAt: Date.now(),
         });
     }
+
+    private canReuseLegacySharedBinding(
+        binding: PersistedRuntimeBinding,
+    ): boolean {
+        if (!this.configPath) {
+            return true;
+        }
+
+        try {
+            return statSync(this.configPath).mtimeMs <= binding.updatedAt;
+        } catch {
+            return true;
+        }
+    }
 }
 
 function resolveRuntimeResources(
@@ -1595,6 +1618,7 @@ function getRuntimeWorkspaceIdentity(
 function shouldResetPersistedRuntimeBinding(
     binding: PersistedRuntimeBinding,
     desired: RuntimeWorkspaceIdentity,
+    allowLegacySharedBindingReuse: boolean,
 ): boolean {
     if (
         desired.workspaceMode === "shared" &&
@@ -1602,7 +1626,7 @@ function shouldResetPersistedRuntimeBinding(
         binding.workspaceRootPath === undefined &&
         binding.workspaceCwd === undefined
     ) {
-        return false;
+        return !allowLegacySharedBindingReuse;
     }
 
     return (
