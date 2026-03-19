@@ -895,7 +895,23 @@ export const chatExistsByLocalId = internalQuery({
                 q.eq("userId", args.userId).eq("localId", args.localId),
             )
             .collect();
-        return chats.some((chat) => chat.agentId === args.agentId);
+        if (chats.some((chat) => chat.agentId === args.agentId)) {
+            return true;
+        }
+
+        if (!args.localId.includes(":")) {
+            return false;
+        }
+
+        const legacyChats = await ctx.db
+            .query("chats")
+            .withIndex("by_user", (q) => q.eq("userId", args.userId))
+            .collect();
+        return legacyChats.some(
+            (chat) =>
+                chat.agentId === args.agentId &&
+                (chat.localId ?? chat._id) === args.localId,
+        );
     },
 });
 

@@ -485,15 +485,16 @@ export class CodexRuntimeManager {
         // If there's a live runtime, verify the agentId matches before tearing down
         const key = getRuntimeKey(params.userId, params.conversationId);
         const runtime = this.runtimes.get(key);
-        if (runtime && runtime.agentId !== params.agentId) {
+        const shouldTearDownRuntime =
+            runtime?.agentId === params.agentId || !runtime;
+        if (runtime && !shouldTearDownRuntime) {
             console.warn(
-                `[agentchat-server] conversation.delete: agentId mismatch (runtime=${runtime.agentId}, request=${params.agentId}); ignoring`,
+                `[agentchat-server] conversation.delete: agentId mismatch (runtime=${runtime.agentId}, request=${params.agentId}); skipping runtime teardown but continuing workspace deletion`,
             );
-            return;
         }
 
         // Tear down any active runtime for this conversation
-        if (runtime) {
+        if (runtime && shouldTearDownRuntime) {
             // Settle any in-flight turn so the awaiting sendMessage() resolves
             if (runtime.activeTurn) {
                 this.cancelPendingMessageDelta(runtime.activeTurn);
@@ -507,8 +508,11 @@ export class CodexRuntimeManager {
             }
             runtime.client.stop();
             this.runtimes.delete(key);
+            this.pendingSubscriptions.delete(key);
         }
-        this.pendingSubscriptions.delete(key);
+        if (!runtime) {
+            this.pendingSubscriptions.delete(key);
+        }
 
         // Delete the sandbox workspace if workspace manager is configured
         if (this.workspaceManager) {

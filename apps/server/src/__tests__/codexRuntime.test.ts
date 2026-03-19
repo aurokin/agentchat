@@ -1687,4 +1687,72 @@ describe("CodexRuntimeManager", () => {
             },
         ]);
     });
+
+    test("deletes the requested agent workspace even when another agent runtime is live for the same conversation id", async () => {
+        const sandboxRoot = makeTempDir("sandbox");
+        const agentRootA = makeTempDir("agent-root-a");
+        const agentRootB = makeTempDir("agent-root-b");
+        writeFileSync(path.join(agentRootA, "version.txt"), "a");
+        writeFileSync(path.join(agentRootB, "version.txt"), "b");
+
+        const config = createConfig();
+        config.sandboxRoot = sandboxRoot;
+        config.agents = [
+            {
+                ...config.agents[0]!,
+                id: "agent-1",
+                rootPath: agentRootA,
+                workspaceMode: "copy-on-conversation",
+            },
+            {
+                ...config.agents[0]!,
+                id: "agent-2",
+                rootPath: agentRootB,
+                workspaceMode: "copy-on-conversation",
+            },
+        ];
+
+        const workspaceManager = createWorkspaceManager(() => config);
+        const persistence = createPersistence(null);
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            workspaceManager,
+        });
+        const workspacePath = await workspaceManager.ensureWorkspace(
+            config.agents[1]!,
+            "user-1",
+            "chat-1",
+        );
+        const client = new FakeCodexClient();
+
+        (
+            manager as unknown as {
+                runtimes: Map<string, Record<string, unknown>>;
+            }
+        ).runtimes.set("user-1:chat-1", {
+            agentId: "agent-1",
+            activeTurn: null,
+            idleTimer: null,
+            client,
+        });
+
+        expect(existsSync(workspacePath)).toBe(true);
+
+        await manager.deleteConversationWorkspace({
+            userId: "user-1",
+            conversationId: "chat-1",
+            agentId: "agent-2",
+        });
+
+        expect(client.stopped).toBe(false);
+        expect(existsSync(workspacePath)).toBe(false);
+        expect(persistence.chatExistsCalls).toEqual([
+            {
+                userId: "user-1",
+                agentId: "agent-2",
+                localId: "chat-1",
+            },
+        ]);
+    });
 });

@@ -282,4 +282,42 @@ describe("runtime ingress", () => {
             }),
         ).resolves.toBe(false);
     });
+
+    test("checks chat existence against _id fallback for legacy chats", async () => {
+        const byLocalIdCollect = mock(async () => []);
+        const byUserCollect = mock(async () => [
+            {
+                _id: "chats:legacy",
+                agentId: "agent-a",
+                userId: "users:test",
+                localId: undefined,
+            },
+        ]);
+        const query = mock((table: string) => {
+            if (table !== "chats") {
+                throw new Error(`Unexpected table ${table}`);
+            }
+            return {
+                withIndex: mock((indexName: string) => ({
+                    collect:
+                        indexName === "by_local_id"
+                            ? byLocalIdCollect
+                            : byUserCollect,
+                })),
+            };
+        });
+        const ctx = {
+            db: {
+                query,
+            },
+        };
+
+        await expect(
+            runHandler(chatExistsByLocalId as unknown as HandlerExport, ctx, {
+                userId: "users:test",
+                agentId: "agent-a",
+                localId: "chats:legacy",
+            }),
+        ).resolves.toBe(true);
+    });
 });
