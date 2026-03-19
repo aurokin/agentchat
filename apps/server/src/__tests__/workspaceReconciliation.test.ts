@@ -4,6 +4,7 @@ import type { AgentConfig } from "../config.ts";
 import {
     filterPersistedWorkspaceEntries,
     getCopyOnConversationAgentIds,
+    shouldSkipPersistedWorkspaceScan,
 } from "../workspaceReconciliation.ts";
 
 function makeAgent(overrides: Partial<AgentConfig> = {}): AgentConfig {
@@ -74,5 +75,39 @@ describe("workspace reconciliation", () => {
                 localId: "chat-1",
             },
         ]);
+    });
+
+    test("skips the persisted workspace scan only when copied workspaces are unused", () => {
+        expect(
+            shouldSkipPersistedWorkspaceScan({
+                copyOnConversationAgentIds: new Set(),
+                activeWorkspaceKeys: new Set(),
+                hasManagedWorkspaces: false,
+            }),
+        ).toBe(true);
+
+        expect(
+            shouldSkipPersistedWorkspaceScan({
+                copyOnConversationAgentIds: new Set(["copy-agent"]),
+                activeWorkspaceKeys: new Set(),
+                hasManagedWorkspaces: false,
+            }),
+        ).toBe(false);
+
+        expect(
+            shouldSkipPersistedWorkspaceScan({
+                copyOnConversationAgentIds: new Set(),
+                activeWorkspaceKeys: new Set(["copy-agent:user-1:chat-1"]),
+                hasManagedWorkspaces: false,
+            }),
+        ).toBe(false);
+
+        expect(
+            shouldSkipPersistedWorkspaceScan({
+                copyOnConversationAgentIds: new Set(),
+                activeWorkspaceKeys: new Set(),
+                hasManagedWorkspaces: true,
+            }),
+        ).toBe(false);
     });
 });

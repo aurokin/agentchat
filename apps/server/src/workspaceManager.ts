@@ -126,6 +126,12 @@ export class WorkspaceManager {
                 return { path: sandboxPath, wasReset: false };
             }
 
+            if (!metadata) {
+                throw new Error(
+                    `Refusing to reuse unmanaged sandbox path without metadata: ${sandboxPath}`,
+                );
+            }
+
             const recreation = (async () => {
                 await this.deleteWorkspacePathBySegments({
                     sandboxRoot: this.getConfig().sandboxRoot,
@@ -259,6 +265,13 @@ export class WorkspaceManager {
             return;
         }
 
+        if (!(await this.hasManagedWorkspaceMetadata(target))) {
+            console.error(
+                `[agentchat-server] refused to delete workspace without sandbox metadata: ${target}`,
+            );
+            return;
+        }
+
         if (!(await this.isSafeSandboxTarget(params.sandboxRoot, target))) {
             console.error(
                 `[agentchat-server] refused to delete workspace outside sandboxRoot: ${target}`,
@@ -332,6 +345,20 @@ export class WorkspaceManager {
                     }
                 }
             }
+        }
+    }
+
+    hasManagedWorkspaces(): boolean {
+        if (!existsSync(this.workspaceMetadataRootPath)) {
+            return false;
+        }
+
+        try {
+            return readdirSync(this.workspaceMetadataRootPath).some((entry) =>
+                entry.endsWith(".json"),
+            );
+        } catch {
+            return false;
         }
     }
 
@@ -449,6 +476,12 @@ export class WorkspaceManager {
         await rm(this.getWorkspaceMetadataPath(sandboxPath), {
             force: true,
         });
+    }
+
+    private async hasManagedWorkspaceMetadata(
+        sandboxPath: string,
+    ): Promise<boolean> {
+        return (await this.readWorkspaceMetadata(sandboxPath)) !== null;
     }
 
     private getWorkspaceMetadataPath(sandboxPath: string): string {

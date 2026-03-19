@@ -526,6 +526,36 @@ describe("WorkspaceManager", () => {
                 ),
             ).toBe(false);
         });
+
+        test("refuses to reuse unmanaged existing directories without metadata", async () => {
+            const sandboxRoot = makeTempDir("sandbox");
+            const rootPath = makeTempDir("agent-root");
+            const sandboxPath = path.join(
+                sandboxRoot,
+                "my-agent",
+                "user-1",
+                "conv-1",
+            );
+            mkdirSync(sandboxPath, { recursive: true });
+            writeFileSync(path.join(sandboxPath, "file.txt"), "unmanaged");
+            writeFileSync(path.join(rootPath, "file.txt"), "source");
+
+            const agent = makeAgent({
+                id: "my-agent",
+                rootPath,
+                workspaceMode: "copy-on-conversation",
+            });
+            const manager = createWorkspaceManager(() =>
+                makeConfig({ sandboxRoot }),
+            );
+
+            await expect(
+                manager.ensureWorkspace(agent, "user-1", "conv-1"),
+            ).rejects.toThrow(/without metadata/);
+            expect(
+                readFileSync(path.join(sandboxPath, "file.txt"), "utf8"),
+            ).toBe("unmanaged");
+        });
     });
 
     describe("deleteWorkspace", () => {
@@ -713,6 +743,29 @@ describe("WorkspaceManager", () => {
                 "conv-nonexistent",
             );
         });
+
+        test("refuses to delete unmanaged directories without sandbox metadata", async () => {
+            const sandboxRoot = makeTempDir("sandbox");
+            const unmanagedPath = path.join(
+                sandboxRoot,
+                "agent-a",
+                "user-1",
+                "conv-1",
+            );
+            mkdirSync(unmanagedPath, { recursive: true });
+            writeFileSync(path.join(unmanagedPath, "keep.txt"), "keep");
+
+            const manager = createWorkspaceManager(() =>
+                makeConfig({ sandboxRoot }),
+            );
+
+            await manager.deleteWorkspace("agent-a", "user-1", "conv-1");
+
+            expect(existsSync(unmanagedPath)).toBe(true);
+            expect(
+                readFileSync(path.join(unmanagedPath, "keep.txt"), "utf8"),
+            ).toBe("keep");
+        });
     });
 
     describe("reconcile", () => {
@@ -883,6 +936,29 @@ describe("WorkspaceManager", () => {
             await manager.reconcile(new Set());
 
             expect(existsSync(workspace)).toBe(true);
+        });
+
+        test("refuses to remove unmanaged directories during reconciliation", async () => {
+            const sandboxRoot = makeTempDir("sandbox");
+            const unmanagedPath = path.join(
+                sandboxRoot,
+                "agent-a",
+                "user-1",
+                "conv-1",
+            );
+            mkdirSync(unmanagedPath, { recursive: true });
+            writeFileSync(path.join(unmanagedPath, "keep.txt"), "keep");
+
+            const manager = createWorkspaceManager(() =>
+                makeConfig({ sandboxRoot }),
+            );
+
+            await manager.reconcile(new Set());
+
+            expect(existsSync(unmanagedPath)).toBe(true);
+            expect(
+                readFileSync(path.join(unmanagedPath, "keep.txt"), "utf8"),
+            ).toBe("keep");
         });
     });
 });

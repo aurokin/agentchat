@@ -24,3 +24,15 @@ export function filterPersistedWorkspaceEntries(
         copyOnConversationAgentIds.has(entry.agentId),
     );
 }
+
+export function shouldSkipPersistedWorkspaceScan(params: {
+    copyOnConversationAgentIds: Set<string>;
+    activeWorkspaceKeys: Set<string>;
+    hasManagedWorkspaces: boolean;
+}): boolean {
+    return (
+        params.copyOnConversationAgentIds.size === 0 &&
+        params.activeWorkspaceKeys.size === 0 &&
+        !params.hasManagedWorkspaces
+    );
+}

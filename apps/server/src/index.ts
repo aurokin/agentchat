@@ -18,6 +18,7 @@ import {
 import {
     filterPersistedWorkspaceEntries,
     getCopyOnConversationAgentIds,
+    shouldSkipPersistedWorkspaceScan,
 } from "./workspaceReconciliation.ts";
 import {
     handleConnectedSocketMessage,
@@ -136,10 +137,21 @@ const RECONCILE_INTERVAL_MS = 10 * 60 * 1000;
 
 async function runReconciliation(): Promise<void> {
     try {
-        const entries = await runtimePersistence.listAllChatLocalIds();
         const copyOnConversationAgentIds = getCopyOnConversationAgentIds(
             configStore.snapshot.agents,
         );
+        const activeRuntimeKeys = runtimeManager.getActiveConversationKeys();
+        if (
+            shouldSkipPersistedWorkspaceScan({
+                copyOnConversationAgentIds,
+                activeWorkspaceKeys: activeRuntimeKeys,
+                hasManagedWorkspaces: workspaceManager.hasManagedWorkspaces(),
+            })
+        ) {
+            return;
+        }
+
+        const entries = await runtimePersistence.listAllChatLocalIds();
         // Build composite keys so reconciliation can distinguish sandboxes
         // across agents, users, and client-supplied localIds.
         const activeKeys = new Set<string>();
@@ -153,7 +165,7 @@ async function runReconciliation(): Promise<void> {
         }
         // Include live runtimes to avoid deleting sandboxes for in-progress
         // sessions not yet persisted to Convex.
-        for (const key of runtimeManager.getActiveConversationKeys()) {
+        for (const key of activeRuntimeKeys) {
             activeKeys.add(key);
         }
         await workspaceManager.reconcile(activeKeys);
