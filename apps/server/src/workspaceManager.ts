@@ -13,7 +13,10 @@ import os from "node:os";
 import path from "node:path";
 
 import type { AgentchatConfig, AgentConfig } from "./config.ts";
-import { pathsOverlap } from "./pathComparison.ts";
+import {
+    canonicalizePathForComparison,
+    pathsOverlap,
+} from "./pathComparison.ts";
 import {
     getSandboxConversationPathSegment,
     getSandboxUserPathSegment,
@@ -24,11 +27,13 @@ const SANDBOX_STATE_DIRECTORY_NAME = ".agentchat-state";
 const SANDBOX_ROOTS_REGISTRY_DIRECTORY_NAME = "sandbox-roots";
 const WORKSPACE_METADATA_DIRECTORY_NAME = "workspace-metadata";
 
+type WorkspaceMetadata = {
+    sourceRootPath: string;
+    state: "creating" | "ready";
+};
+
 function getStableStateKey(value: string): string {
-    return createHash("sha256")
-        .update(path.resolve(value))
-        .digest("hex")
-        .slice(0, 16);
+    return createHash("sha256").update(value).digest("hex").slice(0, 16);
 }
 
 function sanitizeStateFileComponent(value: string): string {
@@ -36,7 +41,10 @@ function sanitizeStateFileComponent(value: string): string {
 }
 
 export function getSandboxStateRootPath(sandboxRoot: string): string {
-    return path.join(path.resolve(sandboxRoot), SANDBOX_STATE_DIRECTORY_NAME);
+    return path.join(
+        canonicalizePathForComparison(sandboxRoot),
+        SANDBOX_STATE_DIRECTORY_NAME,
+    );
 }
 
 function getDefaultAgentchatStateBasePath(): string {
@@ -57,7 +65,9 @@ export function getSandboxRootsRegistryPath(configPath: string): string {
         getDefaultAgentchatStateBasePath(),
         SANDBOX_STATE_DIRECTORY_NAME,
         SANDBOX_ROOTS_REGISTRY_DIRECTORY_NAME,
-        `${configBasename}-${getStableStateKey(resolvedConfigPath)}.json`,
+        `${configBasename}-${getStableStateKey(
+            canonicalizePathForComparison(resolvedConfigPath),
+        )}.json`,
     );
 }
 
@@ -118,7 +128,9 @@ export class WorkspaceManager {
             const metadata = await this.readWorkspaceMetadata(sandboxPath);
             if (
                 metadata &&
-                metadata.sourceRootPath === path.resolve(agent.rootPath) &&
+                metadata.state === "ready" &&
+                metadata.sourceRootPath ===
+                    canonicalizePathForComparison(agent.rootPath) &&
                 (await this.isReusableWorkspaceTarget(
                     this.getConfig().sandboxRoot,
                     sandboxPath,
@@ -329,6 +341,11 @@ export class WorkspaceManager {
      * active set. Call on startup and periodically as a safety net.
      */
     async reconcile(activeKeys: Set<string>): Promise<void> {
+        const protectedKeys = new Set(activeKeys);
+        for (const key of this.pendingWorkspaceCreations.keys()) {
+            protectedKeys.add(key);
+        }
+
         for (const sandboxRoot of this.getKnownSandboxRoots()) {
             if (!existsSync(sandboxRoot)) {
                 continue;
@@ -369,7 +386,7 @@ export class WorkspaceManager {
                             userDir,
                             convDir,
                         );
-                        if (!activeKeys.has(key)) {
+                        if (!protectedKeys.has(key)) {
                             const target = path.join(userPath, convDir);
                             await this.deleteWorkspacePathBySegments({
                                 sandboxRoot,
@@ -441,15 +458,21 @@ export class WorkspaceManager {
         sourcePath: string,
         sandboxPath: string,
     ): Promise<string> {
+        const resolvedSourcePath = canonicalizePathForComparison(sourcePath);
         await this.assertWorkspaceSourceHasNoSymlinks(
-            path.resolve(sourcePath),
-            path.resolve(sourcePath),
+            resolvedSourcePath,
+            resolvedSourcePath,
         );
+        await this.writeWorkspaceMetadata(sandboxPath, {
+            sourceRootPath: resolvedSourcePath,
+            state: "creating",
+        });
         await mkdir(sandboxPath, { recursive: true });
         try {
             await cp(sourcePath, sandboxPath, { recursive: true });
             await this.writeWorkspaceMetadata(sandboxPath, {
-                sourceRootPath: path.resolve(sourcePath),
+                sourceRootPath: resolvedSourcePath,
+                state: "ready",
             });
         } catch (error) {
             // Clean up the partially created directory so the next
@@ -495,18 +518,29 @@ export class WorkspaceManager {
 
     private async readWorkspaceMetadata(
         sandboxPath: string,
-    ): Promise<{ sourceRootPath: string } | null> {
+    ): Promise<WorkspaceMetadata | null> {
         try {
             const raw = await readFile(
                 this.getWorkspaceMetadataPath(sandboxPath),
                 "utf8",
             );
-            const parsed = JSON.parse(raw) as { sourceRootPath?: unknown };
-            if (typeof parsed.sourceRootPath !== "string") {
+            const parsed = JSON.parse(raw) as {
+                sourceRootPath?: unknown;
+                state?: unknown;
+            };
+            if (
+                typeof parsed.sourceRootPath !== "string" ||
+                (parsed.state !== undefined &&
+                    parsed.state !== "creating" &&
+                    parsed.state !== "ready")
+            ) {
                 return null;
             }
             return {
-                sourceRootPath: path.resolve(parsed.sourceRootPath),
+                sourceRootPath: canonicalizePathForComparison(
+                    parsed.sourceRootPath,
+                ),
+                state: parsed.state === "creating" ? "creating" : "ready",
             };
         } catch {
             return null;
@@ -515,7 +549,7 @@ export class WorkspaceManager {
 
     private async writeWorkspaceMetadata(
         sandboxPath: string,
-        metadata: { sourceRootPath: string },
+        metadata: WorkspaceMetadata,
     ): Promise<void> {
         const metadataPath = this.getWorkspaceMetadataPath(sandboxPath);
         await mkdir(path.dirname(metadataPath), { recursive: true });
@@ -542,9 +576,18 @@ export class WorkspaceManager {
         const sandboxRoot = path.dirname(
             path.dirname(path.dirname(sandboxPath)),
         );
+        const relativeWorkspacePath = path.relative(
+            path.resolve(sandboxRoot),
+            path.resolve(sandboxPath),
+        );
         return path.join(
             getWorkspaceMetadataRootPath(sandboxRoot),
-            `${getStableStateKey(sandboxPath)}.json`,
+            `${getStableStateKey(
+                path.join(
+                    canonicalizePathForComparison(sandboxRoot),
+                    relativeWorkspacePath,
+                ),
+            )}.json`,
         );
     }
 
@@ -564,7 +607,7 @@ export class WorkspaceManager {
     }
 
     private rememberSandboxRoot(sandboxRoot: string): void {
-        const resolvedRoot = path.resolve(sandboxRoot);
+        const resolvedRoot = canonicalizePathForComparison(sandboxRoot);
         if (this.knownSandboxRoots.has(resolvedRoot)) {
             return;
         }

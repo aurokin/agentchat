@@ -292,6 +292,43 @@ describe("WorkspaceManager", () => {
             ).toBe("second");
         });
 
+        test("does not reset a copied workspace when the agent rootPath changes only by symlink alias", async () => {
+            const sandboxRoot = makeTempDir("sandbox");
+            const realRoot = makeTempDir("agent-root");
+            const aliasParent = makeTempDir("agent-root-alias");
+            const aliasedRoot = path.join(aliasParent, "linked-root");
+            symlinkSync(realRoot, aliasedRoot);
+            writeFileSync(path.join(realRoot, "file.txt"), "source");
+
+            const agent = makeAgent({
+                id: "my-agent",
+                rootPath: realRoot,
+                workspaceMode: "copy-on-conversation",
+            });
+            const manager = createWorkspaceManager(() =>
+                makeConfig({ sandboxRoot }),
+            );
+
+            const first = await manager.ensureWorkspaceState(
+                agent,
+                "user-1",
+                "conv-1",
+            );
+            writeFileSync(path.join(first.path, "file.txt"), "modified");
+
+            const second = await manager.ensureWorkspaceState(
+                { ...agent, rootPath: aliasedRoot },
+                "user-1",
+                "conv-1",
+            );
+
+            expect(second.wasReset).toBe(false);
+            expect(second.path).toBe(first.path);
+            expect(
+                readFileSync(path.join(second.path, "file.txt"), "utf8"),
+            ).toBe("modified");
+        });
+
         test("recreates an existing copied sandbox when the target becomes a symlink", async () => {
             const sandboxRoot = makeTempDir("sandbox");
             const rootPath = makeTempDir("agent-root");
@@ -622,6 +659,55 @@ describe("WorkspaceManager", () => {
             );
         });
 
+        test("recreates copied workspaces with incomplete metadata", async () => {
+            const sandboxRoot = makeTempDir("sandbox");
+            const rootPath = makeTempDir("agent-root");
+            writeFileSync(path.join(rootPath, "file.txt"), "source");
+
+            const agent = makeAgent({
+                id: "my-agent",
+                rootPath,
+                workspaceMode: "copy-on-conversation",
+            });
+            const manager = createWorkspaceManager(() =>
+                makeConfig({ sandboxRoot }),
+            );
+
+            const workspace = await manager.ensureWorkspace(
+                agent,
+                "user-1",
+                "conv-1",
+            );
+            writeFileSync(path.join(workspace, "file.txt"), "stale");
+            const metadataRoot = getWorkspaceMetadataRootPath(sandboxRoot);
+            const metadataFiles = readdirSync(metadataRoot);
+            expect(metadataFiles).toHaveLength(1);
+            const metadataFile = metadataFiles[0]!;
+            writeFileSync(
+                path.join(metadataRoot, metadataFile),
+                JSON.stringify(
+                    {
+                        sourceRootPath: rootPath,
+                        state: "creating",
+                    },
+                    null,
+                    2,
+                ) + "\n",
+            );
+
+            const workspaceState = await manager.ensureWorkspaceState(
+                agent,
+                "user-1",
+                "conv-1",
+            );
+
+            expect(workspaceState.path).toBe(workspace);
+            expect(workspaceState.wasReset).toBe(true);
+            expect(readFileSync(path.join(workspace, "file.txt"), "utf8")).toBe(
+                "source",
+            );
+        });
+
         test("reports reset when recreating a missing copied workspace from metadata", async () => {
             const sandboxRoot = makeTempDir("sandbox");
             const rootPath = makeTempDir("agent-root");
@@ -733,6 +819,60 @@ describe("WorkspaceManager", () => {
                     path.resolve(secondSandboxRoot),
                 ]),
             );
+        });
+
+        test("keeps metadata lookup stable when sandboxRoot changes only by symlink alias", async () => {
+            const realSandboxRoot = makeTempDir("sandbox-real");
+            const aliasParent = makeTempDir("sandbox-alias");
+            const aliasedSandboxRoot = path.join(aliasParent, "linked-sandbox");
+            symlinkSync(realSandboxRoot, aliasedSandboxRoot);
+            const rootPath = makeTempDir("agent-root");
+            writeFileSync(path.join(rootPath, "file.txt"), "source");
+
+            const agent = makeAgent({
+                id: "my-agent",
+                rootPath,
+                workspaceMode: "copy-on-conversation",
+            });
+            const rootsRegistryPath = path.join(
+                makeTempDir("sandbox-roots-registry"),
+                "sandbox-roots.json",
+            );
+            const config = makeConfig({
+                sandboxRoot: aliasedSandboxRoot,
+                agents: [agent],
+            });
+            const manager = new WorkspaceManager({
+                getConfig: () => config,
+                rootsRegistryPath,
+            });
+
+            const originalWorkspace = await manager.ensureWorkspace(
+                agent,
+                "user-1",
+                "conv-1",
+            );
+            writeFileSync(path.join(originalWorkspace, "file.txt"), "modified");
+
+            config.sandboxRoot = realSandboxRoot;
+
+            const restartedManager = new WorkspaceManager({
+                getConfig: () => config,
+                rootsRegistryPath,
+            });
+            const workspaceState = await restartedManager.ensureWorkspaceState(
+                agent,
+                "user-1",
+                "conv-1",
+            );
+
+            expect(workspaceState.wasReset).toBe(false);
+            expect(
+                readFileSync(
+                    path.join(workspaceState.path, "file.txt"),
+                    "utf8",
+                ),
+            ).toBe("modified");
         });
 
         test("refuses to delete paths with traversal segments", async () => {
@@ -1058,6 +1198,42 @@ describe("WorkspaceManager", () => {
             expect(
                 readFileSync(path.join(unmanagedPath, "keep.txt"), "utf8"),
             ).toBe("keep");
+        });
+
+        test("keeps workspaces that are still being created during reconciliation", async () => {
+            const sandboxRoot = makeTempDir("sandbox");
+            const rootPath = makeTempDir("agent-root");
+            writeFileSync(path.join(rootPath, "file.txt"), "data");
+
+            const agent = makeAgent({
+                id: "agent-a",
+                rootPath,
+                workspaceMode: "copy-on-conversation",
+            });
+            const manager = createWorkspaceManager(() =>
+                makeConfig({ sandboxRoot, agents: [agent] }),
+            );
+
+            const workspace = await manager.ensureWorkspace(
+                agent,
+                "user-1",
+                "conv-1",
+            );
+            (
+                manager as unknown as {
+                    pendingWorkspaceCreations: Map<
+                        string,
+                        Promise<{ path: string; wasReset: boolean }>
+                    >;
+                }
+            ).pendingWorkspaceCreations.set(
+                "agent-a:user-1:conv-1",
+                new Promise(() => {}),
+            );
+
+            await manager.reconcile(new Set());
+
+            expect(existsSync(workspace)).toBe(true);
         });
     });
 });
