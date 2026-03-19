@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
     existsSync,
     mkdirSync,
@@ -18,23 +19,52 @@ import {
 } from "./sandboxPaths.ts";
 
 const DEFAULT_SANDBOX_ROOTS_REGISTRY_PATH = path.join(
-    os.tmpdir(),
-    "agentchat",
-    "sandbox-roots.json",
+    os.homedir(),
+    ".agentchat",
+    "state",
+    "sandbox-roots",
+    "default.json",
 );
+
+function getStableStateKey(value: string): string {
+    return createHash("sha256")
+        .update(path.resolve(value))
+        .digest("hex")
+        .slice(0, 16);
+}
+
+function sanitizeStateFileComponent(value: string): string {
+    return value.replace(/[^a-zA-Z0-9._-]/g, "_");
+}
 
 export function getSandboxRootsRegistryPath(configPath: string): string {
     const resolvedConfigPath = path.resolve(configPath);
-    const configBasename = path.basename(resolvedConfigPath);
+    const configBasename = sanitizeStateFileComponent(
+        path.basename(resolvedConfigPath),
+    );
     return path.join(
-        path.dirname(resolvedConfigPath),
-        `.${configBasename}.sandbox-roots.json`,
+        os.homedir(),
+        ".agentchat",
+        "state",
+        "sandbox-roots",
+        `${configBasename}-${getStableStateKey(resolvedConfigPath)}.json`,
+    );
+}
+
+export function getWorkspaceMetadataRootPath(
+    rootsRegistryPath: string,
+): string {
+    const resolvedRegistryPath = path.resolve(rootsRegistryPath);
+    return path.join(
+        path.dirname(resolvedRegistryPath),
+        `${path.basename(resolvedRegistryPath, path.extname(resolvedRegistryPath))}.workspace-metadata`,
     );
 }
 
 export class WorkspaceManager {
     private readonly getConfig: () => AgentchatConfig;
     private readonly rootsRegistryPath: string;
+    private readonly workspaceMetadataRootPath: string;
     private readonly pendingWorkspaceCreations = new Map<
         string,
         Promise<string>
@@ -48,6 +78,9 @@ export class WorkspaceManager {
         this.getConfig = params.getConfig;
         this.rootsRegistryPath = path.resolve(
             params.rootsRegistryPath ?? DEFAULT_SANDBOX_ROOTS_REGISTRY_PATH,
+        );
+        this.workspaceMetadataRootPath = getWorkspaceMetadataRootPath(
+            this.rootsRegistryPath,
         );
         this.loadKnownSandboxRoots();
         this.rememberSandboxRoot(this.getConfig().sandboxRoot);
@@ -202,6 +235,7 @@ export class WorkspaceManager {
         }
 
         if (!existsSync(target)) {
+            await this.deleteWorkspaceMetadata(target);
             return;
         }
 
@@ -213,6 +247,7 @@ export class WorkspaceManager {
         }
 
         await rm(target, { recursive: true, force: true });
+        await this.deleteWorkspaceMetadata(target);
         console.log(`[agentchat-server] deleted sandbox workspace: ${target}`);
     }
 
@@ -269,6 +304,7 @@ export class WorkspaceManager {
                                     recursive: true,
                                     force: true,
                                 });
+                                await this.deleteWorkspaceMetadata(target);
                                 console.log(
                                     `[agentchat-server] reconcile: removed orphaned sandbox: ${target}`,
                                 );
@@ -327,6 +363,7 @@ export class WorkspaceManager {
             } catch {
                 // best-effort cleanup
             }
+            await this.deleteWorkspaceMetadata(sandboxPath);
             throw error;
         }
         console.log(
@@ -365,7 +402,7 @@ export class WorkspaceManager {
     ): Promise<{ sourceRootPath: string } | null> {
         try {
             const raw = await readFile(
-                path.join(sandboxPath, ".agentchat-sandbox.json"),
+                this.getWorkspaceMetadataPath(sandboxPath),
                 "utf8",
             );
             const parsed = JSON.parse(raw) as { sourceRootPath?: unknown };
@@ -384,10 +421,25 @@ export class WorkspaceManager {
         sandboxPath: string,
         metadata: { sourceRootPath: string },
     ): Promise<void> {
+        const metadataPath = this.getWorkspaceMetadataPath(sandboxPath);
+        await mkdir(path.dirname(metadataPath), { recursive: true });
         await writeFile(
-            path.join(sandboxPath, ".agentchat-sandbox.json"),
+            metadataPath,
             `${JSON.stringify(metadata, null, 2)}\n`,
             "utf8",
+        );
+    }
+
+    private async deleteWorkspaceMetadata(sandboxPath: string): Promise<void> {
+        await rm(this.getWorkspaceMetadataPath(sandboxPath), {
+            force: true,
+        });
+    }
+
+    private getWorkspaceMetadataPath(sandboxPath: string): string {
+        return path.join(
+            this.workspaceMetadataRootPath,
+            `${getStableStateKey(sandboxPath)}.json`,
         );
     }
 

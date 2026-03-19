@@ -2,18 +2,20 @@ import {
     existsSync,
     mkdirSync,
     mkdtempSync,
+    readdirSync,
     rmSync,
     symlinkSync,
     writeFileSync,
     readFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import path from "node:path";
 
 import { afterEach, describe, expect, test } from "bun:test";
 
 import {
     getSandboxRootsRegistryPath,
+    getWorkspaceMetadataRootPath,
     WorkspaceManager,
 } from "../workspaceManager.ts";
 import type { AgentchatConfig, AgentConfig } from "../config.ts";
@@ -88,12 +90,26 @@ afterEach(() => {
 
 describe("WorkspaceManager", () => {
     test("scopes the default sandbox root registry path by config path", () => {
+        const stateDir = path.join(
+            homedir(),
+            ".agentchat",
+            "state",
+            "sandbox-roots",
+        );
+        const devPath = getSandboxRootsRegistryPath(
+            "/tmp/agentchat/dev.config.json",
+        );
+        const stagingPath = getSandboxRootsRegistryPath(
+            "/tmp/agentchat/staging.config.json",
+        );
+
+        expect(path.dirname(devPath)).toBe(stateDir);
+        expect(path.dirname(stagingPath)).toBe(stateDir);
+        expect(devPath).not.toBe(stagingPath);
+        expect(devPath).not.toStartWith("/tmp/agentchat/");
         expect(
             getSandboxRootsRegistryPath("/tmp/agentchat/dev.config.json"),
-        ).toBe("/tmp/agentchat/.dev.config.json.sandbox-roots.json");
-        expect(
-            getSandboxRootsRegistryPath("/tmp/agentchat/staging.config.json"),
-        ).toBe("/tmp/agentchat/.staging.config.json.sandbox-roots.json");
+        ).toBe(devPath);
     });
 
     describe("ensureWorkspace", () => {
@@ -118,6 +134,10 @@ describe("WorkspaceManager", () => {
         test("copies rootPath to sandbox for copy-on-conversation mode", async () => {
             const sandboxRoot = makeTempDir("sandbox");
             const rootPath = makeTempDir("agent-root");
+            const rootsRegistryPath = path.join(
+                makeTempDir("sandbox-roots-registry"),
+                "sandbox-roots.json",
+            );
             writeFileSync(path.join(rootPath, "README.md"), "hello");
             mkdirSync(path.join(rootPath, "src"));
             writeFileSync(path.join(rootPath, "src", "index.ts"), "export {}");
@@ -127,9 +147,10 @@ describe("WorkspaceManager", () => {
                 rootPath,
                 workspaceMode: "copy-on-conversation",
             });
-            const manager = createWorkspaceManager(() =>
-                makeConfig({ sandboxRoot }),
-            );
+            const manager = new WorkspaceManager({
+                getConfig: () => makeConfig({ sandboxRoot }),
+                rootsRegistryPath,
+            });
 
             const result = await manager.ensureWorkspace(
                 agent,
@@ -147,6 +168,13 @@ describe("WorkspaceManager", () => {
             expect(
                 readFileSync(path.join(result, "src", "index.ts"), "utf8"),
             ).toBe("export {}");
+            expect(
+                existsSync(path.join(result, ".agentchat-sandbox.json")),
+            ).toBe(false);
+            expect(
+                readdirSync(getWorkspaceMetadataRootPath(rootsRegistryPath))
+                    .length,
+            ).toBe(1);
         });
 
         test("encodes filesystem-unsafe user ids in sandbox paths", async () => {
