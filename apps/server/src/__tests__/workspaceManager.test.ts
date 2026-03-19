@@ -9,7 +9,7 @@ import {
     writeFileSync,
     readFileSync,
 } from "node:fs";
-import { homedir, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { afterEach, describe, expect, test } from "bun:test";
@@ -90,26 +90,31 @@ afterEach(() => {
 });
 
 describe("WorkspaceManager", () => {
-    test("scopes the default sandbox root registry path by config path", () => {
+    test("scopes the sandbox root registry path by config path within sandbox state", () => {
+        const sandboxRoot = "/tmp/agentchat-sandboxes";
         const stateDir = path.join(
-            homedir(),
-            ".agentchat",
-            "state",
+            sandboxRoot,
+            ".agentchat-state",
             "sandbox-roots",
         );
         const devPath = getSandboxRootsRegistryPath(
             "/tmp/agentchat/dev.config.json",
+            sandboxRoot,
         );
         const stagingPath = getSandboxRootsRegistryPath(
             "/tmp/agentchat/staging.config.json",
+            sandboxRoot,
         );
 
         expect(path.dirname(devPath)).toBe(stateDir);
         expect(path.dirname(stagingPath)).toBe(stateDir);
         expect(devPath).not.toBe(stagingPath);
-        expect(devPath).not.toStartWith("/tmp/agentchat/");
+        expect(devPath).toStartWith("/tmp/agentchat-sandboxes/");
         expect(
-            getSandboxRootsRegistryPath("/tmp/agentchat/dev.config.json"),
+            getSandboxRootsRegistryPath(
+                "/tmp/agentchat/dev.config.json",
+                sandboxRoot,
+            ),
         ).toBe(devPath);
     });
 
@@ -173,8 +178,7 @@ describe("WorkspaceManager", () => {
                 existsSync(path.join(result, ".agentchat-sandbox.json")),
             ).toBe(false);
             expect(
-                readdirSync(getWorkspaceMetadataRootPath(rootsRegistryPath))
-                    .length,
+                readdirSync(getWorkspaceMetadataRootPath(sandboxRoot)).length,
             ).toBe(1);
         });
 
@@ -366,6 +370,7 @@ describe("WorkspaceManager", () => {
                 secondResolved = true;
             });
 
+            await Bun.sleep(0);
             await Bun.sleep(0);
             expect(createCalls).toBe(1);
             await Bun.sleep(0);
@@ -594,7 +599,7 @@ describe("WorkspaceManager", () => {
                 "conv-1",
             );
             writeFileSync(path.join(workspace, "file.txt"), "stale");
-            rmSync(getWorkspaceMetadataRootPath(rootsRegistryPath), {
+            rmSync(getWorkspaceMetadataRootPath(sandboxRoot), {
                 force: true,
                 recursive: true,
             });

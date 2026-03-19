@@ -1540,6 +1540,88 @@ describe("CodexRuntimeManager", () => {
         expect(existsSync(secondSandboxPath)).toBe(true);
     });
 
+    test("does not delete another agent's copied workspace during runtime recycle", async () => {
+        const sandboxRoot = makeTempDir("sandbox");
+        const agentRootA = makeTempDir("agent-root-a");
+        const agentRootB = makeTempDir("agent-root-b");
+        writeFileSync(path.join(agentRootA, "version.txt"), "a");
+        writeFileSync(path.join(agentRootB, "version.txt"), "b");
+
+        const config = createConfig();
+        config.sandboxRoot = sandboxRoot;
+        config.agents = [
+            {
+                ...config.agents[0]!,
+                id: "agent-1",
+                rootPath: agentRootA,
+                workspaceMode: "copy-on-conversation",
+            },
+            {
+                ...config.agents[0]!,
+                id: "agent-2",
+                rootPath: agentRootB,
+                workspaceMode: "copy-on-conversation",
+            },
+        ];
+
+        const workspaceManager = createWorkspaceManager(() => config);
+        const persistence = createPersistence(null);
+        const clients: FakeCodexClient[] = [];
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            workspaceManager,
+            createClient: () => {
+                const client = new FakeCodexClient();
+                clients.push(client);
+                return client;
+            },
+        });
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+        const firstWorkspace = await workspaceManager.ensureWorkspace(
+            config.agents[0]!,
+            "user-1",
+            "chat-1",
+        );
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: {
+                ...createCommand(),
+                payload: {
+                    ...createCommand().payload,
+                    agentId: "agent-2",
+                },
+            },
+            sendEvent: () => undefined,
+        });
+
+        const secondWorkspace = await workspaceManager.ensureWorkspace(
+            config.agents[1]!,
+            "user-1",
+            "chat-1",
+        );
+
+        expect(clients).toHaveLength(2);
+        expect(clients[0]?.stopped).toBe(true);
+        expect(existsSync(firstWorkspace)).toBe(true);
+        expect(existsSync(secondWorkspace)).toBe(true);
+        expect(firstWorkspace).not.toBe(secondWorkspace);
+        expect(
+            readFileSync(path.join(firstWorkspace, "version.txt"), "utf8"),
+        ).toBe("a");
+        expect(
+            readFileSync(path.join(secondWorkspace, "version.txt"), "utf8"),
+        ).toBe("b");
+    });
+
     test("does not resume persisted threads after reopening a shared runtime with a changed rootPath", async () => {
         const firstRoot = makeTempDir("agent-root-a");
         const secondRoot = makeTempDir("agent-root-b");

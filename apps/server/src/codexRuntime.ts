@@ -687,6 +687,7 @@ export class CodexRuntimeManager {
                 if (
                     this.workspaceManager &&
                     existing.agent.workspaceMode === "copy-on-conversation" &&
+                    existing.agent.id === resources.agent.id &&
                     shouldResetConversationState
                 ) {
                     await this.workspaceManager.deleteWorkspacePath({

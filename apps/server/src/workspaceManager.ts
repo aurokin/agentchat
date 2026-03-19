@@ -9,7 +9,6 @@ import {
     writeFileSync,
 } from "node:fs";
 import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 
 import type { AgentchatConfig, AgentConfig } from "./config.ts";
@@ -20,13 +19,9 @@ import {
     getSandboxWorkspacePath,
 } from "./sandboxPaths.ts";
 
-const DEFAULT_SANDBOX_ROOTS_REGISTRY_PATH = path.join(
-    os.homedir(),
-    ".agentchat",
-    "state",
-    "sandbox-roots",
-    "default.json",
-);
+const SANDBOX_STATE_DIRECTORY_NAME = ".agentchat-state";
+const SANDBOX_ROOTS_REGISTRY_DIRECTORY_NAME = "sandbox-roots";
+const WORKSPACE_METADATA_DIRECTORY_NAME = "workspace-metadata";
 
 function getStableStateKey(value: string): string {
     return createHash("sha256")
@@ -39,34 +34,35 @@ function sanitizeStateFileComponent(value: string): string {
     return value.replace(/[^a-zA-Z0-9._-]/g, "_");
 }
 
-export function getSandboxRootsRegistryPath(configPath: string): string {
+export function getSandboxStateRootPath(sandboxRoot: string): string {
+    return path.join(path.resolve(sandboxRoot), SANDBOX_STATE_DIRECTORY_NAME);
+}
+
+export function getSandboxRootsRegistryPath(
+    configPath: string,
+    sandboxRoot: string,
+): string {
     const resolvedConfigPath = path.resolve(configPath);
     const configBasename = sanitizeStateFileComponent(
         path.basename(resolvedConfigPath),
     );
     return path.join(
-        os.homedir(),
-        ".agentchat",
-        "state",
-        "sandbox-roots",
+        getSandboxStateRootPath(sandboxRoot),
+        SANDBOX_ROOTS_REGISTRY_DIRECTORY_NAME,
         `${configBasename}-${getStableStateKey(resolvedConfigPath)}.json`,
     );
 }
 
-export function getWorkspaceMetadataRootPath(
-    rootsRegistryPath: string,
-): string {
-    const resolvedRegistryPath = path.resolve(rootsRegistryPath);
+export function getWorkspaceMetadataRootPath(sandboxRoot: string): string {
     return path.join(
-        path.dirname(resolvedRegistryPath),
-        `${path.basename(resolvedRegistryPath, path.extname(resolvedRegistryPath))}.workspace-metadata`,
+        getSandboxStateRootPath(sandboxRoot),
+        WORKSPACE_METADATA_DIRECTORY_NAME,
     );
 }
 
 export class WorkspaceManager {
     private readonly getConfig: () => AgentchatConfig;
-    private readonly rootsRegistryPath: string;
-    private readonly workspaceMetadataRootPath: string;
+    private readonly getRootsRegistryPath: () => string;
     private readonly pendingWorkspaceCreations = new Map<
         string,
         Promise<{ path: string; wasReset: boolean }>
@@ -76,14 +72,19 @@ export class WorkspaceManager {
     constructor(params: {
         getConfig: () => AgentchatConfig;
         rootsRegistryPath?: string;
+        getRootsRegistryPath?: () => string;
     }) {
         this.getConfig = params.getConfig;
-        this.rootsRegistryPath = path.resolve(
-            params.rootsRegistryPath ?? DEFAULT_SANDBOX_ROOTS_REGISTRY_PATH,
-        );
-        this.workspaceMetadataRootPath = getWorkspaceMetadataRootPath(
-            this.rootsRegistryPath,
-        );
+        this.getRootsRegistryPath =
+            params.getRootsRegistryPath ??
+            (() =>
+                path.resolve(
+                    params.rootsRegistryPath ??
+                        getSandboxRootsRegistryPath(
+                            "default",
+                            this.getConfig().sandboxRoot,
+                        ),
+                ));
         this.loadKnownSandboxRoots();
         this.rememberSandboxRoot(this.getConfig().sandboxRoot);
     }
@@ -336,6 +337,10 @@ export class WorkspaceManager {
             }
 
             for (const agentDir of agentDirs) {
+                if (agentDir === SANDBOX_STATE_DIRECTORY_NAME) {
+                    continue;
+                }
+
                 const agentPath = path.join(sandboxRoot, agentDir);
                 let userDirs: string[];
                 try {
@@ -383,17 +388,27 @@ export class WorkspaceManager {
     }
 
     hasManagedWorkspaces(): boolean {
-        if (!existsSync(this.workspaceMetadataRootPath)) {
-            return false;
+        for (const sandboxRoot of this.getKnownSandboxRoots()) {
+            const workspaceMetadataRootPath =
+                getWorkspaceMetadataRootPath(sandboxRoot);
+            if (!existsSync(workspaceMetadataRootPath)) {
+                continue;
+            }
+
+            try {
+                if (
+                    readdirSync(workspaceMetadataRootPath).some((entry) =>
+                        entry.endsWith(".json"),
+                    )
+                ) {
+                    return true;
+                }
+            } catch {
+                // continue checking other sandbox roots
+            }
         }
 
-        try {
-            return readdirSync(this.workspaceMetadataRootPath).some((entry) =>
-                entry.endsWith(".json"),
-            );
-        } catch {
-            return false;
-        }
+        return false;
     }
 
     private sandboxPath(
@@ -519,8 +534,11 @@ export class WorkspaceManager {
     }
 
     private getWorkspaceMetadataPath(sandboxPath: string): string {
+        const sandboxRoot = path.dirname(
+            path.dirname(path.dirname(sandboxPath)),
+        );
         return path.join(
-            this.workspaceMetadataRootPath,
+            getWorkspaceMetadataRootPath(sandboxRoot),
             `${getStableStateKey(sandboxPath)}.json`,
         );
     }
@@ -556,12 +574,13 @@ export class WorkspaceManager {
     }
 
     private loadKnownSandboxRoots(): void {
-        if (!existsSync(this.rootsRegistryPath)) {
+        const rootsRegistryPath = this.getRootsRegistryPath();
+        if (!existsSync(rootsRegistryPath)) {
             return;
         }
 
         try {
-            const raw = readFileSync(this.rootsRegistryPath, "utf8");
+            const raw = readFileSync(rootsRegistryPath, "utf8");
             const parsed = JSON.parse(raw) as unknown;
             if (!Array.isArray(parsed)) {
                 return;
@@ -574,19 +593,20 @@ export class WorkspaceManager {
             }
         } catch (error) {
             console.error(
-                `[agentchat-server] failed to load sandbox root registry from ${this.rootsRegistryPath}:`,
+                `[agentchat-server] failed to load sandbox root registry from ${rootsRegistryPath}:`,
                 error,
             );
         }
     }
 
     private persistKnownSandboxRoots(): void {
+        const rootsRegistryPath = this.getRootsRegistryPath();
         try {
-            mkdirSync(path.dirname(this.rootsRegistryPath), {
+            mkdirSync(path.dirname(rootsRegistryPath), {
                 recursive: true,
             });
             writeFileSync(
-                this.rootsRegistryPath,
+                rootsRegistryPath,
                 `${JSON.stringify(
                     [...this.knownSandboxRoots].sort((left, right) =>
                         left.localeCompare(right),
@@ -598,7 +618,7 @@ export class WorkspaceManager {
             );
         } catch (error) {
             console.error(
-                `[agentchat-server] failed to persist sandbox root registry to ${this.rootsRegistryPath}:`,
+                `[agentchat-server] failed to persist sandbox root registry to ${rootsRegistryPath}:`,
                 error,
             );
         }
