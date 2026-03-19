@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { z } from "zod";
+import { pathsOverlap } from "./pathComparison.ts";
 import { isSafePathSegment } from "./sandboxPaths.ts";
 
 const GoogleAuthProviderSchema = z.object({
@@ -207,11 +208,7 @@ const AgentchatConfigInputSchema = z
             }
 
             const resolvedRootPath = path.resolve(agent.rootPath);
-            if (
-                resolvedSandboxRoot === resolvedRootPath ||
-                resolvedSandboxRoot.startsWith(resolvedRootPath + path.sep) ||
-                resolvedRootPath.startsWith(resolvedSandboxRoot + path.sep)
-            ) {
+            if (pathsOverlap(resolvedSandboxRoot, resolvedRootPath)) {
                 const effectiveSandboxRoot =
                     config.sandboxRoot ?? DEFAULT_SANDBOX_ROOT;
                 ctx.addIssue({

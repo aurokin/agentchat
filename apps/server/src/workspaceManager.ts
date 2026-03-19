@@ -13,6 +13,7 @@ import os from "node:os";
 import path from "node:path";
 
 import type { AgentchatConfig, AgentConfig } from "./config.ts";
+import { pathsOverlap } from "./pathComparison.ts";
 import {
     getSandboxConversationPathSegment,
     getSandboxUserPathSegment,
@@ -245,11 +246,7 @@ export class WorkspaceManager {
         const config = this.getConfig();
         // Never delete any agent rootPath
         for (const agent of config.agents) {
-            const resolvedRootPath = path.resolve(agent.rootPath);
-            if (
-                target === resolvedRootPath ||
-                resolvedRootPath.startsWith(target + path.sep)
-            ) {
+            if (pathsOverlap(target, agent.rootPath)) {
                 console.error(
                     `[agentchat-server] refused to delete workspace that overlaps agent rootPath: ${target}`,
                 );

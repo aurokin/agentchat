@@ -651,6 +651,32 @@ describe("WorkspaceManager", () => {
             expect(existsSync(nestedRoot)).toBe(true);
         });
 
+        test("refuses to delete agent rootPath through a symlink alias", async () => {
+            const sandboxRoot = makeTempDir("sandbox");
+            const aliasDir = makeTempDir("workspace-alias");
+            const agentId = "nested";
+            const userId = "user";
+            const convId = "conv";
+            const nestedRoot = path.join(sandboxRoot, agentId, userId, convId);
+            mkdirSync(nestedRoot, { recursive: true });
+            writeFileSync(path.join(nestedRoot, "file.txt"), "keep");
+            const aliasPath = path.join(aliasDir, "root-alias");
+            symlinkSync(nestedRoot, aliasPath);
+
+            const agent = makeAgent({
+                id: agentId,
+                rootPath: aliasPath,
+                workspaceMode: "shared",
+            });
+            const manager = createWorkspaceManager(() =>
+                makeConfig({ sandboxRoot, agents: [agent] }),
+            );
+
+            await manager.deleteWorkspace(agentId, userId, convId);
+
+            expect(existsSync(nestedRoot)).toBe(true);
+        });
+
         test("refuses to delete workspaces through symlinked ancestors", async () => {
             const sandboxRoot = makeTempDir("sandbox");
             const outsideDir = makeTempDir("outside");

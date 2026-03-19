@@ -11,11 +11,7 @@ export function getCopyOnConversationAgentIds(
 ): Set<string> {
     return new Set(
         agents
-            .filter(
-                (agent) =>
-                    agent.enabled &&
-                    agent.workspaceMode === "copy-on-conversation",
-            )
+            .filter((agent) => agent.workspaceMode === "copy-on-conversation")
             .map((agent) => agent.id),
     );
 }

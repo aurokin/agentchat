@@ -26,7 +26,7 @@ function makeAgent(overrides: Partial<AgentConfig> = {}): AgentConfig {
 }
 
 describe("workspace reconciliation", () => {
-    test("keeps only enabled copy-on-conversation agents", () => {
+    test("keeps all copy-on-conversation agents regardless of enabled state", () => {
         const copyAgent = makeAgent({
             id: "copy-agent",
             workspaceMode: "copy-on-conversation",
@@ -47,7 +47,7 @@ describe("workspace reconciliation", () => {
                 sharedAgent,
                 disabledCopyAgent,
             ]),
-        ).toEqual(new Set(["copy-agent"]));
+        ).toEqual(new Set(["copy-agent", "disabled-copy-agent"]));
     });
 
     test("filters persisted chat entries to copied workspaces only", () => {

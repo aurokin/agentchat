@@ -1,5 +1,12 @@
 import { describe, expect, mock, test } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+    mkdirSync,
+    mkdtempSync,
+    readFileSync,
+    rmSync,
+    symlinkSync,
+    writeFileSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
@@ -379,6 +386,46 @@ describe("server config", () => {
                 ],
             }),
         ).toThrow(/overlaps with sandboxRoot/);
+    });
+
+    test("rejects sandboxRoot overlaps through symlinked path aliases", () => {
+        const tempDir = mkdtempSync(
+            path.join(os.tmpdir(), "agentchat-config-symlink-"),
+        );
+        const repoRoot = path.join(tempDir, "repo");
+        const aliasParent = path.join(tempDir, "aliases");
+        const sandboxAlias = path.join(aliasParent, "sandboxes");
+        mkdirSync(path.join(repoRoot, "sandboxes"), { recursive: true });
+        mkdirSync(aliasParent, { recursive: true });
+        symlinkSync(path.join(repoRoot, "sandboxes"), sandboxAlias);
+
+        expect(() =>
+            parseConfig({
+                version: 1,
+                sandboxRoot: sandboxAlias,
+                auth: {
+                    defaultProviderId: "local-main",
+                    providers: [
+                        {
+                            id: "local-main",
+                            kind: "local",
+                            enabled: true,
+                            allowSignup: false,
+                        },
+                    ],
+                },
+                providers: exampleConfig.providers,
+                agents: [
+                    {
+                        ...exampleConfig.agents[0],
+                        rootPath: repoRoot,
+                        workspaceMode: "copy-on-conversation",
+                    },
+                ],
+            }),
+        ).toThrow(/overlaps with sandboxRoot/);
+
+        rmSync(tempDir, { recursive: true, force: true });
     });
 
     test("parses local auth config", () => {
