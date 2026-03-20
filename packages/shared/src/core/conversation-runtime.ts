@@ -438,14 +438,18 @@ export type SocketEventResolution =
 
 export function resolveConversationSocketEvent(params: {
     currentChatId: string | null;
+    currentAgentId: string | null;
     event: AgentchatSocketEvent;
     activeRun: ActiveRunState | null;
     messages: Message[];
 }): SocketEventResolution {
     if (
         !params.currentChatId ||
+        !params.currentAgentId ||
         !("conversationId" in params.event.payload) ||
-        params.event.payload.conversationId !== params.currentChatId
+        params.event.payload.conversationId !== params.currentChatId ||
+        !("agentId" in params.event.payload) ||
+        params.event.payload.agentId !== params.currentAgentId
     ) {
         return { type: "ignore" };
     }

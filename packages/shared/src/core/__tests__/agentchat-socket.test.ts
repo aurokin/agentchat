@@ -105,6 +105,7 @@ describe("agentchat socket helpers", () => {
         firstSocket.emitEvent({
             type: "run.started",
             payload: {
+                agentId: "agent-1",
                 conversationId: "chat-1",
                 runId: "run-1",
                 messageId: "assistant-1",

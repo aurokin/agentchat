@@ -392,6 +392,7 @@ export default function ChatScreen(): ReactElement {
 
             const resolution = resolveConversationSocketEvent({
                 currentChatId: currentChatRef.current?.id ?? null,
+                currentAgentId: currentChatRef.current?.agentId ?? null,
                 event,
                 activeRun: activeRunRef.current,
                 messages: chatMessagesRef.current,

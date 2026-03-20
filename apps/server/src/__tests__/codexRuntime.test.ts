@@ -681,6 +681,7 @@ describe("CodexRuntimeManager", () => {
             {
                 type: "run.started",
                 payload: {
+                    agentId: "agent-1",
                     conversationId: "chat-1",
                     runId: expect.any(String),
                     messageId: "assistant-1",
@@ -689,6 +690,7 @@ describe("CodexRuntimeManager", () => {
             {
                 type: "message.started",
                 payload: {
+                    agentId: "agent-1",
                     conversationId: "chat-1",
                     runId: expect.any(String),
                     messageId: "assistant-1",
@@ -700,6 +702,7 @@ describe("CodexRuntimeManager", () => {
             {
                 type: "message.delta",
                 payload: {
+                    agentId: "agent-1",
                     conversationId: "chat-1",
                     messageId: "assistant-1",
                     delta: "Working on it",
@@ -1595,6 +1598,85 @@ describe("CodexRuntimeManager", () => {
         expect(clients[1]?.stopped).toBe(false);
     });
 
+    test("does not recycle an active runtime during config reload", async () => {
+        const config = createConfig();
+        const clients: FakeCodexClient[] = [];
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: createPersistence(
+                null,
+            ) as unknown as RuntimePersistenceClient,
+            createClient: () => {
+                const client = new FakeCodexClient({ autoComplete: false });
+                clients.push(client);
+                return client;
+            },
+        });
+
+        const firstSendPromise = manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        await waitFor(
+            () =>
+                (
+                    manager as unknown as {
+                        runtimes: Map<
+                            string,
+                            { activeTurn: Record<string, unknown> | null }
+                        >;
+                    }
+                ).runtimes.get(JSON.stringify(["user-1", "agent-1", "chat-1"]))
+                    ?.activeTurn !== null,
+        );
+
+        const currentAgent = config.agents[0];
+        if (!currentAgent) {
+            throw new Error("Expected agent config");
+        }
+
+        config.agents[0] = {
+            ...currentAgent,
+            rootPath: "/tmp/agent-1-next",
+        };
+
+        await expect(
+            manager.sendMessage({
+                userId: "user-1",
+                subscriberId: "socket-1",
+                command: createCommand(),
+                sendEvent: () => undefined,
+            }),
+        ).rejects.toThrow("Conversation already has an active run.");
+
+        expect(clients).toHaveLength(1);
+        expect(clients[0]?.stopped).toBe(false);
+        expect(
+            (
+                manager as unknown as {
+                    runtimes: Map<
+                        string,
+                        { activeTurn: Record<string, unknown> | null }
+                    >;
+                }
+            ).runtimes.get(JSON.stringify(["user-1", "agent-1", "chat-1"]))
+                ?.activeTurn,
+        ).not.toBeNull();
+
+        clients[0]?.emit({
+            method: "turn/completed",
+            params: {
+                turn: {
+                    status: "completed",
+                },
+            },
+        });
+        await firstSendPromise;
+    });
+
     test("rebuilds copied workspaces when the agent rootPath changes in config", async () => {
         const sandboxRoot = makeTempDir("sandbox");
         const firstRoot = makeTempDir("agent-root-a");
@@ -2330,11 +2412,15 @@ describe("CodexRuntimeManager", () => {
             autoComplete: false,
             initializePromise: initializeDeferred.promise,
         });
+        let createClientCalls = 0;
         const manager = new CodexRuntimeManager({
             getConfig: () => config,
             persistence: persistence as unknown as RuntimePersistenceClient,
             workspaceManager,
-            createClient: () => client,
+            createClient: () => {
+                createClientCalls += 1;
+                return client;
+            },
         });
         const command = createCommand();
         const workspacePath = workspaceManager.getWorkspacePath(
@@ -2373,7 +2459,9 @@ describe("CodexRuntimeManager", () => {
         );
         await deletePromise;
 
-        expect(client.stopped).toBe(true);
+        if (createClientCalls > 0) {
+            expect(client.stopped).toBe(true);
+        }
         expect(client.requests).toEqual([]);
         expect(existsSync(workspacePath)).toBe(false);
         expect(
@@ -2455,5 +2543,65 @@ describe("CodexRuntimeManager", () => {
                 }
             ).runtimes.size,
         ).toBe(0);
+    });
+
+    test("preserves a reused copied workspace when runtime startup fails", async () => {
+        const sandboxRoot = makeTempDir("sandbox");
+        const agentRoot = makeTempDir("agent-root");
+        writeFileSync(path.join(agentRoot, "version.txt"), "first");
+
+        const config = createConfig();
+        config.sandboxRoot = sandboxRoot;
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath: agentRoot,
+            workspaceMode: "copy-on-conversation",
+        };
+
+        const workspaceManager = createWorkspaceManager(() => config);
+        const command = createCommand();
+        const workspaceState = await workspaceManager.ensureWorkspaceState(
+            config.agents[0]!,
+            "user-1",
+            command.payload.conversationId,
+        );
+        const workspacePath = workspaceState.path;
+        writeFileSync(path.join(workspacePath, "user-note.txt"), "keep me");
+
+        const initializeDeferred = createDeferred<void>();
+        let createClientCalls = 0;
+        const client = new FakeCodexClient({
+            autoComplete: false,
+            initializePromise: initializeDeferred.promise,
+        });
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: createPersistence(
+                null,
+            ) as unknown as RuntimePersistenceClient,
+            workspaceManager,
+            createClient: () => {
+                createClientCalls += 1;
+                return client;
+            },
+        });
+
+        const sendPromise = manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "sub-1",
+            command,
+            sendEvent: () => undefined,
+        });
+
+        await waitFor(() => createClientCalls === 1);
+        initializeDeferred.reject(new Error("initialize failed"));
+
+        await expect(sendPromise).rejects.toThrow("initialize failed");
+
+        expect(client.stopped).toBe(true);
+        expect(existsSync(workspacePath)).toBe(true);
+        expect(
+            readFileSync(path.join(workspacePath, "user-note.txt"), "utf8"),
+        ).toBe("keep me");
     });
 });

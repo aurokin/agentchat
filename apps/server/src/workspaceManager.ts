@@ -113,7 +113,7 @@ export class WorkspaceManager {
     private readonly getRootsRegistryPath: () => string;
     private readonly pendingWorkspaceCreations = new Map<
         string,
-        Promise<{ path: string; wasReset: boolean }>
+        Promise<{ path: string; wasReset: boolean; cleanupOnFailure: boolean }>
     >();
     private readonly knownSandboxRoots = new Set<string>();
 
@@ -138,9 +138,13 @@ export class WorkspaceManager {
         agent: AgentConfig,
         userId: string,
         conversationId: string,
-    ): Promise<{ path: string; wasReset: boolean }> {
+    ): Promise<{ path: string; wasReset: boolean; cleanupOnFailure: boolean }> {
         if (agent.workspaceMode === "shared") {
-            return { path: agent.rootPath, wasReset: false };
+            return {
+                path: agent.rootPath,
+                wasReset: false,
+                cleanupOnFailure: false,
+            };
         }
 
         const creationKey = getWorkspaceActiveKey({
@@ -172,7 +176,11 @@ export class WorkspaceManager {
                     ],
                 ))
             ) {
-                return { path: sandboxPath, wasReset: false };
+                return {
+                    path: sandboxPath,
+                    wasReset: false,
+                    cleanupOnFailure: false,
+                };
             }
 
             const canRecoverMissingMetadata =
@@ -216,6 +224,7 @@ export class WorkspaceManager {
                         sandboxPath,
                     ),
                     wasReset: true,
+                    cleanupOnFailure: true,
                 };
             })();
             this.pendingWorkspaceCreations.set(creationKey, recreation);
@@ -231,6 +240,7 @@ export class WorkspaceManager {
             return {
                 path: await this.createWorkspace(agent.rootPath, sandboxPath),
                 wasReset: metadata !== null,
+                cleanupOnFailure: true,
             };
         })();
         this.pendingWorkspaceCreations.set(creationKey, creation);

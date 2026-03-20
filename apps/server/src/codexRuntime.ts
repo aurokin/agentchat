@@ -135,6 +135,18 @@ function createServerEvent(
     return { type, payload };
 }
 
+function createRuntimeServerEvent(
+    runtime: Pick<ConversationRuntime, "agentId" | "conversationId">,
+    type: ServerEvent["type"],
+    payload: Record<string, unknown>,
+): ServerEvent {
+    return createServerEvent(type, {
+        agentId: runtime.agentId,
+        conversationId: runtime.conversationId,
+        ...payload,
+    });
+}
+
 function extractThreadId(result: unknown): string {
     const threadId = (result as { thread?: { id?: unknown } })?.thread?.id;
     invariant(typeof threadId === "string", "Codex thread id missing");
@@ -285,16 +297,14 @@ export class CodexRuntimeManager {
         const runId = crypto.randomUUID();
         this.emitToSubscribers(
             runtime,
-            createServerEvent("run.started", {
-                conversationId: params.command.payload.conversationId,
+            createRuntimeServerEvent(runtime, "run.started", {
                 runId,
                 messageId: params.command.payload.assistantMessageId,
             }),
         );
         this.emitToSubscribers(
             runtime,
-            createServerEvent("message.started", {
-                conversationId: params.command.payload.conversationId,
+            createRuntimeServerEvent(runtime, "message.started", {
                 runId,
                 messageId: params.command.payload.assistantMessageId,
                 messageIndex: 0,
@@ -485,9 +495,7 @@ export class CodexRuntimeManager {
                     });
                     this.emitToSubscribers(
                         runtime,
-                        createServerEvent("run.failed", {
-                            conversationId:
-                                params.command.payload.conversationId,
+                        createRuntimeServerEvent(runtime, "run.failed", {
                             runId,
                             error: {
                                 message: errorMessage,
@@ -631,15 +639,13 @@ export class CodexRuntimeManager {
         }
 
         params.sendEvent(
-            createServerEvent("run.started", {
-                conversationId: runtime.conversationId,
+            createRuntimeServerEvent(runtime, "run.started", {
                 runId: runtime.activeTurn.runId,
                 messageId: runtime.activeTurn.currentMessageId,
             }),
         );
         params.sendEvent(
-            createServerEvent("message.started", {
-                conversationId: runtime.conversationId,
+            createRuntimeServerEvent(runtime, "message.started", {
                 runId: runtime.activeTurn.runId,
                 messageId: runtime.activeTurn.currentMessageId,
                 messageIndex: runtime.activeTurn.currentMessageIndex,
@@ -650,8 +656,7 @@ export class CodexRuntimeManager {
 
         if (runtime.activeTurn.text) {
             params.sendEvent(
-                createServerEvent("message.delta", {
-                    conversationId: runtime.conversationId,
+                createRuntimeServerEvent(runtime, "message.delta", {
                     messageId: runtime.activeTurn.currentMessageId,
                     delta: runtime.activeTurn.text,
                     content: runtime.activeTurn.text,
@@ -802,6 +807,9 @@ export class CodexRuntimeManager {
         let shouldResetConversationState = false;
         if (existing) {
             if (shouldRecycleRuntime(existing, resources, desiredCwd)) {
+                if (existing.activeTurn) {
+                    return { runtime: existing, isNew: false };
+                }
                 shouldResetConversationState = shouldResetRuntimeState(
                     existing,
                     resources,
@@ -837,6 +845,7 @@ export class CodexRuntimeManager {
 
         let cwd = resources.agent.rootPath;
         let client: CodexClient | null = null;
+        let cleanupWorkspaceOnFailure = false;
         try {
             const workspaceState = this.workspaceManager
                 ? await this.workspaceManager.ensureWorkspaceState(
@@ -844,8 +853,13 @@ export class CodexRuntimeManager {
                       params.userId,
                       params.command.payload.conversationId,
                   )
-                : { path: resources.agent.rootPath, wasReset: false };
+                : {
+                      path: resources.agent.rootPath,
+                      wasReset: false,
+                      cleanupOnFailure: false,
+                  };
             cwd = workspaceState.path;
+            cleanupWorkspaceOnFailure = workspaceState.cleanupOnFailure;
             await this.throwIfRuntimeInitializationCancelled({
                 initializationState,
                 client: null,
@@ -853,6 +867,7 @@ export class CodexRuntimeManager {
                 userId: params.userId,
                 conversationId: params.command.payload.conversationId,
                 cwd,
+                cleanupWorkspace: cleanupWorkspaceOnFailure,
             });
             const workspaceIdentity = getRuntimeWorkspaceIdentity(
                 resources.agent,
@@ -871,6 +886,7 @@ export class CodexRuntimeManager {
                 userId: params.userId,
                 conversationId: params.command.payload.conversationId,
                 cwd,
+                cleanupWorkspace: cleanupWorkspaceOnFailure,
             });
             const persistedState = await this.readConversationPersistenceState({
                 userId: params.userId,
@@ -885,6 +901,7 @@ export class CodexRuntimeManager {
                 userId: params.userId,
                 conversationId: params.command.payload.conversationId,
                 cwd,
+                cleanupWorkspace: cleanupWorkspaceOnFailure,
             });
             invariant(
                 persistedState,
@@ -917,6 +934,7 @@ export class CodexRuntimeManager {
                 userId: params.userId,
                 conversationId: params.command.payload.conversationId,
                 cwd,
+                cleanupWorkspace: cleanupWorkspaceOnFailure,
             });
 
             const runtime: ConversationRuntime = {
@@ -959,6 +977,7 @@ export class CodexRuntimeManager {
                     conversationId: params.command.payload.conversationId,
                     cwd,
                     client,
+                    cleanupWorkspace: cleanupWorkspaceOnFailure,
                 });
             }
             throw error;
@@ -972,6 +991,7 @@ export class CodexRuntimeManager {
         userId: string;
         conversationId: string;
         cwd: string;
+        cleanupWorkspace: boolean;
     }): Promise<void> {
         const cancelReason = params.initializationState.cancelReason;
         if (!cancelReason) {
@@ -980,6 +1000,7 @@ export class CodexRuntimeManager {
 
         params.client?.stop();
         if (
+            params.cleanupWorkspace &&
             this.workspaceManager &&
             params.agent.workspaceMode === "copy-on-conversation"
         ) {
@@ -998,9 +1019,11 @@ export class CodexRuntimeManager {
         conversationId: string;
         cwd: string;
         client: CodexClient | null;
+        cleanupWorkspace: boolean;
     }): Promise<void> {
         params.client?.stop();
         if (
+            params.cleanupWorkspace &&
             this.workspaceManager &&
             params.agent.workspaceMode === "copy-on-conversation"
         ) {
@@ -1235,8 +1258,7 @@ export class CodexRuntimeManager {
             if (activeTurn.text) {
                 this.emitToSubscribers(
                     runtime,
-                    createServerEvent("message.completed", {
-                        conversationId: runtime.conversationId,
+                    createRuntimeServerEvent(runtime, "message.completed", {
                         messageId: activeTurn.currentMessageId,
                         content: activeTurn.text,
                     }),
@@ -1267,8 +1289,7 @@ export class CodexRuntimeManager {
 
             this.emitToSubscribers(
                 runtime,
-                createServerEvent("run.failed", {
-                    conversationId: runtime.conversationId,
+                createRuntimeServerEvent(runtime, "run.failed", {
                     runId: activeTurn.runId,
                     error: {
                         message: error.message,
@@ -1347,8 +1368,7 @@ export class CodexRuntimeManager {
 
                 this.emitToSubscribers(
                     runtime,
-                    createServerEvent("message.started", {
-                        conversationId: runtime.conversationId,
+                    createRuntimeServerEvent(runtime, "message.started", {
                         runId: activeTurn.runId,
                         messageId: activeTurn.currentMessageId,
                         messageIndex: activeTurn.currentMessageIndex,
@@ -1361,8 +1381,7 @@ export class CodexRuntimeManager {
                 activeTurn.lastPersistedContent = activeTurn.text;
                 this.emitToSubscribers(
                     runtime,
-                    createServerEvent("message.delta", {
-                        conversationId: runtime.conversationId,
+                    createRuntimeServerEvent(runtime, "message.delta", {
                         messageId: activeTurn.currentMessageId,
                         delta,
                         content: activeTurn.text,
@@ -1415,8 +1434,7 @@ export class CodexRuntimeManager {
             activeTurn.text += delta;
             this.emitToSubscribers(
                 runtime,
-                createServerEvent("message.delta", {
-                    conversationId: runtime.conversationId,
+                createRuntimeServerEvent(runtime, "message.delta", {
                     messageId: activeTurn.currentMessageId,
                     delta,
                     content: activeTurn.text,
@@ -1485,8 +1503,7 @@ export class CodexRuntimeManager {
 
         this.emitToSubscribers(
             runtime,
-            createServerEvent("message.completed", {
-                conversationId: runtime.conversationId,
+            createRuntimeServerEvent(runtime, "message.completed", {
                 messageId: previousMessageId,
                 content: previousContent,
             }),
@@ -1500,8 +1517,7 @@ export class CodexRuntimeManager {
 
         this.emitToSubscribers(
             runtime,
-            createServerEvent("message.started", {
-                conversationId: runtime.conversationId,
+            createRuntimeServerEvent(runtime, "message.started", {
                 runId: activeTurn.runId,
                 messageId: activeTurn.currentMessageId,
                 messageIndex: activeTurn.currentMessageIndex,
@@ -1562,8 +1578,7 @@ export class CodexRuntimeManager {
     ): Promise<void> {
         this.emitToSubscribers(
             runtime,
-            createServerEvent("message.completed", {
-                conversationId: runtime.conversationId,
+            createRuntimeServerEvent(runtime, "message.completed", {
                 messageId: activeTurn.currentMessageId,
                 content: activeTurn.text,
             }),
@@ -1604,8 +1619,7 @@ export class CodexRuntimeManager {
                 });
             this.emitToSubscribers(
                 runtime,
-                createServerEvent("run.completed", {
-                    conversationId: runtime.conversationId,
+                createRuntimeServerEvent(runtime, "run.completed", {
                     runId: activeTurn.runId,
                 }),
             );
@@ -1637,8 +1651,7 @@ export class CodexRuntimeManager {
                 });
             this.emitToSubscribers(
                 runtime,
-                createServerEvent("run.interrupted", {
-                    conversationId: runtime.conversationId,
+                createRuntimeServerEvent(runtime, "run.interrupted", {
                     runId: activeTurn.runId,
                 }),
             );
@@ -1676,8 +1689,7 @@ export class CodexRuntimeManager {
             });
         this.emitToSubscribers(
             runtime,
-            createServerEvent("run.failed", {
-                conversationId: runtime.conversationId,
+            createRuntimeServerEvent(runtime, "run.failed", {
                 runId: activeTurn.runId,
                 error: {
                     message: errorMessage,

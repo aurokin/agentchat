@@ -450,6 +450,7 @@ describe("conversation runtime controller", () => {
         const event: AgentchatSocketEvent = {
             type: "run.started",
             payload: {
+                agentId: "agent-1",
                 conversationId: "chat-1",
                 runId: "run-1",
                 messageId: "assistant-1",
@@ -459,6 +460,7 @@ describe("conversation runtime controller", () => {
         expect(
             resolveConversationSocketEvent({
                 currentChatId: "chat-1",
+                currentAgentId: "agent-1",
                 event,
                 activeRun: null,
                 messages,
@@ -484,6 +486,7 @@ describe("conversation runtime controller", () => {
         const event: AgentchatSocketEvent = {
             type: "message.started",
             payload: {
+                agentId: "agent-1",
                 conversationId: "chat-1",
                 runId: "run-1",
                 messageId: "assistant-2",
@@ -498,6 +501,7 @@ describe("conversation runtime controller", () => {
         expect(
             resolveConversationSocketEvent({
                 currentChatId: "chat-1",
+                currentAgentId: "agent-1",
                 event,
                 activeRun: {
                     conversationId: "chat-1",
@@ -544,6 +548,7 @@ describe("conversation runtime controller", () => {
         const event: AgentchatSocketEvent = {
             type: "run.failed",
             payload: {
+                agentId: "agent-1",
                 conversationId: "chat-1",
                 runId: "run-1",
                 error: {
@@ -555,6 +560,7 @@ describe("conversation runtime controller", () => {
         expect(
             resolveConversationSocketEvent({
                 currentChatId: "chat-1",
+                currentAgentId: "agent-1",
                 event,
                 activeRun: {
                     conversationId: "chat-1",
@@ -590,7 +596,8 @@ describe("conversation runtime controller", () => {
         const event: AgentchatSocketEvent = {
             type: "message.delta",
             payload: {
-                conversationId: "chat-2",
+                agentId: "agent-2",
+                conversationId: "chat-1",
                 messageId: "assistant-1",
                 delta: "x",
                 content: "x",
@@ -600,6 +607,7 @@ describe("conversation runtime controller", () => {
         expect(
             resolveConversationSocketEvent({
                 currentChatId: "chat-1",
+                currentAgentId: "agent-1",
                 event,
                 activeRun: {
                     conversationId: "chat-1",
