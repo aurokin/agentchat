@@ -294,7 +294,7 @@ describe("runtime ingress", () => {
         const byLocalIdCollect = mock(async () => []);
         const byUserCollect = mock(async () => [
             {
-                _id: "chats:legacy",
+                _id: "legacy-chat",
                 agentId: "agent-a",
                 userId: "users:test",
                 localId: undefined,
@@ -323,7 +323,7 @@ describe("runtime ingress", () => {
             runHandler(chatExistsByLocalId as unknown as HandlerExport, ctx, {
                 userId: "users:test",
                 agentId: "agent-a",
-                localId: "chats:legacy",
+                localId: "legacy-chat",
             }),
         ).resolves.toBe(true);
     });
