@@ -406,6 +406,7 @@ export default function ChatScreen(): ReactElement {
                     flushPendingMobileConversationInterrupt({
                         pendingInterrupt: pendingInterruptRef.current,
                         activeRun: resolution.activeRun,
+                        agentId: currentChatRef.current?.agentId ?? null,
                         sendCommand: (command) => {
                             socketClient.send(command);
                         },
@@ -639,6 +640,7 @@ export default function ChatScreen(): ReactElement {
                         conversationSubscriptionCleanupRef.current =
                             socketClient.subscribeToConversation(
                                 currentChat.id,
+                                currentChat.agentId,
                             );
                     }
                     try {
@@ -715,6 +717,7 @@ export default function ChatScreen(): ReactElement {
     const handleCancel = useCallback(() => {
         const result = requestMobileConversationInterrupt({
             activeRun,
+            agentId: currentChat?.agentId ?? null,
             isLoading,
             queuePendingInterrupt: () => {
                 pendingInterruptRef.current = true;
@@ -726,7 +729,7 @@ export default function ChatScreen(): ReactElement {
         if (result.error) {
             setError(result.error);
         }
-    }, [activeRun, isLoading, socketClient]);
+    }, [activeRun, currentChat?.agentId, isLoading, socketClient]);
 
     const handleDeleteChat = async () => {
         const fallbackChatId = chats.find((chat) => chat.id !== chatId)?.id;

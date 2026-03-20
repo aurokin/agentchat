@@ -113,6 +113,7 @@ describe("RuntimePersistenceClient", () => {
         const client = new RuntimePersistenceClient();
         const result = await client.readRuntimeBinding({
             userId: "user-1",
+            agentId: "agent-1",
             conversationLocalId: "chat-1",
         });
 
@@ -133,6 +134,7 @@ describe("RuntimePersistenceClient", () => {
         const client = new RuntimePersistenceClient();
         const result = await client.readRuntimeBinding({
             userId: "user-1",
+            agentId: "agent-1",
             conversationLocalId: "chat-1",
         });
 

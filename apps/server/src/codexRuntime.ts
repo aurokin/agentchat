@@ -80,8 +80,43 @@ function invariant(condition: unknown, message: string): asserts condition {
     }
 }
 
-function getRuntimeKey(userId: string, conversationId: string): string {
-    return `${userId}:${conversationId}`;
+function getRuntimeKey(
+    userId: string,
+    agentId: string,
+    conversationId: string,
+): string {
+    return JSON.stringify([userId, agentId, conversationId]);
+}
+
+function runtimeKeyMatchesConversation(params: {
+    runtimeKey: string;
+    conversationId: string;
+    agentId?: string;
+}): boolean {
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(params.runtimeKey);
+    } catch {
+        return false;
+    }
+
+    if (!Array.isArray(parsed) || parsed.length !== 3) {
+        return false;
+    }
+
+    const [, keyAgentId, keyConversationId] = parsed;
+    if (
+        typeof keyAgentId !== "string" ||
+        typeof keyConversationId !== "string"
+    ) {
+        return false;
+    }
+
+    if (keyConversationId !== params.conversationId) {
+        return false;
+    }
+
+    return params.agentId === undefined || keyAgentId === params.agentId;
 }
 
 function createServerEvent(
@@ -191,6 +226,10 @@ export class CodexRuntimeManager {
         string,
         Map<string, RuntimeSubscriber>
     >();
+    private readonly pendingRuntimeInitializations = new Map<
+        string,
+        Promise<{ runtime: ConversationRuntime; isNew: boolean }>
+    >();
     private readonly getConfig: () => AgentchatConfig;
     private readonly persistence: RuntimePersistenceClient;
     private readonly createClient: CreateCodexClient;
@@ -289,6 +328,7 @@ export class CodexRuntimeManager {
                     const startedAt = Date.now();
                     await this.persistence.runtimeBinding({
                         userId: params.userId,
+                        agentId: runtime.agentId,
                         conversationLocalId:
                             params.command.payload.conversationId,
                         provider: runtime.provider.id,
@@ -333,6 +373,7 @@ export class CodexRuntimeManager {
 
                     await this.persistence.runStarted({
                         userId: params.userId,
+                        agentId: runtime.agentId,
                         conversationLocalId:
                             params.command.payload.conversationId,
                         triggerMessageLocalId:
@@ -372,6 +413,7 @@ export class CodexRuntimeManager {
                         try {
                             await this.persistence.runFailed({
                                 userId: failedTurn.userId,
+                                agentId: runtime.agentId,
                                 conversationLocalId:
                                     params.command.payload.conversationId,
                                 assistantMessageLocalId:
@@ -392,6 +434,7 @@ export class CodexRuntimeManager {
                     void this.persistence
                         .runtimeBinding({
                             userId: params.userId,
+                            agentId: runtime.agentId,
                             conversationLocalId:
                                 params.command.payload.conversationId,
                             provider: runtime.provider.id,
@@ -420,8 +463,13 @@ export class CodexRuntimeManager {
                                 persistError,
                             );
                         });
-                    runtime.client.stop();
-                    this.runtimes.delete(runtime.key);
+                    this.disposeRuntime(runtime, {
+                        removeFromMap: true,
+                        reason:
+                            error instanceof Error
+                                ? error
+                                : new Error(errorMessage),
+                    });
                     this.emitToSubscribers(
                         runtime,
                         createServerEvent("run.failed", {
@@ -446,9 +494,10 @@ export class CodexRuntimeManager {
     async interrupt(params: {
         userId: string;
         conversationId: string;
+        agentId: string;
     }): Promise<void> {
         const runtime = this.runtimes.get(
-            getRuntimeKey(params.userId, params.conversationId),
+            getRuntimeKey(params.userId, params.agentId, params.conversationId),
         );
         if (!runtime?.activeTurn?.turnId) {
             return;
@@ -487,7 +536,11 @@ export class CodexRuntimeManager {
         }
 
         // If there's a live runtime, verify the agentId matches before tearing down
-        const key = getRuntimeKey(params.userId, params.conversationId);
+        const key = getRuntimeKey(
+            params.userId,
+            params.agentId,
+            params.conversationId,
+        );
         const runtime = this.runtimes.get(key);
         const shouldTearDownRuntime =
             runtime?.agentId === params.agentId || !runtime;
@@ -499,19 +552,10 @@ export class CodexRuntimeManager {
 
         // Tear down any active runtime for this conversation
         if (runtime && shouldTearDownRuntime) {
-            // Settle any in-flight turn so the awaiting sendMessage() resolves
-            if (runtime.activeTurn) {
-                this.cancelPendingMessageDelta(runtime.activeTurn);
-                runtime.activeTurn.reject(
-                    new Error("Conversation deleted during active turn."),
-                );
-                runtime.activeTurn = null;
-            }
-            if (runtime.idleTimer) {
-                clearTimeout(runtime.idleTimer);
-            }
-            runtime.client.stop();
-            this.runtimes.delete(key);
+            this.disposeRuntime(runtime, {
+                removeFromMap: true,
+                reason: new Error("Conversation deleted during active turn."),
+            });
             this.pendingSubscriptions.delete(key);
         }
         if (!runtime) {
@@ -531,10 +575,15 @@ export class CodexRuntimeManager {
     subscribe(params: {
         userId: string;
         conversationId: string;
+        agentId: string;
         subscriberId: string;
         sendEvent: (event: ServerEvent) => void;
     }): Promise<void> | void {
-        const key = getRuntimeKey(params.userId, params.conversationId);
+        const key = getRuntimeKey(
+            params.userId,
+            params.agentId,
+            params.conversationId,
+        );
         const runtime = this.runtimes.get(key);
         if (!runtime) {
             this.addPendingSubscription(
@@ -545,6 +594,7 @@ export class CodexRuntimeManager {
             return this.recoverOrphanedActiveRun({
                 userId: params.userId,
                 conversationId: params.conversationId,
+                agentId: params.agentId,
             });
         }
 
@@ -607,11 +657,14 @@ export class CodexRuntimeManager {
     unsubscribe(params: {
         subscriberId: string;
         conversationId?: string;
+        agentId?: string;
     }): void {
         for (const runtime of this.runtimes.values()) {
             if (
                 params.conversationId &&
-                runtime.conversationId !== params.conversationId
+                (runtime.conversationId !== params.conversationId ||
+                    (params.agentId !== undefined &&
+                        runtime.agentId !== params.agentId))
             ) {
                 continue;
             }
@@ -635,7 +688,11 @@ export class CodexRuntimeManager {
         for (const [key, subscribers] of this.pendingSubscriptions) {
             if (
                 params.conversationId &&
-                !key.endsWith(`:${params.conversationId}`)
+                !runtimeKeyMatchesConversation({
+                    runtimeKey: key,
+                    conversationId: params.conversationId,
+                    agentId: params.agentId,
+                })
             ) {
                 continue;
             }
@@ -665,8 +722,33 @@ export class CodexRuntimeManager {
         const resources = resolveRuntimeResources(config, params.command);
         const key = getRuntimeKey(
             params.userId,
+            params.command.payload.agentId,
             params.command.payload.conversationId,
         );
+        const pendingInitialization =
+            this.pendingRuntimeInitializations.get(key);
+        if (pendingInitialization) {
+            return await pendingInitialization;
+        }
+        const initialization = this.initializeRuntime(params, key);
+        this.pendingRuntimeInitializations.set(key, initialization);
+        try {
+            return await initialization;
+        } finally {
+            this.pendingRuntimeInitializations.delete(key);
+        }
+    }
+
+    private async initializeRuntime(
+        params: {
+            userId: string;
+            command: ConversationSendCommand;
+            sendEvent: (event: ServerEvent) => void;
+        },
+        key: string,
+    ): Promise<{ runtime: ConversationRuntime; isNew: boolean }> {
+        const config = this.getConfig();
+        const resources = resolveRuntimeResources(config, params.command);
         const desiredCwd = getDesiredRuntimeCwd({
             workspaceManager: this.workspaceManager,
             agent: resources.agent,
@@ -682,8 +764,10 @@ export class CodexRuntimeManager {
                     resources,
                     desiredCwd,
                 );
-                existing.client.stop();
-                this.runtimes.delete(key);
+                this.disposeRuntime(existing, {
+                    removeFromMap: true,
+                    reason: new Error("Conversation runtime recycled."),
+                });
                 if (
                     this.workspaceManager &&
                     existing.agent.workspaceMode === "copy-on-conversation" &&
@@ -731,6 +815,7 @@ export class CodexRuntimeManager {
                 ? null
                 : await this.persistence.readRuntimeBinding({
                       userId: params.userId,
+                      agentId: resources.agent.id,
                       conversationLocalId:
                           params.command.payload.conversationId,
                   });
@@ -873,9 +958,11 @@ export class CodexRuntimeManager {
     private async recoverOrphanedActiveRun(params: {
         userId: string;
         conversationId: string;
+        agentId: string;
     }): Promise<void> {
         const persistedBinding = await this.persistence.readRuntimeBinding({
             userId: params.userId,
+            agentId: params.agentId,
             conversationLocalId: params.conversationId,
         });
         if (
@@ -888,6 +975,7 @@ export class CodexRuntimeManager {
 
         await this.persistence.recoverStaleRun({
             userId: params.userId,
+            agentId: params.agentId,
             conversationLocalId: params.conversationId,
             externalRunId: persistedBinding.activeRunId,
             completedAt: Date.now(),
@@ -962,6 +1050,10 @@ export class CodexRuntimeManager {
         runtime: ConversationRuntime,
         error: Error,
     ): void {
+        if (this.runtimes.get(runtime.key) !== runtime) {
+            return;
+        }
+
         if (runtime.idleTimer) {
             clearTimeout(runtime.idleTimer);
             runtime.idleTimer = null;
@@ -988,6 +1080,7 @@ export class CodexRuntimeManager {
             void this.persistence
                 .runFailed({
                     userId: activeTurn.userId,
+                    agentId: runtime.agentId,
                     conversationLocalId: runtime.conversationId,
                     assistantMessageLocalId: activeTurn.currentMessageId,
                     externalRunId: activeTurn.runId,
@@ -1020,6 +1113,7 @@ export class CodexRuntimeManager {
         void this.persistence
             .runtimeBinding({
                 userId: runtime.userId,
+                agentId: runtime.agentId,
                 conversationLocalId: runtime.conversationId,
                 provider: runtime.provider.id,
                 status: "errored",
@@ -1114,6 +1208,7 @@ export class CodexRuntimeManager {
             void this.persistence
                 .messageDelta({
                     userId: activeTurn.userId,
+                    agentId: runtime.agentId,
                     conversationLocalId: runtime.conversationId,
                     assistantMessageLocalId: activeTurn.currentMessageId,
                     externalRunId: activeTurn.runId,
@@ -1249,6 +1344,7 @@ export class CodexRuntimeManager {
         const pendingMessageStartPersistence = this.persistence
             .messageStarted({
                 userId: activeTurn.userId,
+                agentId: runtime.agentId,
                 conversationLocalId: runtime.conversationId,
                 previousAssistantMessageLocalId: previousMessageId,
                 previousCompletedSequence,
@@ -1313,6 +1409,7 @@ export class CodexRuntimeManager {
             void this.persistence
                 .runCompleted({
                     userId: activeTurn.userId,
+                    agentId: runtime.agentId,
                     conversationLocalId: runtime.conversationId,
                     assistantMessageLocalId: activeTurn.currentMessageId,
                     externalRunId: activeTurn.runId,
@@ -1344,6 +1441,7 @@ export class CodexRuntimeManager {
             void this.persistence
                 .runInterrupted({
                     userId: activeTurn.userId,
+                    agentId: runtime.agentId,
                     conversationLocalId: runtime.conversationId,
                     assistantMessageLocalId: activeTurn.currentMessageId,
                     externalRunId: activeTurn.runId,
@@ -1380,6 +1478,7 @@ export class CodexRuntimeManager {
         void this.persistence
             .runFailed({
                 userId: activeTurn.userId,
+                agentId: runtime.agentId,
                 conversationLocalId: runtime.conversationId,
                 assistantMessageLocalId: activeTurn.currentMessageId,
                 externalRunId: activeTurn.runId,
@@ -1416,9 +1515,14 @@ export class CodexRuntimeManager {
         }
 
         runtime.idleTimer = setTimeout(() => {
+            if (this.runtimes.get(runtime.key) !== runtime) {
+                return;
+            }
+
             void this.persistence
                 .runtimeBinding({
                     userId: runtime.userId,
+                    agentId: runtime.agentId,
                     conversationLocalId: runtime.conversationId,
                     provider: runtime.provider.id,
                     status: "expired",
@@ -1497,6 +1601,7 @@ export class CodexRuntimeManager {
 
         await this.persistence.messageDelta({
             userId: activeTurn.userId,
+            agentId: runtime.agentId,
             conversationLocalId: runtime.conversationId,
             assistantMessageLocalId: activeTurn.currentMessageId,
             externalRunId: activeTurn.runId,
@@ -1505,6 +1610,33 @@ export class CodexRuntimeManager {
             delta,
             createdAt: Date.now(),
         });
+    }
+
+    private disposeRuntime(
+        runtime: ConversationRuntime,
+        params: {
+            removeFromMap: boolean;
+            reason: Error;
+        },
+    ): void {
+        if (runtime.idleTimer) {
+            clearTimeout(runtime.idleTimer);
+            runtime.idleTimer = null;
+        }
+
+        if (runtime.activeTurn) {
+            this.cancelPendingMessageDelta(runtime.activeTurn);
+            runtime.activeTurn.reject(params.reason);
+            runtime.activeTurn = null;
+        }
+
+        runtime.client.stop();
+        if (
+            params.removeFromMap &&
+            this.runtimes.get(runtime.key) === runtime
+        ) {
+            this.runtimes.delete(runtime.key);
+        }
     }
 
     private canReuseLegacySharedBinding(

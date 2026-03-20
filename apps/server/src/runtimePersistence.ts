@@ -78,6 +78,7 @@ export class RuntimePersistenceClient {
 
     async readRuntimeBinding(payload: {
         userId: string;
+        agentId: string;
         conversationLocalId: string;
     }): Promise<PersistedRuntimeBinding | null> {
         const response = await this.post(

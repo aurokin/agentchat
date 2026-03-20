@@ -53,11 +53,9 @@ export function BackgroundRuntimeSubscriptions() {
 
         const activeCount = reconcileBackgroundConversationSubscriptions({
             subscriptions: subscriptionsRef.current,
-            desiredConversationIds: activeConversations.map(
-                (entry) => entry.conversationId,
-            ),
-            subscribeToConversation: (conversationId) =>
-                socketClient.subscribeToConversation(conversationId),
+            desiredConversations: activeConversations,
+            subscribeToConversation: ({ conversationId, agentId }) =>
+                socketClient.subscribeToConversation(conversationId, agentId),
         });
 
         if (activeCount === 0) {

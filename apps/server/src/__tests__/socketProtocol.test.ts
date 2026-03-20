@@ -57,6 +57,7 @@ describe("socket protocol parsing", () => {
                     type: "conversation.interrupt",
                     payload: {
                         conversationId: "chat-1",
+                        agentId: "agent-1",
                     },
                 }),
             ),
@@ -65,6 +66,7 @@ describe("socket protocol parsing", () => {
             type: "conversation.interrupt",
             payload: {
                 conversationId: "chat-1",
+                agentId: "agent-1",
             },
         });
     });
@@ -77,6 +79,7 @@ describe("socket protocol parsing", () => {
                     type: "conversation.subscribe",
                     payload: {
                         conversationId: "chat-1",
+                        agentId: "agent-1",
                     },
                 }),
             ),
@@ -85,6 +88,7 @@ describe("socket protocol parsing", () => {
             type: "conversation.subscribe",
             payload: {
                 conversationId: "chat-1",
+                agentId: "agent-1",
             },
         });
     });

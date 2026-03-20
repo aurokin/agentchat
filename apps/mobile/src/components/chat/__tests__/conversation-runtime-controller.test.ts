@@ -135,6 +135,7 @@ describe("mobile conversation runtime controller", () => {
                 content: "",
                 runId: "run-1",
             },
+            agentId: "agent-1",
             sendCommand: () => {
                 throw new Error("cannot interrupt");
             },
@@ -152,6 +153,7 @@ describe("mobile conversation runtime controller", () => {
         expect(
             requestMobileConversationInterrupt({
                 activeRun: null,
+                agentId: "agent-1",
                 isLoading: true,
                 queuePendingInterrupt: () => {
                     calls.push("queued");
@@ -181,6 +183,7 @@ describe("mobile conversation runtime controller", () => {
                     content: "",
                     runId: "run-1",
                 },
+                agentId: "agent-1",
                 sendCommand: (command) => {
                     commands.push(command.type);
                 },

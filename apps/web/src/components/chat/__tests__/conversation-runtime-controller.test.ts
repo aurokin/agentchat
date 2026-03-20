@@ -162,11 +162,14 @@ describe("conversation runtime controller", () => {
     });
 
     test("builds an interrupt command for the active conversation", () => {
-        expect(buildInterruptCommand("chat-1", () => "interrupt-1")).toEqual({
+        expect(
+            buildInterruptCommand("chat-1", "agent-1", () => "interrupt-1"),
+        ).toEqual({
             id: "interrupt-1",
             type: "conversation.interrupt",
             payload: {
                 conversationId: "chat-1",
+                agentId: "agent-1",
             },
         });
     });
@@ -174,12 +177,12 @@ describe("conversation runtime controller", () => {
     test("connects and subscribes the current conversation socket session", async () => {
         const calls: string[] = [];
         const cleanup = connectConversationSocket({
-            currentChatId: "chat-1",
+            currentChat: { id: "chat-1", agentId: "agent-1" },
             dependencies: {
-                subscribeToConversation: (conversationId) => {
-                    calls.push(`subscribe:${conversationId}`);
+                subscribeToConversation: (conversationId, agentId) => {
+                    calls.push(`subscribe:${agentId}:${conversationId}`);
                     return () => {
-                        calls.push(`unsubscribe:${conversationId}`);
+                        calls.push(`unsubscribe:${agentId}:${conversationId}`);
                     };
                 },
                 ensureConnected: async () => {
@@ -189,19 +192,19 @@ describe("conversation runtime controller", () => {
         });
 
         await Promise.resolve();
-        expect(calls).toEqual(["subscribe:chat-1", "ensureConnected"]);
+        expect(calls).toEqual(["subscribe:agent-1:chat-1", "ensureConnected"]);
         cleanup?.();
         expect(calls).toEqual([
-            "subscribe:chat-1",
+            "subscribe:agent-1:chat-1",
             "ensureConnected",
-            "unsubscribe:chat-1",
+            "unsubscribe:agent-1:chat-1",
         ]);
     });
 
     test("reports socket bootstrap failures through the provided error handler", async () => {
         const errors: string[] = [];
         connectConversationSocket({
-            currentChatId: "chat-1",
+            currentChat: { id: "chat-1", agentId: "agent-1" },
             dependencies: {
                 subscribeToConversation: () => () => {},
                 ensureConnected: async () => {
@@ -222,7 +225,7 @@ describe("conversation runtime controller", () => {
 
     test("skips socket setup when no conversation is selected", () => {
         const cleanup = connectConversationSocket({
-            currentChatId: null,
+            currentChat: null,
             dependencies: {
                 subscribeToConversation: () => {
                     throw new Error("should not subscribe");
@@ -367,6 +370,7 @@ describe("conversation runtime controller", () => {
                     content: "",
                     runId: "run-1",
                 },
+                agentId: "agent-1",
                 sendCommand: () => {
                     throw new Error("cannot interrupt");
                 },
@@ -383,6 +387,7 @@ describe("conversation runtime controller", () => {
         expect(
             requestConversationInterrupt({
                 activeRun: null,
+                agentId: "agent-1",
                 isSending: true,
                 queuePendingInterrupt: () => {
                     calls.push("queued");
@@ -412,6 +417,7 @@ describe("conversation runtime controller", () => {
                     content: "",
                     runId: "run-1",
                 },
+                agentId: "agent-1",
                 sendCommand: (command) => {
                     commands.push(command.type);
                 },

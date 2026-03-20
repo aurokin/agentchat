@@ -246,6 +246,7 @@ export function useConversationRuntime({
                     {
                         pendingInterrupt: pendingInterruptRef.current,
                         activeRun: resolution.activeRun,
+                        agentId: currentChatRef.current?.agentId ?? null,
                         sendCommand: (command) => socketClient.send(command),
                     },
                 );
@@ -401,10 +402,19 @@ export function useConversationRuntime({
     useEffect(() => {
         return (
             connectConversationSocket({
-                currentChatId: currentChat?.id ?? null,
+                currentChat:
+                    currentChat && currentChat.agentId
+                        ? {
+                              id: currentChat.id,
+                              agentId: currentChat.agentId,
+                          }
+                        : null,
                 dependencies: {
-                    subscribeToConversation: (conversationId) =>
-                        socketClient.subscribeToConversation(conversationId),
+                    subscribeToConversation: (conversationId, agentId) =>
+                        socketClient.subscribeToConversation(
+                            conversationId,
+                            agentId,
+                        ),
                     ensureConnected: () =>
                         socketClient.ensureConnected(getBackendSessionToken),
                     onConnectionError: (connectError) => {
@@ -416,7 +426,7 @@ export function useConversationRuntime({
                 },
             }) ?? undefined
         );
-    }, [currentChat?.id, getBackendSessionToken, socketClient]);
+    }, [currentChat, getBackendSessionToken, socketClient]);
 
     useEffect(() => {
         const syncPlan = planConversationRuntimeSync({
@@ -545,6 +555,7 @@ export function useConversationRuntime({
     const handleCancel = useCallback(() => {
         const result = requestConversationInterrupt({
             activeRun: activeRunRef.current,
+            agentId: currentChatRef.current?.agentId ?? null,
             isSending: sending,
             queuePendingInterrupt: () => {
                 pendingInterruptRef.current = true;

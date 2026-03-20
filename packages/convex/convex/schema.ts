@@ -45,6 +45,11 @@ export default defineSchema({
     })
         .index("by_user", ["userId"])
         .index("by_user_updated", ["userId", "updatedAt"])
+        .index("by_userId_and_agentId_and_localId", [
+            "userId",
+            "agentId",
+            "localId",
+        ])
         .index("by_userId_and_agentId_and_updatedAt", [
             "userId",
             "agentId",

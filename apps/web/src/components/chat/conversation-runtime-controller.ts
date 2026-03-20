@@ -64,7 +64,10 @@ export type ConversationSendRuntimeDependencies = {
 };
 
 export type ConversationSocketSessionDependencies = {
-    subscribeToConversation: (conversationId: string) => () => void;
+    subscribeToConversation: (
+        conversationId: string,
+        agentId: string,
+    ) => () => void;
     ensureConnected: () => Promise<void>;
     onConnectionError?: (error: unknown) => void;
 };
@@ -82,15 +85,16 @@ export type ConversationSendRuntimeResult =
       };
 
 export function connectConversationSocket(params: {
-    currentChatId: string | null;
+    currentChat: Pick<ChatSession, "id" | "agentId"> | null;
     dependencies: ConversationSocketSessionDependencies;
 }): (() => void) | null {
-    if (!params.currentChatId) {
+    if (!params.currentChat) {
         return null;
     }
 
     const unsubscribe = params.dependencies.subscribeToConversation(
-        params.currentChatId,
+        params.currentChat.id,
+        params.currentChat.agentId,
     );
     void params.dependencies.ensureConnected().catch((error) => {
         params.dependencies.onConnectionError?.(error);
@@ -168,15 +172,26 @@ export async function runConversationSend(params: {
 
 export function interruptConversationRun(params: {
     activeRun: ActiveRunState | null;
+    agentId: string | null;
     sendCommand: (command: ConversationInterruptCommand) => void;
 }): RuntimeErrorState | null {
     if (!params.activeRun) {
         return null;
     }
 
+    if (!params.agentId) {
+        return {
+            message: "No active agent is available to interrupt the run.",
+            isRetryable: true,
+        };
+    }
+
     try {
         params.sendCommand(
-            buildInterruptCommand(params.activeRun.conversationId),
+            buildInterruptCommand(
+                params.activeRun.conversationId,
+                params.agentId,
+            ),
         );
         return null;
     } catch (cancelError) {
@@ -197,6 +212,7 @@ export type RequestConversationInterruptResult = {
 
 export function requestConversationInterrupt(params: {
     activeRun: ActiveRunState | null;
+    agentId: string | null;
     isSending: boolean;
     queuePendingInterrupt: () => void;
     sendCommand: (command: ConversationInterruptCommand) => void;
@@ -206,6 +222,7 @@ export function requestConversationInterrupt(params: {
             queued: false,
             error: interruptConversationRun({
                 activeRun: params.activeRun,
+                agentId: params.agentId,
                 sendCommand: params.sendCommand,
             }),
         };
@@ -231,6 +248,7 @@ export function requestConversationInterrupt(params: {
 export function flushPendingConversationInterrupt(params: {
     pendingInterrupt: boolean;
     activeRun: ActiveRunState | null;
+    agentId: string | null;
     sendCommand: (command: ConversationInterruptCommand) => void;
 }): RuntimeErrorState | null {
     if (!params.pendingInterrupt || !params.activeRun) {
@@ -239,6 +257,7 @@ export function flushPendingConversationInterrupt(params: {
 
     return interruptConversationRun({
         activeRun: params.activeRun,
+        agentId: params.agentId,
         sendCommand: params.sendCommand,
     });
 }

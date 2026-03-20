@@ -42,28 +42,58 @@ const runtimeStatusValidator = v.union(
     v.literal("errored"),
 );
 
-async function getChatByLocalId(
+async function getChatByConversationId(
     ctx: RuntimeMutationCtx,
-    args: { userId: Id<"users">; localId: string },
+    args: {
+        userId: Id<"users">;
+        agentId: string;
+        conversationLocalId: string;
+    },
 ): Promise<Doc<"chats">> {
-    const chat = await findChatByLocalId(ctx, args);
+    const chat = await findChatByConversationId(ctx, args);
     if (!chat) {
         throw new Error("Conversation not found");
     }
     return chat;
 }
 
-async function findChatByLocalId(
+async function findChatByConversationId(
     ctx: RuntimeMutationCtx | RuntimeQueryCtx,
-    args: { userId: Id<"users">; localId: string },
+    args: {
+        userId: Id<"users">;
+        agentId: string;
+        conversationLocalId: string;
+    },
 ): Promise<Doc<"chats"> | null> {
     const chat = await ctx.db
         .query("chats")
-        .withIndex("by_local_id", (q) =>
-            q.eq("userId", args.userId).eq("localId", args.localId),
+        .withIndex("by_userId_and_agentId_and_localId", (q) =>
+            q
+                .eq("userId", args.userId)
+                .eq("agentId", args.agentId)
+                .eq("localId", args.conversationLocalId),
         )
         .unique();
-    return chat;
+    if (chat) {
+        return chat;
+    }
+
+    if (!args.conversationLocalId.includes(":")) {
+        return null;
+    }
+
+    const legacyChats = await ctx.db
+        .query("chats")
+        .withIndex("by_user", (q) => q.eq("userId", args.userId))
+        .collect();
+    return (
+        legacyChats.find(
+            (candidate) =>
+                candidate.agentId === args.agentId &&
+                (candidate.localId ?? candidate._id) ===
+                    args.conversationLocalId,
+        ) ?? null
+    );
 }
 
 async function getMessageByLocalId(
@@ -98,16 +128,15 @@ async function getRuntimeBindingByChatId(
         .unique();
 }
 
-async function getChatByLocalIdForQuery(
+async function getChatByConversationIdForQuery(
     ctx: RuntimeQueryCtx,
-    args: { userId: Id<"users">; localId: string },
+    args: {
+        userId: Id<"users">;
+        agentId: string;
+        conversationLocalId: string;
+    },
 ): Promise<Doc<"chats"> | null> {
-    return await ctx.db
-        .query("chats")
-        .withIndex("by_local_id", (q) =>
-            q.eq("userId", args.userId).eq("localId", args.localId),
-        )
-        .unique();
+    return await findChatByConversationId(ctx, args);
 }
 
 async function getRuntimeBindingByChatIdForQuery(
@@ -316,6 +345,7 @@ async function createAssistantMessage(
 export const runStarted = internalMutation({
     args: {
         userId: v.id("users"),
+        agentId: v.string(),
         conversationLocalId: v.string(),
         triggerMessageLocalId: v.string(),
         assistantMessageLocalId: v.string(),
@@ -326,9 +356,10 @@ export const runStarted = internalMutation({
         startedAt: v.number(),
     },
     handler: async (ctx, args) => {
-        const chat = await getChatByLocalId(ctx, {
+        const chat = await getChatByConversationId(ctx, {
             userId: args.userId,
-            localId: args.conversationLocalId,
+            agentId: args.agentId,
+            conversationLocalId: args.conversationLocalId,
         });
         const triggerMessage = await getMessageByLocalId(ctx, {
             userId: args.userId,
@@ -433,6 +464,7 @@ export const runStarted = internalMutation({
 export const messageStarted = internalMutation({
     args: {
         userId: v.id("users"),
+        agentId: v.string(),
         conversationLocalId: v.string(),
         previousAssistantMessageLocalId: v.string(),
         previousCompletedSequence: v.number(),
@@ -455,9 +487,10 @@ export const messageStarted = internalMutation({
         createdAt: v.number(),
     },
     handler: async (ctx, args) => {
-        const chat = await getChatByLocalId(ctx, {
+        const chat = await getChatByConversationId(ctx, {
             userId: args.userId,
-            localId: args.conversationLocalId,
+            agentId: args.agentId,
+            conversationLocalId: args.conversationLocalId,
         });
         const run = await getRunByExternalId(ctx, args.externalRunId);
         if (!run) {
@@ -537,12 +570,14 @@ export const messageStarted = internalMutation({
 export const readRuntimeBinding = internalQuery({
     args: {
         userId: v.id("users"),
+        agentId: v.string(),
         conversationLocalId: v.string(),
     },
     handler: async (ctx, args) => {
-        const chat = await getChatByLocalIdForQuery(ctx, {
+        const chat = await getChatByConversationIdForQuery(ctx, {
             userId: args.userId,
-            localId: args.conversationLocalId,
+            agentId: args.agentId,
+            conversationLocalId: args.conversationLocalId,
         });
         if (!chat) {
             return null;
@@ -573,6 +608,7 @@ export const readRuntimeBinding = internalQuery({
 export const messageDelta = internalMutation({
     args: {
         userId: v.id("users"),
+        agentId: v.string(),
         conversationLocalId: v.string(),
         assistantMessageLocalId: v.string(),
         externalRunId: v.string(),
@@ -589,9 +625,10 @@ export const messageDelta = internalMutation({
         createdAt: v.number(),
     },
     handler: async (ctx, args) => {
-        const chat = await getChatByLocalId(ctx, {
+        const chat = await getChatByConversationId(ctx, {
             userId: args.userId,
-            localId: args.conversationLocalId,
+            agentId: args.agentId,
+            conversationLocalId: args.conversationLocalId,
         });
         const run = await getRunByExternalId(ctx, args.externalRunId);
         if (!run) {
@@ -646,6 +683,7 @@ export const messageDelta = internalMutation({
 
 const terminalRunArgs = {
     userId: v.id("users"),
+    agentId: v.string(),
     conversationLocalId: v.string(),
     assistantMessageLocalId: v.string(),
     externalRunId: v.string(),
@@ -658,6 +696,7 @@ async function finalizeRun(
     ctx: RuntimeMutationCtx,
     args: {
         userId: Id<"users">;
+        agentId: string;
         conversationLocalId: string;
         assistantMessageLocalId: string;
         externalRunId: string;
@@ -673,9 +712,10 @@ async function finalizeRun(
         errorMessage: string | null;
     },
 ): Promise<void> {
-    const chat = await getChatByLocalId(ctx, {
+    const chat = await getChatByConversationId(ctx, {
         userId: args.userId,
-        localId: args.conversationLocalId,
+        agentId: args.agentId,
+        conversationLocalId: args.conversationLocalId,
     });
     const run = await getRunByExternalId(ctx, args.externalRunId);
     if (!run) {
@@ -798,15 +838,17 @@ export const runFailed = internalMutation({
 export const recoverStaleRun = internalMutation({
     args: {
         userId: v.id("users"),
+        agentId: v.string(),
         conversationLocalId: v.string(),
         externalRunId: v.string(),
         completedAt: v.number(),
         errorMessage: v.string(),
     },
     handler: async (ctx, args) => {
-        const chat = await getChatByLocalId(ctx, {
+        const chat = await getChatByConversationId(ctx, {
             userId: args.userId,
-            localId: args.conversationLocalId,
+            agentId: args.agentId,
+            conversationLocalId: args.conversationLocalId,
         });
         const run = await getRunByExternalId(ctx, args.externalRunId);
         if (!run) {
@@ -829,6 +871,7 @@ export const recoverStaleRun = internalMutation({
         const sequence = await getNextRunSequence(ctx, run._id);
         await finalizeRun(ctx, {
             userId: args.userId,
+            agentId: args.agentId,
             conversationLocalId: args.conversationLocalId,
             assistantMessageLocalId:
                 assistantMessage.localId ?? assistantMessage._id,
@@ -918,6 +961,7 @@ export const chatExistsByLocalId = internalQuery({
 export const runtimeBinding = internalMutation({
     args: {
         userId: v.id("users"),
+        agentId: v.string(),
         conversationLocalId: v.string(),
         provider: v.string(),
         status: runtimeStatusValidator,
@@ -935,9 +979,10 @@ export const runtimeBinding = internalMutation({
         updatedAt: v.number(),
     },
     handler: async (ctx, args) => {
-        const chat = await findChatByLocalId(ctx, {
+        const chat = await findChatByConversationId(ctx, {
             userId: args.userId,
-            localId: args.conversationLocalId,
+            agentId: args.agentId,
+            conversationLocalId: args.conversationLocalId,
         });
         if (!chat) {
             return null;

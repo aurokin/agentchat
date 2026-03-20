@@ -12,16 +12,19 @@ export type RuntimeManagerLike = {
     subscribe(params: {
         userId: string;
         conversationId: string;
+        agentId: string;
         subscriberId: string;
         sendEvent: (event: ServerEvent) => void;
     }): Promise<void> | void;
     unsubscribe(params: {
         subscriberId: string;
         conversationId?: string;
+        agentId?: string;
     }): void;
     interrupt(params: {
         userId: string;
         conversationId: string;
+        agentId: string;
     }): Promise<void>;
     sendMessage(params: {
         userId: string;
@@ -105,6 +108,7 @@ export async function handleConnectedSocketMessage(params: {
             await params.runtimeManager.subscribe({
                 userId: params.session.userId,
                 conversationId: command.payload.conversationId,
+                agentId: command.payload.agentId,
                 subscriberId: params.connectionId,
                 sendEvent,
             });
@@ -115,6 +119,7 @@ export async function handleConnectedSocketMessage(params: {
             params.runtimeManager.unsubscribe({
                 subscriberId: params.connectionId,
                 conversationId: command.payload.conversationId,
+                agentId: command.payload.agentId,
             });
             return;
         }
@@ -123,6 +128,7 @@ export async function handleConnectedSocketMessage(params: {
             await params.runtimeManager.interrupt({
                 userId: params.session.userId,
                 conversationId: command.payload.conversationId,
+                agentId: command.payload.agentId,
             });
             return;
         }

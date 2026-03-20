@@ -302,6 +302,7 @@ export function shouldResetPendingConversationSendOnConversationChange(params: {
 
 export function buildInterruptCommand(
     conversationId: string,
+    agentId: string,
     createId: RuntimeIdFactory = generateId,
 ): ConversationInterruptCommand {
     return {
@@ -309,6 +310,7 @@ export function buildInterruptCommand(
         type: "conversation.interrupt",
         payload: {
             conversationId,
+            agentId,
         },
     };
 }

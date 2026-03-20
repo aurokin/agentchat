@@ -1,4 +1,14 @@
 export type ConversationUnsubscribe = () => void;
+export type ConversationSubscriptionTarget = {
+    conversationId: string;
+    agentId: string;
+};
+
+function getConversationSubscriptionKey(
+    target: ConversationSubscriptionTarget,
+): string {
+    return `${target.agentId}:${target.conversationId}`;
+}
 
 export function clearBackgroundConversationSubscriptions(
     subscriptions: Map<string, ConversationUnsubscribe>,
@@ -11,32 +21,41 @@ export function clearBackgroundConversationSubscriptions(
 
 export function reconcileBackgroundConversationSubscriptions(params: {
     subscriptions: Map<string, ConversationUnsubscribe>;
-    desiredConversationIds: Iterable<string>;
+    desiredConversations: Iterable<ConversationSubscriptionTarget>;
     subscribeToConversation: (
-        conversationId: string,
+        target: ConversationSubscriptionTarget,
     ) => ConversationUnsubscribe;
 }): number {
-    const desiredConversationIds = new Set(params.desiredConversationIds);
+    const desiredConversations = new Map<
+        string,
+        ConversationSubscriptionTarget
+    >();
+    for (const target of params.desiredConversations) {
+        desiredConversations.set(
+            getConversationSubscriptionKey(target),
+            target,
+        );
+    }
 
-    for (const [conversationId, unsubscribe] of params.subscriptions) {
-        if (desiredConversationIds.has(conversationId)) {
+    for (const [conversationKey, unsubscribe] of params.subscriptions) {
+        if (desiredConversations.has(conversationKey)) {
             continue;
         }
 
         unsubscribe();
-        params.subscriptions.delete(conversationId);
+        params.subscriptions.delete(conversationKey);
     }
 
-    for (const conversationId of desiredConversationIds) {
-        if (params.subscriptions.has(conversationId)) {
+    for (const [conversationKey, target] of desiredConversations) {
+        if (params.subscriptions.has(conversationKey)) {
             continue;
         }
 
         params.subscriptions.set(
-            conversationId,
-            params.subscribeToConversation(conversationId),
+            conversationKey,
+            params.subscribeToConversation(target),
         );
     }
 
-    return desiredConversationIds.size;
+    return desiredConversations.size;
 }

@@ -10,33 +10,43 @@ describe("background runtime subscriptions", () => {
         const calls: string[] = [];
         const subscriptions = new Map<string, () => void>([
             [
-                "chat-1",
+                "agent-a:chat-1",
                 () => {
-                    calls.push("unsubscribe:chat-1");
+                    calls.push("unsubscribe:agent-a:chat-1");
                 },
             ],
             [
-                "chat-2",
+                "agent-a:chat-2",
                 () => {
-                    calls.push("unsubscribe:chat-2");
+                    calls.push("unsubscribe:agent-a:chat-2");
                 },
             ],
         ]);
 
         const activeCount = reconcileBackgroundConversationSubscriptions({
             subscriptions,
-            desiredConversationIds: ["chat-2", "chat-3", "chat-3"],
-            subscribeToConversation: (conversationId) => {
-                calls.push(`subscribe:${conversationId}`);
+            desiredConversations: [
+                { conversationId: "chat-2", agentId: "agent-a" },
+                { conversationId: "chat-3", agentId: "agent-b" },
+                { conversationId: "chat-3", agentId: "agent-b" },
+            ],
+            subscribeToConversation: ({ conversationId, agentId }) => {
+                calls.push(`subscribe:${agentId}:${conversationId}`);
                 return () => {
-                    calls.push(`unsubscribe:${conversationId}`);
+                    calls.push(`unsubscribe:${agentId}:${conversationId}`);
                 };
             },
         });
 
         expect(activeCount).toBe(2);
-        expect(calls).toEqual(["unsubscribe:chat-1", "subscribe:chat-3"]);
-        expect([...subscriptions.keys()]).toEqual(["chat-2", "chat-3"]);
+        expect(calls).toEqual([
+            "unsubscribe:agent-a:chat-1",
+            "subscribe:agent-b:chat-3",
+        ]);
+        expect([...subscriptions.keys()]).toEqual([
+            "agent-a:chat-2",
+            "agent-b:chat-3",
+        ]);
     });
 
     test("clears all background subscriptions", () => {

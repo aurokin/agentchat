@@ -193,15 +193,27 @@ export function resolveMobileConversationRuntimeSync(params: {
 
 export function interruptMobileConversationRun(params: {
     activeRun: ActiveRunState | null;
+    agentId: string | null;
     sendCommand: (command: ReturnType<typeof buildInterruptCommand>) => void;
 }): RuntimeErrorState | null {
     if (!params.activeRun) {
         return null;
     }
 
+    if (!params.agentId) {
+        return {
+            message: "No active agent is available to interrupt the run.",
+            isRetryable: true,
+        };
+    }
+
     try {
         params.sendCommand(
-            buildInterruptCommand(params.activeRun.conversationId, uuidv4),
+            buildInterruptCommand(
+                params.activeRun.conversationId,
+                params.agentId,
+                uuidv4,
+            ),
         );
         return null;
     } catch (cancelError) {
@@ -222,6 +234,7 @@ export type RequestMobileConversationInterruptResult = {
 
 export function requestMobileConversationInterrupt(params: {
     activeRun: ActiveRunState | null;
+    agentId: string | null;
     isLoading: boolean;
     queuePendingInterrupt: () => void;
     sendCommand: (command: ReturnType<typeof buildInterruptCommand>) => void;
@@ -231,6 +244,7 @@ export function requestMobileConversationInterrupt(params: {
             queued: false,
             error: interruptMobileConversationRun({
                 activeRun: params.activeRun,
+                agentId: params.agentId,
                 sendCommand: params.sendCommand,
             }),
         };
@@ -256,6 +270,7 @@ export function requestMobileConversationInterrupt(params: {
 export function flushPendingMobileConversationInterrupt(params: {
     pendingInterrupt: boolean;
     activeRun: ActiveRunState | null;
+    agentId: string | null;
     sendCommand: (command: ReturnType<typeof buildInterruptCommand>) => void;
 }): RuntimeErrorState | null {
     if (!params.pendingInterrupt || !params.activeRun) {
@@ -264,6 +279,7 @@ export function flushPendingMobileConversationInterrupt(params: {
 
     return interruptMobileConversationRun({
         activeRun: params.activeRun,
+        agentId: params.agentId,
         sendCommand: params.sendCommand,
     });
 }

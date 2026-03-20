@@ -44,6 +44,7 @@ describe("websocketSession", () => {
                 type: "conversation.subscribe",
                 payload: {
                     conversationId: "chat-1",
+                    agentId: "agent-1",
                 },
             }),
             sendJson,
@@ -54,6 +55,7 @@ describe("websocketSession", () => {
             expect.objectContaining({
                 userId: "user-1",
                 conversationId: "chat-1",
+                agentId: "agent-1",
                 subscriberId: "socket-1",
                 sendEvent: expect.any(Function),
             }),
@@ -74,6 +76,7 @@ describe("websocketSession", () => {
                 type: "conversation.subscribe",
                 payload: {
                     conversationId: "chat-1",
+                    agentId: "agent-1",
                 },
             }),
             sendJson,
@@ -121,6 +124,7 @@ describe("websocketSession", () => {
                 type: "conversation.interrupt",
                 payload: {
                     conversationId: "chat-1",
+                    agentId: "agent-1",
                 },
             }),
             sendJson: () => undefined,
@@ -130,6 +134,7 @@ describe("websocketSession", () => {
         expect(runtimeManager.interrupt).toHaveBeenCalledWith({
             userId: "user-1",
             conversationId: "chat-1",
+            agentId: "agent-1",
         });
     });
 
@@ -145,6 +150,7 @@ describe("websocketSession", () => {
                 type: "conversation.unsubscribe",
                 payload: {
                     conversationId: "chat-1",
+                    agentId: "agent-1",
                 },
             }),
             sendJson: () => undefined,
@@ -154,6 +160,7 @@ describe("websocketSession", () => {
         expect(runtimeManager.unsubscribe).toHaveBeenCalledWith({
             subscriberId: "socket-1",
             conversationId: "chat-1",
+            agentId: "agent-1",
         });
     });
 

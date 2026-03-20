@@ -207,8 +207,14 @@ describe("agentchat socket helpers", () => {
         });
         await connectPromise;
 
-        const unsubscribeA = client.subscribeToConversation("chat-1");
-        const unsubscribeB = client.subscribeToConversation("chat-1");
+        const unsubscribeA = client.subscribeToConversation(
+            "chat-1",
+            "agent-1",
+        );
+        const unsubscribeB = client.subscribeToConversation(
+            "chat-1",
+            "agent-1",
+        );
 
         expect(
             socket.sentMessages.filter((message) =>
@@ -247,7 +253,7 @@ describe("agentchat socket helpers", () => {
             throw new Error("Expected the first websocket connection");
         }
 
-        client.subscribeToConversation("chat-1");
+        client.subscribeToConversation("chat-1", "agent-1");
         expect(
             firstSocket.sentMessages.filter((message) =>
                 message.includes('"type":"conversation.subscribe"'),
@@ -275,6 +281,9 @@ describe("agentchat socket helpers", () => {
         ).toHaveLength(1);
         expect(firstSocket.sentMessages.join("\n")).toContain(
             '"conversationId":"chat-1"',
+        );
+        expect(firstSocket.sentMessages.join("\n")).toContain(
+            '"agentId":"agent-1"',
         );
     });
 
@@ -307,8 +316,8 @@ describe("agentchat socket helpers", () => {
         });
         await connectPromise;
 
-        client.subscribeToConversation("chat-1");
-        client.subscribeToConversation("chat-2");
+        client.subscribeToConversation("chat-1", "agent-1");
+        client.subscribeToConversation("chat-2", "agent-2");
 
         expect(
             firstSocket.sentMessages.filter((message) =>
@@ -346,9 +355,11 @@ describe("agentchat socket helpers", () => {
         expect(resubscribeMessages.join("\n")).toContain(
             '"conversationId":"chat-1"',
         );
+        expect(resubscribeMessages.join("\n")).toContain('"agentId":"agent-1"');
         expect(resubscribeMessages.join("\n")).toContain(
             '"conversationId":"chat-2"',
         );
+        expect(resubscribeMessages.join("\n")).toContain('"agentId":"agent-2"');
     });
 
     test("sends conversation.delete notification when connected", async () => {
@@ -481,7 +492,7 @@ describe("agentchat socket helpers", () => {
         });
         await connectPromise;
 
-        const unsubscribe = client.subscribeToConversation("chat-1");
+        const unsubscribe = client.subscribeToConversation("chat-1", "agent-1");
         expect(
             firstSocket.sentMessages.filter((message) =>
                 message.includes('"type":"conversation.subscribe"'),

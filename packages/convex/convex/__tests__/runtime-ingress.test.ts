@@ -20,7 +20,10 @@ describe("runtime ingress", () => {
         const insert = mock(async () => undefined);
         const patch = mock(async () => undefined);
         const unique = mock(async () => null);
-        const withIndex = mock(() => ({ unique }));
+        const collect = mock(async () => []);
+        const withIndex = mock((indexName: string) =>
+            indexName === "by_user" ? { collect } : { unique },
+        );
         const query = mock(() => ({ withIndex }));
         const ctx = {
             db: {
@@ -33,6 +36,7 @@ describe("runtime ingress", () => {
         await expect(
             runHandler(runtimeBinding as unknown as HandlerExport, ctx, {
                 userId: "users:test",
+                agentId: "agent-1",
                 conversationLocalId: "chat:missing",
                 provider: "codex",
                 status: "active",
@@ -48,6 +52,7 @@ describe("runtime ingress", () => {
 
         expect(query).toHaveBeenCalledWith("chats");
         expect(unique).toHaveBeenCalledTimes(1);
+        expect(collect).toHaveBeenCalledTimes(1);
         expect(insert).not.toHaveBeenCalled();
         expect(patch).not.toHaveBeenCalled();
     });
@@ -97,6 +102,7 @@ describe("runtime ingress", () => {
         await expect(
             runHandler(runtimeBinding as unknown as HandlerExport, ctx, {
                 userId: "users:test",
+                agentId: "agent-1",
                 conversationLocalId: "chat:1",
                 provider: "codex",
                 status: "idle",
@@ -171,6 +177,7 @@ describe("runtime ingress", () => {
         await expect(
             runHandler(readRuntimeBinding as unknown as HandlerExport, ctx, {
                 userId: "users:test",
+                agentId: "agent-1",
                 conversationLocalId: "chat:1",
             }),
         ).resolves.toEqual({
@@ -319,5 +326,135 @@ describe("runtime ingress", () => {
                 localId: "chats:legacy",
             }),
         ).resolves.toBe(true);
+    });
+
+    test("readRuntimeBinding resolves the matching agent when chats share a localId", async () => {
+        const chatUnique = mock(async () => ({
+            _id: "chats:agent-b",
+        }));
+        const bindingUnique = mock(async () => ({
+            provider: "codex",
+            status: "idle",
+            providerThreadId: "thread-b",
+            providerResumeToken: null,
+            activeRunId: null,
+            lastError: null,
+            lastEventAt: 123,
+            expiresAt: null,
+            workspaceMode: "copy-on-conversation",
+            workspaceRootPath: "/repos/agent-b",
+            workspaceCwd: "/sandboxes/agent-b/user/chat-1",
+            updatedAt: 456,
+        }));
+        const query = (table: string) => {
+            if (table === "chats") {
+                return {
+                    withIndex: mock(() => ({
+                        unique: chatUnique,
+                    })),
+                };
+            }
+
+            return {
+                withIndex: mock(() => ({
+                    unique: bindingUnique,
+                })),
+            };
+        };
+        const ctx = {
+            db: {
+                query,
+            },
+        };
+
+        await expect(
+            runHandler(readRuntimeBinding as unknown as HandlerExport, ctx, {
+                userId: "users:test",
+                agentId: "agent-b",
+                conversationLocalId: "chat-1",
+            }),
+        ).resolves.toMatchObject({
+            providerThreadId: "thread-b",
+            workspaceRootPath: "/repos/agent-b",
+        });
+    });
+
+    test("runtimeBinding updates the matching agent when chats share a localId", async () => {
+        const insert = mock(async () => undefined);
+        const patch = mock(async () => undefined);
+        const chatUnique = mock(async () => ({
+            _id: "chats:agent-b",
+        }));
+        const bindingUnique = mock(async () => ({
+            _id: "runtimeBindings:agent-b",
+            chatId: "chats:agent-b",
+            userId: "users:test",
+            provider: "codex",
+            status: "idle",
+            providerThreadId: "thread-old",
+            providerResumeToken: null,
+            activeRunId: null,
+            lastError: null,
+            lastEventAt: 100,
+            expiresAt: null,
+            updatedAt: 100,
+        }));
+        const query = (table: string) => {
+            if (table === "chats") {
+                return {
+                    withIndex: mock(() => ({
+                        unique: chatUnique,
+                    })),
+                };
+            }
+
+            return {
+                withIndex: mock(() => ({
+                    unique: bindingUnique,
+                })),
+            };
+        };
+        const ctx = {
+            db: {
+                query,
+                insert,
+                patch,
+            },
+        };
+
+        await expect(
+            runHandler(runtimeBinding as unknown as HandlerExport, ctx, {
+                userId: "users:test",
+                agentId: "agent-b",
+                conversationLocalId: "chat-1",
+                provider: "codex",
+                status: "active",
+                providerThreadId: "thread-new",
+                providerResumeToken: null,
+                activeRunId: "run:test",
+                lastError: null,
+                lastEventAt: 123,
+                expiresAt: null,
+                updatedAt: 123,
+            }),
+        ).resolves.toBeNull();
+
+        expect(insert).not.toHaveBeenCalled();
+        expect(patch).toHaveBeenCalledWith("runtimeBindings:agent-b", {
+            chatId: "chats:agent-b",
+            userId: "users:test",
+            provider: "codex",
+            status: "active",
+            providerThreadId: "thread-new",
+            providerResumeToken: null,
+            activeRunId: "run:test",
+            lastError: null,
+            lastEventAt: 123,
+            expiresAt: null,
+            workspaceMode: undefined,
+            workspaceRootPath: undefined,
+            workspaceCwd: undefined,
+            updatedAt: 123,
+        });
     });
 });

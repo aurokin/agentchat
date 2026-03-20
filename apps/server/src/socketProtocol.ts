@@ -23,6 +23,7 @@ export interface ConversationInterruptCommand {
     type: "conversation.interrupt";
     payload: {
         conversationId: string;
+        agentId: string;
     };
 }
 
@@ -31,6 +32,7 @@ export interface ConversationSubscribeCommand {
     type: "conversation.subscribe" | "conversation.unsubscribe";
     payload: {
         conversationId: string;
+        agentId: string;
     };
 }
 
@@ -100,7 +102,11 @@ export function parseClientCommand(raw: string): ClientCommand {
         const payload = command.payload as
             | ConversationSubscribeCommand["payload"]
             | undefined;
-        if (!payload || typeof payload.conversationId !== "string") {
+        if (
+            !payload ||
+            typeof payload.conversationId !== "string" ||
+            typeof payload.agentId !== "string"
+        ) {
             throw new Error("Invalid conversation subscription payload");
         }
 
@@ -115,7 +121,11 @@ export function parseClientCommand(raw: string): ClientCommand {
         const payload = command.payload as
             | ConversationInterruptCommand["payload"]
             | undefined;
-        if (!payload || typeof payload.conversationId !== "string") {
+        if (
+            !payload ||
+            typeof payload.conversationId !== "string" ||
+            typeof payload.agentId !== "string"
+        ) {
             throw new Error("Invalid interrupt payload");
         }
 

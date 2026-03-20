@@ -208,6 +208,7 @@ function createPersistence(
     return {
         readRuntimeBindingCalls: [] as Array<{
             userId: string;
+            agentId: string;
             conversationLocalId: string;
         }>,
         chatExistsCalls: [] as Array<{
@@ -224,6 +225,7 @@ function createPersistence(
         recoverStaleRunCalls: [] as Array<Record<string, unknown>>,
         async readRuntimeBinding(payload: {
             userId: string;
+            agentId: string;
             conversationLocalId: string;
         }) {
             this.readRuntimeBindingCalls.push(payload);
@@ -413,6 +415,7 @@ describe("CodexRuntimeManager", () => {
         expect(persistence.readRuntimeBindingCalls).toEqual([
             {
                 userId: "user-1",
+                agentId: "agent-1",
                 conversationLocalId: "chat-1",
             },
         ]);
@@ -636,6 +639,7 @@ describe("CodexRuntimeManager", () => {
         await manager.subscribe({
             userId: "user-1",
             conversationId: "chat-1",
+            agentId: "agent-1",
             subscriberId: "socket-2",
             sendEvent: (event) => {
                 replayedEvents.push(event);
@@ -714,6 +718,7 @@ describe("CodexRuntimeManager", () => {
         manager.unsubscribe({
             subscriberId: "socket-1",
             conversationId: "chat-1",
+            agentId: "agent-1",
         });
 
         fakeClient.emit({
@@ -759,6 +764,7 @@ describe("CodexRuntimeManager", () => {
         await manager.subscribe({
             userId: "user-1",
             conversationId: "chat-1",
+            agentId: "agent-1",
             subscriberId: "socket-2",
             sendEvent: () => undefined,
         });
@@ -766,12 +772,14 @@ describe("CodexRuntimeManager", () => {
         expect(persistence.readRuntimeBindingCalls).toEqual([
             {
                 userId: "user-1",
+                agentId: "agent-1",
                 conversationLocalId: "chat-1",
             },
         ]);
         expect(persistence.recoverStaleRunCalls).toHaveLength(1);
         expect(persistence.recoverStaleRunCalls[0]).toMatchObject({
             userId: "user-1",
+            agentId: "agent-1",
             conversationLocalId: "chat-1",
             externalRunId: "run-orphaned",
             errorMessage:
@@ -815,6 +823,7 @@ describe("CodexRuntimeManager", () => {
         await manager.subscribe({
             userId: "user-1",
             conversationId: "chat-1",
+            agentId: "agent-1",
             subscriberId: "socket-2",
             sendEvent: (event) => {
                 reconnectedEvents.push(event);
@@ -865,6 +874,7 @@ describe("CodexRuntimeManager", () => {
         await manager.subscribe({
             userId: "user-1",
             conversationId: "chat-1",
+            agentId: "agent-1",
             subscriberId: "socket-2",
             sendEvent: (event) => {
                 observerEvents.push(event);
@@ -913,6 +923,75 @@ describe("CodexRuntimeManager", () => {
             "run.completed",
         ]);
         expect(persistence.recoverStaleRunCalls).toHaveLength(0);
+    });
+
+    test("serializes concurrent runtime initialization for the same agent conversation", async () => {
+        const config = createConfig();
+        const persistence = createPersistence(null);
+        const clients: FakeCodexClient[] = [];
+        let releaseInitialization!: () => void;
+        const initializationGate = new Promise<void>((resolve) => {
+            releaseInitialization = resolve;
+        });
+
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: () => {
+                const client = new FakeCodexClient({
+                    startedThreadId: "thread-fresh",
+                    autoComplete: false,
+                });
+                client.initialize = async () => {
+                    await initializationGate;
+                };
+                clients.push(client);
+                return client;
+            },
+        });
+
+        const firstSend = manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+        await Bun.sleep(0);
+
+        const secondSendError = manager
+            .sendMessage({
+                userId: "user-1",
+                subscriberId: "socket-2",
+                command: createCommand(),
+                sendEvent: () => undefined,
+            })
+            .then(
+                () => null,
+                (error) =>
+                    error instanceof Error ? error.message : String(error),
+            );
+
+        await Bun.sleep(0);
+        expect(clients).toHaveLength(1);
+
+        releaseInitialization();
+        await Bun.sleep(0);
+
+        expect(await secondSendError).toBe(
+            "Conversation already has an active run.",
+        );
+
+        clients[0]?.emit({
+            method: "turn/completed",
+            params: {
+                turn: {
+                    status: "completed",
+                },
+            },
+        });
+
+        await firstSend;
+        expect(clients).toHaveLength(1);
     });
 
     test("promotes Codex agent reasoning into an assistant status message before output", async () => {
@@ -1283,6 +1362,7 @@ describe("CodexRuntimeManager", () => {
             manager.interrupt({
                 userId: "user-1",
                 conversationId: "chat-1",
+                agentId: "agent-1",
             }),
         ).resolves.toBeUndefined();
     });
@@ -1610,7 +1690,7 @@ describe("CodexRuntimeManager", () => {
         );
 
         expect(clients).toHaveLength(2);
-        expect(clients[0]?.stopped).toBe(true);
+        expect(clients[0]?.stopped).toBe(false);
         expect(existsSync(firstWorkspace)).toBe(true);
         expect(existsSync(secondWorkspace)).toBe(true);
         expect(firstWorkspace).not.toBe(secondWorkspace);
@@ -1821,7 +1901,7 @@ describe("CodexRuntimeManager", () => {
             manager as unknown as {
                 runtimes: Map<string, Record<string, unknown>>;
             }
-        ).runtimes.set("user-1:chat-1", {
+        ).runtimes.set(JSON.stringify(["user-1", "agent-1", "chat-1"]), {
             agentId: "agent-1",
             activeTurn: {
                 pendingDeltaFlush: null,
