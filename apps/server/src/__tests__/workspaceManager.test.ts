@@ -330,6 +330,36 @@ describe("WorkspaceManager", () => {
             ).toBe("modified");
         });
 
+        test("copies symlinked agent roots by dereferencing the root alias", async () => {
+            const sandboxRoot = makeTempDir("sandbox");
+            const realRoot = makeTempDir("agent-root");
+            const aliasParent = makeTempDir("agent-root-alias");
+            const aliasedRoot = path.join(aliasParent, "linked-root");
+            symlinkSync(realRoot, aliasedRoot);
+            writeFileSync(path.join(realRoot, "file.txt"), "source");
+
+            const agent = makeAgent({
+                id: "my-agent",
+                rootPath: aliasedRoot,
+                workspaceMode: "copy-on-conversation",
+            });
+            const manager = createWorkspaceManager(() =>
+                makeConfig({ sandboxRoot }),
+            );
+
+            const workspace = await manager.ensureWorkspaceState(
+                agent,
+                "user-1",
+                "conv-1",
+            );
+
+            expect(workspace.wasReset).toBe(false);
+            expect(
+                readFileSync(path.join(workspace.path, "file.txt"), "utf8"),
+            ).toBe("source");
+            expect(lstatSync(workspace.path).isSymbolicLink()).toBe(false);
+        });
+
         test("recreates an existing copied sandbox when the target becomes a symlink", async () => {
             const sandboxRoot = makeTempDir("sandbox");
             const rootPath = makeTempDir("agent-root");

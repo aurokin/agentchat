@@ -147,6 +147,31 @@ function createRuntimeServerEvent(
     });
 }
 
+function mergeRuntimeSubscribers(
+    primary: Map<string, RuntimeSubscriber>,
+    secondary: Map<string, RuntimeSubscriber> | undefined,
+): Map<string, RuntimeSubscriber> {
+    const merged = new Map(primary);
+    if (!secondary) {
+        return merged;
+    }
+
+    for (const [subscriberId, subscriber] of secondary) {
+        const existing = merged.get(subscriberId);
+        merged.set(subscriberId, {
+            sendEvent: subscriber.sendEvent,
+            subscriptionCount:
+                (existing?.subscriptionCount ?? 0) +
+                subscriber.subscriptionCount,
+            retainDuringActiveTurn:
+                (existing?.retainDuringActiveTurn ?? false) ||
+                subscriber.retainDuringActiveTurn,
+        });
+    }
+
+    return merged;
+}
+
 function extractThreadId(result: unknown): string {
     const threadId = (result as { thread?: { id?: unknown } })?.thread?.id;
     invariant(typeof threadId === "string", "Codex thread id missing");
@@ -805,11 +830,13 @@ export class CodexRuntimeManager {
         });
         const existing = this.runtimes.get(key);
         let shouldResetConversationState = false;
+        let recycledSubscribers: Map<string, RuntimeSubscriber> | null = null;
         if (existing) {
             if (shouldRecycleRuntime(existing, resources, desiredCwd)) {
                 if (existing.activeTurn) {
                     return { runtime: existing, isNew: false };
                 }
+                recycledSubscribers = new Map(existing.subscribers);
                 shouldResetConversationState = shouldResetRuntimeState(
                     existing,
                     resources,
@@ -951,12 +978,17 @@ export class CodexRuntimeManager {
                 threadId,
                 activeTurn: null,
                 idleTimer: null,
-                subscribers: new Map(),
+                subscribers: recycledSubscribers
+                    ? new Map(recycledSubscribers)
+                    : new Map(),
             };
 
             const pendingSubscribers = this.pendingSubscriptions.get(key);
             if (pendingSubscribers) {
-                runtime.subscribers = new Map(pendingSubscribers);
+                runtime.subscribers = mergeRuntimeSubscribers(
+                    runtime.subscribers,
+                    pendingSubscribers,
+                );
                 this.pendingSubscriptions.delete(key);
             }
 

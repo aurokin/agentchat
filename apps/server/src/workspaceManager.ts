@@ -503,7 +503,7 @@ export class WorkspaceManager {
         });
         await mkdir(sandboxPath, { recursive: true });
         try {
-            await cp(sourcePath, sandboxPath, { recursive: true });
+            await cp(resolvedSourcePath, sandboxPath, { recursive: true });
             await this.writeWorkspaceMetadata(sandboxPath, {
                 sourceRootPath: resolvedSourcePath,
                 state: "ready",

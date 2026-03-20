@@ -1598,6 +1598,67 @@ describe("CodexRuntimeManager", () => {
         expect(clients[1]?.stopped).toBe(false);
     });
 
+    test("preserves existing subscribers when recycling an idle runtime", async () => {
+        const config = createConfig();
+        const clients: FakeCodexClient[] = [];
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: createPersistence(
+                null,
+            ) as unknown as RuntimePersistenceClient,
+            createClient: () => {
+                const client = new FakeCodexClient();
+                clients.push(client);
+                return client;
+            },
+        });
+
+        const subscriberEvents: ServerEvent[] = [];
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+        await manager.subscribe({
+            userId: "user-1",
+            conversationId: "chat-1",
+            agentId: "agent-1",
+            subscriberId: "socket-2",
+            sendEvent: (event) => {
+                subscriberEvents.push(event);
+            },
+        });
+
+        const currentAgent = config.agents[0];
+        if (!currentAgent) {
+            throw new Error("Expected agent config");
+        }
+
+        config.agents[0] = {
+            ...currentAgent,
+            rootPath: "/tmp/agent-1-next",
+        };
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        expect(clients).toHaveLength(2);
+        expect(
+            subscriberEvents.some(
+                (event) =>
+                    event.type === "run.started" &&
+                    event.payload.agentId === "agent-1" &&
+                    event.payload.conversationId === "chat-1",
+            ),
+        ).toBe(true);
+    });
+
     test("does not recycle an active runtime during config reload", async () => {
         const config = createConfig();
         const clients: FakeCodexClient[] = [];
