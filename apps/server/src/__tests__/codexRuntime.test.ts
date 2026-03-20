@@ -208,6 +208,7 @@ function createPersistence(
         updatedAt?: number;
     } | null,
 ) {
+    const chatId = "chats:chat-1";
     return {
         readRuntimeBindingCalls: [] as Array<{
             userId: string;
@@ -232,23 +233,24 @@ function createPersistence(
             conversationLocalId: string;
         }) {
             this.readRuntimeBindingCalls.push(payload);
-            if (!binding) {
-                return null;
-            }
-
             return {
-                provider: binding.provider,
-                status: binding.status ?? ("expired" as const),
-                providerThreadId: binding.providerThreadId,
-                providerResumeToken: null,
-                activeRunId: binding.activeRunId ?? null,
-                lastError: null,
-                lastEventAt: null,
-                expiresAt: null,
-                workspaceMode: binding.workspaceMode,
-                workspaceRootPath: binding.workspaceRootPath,
-                workspaceCwd: binding.workspaceCwd,
-                updatedAt: binding.updatedAt ?? Date.now(),
+                chatId,
+                binding: binding
+                    ? {
+                          provider: binding.provider,
+                          status: binding.status ?? ("expired" as const),
+                          providerThreadId: binding.providerThreadId,
+                          providerResumeToken: null,
+                          activeRunId: binding.activeRunId ?? null,
+                          lastError: null,
+                          lastEventAt: null,
+                          expiresAt: null,
+                          workspaceMode: binding.workspaceMode,
+                          workspaceRootPath: binding.workspaceRootPath,
+                          workspaceCwd: binding.workspaceCwd,
+                          updatedAt: binding.updatedAt ?? Date.now(),
+                      }
+                    : null,
             };
         },
         async chatExists(userId: string, agentId: string, localId: string) {
@@ -1676,23 +1678,24 @@ describe("CodexRuntimeManager", () => {
         let bindingThreadId: string | null = null;
         persistence.readRuntimeBinding = async (payload) => {
             persistence.readRuntimeBindingCalls.push(payload);
-            if (!bindingThreadId) {
-                return null;
-            }
-
             return {
-                provider: "codex-default",
-                status: "idle" as const,
-                providerThreadId: bindingThreadId,
-                providerResumeToken: null,
-                activeRunId: null,
-                lastError: null,
-                lastEventAt: null,
-                expiresAt: null,
-                workspaceMode: undefined,
-                workspaceRootPath: undefined,
-                workspaceCwd: undefined,
-                updatedAt: Date.now(),
+                chatId: "chats:chat-1",
+                binding: bindingThreadId
+                    ? {
+                          provider: "codex-default",
+                          status: "idle" as const,
+                          providerThreadId: bindingThreadId,
+                          providerResumeToken: null,
+                          activeRunId: null,
+                          lastError: null,
+                          lastEventAt: null,
+                          expiresAt: null,
+                          workspaceMode: undefined,
+                          workspaceRootPath: undefined,
+                          workspaceCwd: undefined,
+                          updatedAt: Date.now(),
+                      }
+                    : null,
             };
         };
 

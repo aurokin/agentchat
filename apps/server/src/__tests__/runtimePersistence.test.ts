@@ -94,18 +94,21 @@ describe("RuntimePersistenceClient", () => {
     test("returns parsed runtime binding payloads", async () => {
         const fetchMock = mock(async () => {
             return Response.json({
-                provider: "codex-main",
-                status: "active",
-                providerThreadId: "thread-1",
-                providerResumeToken: null,
-                activeRunId: "run-1",
-                lastError: null,
-                lastEventAt: 1,
-                expiresAt: null,
-                workspaceMode: "copy-on-conversation",
-                workspaceRootPath: "/tmp/agent",
-                workspaceCwd: "/tmp/sandbox/chat-1",
-                updatedAt: 2,
+                chatId: "chats:1",
+                binding: {
+                    provider: "codex-main",
+                    status: "active",
+                    providerThreadId: "thread-1",
+                    providerResumeToken: null,
+                    activeRunId: "run-1",
+                    lastError: null,
+                    lastEventAt: 1,
+                    expiresAt: null,
+                    workspaceMode: "copy-on-conversation",
+                    workspaceRootPath: "/tmp/agent",
+                    workspaceCwd: "/tmp/sandbox/chat-1",
+                    updatedAt: 2,
+                },
             });
         });
         globalThis.fetch = fetchMock as unknown as typeof fetch;
@@ -118,11 +121,14 @@ describe("RuntimePersistenceClient", () => {
         });
 
         expect(result).toMatchObject({
-            provider: "codex-main",
-            activeRunId: "run-1",
-            workspaceMode: "copy-on-conversation",
-            workspaceRootPath: "/tmp/agent",
-            workspaceCwd: "/tmp/sandbox/chat-1",
+            chatId: "chats:1",
+            binding: {
+                provider: "codex-main",
+                activeRunId: "run-1",
+                workspaceMode: "copy-on-conversation",
+                workspaceRootPath: "/tmp/agent",
+                workspaceCwd: "/tmp/sandbox/chat-1",
+            },
         });
         expect(fetchMock).toHaveBeenCalledTimes(1);
     });
@@ -139,6 +145,28 @@ describe("RuntimePersistenceClient", () => {
         });
 
         expect(result).toBeNull();
+    });
+
+    test("returns conversation state when a chat exists without a binding", async () => {
+        const fetchMock = mock(async () =>
+            Response.json({
+                chatId: "chats:1",
+                binding: null,
+            }),
+        );
+        globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+        const client = new RuntimePersistenceClient();
+        const result = await client.readRuntimeBinding({
+            userId: "user-1",
+            agentId: "agent-1",
+            conversationLocalId: "chat-1",
+        });
+
+        expect(result).toEqual({
+            chatId: "chats:1",
+            binding: null,
+        });
     });
 
     test("paginates chat local ids until the ingress reports completion", async () => {

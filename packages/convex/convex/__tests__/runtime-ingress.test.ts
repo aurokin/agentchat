@@ -3,6 +3,7 @@ import { describe, expect, mock, test } from "bun:test";
 import {
     chatExistsByLocalId,
     listAllChatLocalIds,
+    messageDelta,
     readRuntimeBinding,
     runtimeBinding,
 } from "../runtimeIngress";
@@ -38,6 +39,7 @@ describe("runtime ingress", () => {
                 userId: "users:test",
                 agentId: "agent-1",
                 conversationLocalId: "chat:missing",
+                chatId: "chats:missing",
                 provider: "codex",
                 status: "active",
                 providerThreadId: null,
@@ -104,6 +106,7 @@ describe("runtime ingress", () => {
                 userId: "users:test",
                 agentId: "agent-1",
                 conversationLocalId: "chat:1",
+                chatId: "chats:1",
                 provider: "codex",
                 status: "idle",
                 providerThreadId: "thread-1",
@@ -181,18 +184,59 @@ describe("runtime ingress", () => {
                 conversationLocalId: "chat:1",
             }),
         ).resolves.toEqual({
-            provider: "codex",
-            status: "idle",
-            providerThreadId: "thread-1",
-            providerResumeToken: null,
-            activeRunId: null,
-            lastError: null,
-            lastEventAt: 123,
-            expiresAt: null,
-            workspaceMode: "copy-on-conversation",
-            workspaceRootPath: "/repos/agent-a",
-            workspaceCwd: "/sandboxes/agent-a/user/chat",
-            updatedAt: 456,
+            chatId: "chats:1",
+            binding: {
+                provider: "codex",
+                status: "idle",
+                providerThreadId: "thread-1",
+                providerResumeToken: null,
+                activeRunId: null,
+                lastError: null,
+                lastEventAt: 123,
+                expiresAt: null,
+                workspaceMode: "copy-on-conversation",
+                workspaceRootPath: "/repos/agent-a",
+                workspaceCwd: "/sandboxes/agent-a/user/chat",
+                updatedAt: 456,
+            },
+        });
+    });
+
+    test("returns the chat id even when no runtime binding exists yet", async () => {
+        const chatUnique = mock(async () => ({
+            _id: "chats:1",
+        }));
+        const bindingUnique = mock(async () => null);
+        const query = (table: string) => {
+            if (table === "chats") {
+                return {
+                    withIndex: mock(() => ({
+                        unique: chatUnique,
+                    })),
+                };
+            }
+
+            return {
+                withIndex: mock(() => ({
+                    unique: bindingUnique,
+                })),
+            };
+        };
+        const ctx = {
+            db: {
+                query,
+            },
+        };
+
+        await expect(
+            runHandler(readRuntimeBinding as unknown as HandlerExport, ctx, {
+                userId: "users:test",
+                agentId: "agent-1",
+                conversationLocalId: "chat:1",
+            }),
+        ).resolves.toEqual({
+            chatId: "chats:1",
+            binding: null,
         });
     });
 
@@ -374,8 +418,11 @@ describe("runtime ingress", () => {
                 conversationLocalId: "chat-1",
             }),
         ).resolves.toMatchObject({
-            providerThreadId: "thread-b",
-            workspaceRootPath: "/repos/agent-b",
+            chatId: "chats:agent-b",
+            binding: {
+                providerThreadId: "thread-b",
+                workspaceRootPath: "/repos/agent-b",
+            },
         });
     });
 
@@ -427,6 +474,7 @@ describe("runtime ingress", () => {
                 userId: "users:test",
                 agentId: "agent-b",
                 conversationLocalId: "chat-1",
+                chatId: "chats:agent-b",
                 provider: "codex",
                 status: "active",
                 providerThreadId: "thread-new",
@@ -456,5 +504,196 @@ describe("runtime ingress", () => {
             workspaceCwd: undefined,
             updatedAt: 123,
         });
+    });
+
+    test("runtimeBinding no-ops when the local id now points at a different chat", async () => {
+        const insert = mock(async () => undefined);
+        const patch = mock(async () => undefined);
+        const chatUnique = mock(async () => ({
+            _id: "chats:new",
+        }));
+        const query = (table: string) => {
+            if (table === "chats") {
+                return {
+                    withIndex: mock(() => ({
+                        unique: chatUnique,
+                    })),
+                };
+            }
+
+            return {
+                withIndex: mock(() => ({
+                    unique: mock(async () => null),
+                })),
+            };
+        };
+        const ctx = {
+            db: {
+                query,
+                insert,
+                patch,
+            },
+        };
+
+        await expect(
+            runHandler(runtimeBinding as unknown as HandlerExport, ctx, {
+                userId: "users:test",
+                agentId: "agent-b",
+                conversationLocalId: "chat-1",
+                chatId: "chats:old",
+                provider: "codex",
+                status: "errored",
+                providerThreadId: "thread-old",
+                providerResumeToken: null,
+                activeRunId: null,
+                lastError: "stale",
+                lastEventAt: 123,
+                expiresAt: null,
+                updatedAt: 123,
+            }),
+        ).resolves.toBeNull();
+
+        expect(insert).not.toHaveBeenCalled();
+        expect(patch).not.toHaveBeenCalled();
+    });
+
+    test("messageDelta no-ops when the run belongs to an older chat", async () => {
+        const patch = mock(async () => undefined);
+        const insert = mock(async () => undefined);
+        const chatUnique = mock(async () => ({
+            _id: "chats:new",
+            updatedAt: 100,
+        }));
+        const runUnique = mock(async () => ({
+            _id: "runs:1",
+            chatId: "chats:old",
+            provider: "codex",
+            status: "running",
+            providerThreadId: "thread-old",
+        }));
+        const messageUnique = mock(async () => ({
+            _id: "messages:1",
+            chatId: "chats:new",
+        }));
+        const bindingUnique = mock(async () => null);
+        const query = mock((table: string) => {
+            if (table === "chats") {
+                return {
+                    withIndex: mock(() => ({
+                        unique: chatUnique,
+                    })),
+                };
+            }
+            if (table === "runs") {
+                return {
+                    withIndex: mock(() => ({
+                        unique: runUnique,
+                    })),
+                };
+            }
+            if (table === "messages") {
+                return {
+                    withIndex: mock(() => ({
+                        unique: messageUnique,
+                    })),
+                };
+            }
+
+            return {
+                withIndex: mock(() => ({
+                    unique: bindingUnique,
+                })),
+            };
+        });
+        const ctx = {
+            db: {
+                query,
+                patch,
+                insert,
+            },
+        };
+
+        await expect(
+            runHandler(messageDelta as unknown as HandlerExport, ctx, {
+                chatId: "chats:new",
+                userId: "users:test",
+                agentId: "agent-1",
+                conversationLocalId: "chat-1",
+                assistantMessageLocalId: "assistant-1",
+                externalRunId: "run:old",
+                sequence: 3,
+                content: "stale",
+                delta: "stale",
+                createdAt: 123,
+            }),
+        ).resolves.toBeUndefined();
+
+        expect(patch).not.toHaveBeenCalled();
+        expect(insert).not.toHaveBeenCalled();
+    });
+
+    test("runtimeBinding ignores older updates than the persisted binding", async () => {
+        const insert = mock(async () => undefined);
+        const patch = mock(async () => undefined);
+        const chatUnique = mock(async () => ({
+            _id: "chats:1",
+        }));
+        const bindingUnique = mock(async () => ({
+            _id: "runtimeBindings:1",
+            chatId: "chats:1",
+            userId: "users:test",
+            provider: "codex",
+            status: "idle",
+            providerThreadId: "thread-new",
+            providerResumeToken: null,
+            activeRunId: null,
+            lastError: null,
+            lastEventAt: 200,
+            expiresAt: null,
+            updatedAt: 200,
+        }));
+        const query = (table: string) => {
+            if (table === "chats") {
+                return {
+                    withIndex: mock(() => ({
+                        unique: chatUnique,
+                    })),
+                };
+            }
+
+            return {
+                withIndex: mock(() => ({
+                    unique: bindingUnique,
+                })),
+            };
+        };
+        const ctx = {
+            db: {
+                query,
+                insert,
+                patch,
+            },
+        };
+
+        await expect(
+            runHandler(runtimeBinding as unknown as HandlerExport, ctx, {
+                userId: "users:test",
+                agentId: "agent-1",
+                conversationLocalId: "chat:1",
+                chatId: "chats:1",
+                provider: "codex",
+                status: "expired",
+                providerThreadId: "thread-old",
+                providerResumeToken: null,
+                activeRunId: null,
+                lastError: null,
+                lastEventAt: 100,
+                expiresAt: 100,
+                updatedAt: 100,
+            }),
+        ).resolves.toBeNull();
+
+        expect(insert).not.toHaveBeenCalled();
+        expect(patch).not.toHaveBeenCalled();
     });
 });

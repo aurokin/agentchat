@@ -57,6 +57,22 @@ async function getChatByConversationId(
     return chat;
 }
 
+async function findCurrentChatByConversationId(
+    ctx: RuntimeMutationCtx,
+    args: {
+        userId: Id<"users">;
+        agentId: string;
+        conversationLocalId: string;
+        chatId: Id<"chats">;
+    },
+): Promise<Doc<"chats"> | null> {
+    const chat = await findChatByConversationId(ctx, args);
+    if (!chat || chat._id !== args.chatId) {
+        return null;
+    }
+    return chat;
+}
+
 async function findChatByConversationId(
     ctx: RuntimeMutationCtx | RuntimeQueryCtx,
     args: {
@@ -106,6 +122,17 @@ async function getMessageByLocalId(
             q.eq("userId", args.userId).eq("localId", args.localId),
         )
         .unique();
+}
+
+async function getMessageByLocalIdInChat(
+    ctx: RuntimeMutationCtx,
+    args: { userId: Id<"users">; chatId: Id<"chats">; localId: string },
+): Promise<Doc<"messages"> | null> {
+    const message = await getMessageByLocalId(ctx, args);
+    if (!message || message.chatId !== args.chatId) {
+        return null;
+    }
+    return message;
 }
 
 async function getRunByExternalId(
@@ -217,6 +244,9 @@ async function upsertRuntimeBinding(
     };
 
     if (existing) {
+        if (existing.updatedAt > args.updatedAt) {
+            return;
+        }
         await ctx.db.patch(existing._id, payload);
         return;
     }
@@ -228,6 +258,7 @@ async function updateAssistantMessage(
     ctx: RuntimeMutationCtx,
     args: {
         userId: Id<"users">;
+        chatId: Id<"chats">;
         localId: string;
         kind?: "assistant_message" | "assistant_status";
         content: string;
@@ -238,8 +269,9 @@ async function updateAssistantMessage(
         completedAt: number | null;
     },
 ): Promise<Doc<"messages">> {
-    const message = await getMessageByLocalId(ctx, {
+    const message = await getMessageByLocalIdInChat(ctx, {
         userId: args.userId,
+        chatId: args.chatId,
         localId: args.localId,
     });
     if (!message) {
@@ -290,6 +322,9 @@ async function createAssistantMessage(
         localId: args.localId,
     });
     if (existing) {
+        if (existing.chatId !== args.chatId) {
+            throw new Error("Assistant message not found");
+        }
         await ctx.db.patch(existing._id, {
             role: "assistant",
             kind: args.kind,
@@ -344,6 +379,7 @@ async function createAssistantMessage(
 
 export const runStarted = internalMutation({
     args: {
+        chatId: v.id("chats"),
         userId: v.id("users"),
         agentId: v.string(),
         conversationLocalId: v.string(),
@@ -356,17 +392,23 @@ export const runStarted = internalMutation({
         startedAt: v.number(),
     },
     handler: async (ctx, args) => {
-        const chat = await getChatByConversationId(ctx, {
+        const chat = await findCurrentChatByConversationId(ctx, {
             userId: args.userId,
             agentId: args.agentId,
             conversationLocalId: args.conversationLocalId,
+            chatId: args.chatId,
         });
-        const triggerMessage = await getMessageByLocalId(ctx, {
+        if (!chat) {
+            return { runId: null };
+        }
+        const triggerMessage = await getMessageByLocalIdInChat(ctx, {
             userId: args.userId,
+            chatId: chat._id,
             localId: args.triggerMessageLocalId,
         });
         const assistantMessage = await updateAssistantMessage(ctx, {
             userId: args.userId,
+            chatId: chat._id,
             localId: args.assistantMessageLocalId,
             kind: "assistant_message",
             content: "",
@@ -407,6 +449,9 @@ export const runStarted = internalMutation({
             }));
 
         if (existingRun) {
+            if (existingRun.chatId !== chat._id) {
+                return { runId: null };
+            }
             await ctx.db.patch(existingRun._id, {
                 status: "running",
                 triggerMessageId:
@@ -463,6 +508,7 @@ export const runStarted = internalMutation({
 
 export const messageStarted = internalMutation({
     args: {
+        chatId: v.id("chats"),
         userId: v.id("users"),
         agentId: v.string(),
         conversationLocalId: v.string(),
@@ -487,14 +533,21 @@ export const messageStarted = internalMutation({
         createdAt: v.number(),
     },
     handler: async (ctx, args) => {
-        const chat = await getChatByConversationId(ctx, {
+        const chat = await findCurrentChatByConversationId(ctx, {
             userId: args.userId,
             agentId: args.agentId,
             conversationLocalId: args.conversationLocalId,
+            chatId: args.chatId,
         });
+        if (!chat) {
+            return;
+        }
         const run = await getRunByExternalId(ctx, args.externalRunId);
         if (!run) {
             throw new Error("Run not found");
+        }
+        if (run.chatId !== chat._id) {
+            return;
         }
 
         if (isTerminalRunStatus(run.status)) {
@@ -503,6 +556,7 @@ export const messageStarted = internalMutation({
 
         const previousMessage = await updateAssistantMessage(ctx, {
             userId: args.userId,
+            chatId: chat._id,
             localId: args.previousAssistantMessageLocalId,
             kind: args.previousKind,
             content: args.previousContent,
@@ -584,29 +638,31 @@ export const readRuntimeBinding = internalQuery({
         }
 
         const binding = await getRuntimeBindingByChatIdForQuery(ctx, chat._id);
-        if (!binding) {
-            return null;
-        }
-
         return {
-            provider: binding.provider,
-            status: binding.status,
-            providerThreadId: binding.providerThreadId,
-            providerResumeToken: binding.providerResumeToken,
-            activeRunId: binding.activeRunId,
-            lastError: binding.lastError,
-            lastEventAt: binding.lastEventAt,
-            expiresAt: binding.expiresAt,
-            workspaceMode: binding.workspaceMode,
-            workspaceRootPath: binding.workspaceRootPath,
-            workspaceCwd: binding.workspaceCwd,
-            updatedAt: binding.updatedAt,
+            chatId: chat._id,
+            binding: binding
+                ? {
+                      provider: binding.provider,
+                      status: binding.status,
+                      providerThreadId: binding.providerThreadId,
+                      providerResumeToken: binding.providerResumeToken,
+                      activeRunId: binding.activeRunId,
+                      lastError: binding.lastError,
+                      lastEventAt: binding.lastEventAt,
+                      expiresAt: binding.expiresAt,
+                      workspaceMode: binding.workspaceMode,
+                      workspaceRootPath: binding.workspaceRootPath,
+                      workspaceCwd: binding.workspaceCwd,
+                      updatedAt: binding.updatedAt,
+                  }
+                : null,
         };
     },
 });
 
 export const messageDelta = internalMutation({
     args: {
+        chatId: v.id("chats"),
         userId: v.id("users"),
         agentId: v.string(),
         conversationLocalId: v.string(),
@@ -625,14 +681,21 @@ export const messageDelta = internalMutation({
         createdAt: v.number(),
     },
     handler: async (ctx, args) => {
-        const chat = await getChatByConversationId(ctx, {
+        const chat = await findCurrentChatByConversationId(ctx, {
             userId: args.userId,
             agentId: args.agentId,
             conversationLocalId: args.conversationLocalId,
+            chatId: args.chatId,
         });
+        if (!chat) {
+            return;
+        }
         const run = await getRunByExternalId(ctx, args.externalRunId);
         if (!run) {
             throw new Error("Run not found");
+        }
+        if (run.chatId !== chat._id) {
+            return;
         }
 
         // Guard: if the run already reached a terminal state (e.g. runCompleted
@@ -644,6 +707,7 @@ export const messageDelta = internalMutation({
 
         const assistantMessage = await updateAssistantMessage(ctx, {
             userId: args.userId,
+            chatId: chat._id,
             localId: args.assistantMessageLocalId,
             kind: args.kind,
             content: args.content,
@@ -682,6 +746,7 @@ export const messageDelta = internalMutation({
 });
 
 const terminalRunArgs = {
+    chatId: v.id("chats"),
     userId: v.id("users"),
     agentId: v.string(),
     conversationLocalId: v.string(),
@@ -695,6 +760,7 @@ const terminalRunArgs = {
 async function finalizeRun(
     ctx: RuntimeMutationCtx,
     args: {
+        chatId: Id<"chats">;
         userId: Id<"users">;
         agentId: string;
         conversationLocalId: string;
@@ -712,18 +778,26 @@ async function finalizeRun(
         errorMessage: string | null;
     },
 ): Promise<void> {
-    const chat = await getChatByConversationId(ctx, {
+    const chat = await findCurrentChatByConversationId(ctx, {
         userId: args.userId,
         agentId: args.agentId,
         conversationLocalId: args.conversationLocalId,
+        chatId: args.chatId,
     });
+    if (!chat) {
+        return;
+    }
     const run = await getRunByExternalId(ctx, args.externalRunId);
     if (!run) {
         throw new Error("Run not found");
     }
+    if (run.chatId !== chat._id) {
+        return;
+    }
 
     const assistantMessage = await updateAssistantMessage(ctx, {
         userId: args.userId,
+        chatId: chat._id,
         localId: args.assistantMessageLocalId,
         content: args.content,
         status: args.messageStatus,
@@ -837,6 +911,7 @@ export const runFailed = internalMutation({
 
 export const recoverStaleRun = internalMutation({
     args: {
+        chatId: v.id("chats"),
         userId: v.id("users"),
         agentId: v.string(),
         conversationLocalId: v.string(),
@@ -845,11 +920,15 @@ export const recoverStaleRun = internalMutation({
         errorMessage: v.string(),
     },
     handler: async (ctx, args) => {
-        const chat = await getChatByConversationId(ctx, {
+        const chat = await findCurrentChatByConversationId(ctx, {
             userId: args.userId,
             agentId: args.agentId,
             conversationLocalId: args.conversationLocalId,
+            chatId: args.chatId,
         });
+        if (!chat) {
+            return;
+        }
         const run = await getRunByExternalId(ctx, args.externalRunId);
         if (!run) {
             throw new Error("Run not found");
@@ -870,6 +949,7 @@ export const recoverStaleRun = internalMutation({
 
         const sequence = await getNextRunSequence(ctx, run._id);
         await finalizeRun(ctx, {
+            chatId: args.chatId,
             userId: args.userId,
             agentId: args.agentId,
             conversationLocalId: args.conversationLocalId,
@@ -956,6 +1036,7 @@ export const chatExistsByLocalId = internalQuery({
 
 export const runtimeBinding = internalMutation({
     args: {
+        chatId: v.id("chats"),
         userId: v.id("users"),
         agentId: v.string(),
         conversationLocalId: v.string(),
@@ -975,10 +1056,11 @@ export const runtimeBinding = internalMutation({
         updatedAt: v.number(),
     },
     handler: async (ctx, args) => {
-        const chat = await findChatByConversationId(ctx, {
+        const chat = await findCurrentChatByConversationId(ctx, {
             userId: args.userId,
             agentId: args.agentId,
             conversationLocalId: args.conversationLocalId,
+            chatId: args.chatId,
         });
         if (!chat) {
             return null;

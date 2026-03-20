@@ -14,6 +14,7 @@ import type {
     ServerEvent,
 } from "./socketProtocol.ts";
 import type {
+    PersistedConversationRuntimeState,
     PersistedRuntimeBinding,
     RuntimePersistenceClient,
 } from "./runtimePersistence.ts";
@@ -44,6 +45,7 @@ type ActiveTurn = {
 
 type ConversationRuntime = {
     key: string;
+    chatId: string;
     userId: string;
     conversationId: string;
     agentId: string;
@@ -333,6 +335,7 @@ export class CodexRuntimeManager {
 
                     const startedAt = Date.now();
                     await this.persistence.runtimeBinding({
+                        chatId: runtime.chatId,
                         userId: params.userId,
                         agentId: runtime.agentId,
                         conversationLocalId:
@@ -378,6 +381,7 @@ export class CodexRuntimeManager {
                     runtime.modelId = params.command.payload.modelId;
 
                     await this.persistence.runStarted({
+                        chatId: runtime.chatId,
                         userId: params.userId,
                         agentId: runtime.agentId,
                         conversationLocalId:
@@ -418,6 +422,7 @@ export class CodexRuntimeManager {
                     if (failedTurn) {
                         try {
                             await this.persistence.runFailed({
+                                chatId: runtime.chatId,
                                 userId: failedTurn.userId,
                                 agentId: runtime.agentId,
                                 conversationLocalId:
@@ -439,6 +444,7 @@ export class CodexRuntimeManager {
                     }
                     void this.persistence
                         .runtimeBinding({
+                            chatId: runtime.chatId,
                             userId: params.userId,
                             agentId: runtime.agentId,
                             conversationLocalId:
@@ -862,15 +868,12 @@ export class CodexRuntimeManager {
             conversationId: params.command.payload.conversationId,
             cwd,
         });
-        const persistedBinding =
-            shouldResetConversationState || workspaceState.wasReset
-                ? null
-                : await this.persistence.readRuntimeBinding({
-                      userId: params.userId,
-                      agentId: resources.agent.id,
-                      conversationLocalId:
-                          params.command.payload.conversationId,
-                  });
+        const persistedState = await this.readConversationPersistenceState({
+            userId: params.userId,
+            agentId: resources.agent.id,
+            conversationId: params.command.payload.conversationId,
+            allowMissingConversation: false,
+        });
         await this.throwIfRuntimeInitializationCancelled({
             initializationState,
             client,
@@ -879,6 +882,14 @@ export class CodexRuntimeManager {
             conversationId: params.command.payload.conversationId,
             cwd,
         });
+        invariant(
+            persistedState,
+            "Conversation not found during runtime initialization.",
+        );
+        const persistedBinding =
+            shouldResetConversationState || workspaceState.wasReset
+                ? null
+                : persistedState.binding;
         const resumableBinding =
             persistedBinding &&
             !shouldResetPersistedRuntimeBinding(
@@ -906,6 +917,7 @@ export class CodexRuntimeManager {
 
         const runtime: ConversationRuntime = {
             key,
+            chatId: persistedState.chatId,
             userId: params.userId,
             conversationId: params.command.payload.conversationId,
             agentId: resources.agent.id,
@@ -1050,17 +1062,41 @@ export class CodexRuntimeManager {
         }
     }
 
+    private async readConversationPersistenceState(params: {
+        userId: string;
+        agentId: string;
+        conversationId: string;
+        allowMissingConversation: boolean;
+    }): Promise<PersistedConversationRuntimeState | null> {
+        const persistedState = await this.persistence.readRuntimeBinding({
+            userId: params.userId,
+            agentId: params.agentId,
+            conversationLocalId: params.conversationId,
+        });
+        if (persistedState) {
+            return persistedState;
+        }
+        if (params.allowMissingConversation) {
+            return null;
+        }
+
+        throw new Error("Conversation not found");
+    }
+
     private async recoverOrphanedActiveRun(params: {
         userId: string;
         conversationId: string;
         agentId: string;
     }): Promise<void> {
-        const persistedBinding = await this.persistence.readRuntimeBinding({
+        const persistedState = await this.readConversationPersistenceState({
             userId: params.userId,
             agentId: params.agentId,
-            conversationLocalId: params.conversationId,
+            conversationId: params.conversationId,
+            allowMissingConversation: true,
         });
+        const persistedBinding = persistedState?.binding ?? null;
         if (
+            !persistedState ||
             !persistedBinding ||
             persistedBinding.status !== "active" ||
             !persistedBinding.activeRunId
@@ -1069,6 +1105,7 @@ export class CodexRuntimeManager {
         }
 
         await this.persistence.recoverStaleRun({
+            chatId: persistedState.chatId,
             userId: params.userId,
             agentId: params.agentId,
             conversationLocalId: params.conversationId,
@@ -1174,6 +1211,7 @@ export class CodexRuntimeManager {
             activeTurn.nextSequence += 2;
             void this.persistence
                 .runFailed({
+                    chatId: runtime.chatId,
                     userId: activeTurn.userId,
                     agentId: runtime.agentId,
                     conversationLocalId: runtime.conversationId,
@@ -1207,6 +1245,7 @@ export class CodexRuntimeManager {
 
         void this.persistence
             .runtimeBinding({
+                chatId: runtime.chatId,
                 userId: runtime.userId,
                 agentId: runtime.agentId,
                 conversationLocalId: runtime.conversationId,
@@ -1302,6 +1341,7 @@ export class CodexRuntimeManager {
 
             void this.persistence
                 .messageDelta({
+                    chatId: runtime.chatId,
                     userId: activeTurn.userId,
                     agentId: runtime.agentId,
                     conversationLocalId: runtime.conversationId,
@@ -1438,6 +1478,7 @@ export class CodexRuntimeManager {
 
         const pendingMessageStartPersistence = this.persistence
             .messageStarted({
+                chatId: runtime.chatId,
                 userId: activeTurn.userId,
                 agentId: runtime.agentId,
                 conversationLocalId: runtime.conversationId,
@@ -1509,6 +1550,7 @@ export class CodexRuntimeManager {
         if (params.finalStatus === "completed") {
             void this.persistence
                 .runCompleted({
+                    chatId: runtime.chatId,
                     userId: activeTurn.userId,
                     agentId: runtime.agentId,
                     conversationLocalId: runtime.conversationId,
@@ -1541,6 +1583,7 @@ export class CodexRuntimeManager {
         if (params.finalStatus === "interrupted") {
             void this.persistence
                 .runInterrupted({
+                    chatId: runtime.chatId,
                     userId: activeTurn.userId,
                     agentId: runtime.agentId,
                     conversationLocalId: runtime.conversationId,
@@ -1578,6 +1621,7 @@ export class CodexRuntimeManager {
 
         void this.persistence
             .runFailed({
+                chatId: runtime.chatId,
                 userId: activeTurn.userId,
                 agentId: runtime.agentId,
                 conversationLocalId: runtime.conversationId,
@@ -1627,6 +1671,7 @@ export class CodexRuntimeManager {
 
             void this.persistence
                 .runtimeBinding({
+                    chatId: runtime.chatId,
                     userId: runtime.userId,
                     agentId: runtime.agentId,
                     conversationLocalId: runtime.conversationId,
@@ -1707,6 +1752,7 @@ export class CodexRuntimeManager {
         activeTurn.lastPersistedContent = activeTurn.text;
 
         await this.persistence.messageDelta({
+            chatId: runtime.chatId,
             userId: activeTurn.userId,
             agentId: runtime.agentId,
             conversationLocalId: runtime.conversationId,

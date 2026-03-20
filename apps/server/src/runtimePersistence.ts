@@ -15,6 +15,11 @@ export type PersistedRuntimeBinding = {
     updatedAt: number;
 };
 
+export type PersistedConversationRuntimeState = {
+    chatId: string;
+    binding: PersistedRuntimeBinding | null;
+};
+
 function trimTrailingSlash(value: string): string {
     return value.replace(/\/+$/, "");
 }
@@ -80,13 +85,13 @@ export class RuntimePersistenceClient {
         userId: string;
         agentId: string;
         conversationLocalId: string;
-    }): Promise<PersistedRuntimeBinding | null> {
+    }): Promise<PersistedConversationRuntimeState | null> {
         const response = await this.post(
             "/runtime/runtime-binding/read",
             payload,
         );
         const result =
-            (await response.json()) as PersistedRuntimeBinding | null;
+            (await response.json()) as PersistedConversationRuntimeState | null;
         return result;
     }
 
