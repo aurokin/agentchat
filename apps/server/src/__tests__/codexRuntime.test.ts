@@ -12,6 +12,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 
 import type { AgentchatConfig } from "../config.ts";
 import type { RuntimePersistenceClient } from "../runtimePersistence.ts";
+import type { ServerEvent } from "../socketProtocol.ts";
 import { WorkspaceManager } from "../workspaceManager.ts";
 import {
     buildInitialTurnText,
@@ -103,6 +104,7 @@ type FakeClientOptions = {
     turnId?: string;
     autoComplete?: boolean;
     turnStartError?: Error;
+    initializePromise?: Promise<void>;
 };
 
 class FakeCodexClient {
@@ -117,6 +119,7 @@ class FakeCodexClient {
     }
 
     async initialize(): Promise<void> {
+        await this.options.initializePromise;
         return undefined;
     }
 
@@ -289,6 +292,31 @@ function createWorkspaceManager(
             "sandbox-roots.json",
         ),
     });
+}
+
+function createDeferred<T>(): {
+    promise: Promise<T>;
+    resolve: (value: T | PromiseLike<T>) => void;
+    reject: (reason?: unknown) => void;
+} {
+    let resolve!: (value: T | PromiseLike<T>) => void;
+    let reject!: (reason?: unknown) => void;
+    const promise = new Promise<T>((promiseResolve, promiseReject) => {
+        resolve = promiseResolve;
+        reject = promiseReject;
+    });
+    return { promise, resolve, reject };
+}
+
+async function waitFor(condition: () => boolean): Promise<void> {
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+        if (condition()) {
+            return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+
+    throw new Error("Timed out waiting for test condition.");
 }
 
 function createCommand() {
@@ -994,6 +1022,89 @@ describe("CodexRuntimeManager", () => {
         expect(clients).toHaveLength(1);
     });
 
+    test("ignores queued idle-expiration callbacks after a new run starts", async () => {
+        const originalSetTimeout = globalThis.setTimeout;
+        const originalClearTimeout = globalThis.clearTimeout;
+        const scheduledCallbacks: Array<() => void> = [];
+
+        globalThis.setTimeout = (((handler: TimerHandler) => {
+            if (typeof handler === "function") {
+                scheduledCallbacks.push(handler as () => void);
+            }
+            return Symbol("timeout") as unknown as ReturnType<
+                typeof setTimeout
+            >;
+        }) as unknown) as typeof setTimeout;
+        globalThis.clearTimeout = (() => undefined) as typeof clearTimeout;
+
+        try {
+            const config = createConfig();
+            const persistence = createPersistence(null);
+            const fakeClient = new FakeCodexClient({
+                startedThreadId: "thread-fresh",
+                autoComplete: false,
+            });
+            const manager = new CodexRuntimeManager({
+                getConfig: () => config,
+                persistence: persistence as unknown as RuntimePersistenceClient,
+                createClient: () => fakeClient,
+            });
+            const runtime: Record<string, unknown> = {
+                key: JSON.stringify(["user-1", "agent-1", "chat-1"]),
+                userId: "user-1",
+                conversationId: "chat-1",
+                agentId: "agent-1",
+                modelId: "gpt-5.3-codex",
+                provider: config.providers[0]!,
+                agent: config.agents[0]!,
+                cwd: config.agents[0]!.rootPath,
+                client: fakeClient,
+                threadId: "thread-fresh",
+                activeTurn: null,
+                idleTimer: null,
+                subscribers: new Map(),
+            };
+
+            (
+                manager as unknown as {
+                    runtimes: Map<string, Record<string, unknown>>;
+                    scheduleIdleExpiration: (
+                        runtime: Record<string, unknown>,
+                    ) => void;
+                }
+            ).runtimes.set(runtime.key as string, runtime);
+            (
+                manager as unknown as {
+                    scheduleIdleExpiration: (
+                        runtime: Record<string, unknown>,
+                    ) => void;
+                }
+            ).scheduleIdleExpiration(runtime);
+
+            const queuedIdleCallback = scheduledCallbacks[0];
+            expect(queuedIdleCallback).toBeDefined();
+
+            runtime.idleTimer = null;
+            runtime.activeTurn = {
+                reject: () => undefined,
+            };
+
+            queuedIdleCallback?.();
+
+            expect(fakeClient.stopped).toBe(false);
+            expect(
+                (
+                    manager as unknown as {
+                        runtimes: Map<string, unknown>;
+                    }
+                ).runtimes.get(runtime.key as string),
+            ).toBe(runtime);
+        } finally {
+            globalThis.setTimeout = originalSetTimeout;
+            globalThis.clearTimeout = originalClearTimeout;
+        }
+    });
+
     test("promotes Codex agent reasoning into an assistant status message before output", async () => {
         const config = createConfig();
         const persistence = createPersistence(null);
@@ -1347,6 +1458,77 @@ describe("CodexRuntimeManager", () => {
             lastError: "Codex process exited unexpectedly",
             activeRunId: null,
         });
+    });
+
+    test("does not complete a turn after the runtime was deleted mid-finalization", async () => {
+        const config = createConfig();
+        const persistence = createPersistence(null);
+        const fakeClient = new FakeCodexClient({
+            startedThreadId: "thread-fresh",
+            autoComplete: false,
+        });
+        const messageStartedDeferred = createDeferred<void>();
+        persistence.messageStarted = async (
+            payload: Record<string, unknown>,
+        ) => {
+            persistence.messageStartedCalls.push(payload);
+            await messageStartedDeferred.promise;
+        };
+        const eventTypes: ServerEvent["type"][] = [];
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: () => fakeClient,
+        });
+
+        const sendPromise = manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: (event) => {
+                eventTypes.push(event.type);
+            },
+        });
+        await Bun.sleep(0);
+
+        fakeClient.emit({
+            method: "codex/event/agent_reasoning",
+            params: {
+                msg: {
+                    text: "Thinking",
+                },
+            },
+        });
+        fakeClient.emit({
+            method: "item/agentMessage/delta",
+            params: {
+                delta: "Final answer",
+            },
+        });
+        fakeClient.emit({
+            method: "turn/completed",
+            params: {
+                turn: {
+                    status: "completed",
+                },
+            },
+        });
+
+        await waitFor(() => persistence.messageStartedCalls.length === 1);
+
+        const deletePromise = manager.deleteConversationWorkspace({
+            userId: "user-1",
+            conversationId: "chat-1",
+            agentId: "agent-1",
+        });
+        messageStartedDeferred.resolve();
+
+        await sendPromise;
+        await deletePromise;
+
+        expect(persistence.runCompletedCalls).toHaveLength(0);
+        expect(eventTypes.includes("run.completed")).toBe(false);
+        expect(fakeClient.stopped).toBe(true);
     });
 
     test("interrupt is a no-op when no active run exists", async () => {
@@ -2008,6 +2190,95 @@ describe("CodexRuntimeManager", () => {
             {
                 userId: "user-1",
                 agentId: "agent-2",
+                localId: "chat-1",
+            },
+        ]);
+    });
+
+    test("cancels pending runtime initialization when the conversation is deleted", async () => {
+        const sandboxRoot = makeTempDir("sandbox");
+        const agentRoot = makeTempDir("agent-root");
+        writeFileSync(path.join(agentRoot, "version.txt"), "first");
+
+        const config = createConfig();
+        config.sandboxRoot = sandboxRoot;
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath: agentRoot,
+            workspaceMode: "copy-on-conversation",
+        };
+
+        const workspaceManager = createWorkspaceManager(() => config);
+        const persistence = createPersistence(null);
+        const initializeDeferred = createDeferred<void>();
+        const client = new FakeCodexClient({
+            autoComplete: false,
+            initializePromise: initializeDeferred.promise,
+        });
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            workspaceManager,
+            createClient: () => client,
+        });
+        const command = createCommand();
+        const workspacePath = workspaceManager.getWorkspacePath(
+            "agent-1",
+            "user-1",
+            command.payload.conversationId,
+        );
+
+        const sendPromise = manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "sub-1",
+            command,
+            sendEvent: () => undefined,
+        });
+
+        await waitFor(
+            () =>
+                (
+                    manager as unknown as {
+                        pendingRuntimeInitializations: Map<string, unknown>;
+                    }
+                ).pendingRuntimeInitializations.size === 1 &&
+                existsSync(workspacePath),
+        );
+
+        const deletePromise = manager.deleteConversationWorkspace({
+            userId: "user-1",
+            conversationId: command.payload.conversationId,
+            agentId: command.payload.agentId,
+        });
+
+        initializeDeferred.resolve();
+
+        await expect(sendPromise).rejects.toThrow(
+            "Conversation deleted during runtime initialization.",
+        );
+        await deletePromise;
+
+        expect(client.stopped).toBe(true);
+        expect(client.requests).toEqual([]);
+        expect(existsSync(workspacePath)).toBe(false);
+        expect(
+            (
+                manager as unknown as {
+                    runtimes: Map<string, unknown>;
+                }
+            ).runtimes.size,
+        ).toBe(0);
+        expect(
+            (
+                manager as unknown as {
+                    pendingRuntimeInitializations: Map<string, unknown>;
+                }
+            ).pendingRuntimeInitializations.size,
+        ).toBe(0);
+        expect(persistence.chatExistsCalls).toEqual([
+            {
+                userId: "user-1",
+                agentId: "agent-1",
                 localId: "chat-1",
             },
         ]);
