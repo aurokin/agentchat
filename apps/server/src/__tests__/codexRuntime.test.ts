@@ -3,6 +3,7 @@ import {
     mkdtempSync,
     readFileSync,
     rmSync,
+    symlinkSync,
     writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -1805,6 +1806,69 @@ describe("CodexRuntimeManager", () => {
         expect(existsSync(secondSandboxPath)).toBe(true);
     });
 
+    test("does not recycle copied runtimes when sandboxRoot changes only by symlink alias", async () => {
+        const sandboxRoot = makeTempDir("sandbox-real");
+        const sandboxAliasParent = makeTempDir("sandbox-alias");
+        const sandboxAlias = path.join(sandboxAliasParent, "linked-sandbox");
+        symlinkSync(sandboxRoot, sandboxAlias, "dir");
+        const agentRoot = makeTempDir("agent-root");
+        writeFileSync(path.join(agentRoot, "version.txt"), "shared");
+
+        const config = createConfig();
+        config.sandboxRoot = sandboxAlias;
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath: agentRoot,
+            workspaceMode: "copy-on-conversation",
+        };
+
+        const workspaceManager = createWorkspaceManager(() => config);
+        const sandboxesUsed: string[] = [];
+        const clients: FakeCodexClient[] = [];
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: createPersistence(
+                null,
+            ) as unknown as RuntimePersistenceClient,
+            workspaceManager,
+            createClient: (params) => {
+                sandboxesUsed.push(params.agent.rootPath);
+                const client = new FakeCodexClient();
+                clients.push(client);
+                return client;
+            },
+        });
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        const sandboxPath = sandboxesUsed[0];
+        if (!sandboxPath) {
+            throw new Error("Expected the copied sandbox path");
+        }
+        writeFileSync(path.join(sandboxPath, "session.txt"), "keep");
+
+        config.sandboxRoot = sandboxRoot;
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        expect(clients).toHaveLength(1);
+        expect(clients[0]?.stopped).toBe(false);
+        expect(sandboxesUsed).toEqual([sandboxPath]);
+        expect(
+            readFileSync(path.join(sandboxPath, "session.txt"), "utf8"),
+        ).toBe("keep");
+    });
+
     test("does not delete another agent's copied workspace during runtime recycle", async () => {
         const sandboxRoot = makeTempDir("sandbox");
         const agentRootA = makeTempDir("agent-root-a");
@@ -1993,6 +2057,54 @@ describe("CodexRuntimeManager", () => {
         expect(
             readFileSync(path.join(initialWorkspace, "version.txt"), "utf8"),
         ).toBe("second");
+    });
+
+    test("resumes persisted threads after reopening a shared runtime when rootPath changes only by symlink alias", async () => {
+        const realRoot = makeTempDir("agent-root-real");
+        const aliasParent = makeTempDir("agent-root-alias");
+        const aliasRoot = path.join(aliasParent, "linked-root");
+        symlinkSync(realRoot, aliasRoot, "dir");
+
+        const config = createConfig();
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath: realRoot,
+            workspaceMode: "shared",
+        };
+
+        const persistence = createPersistence({
+            provider: "codex-default",
+            status: "idle",
+            providerThreadId: "thread-existing",
+            workspaceMode: "shared",
+            workspaceRootPath: aliasRoot,
+            workspaceCwd: aliasRoot,
+        });
+        const clients: FakeCodexClient[] = [];
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: () => {
+                const client = new FakeCodexClient({
+                    resumedThreadId: "thread-existing",
+                });
+                clients.push(client);
+                return client;
+            },
+        });
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        expect(clients).toHaveLength(1);
+        expect(clients[0]?.requests.map((request) => request.method)).toEqual([
+            "thread/resume",
+            "turn/start",
+        ]);
     });
 
     test("does not resume persisted threads after a copied workspace is recreated", async () => {
@@ -2285,5 +2397,63 @@ describe("CodexRuntimeManager", () => {
                 localId: "chat-1",
             },
         ]);
+    });
+
+    test("cleans up copied workspace and client when conversation lookup fails during initialization", async () => {
+        const sandboxRoot = makeTempDir("sandbox");
+        const agentRoot = makeTempDir("agent-root");
+        writeFileSync(path.join(agentRoot, "version.txt"), "first");
+
+        const config = createConfig();
+        config.sandboxRoot = sandboxRoot;
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath: agentRoot,
+            workspaceMode: "copy-on-conversation",
+        };
+
+        const workspaceManager = createWorkspaceManager(() => config);
+        const persistence = createPersistence(null);
+        persistence.readRuntimeBinding = (async (
+            payload: Parameters<typeof persistence.readRuntimeBinding>[0],
+        ) => {
+            persistence.readRuntimeBindingCalls.push(payload);
+            return null;
+        }) as unknown as typeof persistence.readRuntimeBinding;
+        const client = new FakeCodexClient({
+            autoComplete: false,
+        });
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            workspaceManager,
+            createClient: () => client,
+        });
+        const command = createCommand();
+        const workspacePath = workspaceManager.getWorkspacePath(
+            "agent-1",
+            "user-1",
+            command.payload.conversationId,
+        );
+
+        await expect(
+            manager.sendMessage({
+                userId: "user-1",
+                subscriberId: "sub-1",
+                command,
+                sendEvent: () => undefined,
+            }),
+        ).rejects.toThrow("Conversation not found");
+
+        expect(client.stopped).toBe(true);
+        expect(client.requests).toEqual([]);
+        expect(existsSync(workspacePath)).toBe(false);
+        expect(
+            (
+                manager as unknown as {
+                    runtimes: Map<string, unknown>;
+                }
+            ).runtimes.size,
+        ).toBe(0);
     });
 });

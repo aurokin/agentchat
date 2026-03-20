@@ -5,6 +5,7 @@ import {
     listAllChatLocalIds,
     messageDelta,
     readRuntimeBinding,
+    runStarted,
     runtimeBinding,
 } from "../runtimeIngress";
 
@@ -695,5 +696,110 @@ describe("runtime ingress", () => {
 
         expect(insert).not.toHaveBeenCalled();
         expect(patch).not.toHaveBeenCalled();
+    });
+
+    test("readRuntimeBinding resolves legacy chats even when the _id has no colon", async () => {
+        const byConversationLocalIdUnique = mock(async () => null);
+        const byUserCollect = mock(async () => [
+            {
+                _id: "legacychatid",
+                agentId: "agent-1",
+                userId: "users:test",
+                localId: undefined,
+            },
+        ]);
+        const bindingUnique = mock(async () => ({
+            provider: "codex",
+            status: "idle",
+            providerThreadId: "thread-legacy",
+            providerResumeToken: null,
+            activeRunId: null,
+            lastError: null,
+            lastEventAt: 123,
+            expiresAt: null,
+            updatedAt: 456,
+        }));
+        const query = (table: string) => {
+            if (table === "chats") {
+                return {
+                    withIndex: mock((indexName: string) => {
+                        if (indexName === "by_userId_and_agentId_and_localId") {
+                            return {
+                                unique: byConversationLocalIdUnique,
+                            };
+                        }
+                        return { collect: byUserCollect };
+                    }),
+                };
+            }
+
+            return {
+                withIndex: mock(() => ({
+                    unique: bindingUnique,
+                })),
+            };
+        };
+        const ctx = {
+            db: {
+                query,
+            },
+        };
+
+        await expect(
+            runHandler(readRuntimeBinding as unknown as HandlerExport, ctx, {
+                userId: "users:test",
+                agentId: "agent-1",
+                conversationLocalId: "legacychatid",
+            }),
+        ).resolves.toMatchObject({
+            chatId: "legacychatid",
+            binding: {
+                providerThreadId: "thread-legacy",
+            },
+        });
+    });
+
+    test("runStarted throws when the conversation now resolves to a different chat", async () => {
+        const chatUnique = mock(async () => ({
+            _id: "chats:new",
+        }));
+        const query = (table: string) => {
+            if (table === "chats") {
+                return {
+                    withIndex: mock(() => ({
+                        unique: chatUnique,
+                    })),
+                };
+            }
+
+            return {
+                withIndex: mock(() => ({
+                    unique: mock(async () => null),
+                })),
+            };
+        };
+        const ctx = {
+            db: {
+                query,
+                patch: mock(async () => undefined),
+                insert: mock(async () => "runs:1"),
+            },
+        };
+
+        await expect(
+            runHandler(runStarted as unknown as HandlerExport, ctx, {
+                chatId: "chats:old",
+                userId: "users:test",
+                agentId: "agent-1",
+                conversationLocalId: "chat-1",
+                triggerMessageLocalId: "user-1",
+                assistantMessageLocalId: "assistant-1",
+                externalRunId: "run-1",
+                provider: "codex",
+                providerThreadId: "thread-1",
+                providerTurnId: "turn-1",
+                startedAt: 123,
+            }),
+        ).rejects.toThrow("Conversation not found");
     });
 });

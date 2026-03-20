@@ -2,6 +2,7 @@ import path from "node:path";
 import { statSync } from "node:fs";
 
 import type { AgentchatConfig, AgentConfig, ProviderConfig } from "./config.ts";
+import { canonicalizePathForComparison } from "./pathComparison.ts";
 import {
     CodexAppServerClient,
     type CodexClient,
@@ -834,119 +835,134 @@ export class CodexRuntimeManager {
             }
         }
 
-        const workspaceState = this.workspaceManager
-            ? await this.workspaceManager.ensureWorkspaceState(
-                  resources.agent,
-                  params.userId,
-                  params.command.payload.conversationId,
-              )
-            : { path: resources.agent.rootPath, wasReset: false };
-        const cwd = workspaceState.path;
-        await this.throwIfRuntimeInitializationCancelled({
-            initializationState,
-            client: null,
-            agent: resources.agent,
-            userId: params.userId,
-            conversationId: params.command.payload.conversationId,
-            cwd,
-        });
-        const workspaceIdentity = getRuntimeWorkspaceIdentity(
-            resources.agent,
-            cwd,
-        );
+        let cwd = resources.agent.rootPath;
+        let client: CodexClient | null = null;
+        try {
+            const workspaceState = this.workspaceManager
+                ? await this.workspaceManager.ensureWorkspaceState(
+                      resources.agent,
+                      params.userId,
+                      params.command.payload.conversationId,
+                  )
+                : { path: resources.agent.rootPath, wasReset: false };
+            cwd = workspaceState.path;
+            await this.throwIfRuntimeInitializationCancelled({
+                initializationState,
+                client: null,
+                agent: resources.agent,
+                userId: params.userId,
+                conversationId: params.command.payload.conversationId,
+                cwd,
+            });
+            const workspaceIdentity = getRuntimeWorkspaceIdentity(
+                resources.agent,
+                cwd,
+            );
 
-        const client = this.createClient({
-            provider: resources.provider,
-            agent: { ...resources.agent, rootPath: cwd },
-        });
-        await client.initialize();
-        await this.throwIfRuntimeInitializationCancelled({
-            initializationState,
-            client,
-            agent: resources.agent,
-            userId: params.userId,
-            conversationId: params.command.payload.conversationId,
-            cwd,
-        });
-        const persistedState = await this.readConversationPersistenceState({
-            userId: params.userId,
-            agentId: resources.agent.id,
-            conversationId: params.command.payload.conversationId,
-            allowMissingConversation: false,
-        });
-        await this.throwIfRuntimeInitializationCancelled({
-            initializationState,
-            client,
-            agent: resources.agent,
-            userId: params.userId,
-            conversationId: params.command.payload.conversationId,
-            cwd,
-        });
-        invariant(
-            persistedState,
-            "Conversation not found during runtime initialization.",
-        );
-        const persistedBinding =
-            shouldResetConversationState || workspaceState.wasReset
-                ? null
-                : persistedState.binding;
-        const resumableBinding =
-            persistedBinding &&
-            !shouldResetPersistedRuntimeBinding(
-                persistedBinding,
-                workspaceIdentity,
-                this.canReuseLegacySharedBinding(persistedBinding),
-            )
-                ? persistedBinding
-                : null;
-        const { threadId, isNew } = await this.openThread({
-            client,
-            resources,
-            binding: resumableBinding,
-            modelId: params.command.payload.modelId,
-            cwd,
-        });
-        await this.throwIfRuntimeInitializationCancelled({
-            initializationState,
-            client,
-            agent: resources.agent,
-            userId: params.userId,
-            conversationId: params.command.payload.conversationId,
-            cwd,
-        });
+            client = this.createClient({
+                provider: resources.provider,
+                agent: { ...resources.agent, rootPath: cwd },
+            });
+            await client.initialize();
+            await this.throwIfRuntimeInitializationCancelled({
+                initializationState,
+                client,
+                agent: resources.agent,
+                userId: params.userId,
+                conversationId: params.command.payload.conversationId,
+                cwd,
+            });
+            const persistedState = await this.readConversationPersistenceState({
+                userId: params.userId,
+                agentId: resources.agent.id,
+                conversationId: params.command.payload.conversationId,
+                allowMissingConversation: false,
+            });
+            await this.throwIfRuntimeInitializationCancelled({
+                initializationState,
+                client,
+                agent: resources.agent,
+                userId: params.userId,
+                conversationId: params.command.payload.conversationId,
+                cwd,
+            });
+            invariant(
+                persistedState,
+                "Conversation not found during runtime initialization.",
+            );
+            const persistedBinding =
+                shouldResetConversationState || workspaceState.wasReset
+                    ? null
+                    : persistedState.binding;
+            const resumableBinding =
+                persistedBinding &&
+                !shouldResetPersistedRuntimeBinding(
+                    persistedBinding,
+                    workspaceIdentity,
+                    this.canReuseLegacySharedBinding(persistedBinding),
+                )
+                    ? persistedBinding
+                    : null;
+            const { threadId, isNew } = await this.openThread({
+                client,
+                resources,
+                binding: resumableBinding,
+                modelId: params.command.payload.modelId,
+                cwd,
+            });
+            await this.throwIfRuntimeInitializationCancelled({
+                initializationState,
+                client,
+                agent: resources.agent,
+                userId: params.userId,
+                conversationId: params.command.payload.conversationId,
+                cwd,
+            });
 
-        const runtime: ConversationRuntime = {
-            key,
-            chatId: persistedState.chatId,
-            userId: params.userId,
-            conversationId: params.command.payload.conversationId,
-            agentId: resources.agent.id,
-            modelId: params.command.payload.modelId,
-            provider: resources.provider,
-            agent: resources.agent,
-            cwd,
-            client,
-            threadId,
-            activeTurn: null,
-            idleTimer: null,
-            subscribers: new Map(),
-        };
+            const runtime: ConversationRuntime = {
+                key,
+                chatId: persistedState.chatId,
+                userId: params.userId,
+                conversationId: params.command.payload.conversationId,
+                agentId: resources.agent.id,
+                modelId: params.command.payload.modelId,
+                provider: resources.provider,
+                agent: resources.agent,
+                cwd,
+                client,
+                threadId,
+                activeTurn: null,
+                idleTimer: null,
+                subscribers: new Map(),
+            };
 
-        const pendingSubscribers = this.pendingSubscriptions.get(key);
-        if (pendingSubscribers) {
-            runtime.subscribers = new Map(pendingSubscribers);
-            this.pendingSubscriptions.delete(key);
+            const pendingSubscribers = this.pendingSubscriptions.get(key);
+            if (pendingSubscribers) {
+                runtime.subscribers = new Map(pendingSubscribers);
+                this.pendingSubscriptions.delete(key);
+            }
+
+            client.onNotification((notification) => {
+                this.handleNotification(runtime, notification);
+            });
+            client.onExit((error) => {
+                this.handleRuntimeExit(runtime, error);
+            });
+
+            this.runtimes.set(key, runtime);
+            return { runtime, isNew };
+        } catch (error) {
+            if (initializationState.cancelReason !== error) {
+                await this.cleanupFailedRuntimeInitialization({
+                    agent: resources.agent,
+                    userId: params.userId,
+                    conversationId: params.command.payload.conversationId,
+                    cwd,
+                    client,
+                });
+            }
+            throw error;
         }
-
-        client.onNotification((notification) => {
-            this.handleNotification(runtime, notification);
-        });
-        client.onExit((error) => {
-            this.handleRuntimeExit(runtime, error);
-        });
-
-        this.runtimes.set(key, runtime);
-        return { runtime, isNew };
     }
 
     private async throwIfRuntimeInitializationCancelled(params: {
@@ -974,6 +990,26 @@ export class CodexRuntimeManager {
             );
         }
         throw cancelReason;
+    }
+
+    private async cleanupFailedRuntimeInitialization(params: {
+        agent: AgentConfig;
+        userId: string;
+        conversationId: string;
+        cwd: string;
+        client: CodexClient | null;
+    }): Promise<void> {
+        params.client?.stop();
+        if (
+            this.workspaceManager &&
+            params.agent.workspaceMode === "copy-on-conversation"
+        ) {
+            await this.workspaceManager.deleteWorkspace(
+                params.agent.id,
+                params.userId,
+                params.conversationId,
+            );
+        }
     }
 
     private addConversationSubscription(
@@ -1851,15 +1887,12 @@ function shouldRecycleRuntime(
         return true;
     }
 
-    if (runtime.agent.rootPath !== resources.agent.rootPath) {
-        return true;
-    }
-
-    if (runtime.agent.workspaceMode !== resources.agent.workspaceMode) {
-        return true;
-    }
-
-    if (runtime.cwd !== desiredCwd) {
+    if (
+        !runtimeWorkspaceMatches(
+            getRuntimeWorkspaceIdentity(runtime.agent, runtime.cwd),
+            getRuntimeWorkspaceIdentity(resources.agent, desiredCwd),
+        )
+    ) {
         return true;
     }
 
@@ -1884,9 +1917,10 @@ function shouldResetRuntimeState(
 ): boolean {
     return (
         runtime.agent.id !== resources.agent.id ||
-        runtime.agent.rootPath !== resources.agent.rootPath ||
-        runtime.agent.workspaceMode !== resources.agent.workspaceMode ||
-        runtime.cwd !== desiredCwd
+        !runtimeWorkspaceMatches(
+            getRuntimeWorkspaceIdentity(runtime.agent, runtime.cwd),
+            getRuntimeWorkspaceIdentity(resources.agent, desiredCwd),
+        )
     );
 }
 
@@ -1896,8 +1930,8 @@ function getRuntimeWorkspaceIdentity(
 ): RuntimeWorkspaceIdentity {
     return {
         workspaceMode: agent.workspaceMode,
-        workspaceRootPath: agent.rootPath,
-        workspaceCwd: cwd,
+        workspaceRootPath: canonicalizePathForComparison(agent.rootPath),
+        workspaceCwd: canonicalizePathForComparison(cwd),
     };
 }
 
@@ -1915,11 +1949,43 @@ function shouldResetPersistedRuntimeBinding(
         return !allowLegacySharedBindingReuse;
     }
 
-    return (
-        binding.workspaceMode !== desired.workspaceMode ||
-        binding.workspaceRootPath !== desired.workspaceRootPath ||
-        binding.workspaceCwd !== desired.workspaceCwd
+    return !runtimeWorkspaceMatches(
+        {
+            workspaceMode: binding.workspaceMode,
+            workspaceRootPath: binding.workspaceRootPath,
+            workspaceCwd: binding.workspaceCwd,
+        },
+        desired,
     );
+}
+
+function runtimeWorkspaceMatches(
+    current:
+        | RuntimeWorkspaceIdentity
+        | {
+              workspaceMode?: "shared" | "copy-on-conversation";
+              workspaceRootPath?: string;
+              workspaceCwd?: string;
+          },
+    desired: RuntimeWorkspaceIdentity,
+): boolean {
+    return (
+        current.workspaceMode === desired.workspaceMode &&
+        canonicalizeRuntimeWorkspacePath(current.workspaceRootPath) ===
+            desired.workspaceRootPath &&
+        canonicalizeRuntimeWorkspacePath(current.workspaceCwd) ===
+            desired.workspaceCwd
+    );
+}
+
+function canonicalizeRuntimeWorkspacePath(
+    targetPath: string | undefined,
+): string | undefined {
+    if (targetPath === undefined) {
+        return undefined;
+    }
+
+    return canonicalizePathForComparison(targetPath);
 }
 
 function getDesiredRuntimeCwd(params: {

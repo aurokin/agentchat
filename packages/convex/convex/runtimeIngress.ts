@@ -94,10 +94,6 @@ async function findChatByConversationId(
         return chat;
     }
 
-    if (!args.conversationLocalId.includes(":")) {
-        return null;
-    }
-
     const legacyChats = await ctx.db
         .query("chats")
         .withIndex("by_user", (q) => q.eq("userId", args.userId))
@@ -399,7 +395,7 @@ export const runStarted = internalMutation({
             chatId: args.chatId,
         });
         if (!chat) {
-            return { runId: null };
+            throw new Error("Conversation not found");
         }
         const triggerMessage = await getMessageByLocalIdInChat(ctx, {
             userId: args.userId,
@@ -450,7 +446,7 @@ export const runStarted = internalMutation({
 
         if (existingRun) {
             if (existingRun.chatId !== chat._id) {
-                return { runId: null };
+                throw new Error("Run does not belong to conversation");
             }
             await ctx.db.patch(existingRun._id, {
                 status: "running",
