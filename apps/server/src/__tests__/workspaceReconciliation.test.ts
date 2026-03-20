@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import type { AgentConfig } from "../config.ts";
+import { getWorkspaceActiveKey } from "../workspaceManager.ts";
 import {
     filterPersistedWorkspaceEntries,
     getCopyOnConversationAgentIds,
@@ -97,7 +98,14 @@ describe("workspace reconciliation", () => {
         expect(
             shouldSkipPersistedWorkspaceScan({
                 copyOnConversationAgentIds: new Set(),
-                activeWorkspaceKeys: new Set(["copy-agent:user-1:chat-1"]),
+                activeWorkspaceKeys: new Set([
+                    getWorkspaceActiveKey({
+                        sandboxRoot: "/tmp/sandbox",
+                        agentId: "copy-agent",
+                        userId: "user-1",
+                        conversationId: "chat-1",
+                    }),
+                ]),
                 hasManagedWorkspaces: false,
             }),
         ).toBe(false);

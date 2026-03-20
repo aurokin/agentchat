@@ -8,11 +8,8 @@ import { CodexRuntimeManager } from "./codexRuntime.ts";
 import { createFetchHandler } from "./http.ts";
 import { RuntimePersistenceClient } from "./runtimePersistence.ts";
 import {
-    getSandboxConversationPathSegment,
-    getSandboxUserPathSegment,
-} from "./sandboxPaths.ts";
-import {
     getSandboxRootsRegistryPath,
+    getWorkspaceActiveKey,
     WorkspaceManager,
 } from "./workspaceManager.ts";
 import {
@@ -160,7 +157,12 @@ async function runReconciliation(): Promise<void> {
             copyOnConversationAgentIds,
         )) {
             activeKeys.add(
-                `${entry.agentId}:${getSandboxUserPathSegment(entry.userId)}:${getSandboxConversationPathSegment(entry.localId)}`,
+                getWorkspaceActiveKey({
+                    sandboxRoot: configStore.snapshot.sandboxRoot,
+                    agentId: entry.agentId,
+                    userId: entry.userId,
+                    conversationId: entry.localId,
+                }),
             );
         }
         // Include live runtimes to avoid deleting sandboxes for in-progress

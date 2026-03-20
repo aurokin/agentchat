@@ -16,6 +16,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 
 import {
     getSandboxRootsRegistryPath,
+    getWorkspaceActiveKey,
     getWorkspaceMetadataRootPath,
     WorkspaceManager,
 } from "../workspaceManager.ts";
@@ -1039,7 +1040,16 @@ describe("WorkspaceManager", () => {
             expect(existsSync(keepPath)).toBe(true);
             expect(existsSync(removePath)).toBe(true);
 
-            await manager.reconcile(new Set(["agent-a:user-1:conv-keep"]));
+            await manager.reconcile(
+                new Set([
+                    getWorkspaceActiveKey({
+                        sandboxRoot,
+                        agentId: "agent-a",
+                        userId: "user-1",
+                        conversationId: "conv-keep",
+                    }),
+                ]),
+            );
 
             expect(existsSync(keepPath)).toBe(true);
             expect(existsSync(removePath)).toBe(false);
@@ -1082,10 +1092,53 @@ describe("WorkspaceManager", () => {
                 "conv-1",
             );
 
-            await manager.reconcile(new Set(["agent-a:user-1:conv-1"]));
+            await manager.reconcile(
+                new Set([
+                    getWorkspaceActiveKey({
+                        sandboxRoot,
+                        agentId: "agent-a",
+                        userId: "user-1",
+                        conversationId: "conv-1",
+                    }),
+                ]),
+            );
 
             expect(existsSync(keepPath)).toBe(true);
             expect(existsSync(removePath)).toBe(false);
+        });
+
+        test("keeps active workspaces with encoded user and conversation path segments", async () => {
+            const sandboxRoot = makeTempDir("sandbox");
+            const rootPath = makeTempDir("agent-root");
+            writeFileSync(path.join(rootPath, "f.txt"), "x");
+
+            const agent = makeAgent({
+                id: "agent-a",
+                rootPath,
+                workspaceMode: "copy-on-conversation",
+            });
+            const manager = createWorkspaceManager(() =>
+                makeConfig({ sandboxRoot, agents: [agent] }),
+            );
+
+            const workspace = await manager.ensureWorkspace(
+                agent,
+                "users:test",
+                "chats:2",
+            );
+
+            await manager.reconcile(
+                new Set([
+                    getWorkspaceActiveKey({
+                        sandboxRoot,
+                        agentId: "agent-a",
+                        userId: "users:test",
+                        conversationId: "chats:2",
+                    }),
+                ]),
+            );
+
+            expect(existsSync(workspace)).toBe(true);
         });
 
         test("is a no-op when sandboxRoot does not exist", async () => {
@@ -1138,6 +1191,51 @@ describe("WorkspaceManager", () => {
             await restartedManager.reconcile(new Set());
 
             expect(existsSync(originalWorkspace)).toBe(false);
+        });
+
+        test("removes stale old-root workspaces after sandboxRoot migration even when the chat still exists", async () => {
+            const firstSandboxRoot = makeTempDir("sandbox-a");
+            const secondSandboxRoot = makeTempDir("sandbox-b");
+            const rootPath = makeTempDir("agent-root");
+            writeFileSync(path.join(rootPath, "file.txt"), "data");
+
+            const agent = makeAgent({
+                id: "agent-a",
+                rootPath,
+                workspaceMode: "copy-on-conversation",
+            });
+            const config = makeConfig({
+                sandboxRoot: firstSandboxRoot,
+                agents: [agent],
+            });
+            const manager = createWorkspaceManager(() => config);
+
+            const oldWorkspace = await manager.ensureWorkspace(
+                agent,
+                "user-1",
+                "conv-1",
+            );
+
+            config.sandboxRoot = secondSandboxRoot;
+            const newWorkspace = await manager.ensureWorkspace(
+                agent,
+                "user-1",
+                "conv-1",
+            );
+
+            await manager.reconcile(
+                new Set([
+                    getWorkspaceActiveKey({
+                        sandboxRoot: secondSandboxRoot,
+                        agentId: "agent-a",
+                        userId: "user-1",
+                        conversationId: "conv-1",
+                    }),
+                ]),
+            );
+
+            expect(existsSync(oldWorkspace)).toBe(false);
+            expect(existsSync(newWorkspace)).toBe(true);
         });
 
         test("refuses to remove orphaned workspaces that overlap an agent rootPath", async () => {
@@ -1227,7 +1325,12 @@ describe("WorkspaceManager", () => {
                     >;
                 }
             ).pendingWorkspaceCreations.set(
-                "agent-a:user-1:conv-1",
+                getWorkspaceActiveKey({
+                    sandboxRoot,
+                    agentId: "agent-a",
+                    userId: "user-1",
+                    conversationId: "conv-1",
+                }),
                 new Promise(() => {}),
             );
 

@@ -1027,14 +1027,14 @@ describe("CodexRuntimeManager", () => {
         const originalClearTimeout = globalThis.clearTimeout;
         const scheduledCallbacks: Array<() => void> = [];
 
-        globalThis.setTimeout = (((handler: TimerHandler) => {
+        globalThis.setTimeout = ((handler: TimerHandler) => {
             if (typeof handler === "function") {
                 scheduledCallbacks.push(handler as () => void);
             }
             return Symbol("timeout") as unknown as ReturnType<
                 typeof setTimeout
             >;
-        }) as unknown) as typeof setTimeout;
+        }) as unknown as typeof setTimeout;
         globalThis.clearTimeout = (() => undefined) as typeof clearTimeout;
 
         try {

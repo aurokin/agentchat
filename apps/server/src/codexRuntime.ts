@@ -22,6 +22,7 @@ import {
     getSandboxUserPathSegment,
 } from "./sandboxPaths.ts";
 import type { WorkspaceManager } from "./workspaceManager.ts";
+import { getWorkspaceActiveKeyFromSegments } from "./workspaceManager.ts";
 
 type ActiveTurn = {
     runId: string;
@@ -662,8 +663,18 @@ export class CodexRuntimeManager {
             if (runtime.agent.workspaceMode !== "copy-on-conversation") {
                 continue;
             }
+            const sandboxRoot = path.dirname(
+                path.dirname(path.dirname(runtime.cwd)),
+            );
             keys.add(
-                `${runtime.agentId}:${getSandboxUserPathSegment(runtime.userId)}:${getSandboxConversationPathSegment(runtime.conversationId)}`,
+                getWorkspaceActiveKeyFromSegments({
+                    sandboxRoot,
+                    agentIdSegment: runtime.agentId,
+                    userIdSegment: getSandboxUserPathSegment(runtime.userId),
+                    conversationIdSegment: getSandboxConversationPathSegment(
+                        runtime.conversationId,
+                    ),
+                }),
             );
         }
         return keys;

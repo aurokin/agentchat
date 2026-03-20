@@ -78,6 +78,36 @@ export function getWorkspaceMetadataRootPath(sandboxRoot: string): string {
     );
 }
 
+export function getWorkspaceActiveKey(params: {
+    sandboxRoot: string;
+    agentId: string;
+    userId: string;
+    conversationId: string;
+}): string {
+    return getWorkspaceActiveKeyFromSegments({
+        sandboxRoot: params.sandboxRoot,
+        agentIdSegment: params.agentId,
+        userIdSegment: getSandboxUserPathSegment(params.userId),
+        conversationIdSegment: getSandboxConversationPathSegment(
+            params.conversationId,
+        ),
+    });
+}
+
+export function getWorkspaceActiveKeyFromSegments(params: {
+    sandboxRoot: string;
+    agentIdSegment: string;
+    userIdSegment: string;
+    conversationIdSegment: string;
+}): string {
+    return JSON.stringify([
+        canonicalizePathForComparison(params.sandboxRoot),
+        params.agentIdSegment,
+        params.userIdSegment,
+        params.conversationIdSegment,
+    ]);
+}
+
 export class WorkspaceManager {
     private readonly getConfig: () => AgentchatConfig;
     private readonly getRootsRegistryPath: () => string;
@@ -113,11 +143,12 @@ export class WorkspaceManager {
             return { path: agent.rootPath, wasReset: false };
         }
 
-        const creationKey = this.activeWorkspaceKey(
-            agent.id,
+        const creationKey = getWorkspaceActiveKey({
+            sandboxRoot: this.getConfig().sandboxRoot,
+            agentId: agent.id,
             userId,
             conversationId,
-        );
+        });
         const pendingCreation = this.pendingWorkspaceCreations.get(creationKey);
         if (pendingCreation) {
             return await pendingCreation;
@@ -381,11 +412,12 @@ export class WorkspaceManager {
                     }
 
                     for (const convDir of convDirs) {
-                        const key = this.activeWorkspaceKey(
-                            agentDir,
-                            userDir,
-                            convDir,
-                        );
+                        const key = getWorkspaceActiveKeyFromSegments({
+                            sandboxRoot,
+                            agentIdSegment: agentDir,
+                            userIdSegment: userDir,
+                            conversationIdSegment: convDir,
+                        });
                         if (!protectedKeys.has(key)) {
                             const target = path.join(userPath, convDir);
                             await this.deleteWorkspacePathBySegments({
@@ -444,14 +476,6 @@ export class WorkspaceManager {
             userId,
             conversationId,
         );
-    }
-
-    private activeWorkspaceKey(
-        agentId: string,
-        userId: string,
-        conversationId: string,
-    ): string {
-        return `${agentId}:${getSandboxUserPathSegment(userId)}:${getSandboxConversationPathSegment(conversationId)}`;
     }
 
     private async createWorkspace(
