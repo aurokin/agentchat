@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import {
     existsSync,
     lstatSync,
@@ -9,7 +8,6 @@ import {
     writeFileSync,
 } from "node:fs";
 import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 
 import type { AgentchatConfig, AgentConfig } from "./config.ts";
@@ -22,6 +20,12 @@ import {
     getSandboxUserPathSegment,
     getSandboxWorkspacePath,
 } from "./sandboxPaths.ts";
+import {
+    getDefaultAgentchatStateBasePath,
+    getServerStateScopeKey,
+    getStableStateKey,
+    resolveDefaultStateId,
+} from "./serverState.ts";
 
 const SANDBOX_STATE_DIRECTORY_NAME = ".agentchat-state";
 const SANDBOX_ROOTS_REGISTRY_DIRECTORY_NAME = "sandbox-roots";
@@ -33,14 +37,6 @@ type WorkspaceMetadata = {
     state: "creating" | "ready";
 };
 
-function getStableStateKey(value: string): string {
-    return createHash("sha256").update(value).digest("hex").slice(0, 16);
-}
-
-function sanitizeStateFileComponent(value: string): string {
-    return value.replace(/[^a-zA-Z0-9._-]/g, "_");
-}
-
 export function getSandboxStateRootPath(sandboxRoot: string): string {
     return path.join(
         canonicalizePathForComparison(sandboxRoot),
@@ -48,27 +44,12 @@ export function getSandboxStateRootPath(sandboxRoot: string): string {
     );
 }
 
-function getDefaultAgentchatStateBasePath(): string {
-    const xdgStateHome = process.env.XDG_STATE_HOME?.trim();
-    if (xdgStateHome) {
-        return path.join(xdgStateHome, "agentchat");
-    }
-
-    return path.join(os.homedir(), ".local", "state", "agentchat");
-}
-
-export function getSandboxRootsRegistryPath(configPath: string): string {
-    const resolvedConfigPath = path.resolve(configPath);
-    const configBasename = sanitizeStateFileComponent(
-        path.basename(resolvedConfigPath),
-    );
+export function getSandboxRootsRegistryPath(stateId: string): string {
     return path.join(
         getDefaultAgentchatStateBasePath(),
         SANDBOX_STATE_DIRECTORY_NAME,
         SANDBOX_ROOTS_REGISTRY_DIRECTORY_NAME,
-        `${configBasename}-${getStableStateKey(
-            canonicalizePathForComparison(resolvedConfigPath),
-        )}.json`,
+        `${getServerStateScopeKey(stateId)}.json`,
     );
 }
 
@@ -127,6 +108,7 @@ export class WorkspaceManager {
 
     constructor(params: {
         getConfig: () => AgentchatConfig;
+        stateId?: string;
         rootsRegistryPath?: string;
         getRootsRegistryPath?: () => string;
     }) {
@@ -136,7 +118,11 @@ export class WorkspaceManager {
             (() =>
                 path.resolve(
                     params.rootsRegistryPath ??
-                        getSandboxRootsRegistryPath("default"),
+                        getSandboxRootsRegistryPath(
+                            params.stateId ??
+                                this.getConfig().stateId ??
+                                resolveDefaultStateId("agentchat.config.json"),
+                        ),
                 ));
         this.loadKnownSandboxRoots();
         this.rememberSandboxRoot(this.getConfig().sandboxRoot);

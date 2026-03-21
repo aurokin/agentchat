@@ -55,6 +55,7 @@ function makeConfig(overrides: {
 }): AgentchatConfig {
     return {
         version: 1,
+        stateId: "test-state",
         sandboxRoot: overrides.sandboxRoot,
         auth: {
             defaultProviderId: "local-main",
@@ -91,16 +92,13 @@ afterEach(() => {
 });
 
 describe("WorkspaceManager", () => {
-    test("scopes the sandbox root registry path by config path in stable state", () => {
+    test("keeps the sandbox root registry path stable for the same state id", () => {
         const originalXdgStateHome = process.env.XDG_STATE_HOME;
         try {
             process.env.XDG_STATE_HOME = "/tmp/agentchat-state-home";
-            const devPath = getSandboxRootsRegistryPath(
-                "/tmp/agentchat/dev.config.json",
-            );
-            const stagingPath = getSandboxRootsRegistryPath(
-                "/tmp/agentchat/staging.config.json",
-            );
+            const releaseAPath = getSandboxRootsRegistryPath("agentchat-prod");
+            const releaseBPath = getSandboxRootsRegistryPath("agentchat-prod");
+            const stagingPath = getSandboxRootsRegistryPath("agentchat-stage");
             const stateDir = path.join(
                 "/tmp/agentchat-state-home",
                 "agentchat",
@@ -108,13 +106,15 @@ describe("WorkspaceManager", () => {
                 "sandbox-roots",
             );
 
-            expect(path.dirname(devPath)).toBe(stateDir);
+            expect(path.dirname(releaseAPath)).toBe(stateDir);
+            expect(path.dirname(releaseBPath)).toBe(stateDir);
             expect(path.dirname(stagingPath)).toBe(stateDir);
-            expect(devPath).not.toBe(stagingPath);
-            expect(devPath).toStartWith("/tmp/agentchat-state-home/");
-            expect(
-                getSandboxRootsRegistryPath("/tmp/agentchat/dev.config.json"),
-            ).toBe(devPath);
+            expect(releaseAPath).toBe(releaseBPath);
+            expect(releaseAPath).not.toBe(stagingPath);
+            expect(releaseAPath).toStartWith("/tmp/agentchat-state-home/");
+            expect(getSandboxRootsRegistryPath("agentchat-prod")).toBe(
+                releaseAPath,
+            );
         } finally {
             if (originalXdgStateHome === undefined) {
                 delete process.env.XDG_STATE_HOME;

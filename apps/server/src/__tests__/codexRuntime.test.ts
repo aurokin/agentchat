@@ -52,6 +52,7 @@ async function withTempStateHome<T>(run: () => Promise<T>): Promise<T> {
 function createConfig(): AgentchatConfig {
     return {
         version: 1,
+        stateId: "test-state",
         sandboxRoot: "/tmp/agentchat-sandboxes",
         auth: {
             defaultProviderId: "google-main",
@@ -475,11 +476,6 @@ describe("CodexRuntimeManager", () => {
     test("resumes legacy shared bindings without persisted workspace metadata", async () => {
         await withTempStateHome(async () => {
             const config = createConfig();
-            const configPath = path.join(
-                makeTempDir("config"),
-                "agentchat.json",
-            );
-            writeFileSync(configPath, JSON.stringify({ version: 1 }));
             const persistence = createPersistence({
                 provider: "codex-default",
                 providerThreadId: "thread-existing",
@@ -491,7 +487,7 @@ describe("CodexRuntimeManager", () => {
                 getConfig: () => config,
                 persistence: persistence as unknown as RuntimePersistenceClient,
                 createClient: () => fakeClient,
-                configPath,
+                stateId: "legacy-shared-runtime",
             });
 
             await manager.sendMessage({
@@ -507,13 +503,8 @@ describe("CodexRuntimeManager", () => {
         });
     });
 
-    test("does not resume legacy shared bindings after the agent root path changes", async () => {
+    test("does not resume legacy shared bindings after the agent root path changes across checkout relocations", async () => {
         await withTempStateHome(async () => {
-            const configPath = path.join(
-                makeTempDir("config"),
-                "agentchat.json",
-            );
-            writeFileSync(configPath, JSON.stringify({ version: 1 }));
             const initialConfig = createConfig();
             const initialPersistence = createPersistence({
                 provider: "codex-default",
@@ -528,7 +519,7 @@ describe("CodexRuntimeManager", () => {
                 persistence:
                     initialPersistence as unknown as RuntimePersistenceClient,
                 createClient: () => initialClient,
-                configPath,
+                stateId: "release-runtime",
             });
 
             await initialManager.sendMessage({
@@ -556,7 +547,7 @@ describe("CodexRuntimeManager", () => {
                 persistence:
                     updatedPersistence as unknown as RuntimePersistenceClient,
                 createClient: () => updatedClient,
-                configPath,
+                stateId: "release-runtime",
             });
 
             await updatedManager.sendMessage({
@@ -575,12 +566,6 @@ describe("CodexRuntimeManager", () => {
     test("keeps resuming legacy shared bindings across unrelated config edits", async () => {
         await withTempStateHome(async () => {
             const config = createConfig();
-            const configPath = path.join(
-                makeTempDir("config"),
-                "agentchat.json",
-            );
-            writeFileSync(configPath, JSON.stringify({ version: 1 }));
-
             const initialPersistence = createPersistence({
                 provider: "codex-default",
                 providerThreadId: "thread-existing",
@@ -594,7 +579,7 @@ describe("CodexRuntimeManager", () => {
                 persistence:
                     initialPersistence as unknown as RuntimePersistenceClient,
                 createClient: () => initialClient,
-                configPath,
+                stateId: "legacy-shared-runtime",
             });
 
             await initialManager.sendMessage({
@@ -603,11 +588,6 @@ describe("CodexRuntimeManager", () => {
                 command: createCommand(),
                 sendEvent: () => undefined,
             });
-
-            writeFileSync(
-                configPath,
-                JSON.stringify({ version: 1, note: "unrelated edit" }),
-            );
 
             const updatedPersistence = createPersistence({
                 provider: "codex-default",
@@ -622,7 +602,7 @@ describe("CodexRuntimeManager", () => {
                 persistence:
                     updatedPersistence as unknown as RuntimePersistenceClient,
                 createClient: () => updatedClient,
-                configPath,
+                stateId: "legacy-shared-runtime",
             });
 
             await updatedManager.sendMessage({
@@ -2613,15 +2593,33 @@ describe("CodexRuntimeManager", () => {
             command,
             sendEvent: () => undefined,
         });
+        const sendResultPromise = sendPromise.then(
+            () => null,
+            (error) => error,
+        );
 
         await waitFor(
             () =>
-                (
-                    manager as unknown as {
-                        pendingRuntimeInitializations: Map<string, unknown>;
-                    }
-                ).pendingRuntimeInitializations.size === 1 &&
-                existsSync(workspacePath),
+                existsSync(workspacePath) &&
+                (() => {
+                    const pendingInitializations = (
+                        manager as unknown as {
+                            pendingRuntimeInitializations: Map<
+                                string,
+                                {
+                                    client: FakeCodexClient | null;
+                                }
+                            >;
+                        }
+                    ).pendingRuntimeInitializations;
+                    const pendingInitialization = [
+                        ...pendingInitializations.values(),
+                    ][0];
+                    return (
+                        pendingInitializations.size === 1 &&
+                        pendingInitialization?.client === client
+                    );
+                })(),
         );
 
         const deletePromise = manager.deleteConversationWorkspace({
@@ -2813,7 +2811,9 @@ describe("CodexRuntimeManager", () => {
         expect(existsSync(workspacePath)).toBe(false);
 
         initializeDeferred.resolve();
-        await expect(sendPromise).rejects.toThrow(
+        const sendError = await sendResultPromise;
+        expect(sendError).toBeInstanceOf(Error);
+        expect((sendError as Error).message).toContain(
             "Conversation deleted during runtime initialization.",
         );
     });

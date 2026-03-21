@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { pathsOverlap } from "./pathComparison.ts";
 import { isSafePathSegment } from "./sandboxPaths.ts";
+import { resolveDefaultStateId } from "./serverState.ts";
 
 const GoogleAuthProviderSchema = z.object({
     id: z.string().min(1),
@@ -154,6 +155,7 @@ const AgentchatConfigInputSchema = z
     .object({
         version: z.literal(1),
         auth: z.union([ProviderAuthConfigSchema, LegacyAuthConfigSchema]),
+        stateId: z.string().min(1).optional(),
         sandboxRoot: z.string().min(1).optional(),
         providers: z.array(CodexProviderSchema),
         agents: z.array(AgentSchema),
@@ -223,9 +225,10 @@ export type AuthProviderConfig = z.infer<typeof AuthProviderSchema>;
 export type AuthConfig = z.infer<typeof ProviderAuthConfigSchema>;
 export type AgentchatConfig = Omit<
     z.infer<typeof AgentchatConfigInputSchema>,
-    "auth" | "sandboxRoot"
+    "auth" | "sandboxRoot" | "stateId"
 > & {
     auth: AuthConfig;
+    stateId?: string;
     sandboxRoot: string;
 };
 export type AgentConfig = AgentchatConfig["agents"][number];
@@ -278,12 +281,16 @@ const DEFAULT_SANDBOX_ROOT = path.join(os.homedir(), ".agentchat", "sandboxes");
 export function parseConfig(input: unknown): AgentchatConfig {
     const {
         sandboxRoot: rawSandboxRoot,
+        stateId: rawStateId,
         auth,
         ...rest
     } = AgentchatConfigInputSchema.parse(input);
     return {
         ...rest,
         auth: normalizeAuthConfig(auth),
+        stateId:
+            rawStateId?.trim() ||
+            resolveDefaultStateId("agentchat.config.json"),
         sandboxRoot: rawSandboxRoot ?? DEFAULT_SANDBOX_ROOT,
     };
 }
@@ -292,7 +299,19 @@ export function loadConfigFile(
     configPath = resolveDefaultConfigPath(),
 ): AgentchatConfig {
     const raw = readFileSync(configPath, "utf8");
-    return parseConfig(JSON.parse(raw) as unknown);
+    const parsed = AgentchatConfigInputSchema.parse(JSON.parse(raw) as unknown);
+    const {
+        sandboxRoot: rawSandboxRoot,
+        stateId: rawStateId,
+        auth,
+        ...rest
+    } = parsed;
+    return {
+        ...rest,
+        auth: normalizeAuthConfig(auth),
+        stateId: rawStateId?.trim() || resolveDefaultStateId(configPath),
+        sandboxRoot: rawSandboxRoot ?? DEFAULT_SANDBOX_ROOT,
+    };
 }
 
 export class ConfigStore {

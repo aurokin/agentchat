@@ -11,6 +11,7 @@ import {
     getSandboxRootsRegistryPath,
     WorkspaceManager,
 } from "./workspaceManager.ts";
+import { resolveDefaultStateId } from "./serverState.ts";
 import {
     getPersistedWorkspaceActiveKeys,
     getCopyOnConversationAgentIds,
@@ -30,13 +31,18 @@ const modelCatalog = new CodexModelCatalog({
 });
 const workspaceManager = new WorkspaceManager({
     getConfig: () => configStore.snapshot,
-    getRootsRegistryPath: () => getSandboxRootsRegistryPath(configStore.path),
+    getRootsRegistryPath: () =>
+        getSandboxRootsRegistryPath(
+            configStore.snapshot.stateId ??
+                resolveDefaultStateId(configStore.path),
+        ),
 });
 const runtimeManager = new CodexRuntimeManager({
     getConfig: () => configStore.snapshot,
     persistence: runtimePersistence,
     workspaceManager,
-    configPath: configStore.path,
+    stateId:
+        configStore.snapshot.stateId ?? resolveDefaultStateId(configStore.path),
 });
 
 type WebSocketData = {

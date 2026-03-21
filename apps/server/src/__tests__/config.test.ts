@@ -10,7 +10,7 @@ import {
 import os from "node:os";
 import path from "node:path";
 
-import { ConfigStore, parseConfig } from "../config.ts";
+import { ConfigStore, loadConfigFile, parseConfig } from "../config.ts";
 import { createFetchHandler } from "../http.ts";
 
 const exampleConfigPath = path.resolve(
@@ -49,6 +49,40 @@ describe("server config", () => {
         expect(exampleConfig.agents).toHaveLength(1);
         expect(exampleConfig.agents[0]?.defaultProviderId).toBe("codex-main");
         expect(exampleConfig.providers[0]?.models[0]?.id).toBe("gpt-5.4");
+    });
+
+    test("keeps the default state id stable across checkout relocations", () => {
+        const releaseADir = mkdtempSync(path.join(os.tmpdir(), "release-a-"));
+        const releaseBDir = mkdtempSync(path.join(os.tmpdir(), "release-b-"));
+        const releaseAPath = path.join(releaseADir, "agentchat.config.json");
+        const releaseBPath = path.join(releaseBDir, "agentchat.config.json");
+        const rawConfig = JSON.parse(
+            readFileSync(exampleConfigPath, "utf8"),
+        ) as unknown;
+
+        try {
+            writeFileSync(releaseAPath, JSON.stringify(rawConfig));
+            writeFileSync(releaseBPath, JSON.stringify(rawConfig));
+
+            expect(loadConfigFile(releaseAPath).stateId).toBe(
+                loadConfigFile(releaseBPath).stateId,
+            );
+        } finally {
+            rmSync(releaseADir, { recursive: true, force: true });
+            rmSync(releaseBDir, { recursive: true, force: true });
+        }
+    });
+
+    test("preserves an explicit state id from config", () => {
+        const parsed = parseConfig({
+            version: 1,
+            stateId: "prod-self-host",
+            auth: exampleConfig.auth,
+            providers: exampleConfig.providers,
+            agents: exampleConfig.agents,
+        });
+
+        expect(parsed.stateId).toBe("prod-self-host");
     });
 
     test("serves bootstrap, provider models, and agent options routes", async () => {

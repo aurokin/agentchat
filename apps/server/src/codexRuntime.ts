@@ -1,6 +1,4 @@
-import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import os from "node:os";
 import path from "node:path";
 
 import type { AgentchatConfig, AgentConfig, ProviderConfig } from "./config.ts";
@@ -25,6 +23,10 @@ import {
     getSandboxConversationPathSegment,
     getSandboxUserPathSegment,
 } from "./sandboxPaths.ts";
+import {
+    getDefaultAgentchatStateBasePath,
+    getServerStateScopeKey,
+} from "./serverState.ts";
 import type { WorkspaceManager } from "./workspaceManager.ts";
 import { getWorkspaceActiveKeyFromSegments } from "./workspaceManager.ts";
 
@@ -93,7 +95,6 @@ type LegacySharedRootHistoryEntry = {
 
 type LegacySharedRootHistory = Record<string, LegacySharedRootHistoryEntry>;
 
-const AGENTCHAT_STATE_DIRECTORY_NAME = ".agentchat-state";
 const LEGACY_SHARED_ROOT_HISTORY_DIRECTORY_NAME = "legacy-shared-roots";
 const PENDING_RUNTIME_DELETE_WAIT_MS = 1_000;
 
@@ -103,32 +104,11 @@ function invariant(condition: unknown, message: string): asserts condition {
     }
 }
 
-function getDefaultAgentchatStateBasePath(): string {
-    const xdgStateHome = process.env.XDG_STATE_HOME?.trim();
-    if (xdgStateHome) {
-        return path.join(xdgStateHome, "agentchat");
-    }
-
-    return path.join(os.homedir(), ".local", "state", "agentchat");
-}
-
-function sanitizeStateFileComponent(value: string): string {
-    return value.replace(/[^a-zA-Z0-9._-]/g, "_");
-}
-
-function getStableStateKey(value: string): string {
-    return createHash("sha256").update(value).digest("hex").slice(0, 16);
-}
-
-function getLegacySharedRootHistoryPath(configPath: string): string {
-    const resolvedConfigPath = path.resolve(configPath);
+function getLegacySharedRootHistoryPath(stateId: string): string {
     return path.join(
         getDefaultAgentchatStateBasePath(),
-        AGENTCHAT_STATE_DIRECTORY_NAME,
         LEGACY_SHARED_ROOT_HISTORY_DIRECTORY_NAME,
-        `${sanitizeStateFileComponent(path.basename(resolvedConfigPath))}-${getStableStateKey(
-            canonicalizePathForComparison(resolvedConfigPath),
-        )}.json`,
+        `${getServerStateScopeKey(stateId)}.json`,
     );
 }
 
@@ -323,7 +303,7 @@ export class CodexRuntimeManager {
     private readonly persistence: RuntimePersistenceClient;
     private readonly createClient: CreateCodexClient;
     private readonly workspaceManager: WorkspaceManager | null;
-    private readonly configPath: string | null;
+    private readonly stateId: string | null;
     private readonly pendingRuntimeDeleteWaitMs: number;
 
     constructor(params: {
@@ -331,7 +311,7 @@ export class CodexRuntimeManager {
         persistence: RuntimePersistenceClient;
         createClient?: CreateCodexClient;
         workspaceManager?: WorkspaceManager;
-        configPath?: string;
+        stateId?: string;
         pendingRuntimeDeleteWaitMs?: number;
     }) {
         this.getConfig = params.getConfig;
@@ -340,7 +320,7 @@ export class CodexRuntimeManager {
             params.createClient ??
             ((clientParams) => new CodexAppServerClient(clientParams));
         this.workspaceManager = params.workspaceManager ?? null;
-        this.configPath = params.configPath ?? null;
+        this.stateId = params.stateId ?? null;
         this.pendingRuntimeDeleteWaitMs =
             params.pendingRuntimeDeleteWaitMs ?? PENDING_RUNTIME_DELETE_WAIT_MS;
     }
@@ -1971,7 +1951,7 @@ export class CodexRuntimeManager {
         agent: AgentConfig,
         binding: PersistedRuntimeBinding,
     ): boolean {
-        if (!this.configPath) {
+        if (!this.stateId) {
             return true;
         }
 
@@ -2007,11 +1987,11 @@ export class CodexRuntimeManager {
     }
 
     private readLegacySharedRootHistory(): LegacySharedRootHistory {
-        if (!this.configPath) {
+        if (!this.stateId) {
             return {};
         }
 
-        const historyPath = getLegacySharedRootHistoryPath(this.configPath);
+        const historyPath = getLegacySharedRootHistoryPath(this.stateId);
         if (!existsSync(historyPath)) {
             return {};
         }
@@ -2052,11 +2032,11 @@ export class CodexRuntimeManager {
     private writeLegacySharedRootHistory(
         history: LegacySharedRootHistory,
     ): void {
-        if (!this.configPath) {
+        if (!this.stateId) {
             return;
         }
 
-        const historyPath = getLegacySharedRootHistoryPath(this.configPath);
+        const historyPath = getLegacySharedRootHistoryPath(this.stateId);
         mkdirSync(path.dirname(historyPath), { recursive: true });
         writeFileSync(
             historyPath,
