@@ -85,6 +85,30 @@ function createWorkspaceManager(
     });
 }
 
+function createDeferred<T>(): {
+    promise: Promise<T>;
+    resolve: (value: T | PromiseLike<T>) => void;
+    reject: (reason?: unknown) => void;
+} {
+    let resolve!: (value: T | PromiseLike<T>) => void;
+    let reject!: (reason?: unknown) => void;
+    const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+        resolve = resolvePromise;
+        reject = rejectPromise;
+    });
+    return { promise, resolve, reject };
+}
+
+async function waitFor(condition: () => boolean): Promise<void> {
+    const deadline = Date.now() + 2_000;
+    while (!condition()) {
+        if (Date.now() > deadline) {
+            throw new Error("Timed out waiting for condition");
+        }
+        await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+}
+
 afterEach(() => {
     for (const tempRoot of tempRoots.splice(0)) {
         rmSync(tempRoot, { force: true, recursive: true });
@@ -456,6 +480,69 @@ describe("WorkspaceManager", () => {
             expect(
                 readFileSync(path.join(sandboxPath, "file.txt"), "utf8"),
             ).toBe("ready");
+        });
+
+        test("serializes managed workspace registry updates for the same sandbox root", async () => {
+            const sandboxRoot = makeTempDir("sandbox");
+            const manager = createWorkspaceManager(() =>
+                makeConfig({ sandboxRoot }),
+            );
+            const workspacePathA = manager.getWorkspacePath(
+                "test-agent",
+                "user-1",
+                "conv-1",
+            );
+            const workspacePathB = manager.getWorkspacePath(
+                "test-agent",
+                "user-1",
+                "conv-2",
+            );
+            const gate = createDeferred<void>();
+            let firstWriteStarted = false;
+            const managerInternals = manager as unknown as {
+                recordManagedWorkspace: (sandboxPath: string) => Promise<void>;
+                readManagedWorkspaceRegistry: (workspacePathInfo: {
+                    sandboxRoot: string;
+                }) => Promise<Set<string>>;
+                writeManagedWorkspaceRegistry: (
+                    workspacePathInfo: {
+                        sandboxRoot: string;
+                    },
+                    registry: Set<string>,
+                ) => Promise<void>;
+            };
+            const originalWriteRegistry =
+                managerInternals.writeManagedWorkspaceRegistry.bind(manager);
+            managerInternals.writeManagedWorkspaceRegistry = async (
+                workspacePathInfo,
+                registry,
+            ) => {
+                if (!firstWriteStarted) {
+                    firstWriteStarted = true;
+                    await gate.promise;
+                }
+                await originalWriteRegistry(workspacePathInfo, registry);
+            };
+
+            const firstRecord =
+                managerInternals.recordManagedWorkspace(workspacePathA);
+            await waitFor(() => firstWriteStarted);
+            const secondRecord =
+                managerInternals.recordManagedWorkspace(workspacePathB);
+            gate.resolve();
+            await Promise.all([firstRecord, secondRecord]);
+
+            const registry =
+                await managerInternals.readManagedWorkspaceRegistry({
+                    sandboxRoot,
+                });
+            expect(
+                [...registry].sort((left, right) => left.localeCompare(right)),
+            ).toEqual(
+                [workspacePathA, workspacePathB].sort((left, right) =>
+                    left.localeCompare(right),
+                ),
+            );
         });
 
         test("isolates sandboxes between different users", async () => {

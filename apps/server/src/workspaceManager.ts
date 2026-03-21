@@ -104,6 +104,10 @@ export class WorkspaceManager {
         string,
         Promise<{ path: string; wasReset: boolean; cleanupOnFailure: boolean }>
     >();
+    private readonly managedWorkspaceRegistryMutations = new Map<
+        string,
+        Promise<void>
+    >();
     private readonly knownSandboxRoots = new Set<string>();
 
     constructor(params: {
@@ -637,25 +641,31 @@ export class WorkspaceManager {
 
     private async recordManagedWorkspace(sandboxPath: string): Promise<void> {
         const workspacePathInfo = this.getWorkspacePathInfo(sandboxPath);
-        const registry =
-            await this.readManagedWorkspaceRegistry(workspacePathInfo);
-        registry.add(
-            path.join(
-                workspacePathInfo.sandboxRoot,
-                workspacePathInfo.relativeWorkspacePath,
-            ),
+        await this.updateManagedWorkspaceRegistry(
+            workspacePathInfo,
+            (registry) => {
+                registry.add(
+                    path.join(
+                        workspacePathInfo.sandboxRoot,
+                        workspacePathInfo.relativeWorkspacePath,
+                    ),
+                );
+            },
         );
-        await this.writeManagedWorkspaceRegistry(workspacePathInfo, registry);
     }
 
     private async removeManagedWorkspaceRecord(
         sandboxPath: string,
     ): Promise<void> {
         const workspacePathInfo = this.getWorkspacePathInfo(sandboxPath);
-        const registry =
-            await this.readManagedWorkspaceRegistry(workspacePathInfo);
-        registry.delete(this.getManagedWorkspaceRegistryKey(sandboxPath));
-        await this.writeManagedWorkspaceRegistry(workspacePathInfo, registry);
+        await this.updateManagedWorkspaceRegistry(
+            workspacePathInfo,
+            (registry) => {
+                registry.delete(
+                    this.getManagedWorkspaceRegistryKey(sandboxPath),
+                );
+            },
+        );
     }
 
     private getWorkspaceMetadataPath(sandboxPath: string): string {
@@ -742,6 +752,48 @@ export class WorkspaceManager {
             )}\n`,
             "utf8",
         );
+    }
+
+    private async updateManagedWorkspaceRegistry(
+        workspacePathInfo: {
+            sandboxRoot: string;
+            relativeWorkspacePath: string;
+        },
+        mutate: (registry: Set<string>) => void,
+    ): Promise<void> {
+        const registryPath = getManagedWorkspacesRegistryPath(
+            workspacePathInfo.sandboxRoot,
+        );
+        const previous =
+            this.managedWorkspaceRegistryMutations.get(registryPath) ??
+            Promise.resolve();
+        let releaseCurrentMutation!: () => void;
+        const currentMutation = new Promise<void>((resolve) => {
+            releaseCurrentMutation = resolve;
+        });
+        const mutationChain = previous
+            .catch(() => undefined)
+            .then(() => currentMutation);
+        this.managedWorkspaceRegistryMutations.set(registryPath, mutationChain);
+
+        try {
+            await previous.catch(() => undefined);
+            const registry =
+                await this.readManagedWorkspaceRegistry(workspacePathInfo);
+            mutate(registry);
+            await this.writeManagedWorkspaceRegistry(
+                workspacePathInfo,
+                registry,
+            );
+        } finally {
+            releaseCurrentMutation();
+            if (
+                this.managedWorkspaceRegistryMutations.get(registryPath) ===
+                mutationChain
+            ) {
+                this.managedWorkspaceRegistryMutations.delete(registryPath);
+            }
+        }
     }
 
     private sandboxPathForRoot(
