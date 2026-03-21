@@ -1,10 +1,12 @@
 import { describe, expect, it } from "bun:test";
 import {
-    getPreferredHomeChatId,
+    buildChatRouteId,
+    getPreferredHomeChatRouteId,
+    parseChatRouteId,
     resolveRouteChatSelection,
 } from "../home-chat-route";
 
-describe("getPreferredHomeChatId", () => {
+describe("home chat route helpers", () => {
     const chats = [
         {
             id: "chat-1",
@@ -28,29 +30,65 @@ describe("getPreferredHomeChatId", () => {
         },
     ];
 
+    it("builds and parses agent-scoped route ids", () => {
+        const routeId = buildChatRouteId({
+            chatId: "legacy:chat-1",
+            agentId: "agent/one",
+        });
+
+        expect(parseChatRouteId(routeId)).toEqual({
+            chatId: "legacy:chat-1",
+            agentId: "agent/one",
+        });
+    });
+
+    it("keeps legacy route ids without agent information readable", () => {
+        expect(parseChatRouteId("chat-1")).toEqual({
+            chatId: "chat-1",
+            agentId: null,
+        });
+    });
+
+    it("keeps legacy Convex-style route ids with colons readable", () => {
+        expect(parseChatRouteId("chats:legacy-1")).toEqual({
+            chatId: "chats:legacy-1",
+            agentId: null,
+        });
+    });
+
     it("prefers the current chat when it is still in scope", () => {
         expect(
-            getPreferredHomeChatId({
+            getPreferredHomeChatRouteId({
                 currentChatId: "chat-2",
                 currentChatAgentId: "agent-1",
                 chats,
             }),
-        ).toBe("chat-2");
+        ).toBe(
+            buildChatRouteId({
+                chatId: "chat-2",
+                agentId: "agent-1",
+            }),
+        );
     });
 
     it("falls back to the first chat when the current chat is out of scope", () => {
         expect(
-            getPreferredHomeChatId({
+            getPreferredHomeChatRouteId({
                 currentChatId: "chat-3",
                 currentChatAgentId: "agent-1",
                 chats,
             }),
-        ).toBe("chat-1");
+        ).toBe(
+            buildChatRouteId({
+                chatId: "chat-1",
+                agentId: "agent-1",
+            }),
+        );
     });
 
     it("returns null when there are no chats", () => {
         expect(
-            getPreferredHomeChatId({
+            getPreferredHomeChatRouteId({
                 currentChatId: null,
                 currentChatAgentId: null,
                 chats: [],
@@ -72,19 +110,25 @@ describe("getPreferredHomeChatId", () => {
         ];
 
         expect(
-            getPreferredHomeChatId({
+            getPreferredHomeChatRouteId({
                 currentChatId: "shared-chat",
                 currentChatAgentId: "agent-1",
                 chats: collidedChats.filter(
                     (chat) => chat.agentId === "agent-2",
                 ),
             }),
-        ).toBe("shared-chat");
+        ).toBe(
+            buildChatRouteId({
+                chatId: "shared-chat",
+                agentId: "agent-2",
+            }),
+        );
     });
 
     it("reselects the route chat when the current chat belongs to another agent", () => {
         const routeChat = resolveRouteChatSelection({
             routeChatId: "shared-chat",
+            routeAgentId: "agent-2",
             chats: [
                 {
                     ...chats[0],
@@ -103,5 +147,27 @@ describe("getPreferredHomeChatId", () => {
             id: "shared-chat",
             agentId: "agent-2",
         });
+    });
+
+    it("does not guess across agents for ambiguous legacy route ids", () => {
+        expect(
+            resolveRouteChatSelection({
+                routeChatId: "shared-chat",
+                routeAgentId: null,
+                chats: [
+                    {
+                        ...chats[0],
+                        id: "shared-chat",
+                        agentId: "agent-1",
+                    },
+                    {
+                        ...chats[1],
+                        id: "shared-chat",
+                        agentId: "agent-2",
+                    },
+                ],
+                currentChat: null,
+            }),
+        ).toBeNull();
     });
 });

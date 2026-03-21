@@ -25,7 +25,10 @@ import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AgentSwitcher } from "@/components/chat/AgentSwitcher";
 import { getScopedChatStateKey } from "@/contexts/chat-state";
-import { getPreferredHomeChatId } from "@/lib/home-chat-route";
+import {
+    buildChatRouteId,
+    getPreferredHomeChatRouteId,
+} from "@/lib/home-chat-route";
 import { resolveResponsiveLayout } from "@/lib/responsive-layout";
 
 export default function HomeScreen(): React.ReactElement {
@@ -84,13 +87,13 @@ export default function HomeScreen(): React.ReactElement {
     useEffect(() => {
         if (!isInitialized || !useTabletLandscapeLayout) return;
         if (isLoading || chats.length === 0) return;
-        const preferredChatId = getPreferredHomeChatId({
+        const preferredChatRouteId = getPreferredHomeChatRouteId({
             currentChatId: currentChat?.id ?? null,
             currentChatAgentId: currentChat?.agentId ?? null,
             chats,
         });
-        if (!preferredChatId) return;
-        router.replace(`/chat/${preferredChatId}`);
+        if (!preferredChatRouteId) return;
+        router.replace(`/chat/${preferredChatRouteId}`);
     }, [
         chats,
         currentChat?.agentId,
@@ -103,11 +106,21 @@ export default function HomeScreen(): React.ReactElement {
 
     const handleCreateChat = async () => {
         const chat = await createChat();
-        router.push(`/chat/${chat.id}`);
+        router.push(
+            `/chat/${buildChatRouteId({
+                chatId: chat.id,
+                agentId: chat.agentId,
+            })}`,
+        );
     };
 
-    const handleSelectChat = async (chatId: string) => {
-        router.push(`/chat/${chatId}`);
+    const handleSelectChat = async (chatId: string, agentId: string) => {
+        router.push(
+            `/chat/${buildChatRouteId({
+                chatId,
+                agentId,
+            })}`,
+        );
     };
 
     const clearSelection = useCallback(() => {
@@ -145,7 +158,7 @@ export default function HomeScreen(): React.ReactElement {
             return;
         }
 
-        void handleSelectChat(chatId);
+        void handleSelectChat(chatId, agentId);
     };
 
     const handleChatLongPress = (chatId: string, agentId: string) => {

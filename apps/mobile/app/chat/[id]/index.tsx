@@ -51,7 +51,11 @@ import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { TopBar } from "@/components/ui/TopBar";
 import { consumePendingSharePayload } from "@/lib/share-intent/pending-share";
 import { resolveResponsiveLayout } from "@/lib/responsive-layout";
-import { resolveRouteChatSelection } from "@/lib/home-chat-route";
+import {
+    buildChatRouteId,
+    parseChatRouteId,
+    resolveRouteChatSelection,
+} from "@/lib/home-chat-route";
 import {
     flushPendingMobileConversationInterrupt,
     requestMobileConversationInterrupt,
@@ -70,7 +74,9 @@ const EMPTY_MESSAGES: Message[] = [];
 export default function ChatScreen(): ReactElement {
     const params = useLocalSearchParams();
     const router = useRouter();
-    const chatId = params.id as string;
+    const routeId = params.id as string;
+    const routeSelection = useMemo(() => parseChatRouteId(routeId), [routeId]);
+    const chatId = routeSelection.chatId;
     const {
         chats,
         currentChat,
@@ -100,7 +106,7 @@ export default function ChatScreen(): ReactElement {
         favoriteModels,
         toggleFavoriteModel,
     } = useModelContext();
-    const { selectedAgent } = useAgent();
+    const { selectedAgent, selectedAgentId, setSelectedAgentId } = useAgent();
     const { colors } = useTheme();
     const styles = useMemo(() => createStyles(colors), [colors]);
     const { socketClient, ensureConnected, connectionError, isConfigured } =
@@ -156,8 +162,17 @@ export default function ChatScreen(): ReactElement {
             return;
         }
 
+        if (
+            routeSelection.agentId &&
+            routeSelection.agentId !== selectedAgentId
+        ) {
+            void setSelectedAgentId(routeSelection.agentId);
+            return;
+        }
+
         const routeChat = resolveRouteChatSelection({
             routeChatId: chatId,
+            routeAgentId: routeSelection.agentId,
             chats,
             currentChat,
         });
@@ -166,7 +181,15 @@ export default function ChatScreen(): ReactElement {
         }
 
         void selectChat(routeChat.id);
-    }, [chatId, chats, currentChat, selectChat]);
+    }, [
+        chatId,
+        chats,
+        currentChat,
+        routeSelection.agentId,
+        selectChat,
+        selectedAgentId,
+        setSelectedAgentId,
+    ]);
 
     useEffect(() => {
         if (!chatId) {
@@ -195,8 +218,13 @@ export default function ChatScreen(): ReactElement {
     useEffect(() => {
         if (!useTabletLandscapeLayout) return;
         if (currentChat || chats.length === 0) return;
-        router.replace(`/chat/${chats[0].id}`);
-    }, [chats, currentChat, useTabletLandscapeLayout, router]);
+        router.replace(
+            `/chat/${buildChatRouteId({
+                chatId: chats[0].id,
+                agentId: chats[0].agentId,
+            })}`,
+        );
+    }, [chats, currentChat, router, useTabletLandscapeLayout]);
 
     useEffect(() => {
         return () => {
@@ -754,10 +782,24 @@ export default function ChatScreen(): ReactElement {
     }, [activeRun, currentChat?.agentId, isLoading, socketClient]);
 
     const handleDeleteChat = async () => {
-        const fallbackChatId = chats.find((chat) => chat.id !== chatId)?.id;
+        const fallbackChat =
+            chats.find(
+                (chat) =>
+                    !(
+                        chat.id === chatId &&
+                        (!routeSelection.agentId ||
+                            chat.agentId === routeSelection.agentId)
+                    ),
+            ) ?? null;
+        const fallbackChatId = fallbackChat?.id ?? null;
         const navigateAfterDelete = () => {
-            if (useTabletLandscapeLayout && fallbackChatId) {
-                router.replace(`/chat/${fallbackChatId}`);
+            if (useTabletLandscapeLayout && fallbackChatId && fallbackChat) {
+                router.replace(
+                    `/chat/${buildChatRouteId({
+                        chatId: fallbackChatId,
+                        agentId: fallbackChat.agentId,
+                    })}`,
+                );
                 return;
             }
             router.replace("/");
@@ -786,12 +828,28 @@ export default function ChatScreen(): ReactElement {
 
     const handleStartNewChat = async () => {
         const chat = await createChat();
-        router.replace(`/chat/${chat.id}`);
+        router.replace(
+            `/chat/${buildChatRouteId({
+                chatId: chat.id,
+                agentId: chat.agentId,
+            })}`,
+        );
     };
 
     const handleSelectChatFromSidebar = (nextChatId: string) => {
         if (nextChatId === chatId) return;
-        router.replace(`/chat/${nextChatId}`);
+        const nextChat =
+            chats.find((candidate) => candidate.id === nextChatId) ?? null;
+        if (!nextChat) {
+            return;
+        }
+
+        router.replace(
+            `/chat/${buildChatRouteId({
+                chatId: nextChatId,
+                agentId: nextChat.agentId,
+            })}`,
+        );
     };
 
     const formatChatListDate = (timestamp: number): string => {

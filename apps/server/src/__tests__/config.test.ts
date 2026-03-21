@@ -380,7 +380,34 @@ describe("server config", () => {
         expect(exampleConfig.agents[0]?.workspaceMode).toBe("shared");
     });
 
-    test("rejects agent ids that are unsafe filesystem path segments", () => {
+    test("allows unsafe legacy agent ids in shared mode", () => {
+        const config = parseConfig({
+            version: 1,
+            auth: {
+                defaultProviderId: "local-main",
+                providers: [
+                    {
+                        id: "local-main",
+                        kind: "local",
+                        enabled: true,
+                        allowSignup: false,
+                    },
+                ],
+            },
+            providers: exampleConfig.providers,
+            agents: [
+                {
+                    ...exampleConfig.agents[0],
+                    id: "team/frontend",
+                    workspaceMode: "shared",
+                },
+            ],
+        });
+
+        expect(config.agents[0]?.id).toBe("team/frontend");
+    });
+
+    test("rejects unsafe agent ids for copy-on-conversation workspaces", () => {
         expect(() =>
             parseConfig({
                 version: 1,
@@ -400,6 +427,7 @@ describe("server config", () => {
                     {
                         ...exampleConfig.agents[0],
                         id: "team/frontend",
+                        workspaceMode: "copy-on-conversation",
                     },
                 ],
             }),
@@ -426,6 +454,7 @@ describe("server config", () => {
                     {
                         ...exampleConfig.agents[0],
                         id: "frontend:api",
+                        workspaceMode: "copy-on-conversation",
                     },
                 ],
             }),
@@ -450,6 +479,7 @@ describe("server config", () => {
                     {
                         ...exampleConfig.agents[0],
                         id: "CON",
+                        workspaceMode: "copy-on-conversation",
                     },
                 ],
             }),

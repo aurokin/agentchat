@@ -139,10 +139,13 @@ const AgentSchema = z
             });
         }
 
-        if (!isSafePathSegment(agent.id)) {
+        if (
+            agent.workspaceMode === "copy-on-conversation" &&
+            !isSafePathSegment(agent.id)
+        ) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
-                message: `Agent '${agent.id}' id must be a safe filesystem path segment.`,
+                message: `Agent '${agent.id}' id must be a safe filesystem path segment when workspaceMode is copy-on-conversation.`,
             });
         }
 

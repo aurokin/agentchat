@@ -620,6 +620,99 @@ describe("CodexRuntimeManager", () => {
         });
     });
 
+    test("keeps legacy shared-root history isolated per runtime instance", async () => {
+        await withTempStateHome(async () => {
+            const releaseAConfig = createConfig();
+            releaseAConfig.instanceKey = "instance-a";
+            releaseAConfig.agents[0] = {
+                ...releaseAConfig.agents[0]!,
+                rootPath: "/tmp/release-a/agent-1",
+            };
+            const releaseAInitialClient = new FakeCodexClient({
+                startedThreadId: "thread-a",
+            });
+            const releaseAInitialManager = new CodexRuntimeManager({
+                getConfig: () => releaseAConfig,
+                persistence: createPersistence({
+                    provider: "codex-default",
+                    providerThreadId: "thread-a-legacy",
+                    updatedAt: Date.now() - 60_000,
+                }) as unknown as RuntimePersistenceClient,
+                createClient: () => releaseAInitialClient,
+                stateId: "shared-install",
+            });
+
+            await releaseAInitialManager.sendMessage({
+                userId: "user-1",
+                subscriberId: "socket-1",
+                command: createCommand(),
+                sendEvent: () => undefined,
+            });
+
+            expect(
+                releaseAInitialClient.requests.map((request) => request.method),
+            ).toEqual(["thread/start", "turn/start"]);
+
+            const releaseAUpdatedAt = Date.now() + 1_000;
+
+            const releaseBConfig = createConfig();
+            releaseBConfig.instanceKey = "instance-b";
+            releaseBConfig.agents[0] = {
+                ...releaseBConfig.agents[0]!,
+                rootPath: "/tmp/release-b/agent-1",
+            };
+            const releaseBClient = new FakeCodexClient({
+                startedThreadId: "thread-b",
+            });
+            const releaseBManager = new CodexRuntimeManager({
+                getConfig: () => releaseBConfig,
+                persistence: createPersistence({
+                    provider: "codex-default",
+                    providerThreadId: "thread-b-existing",
+                    updatedAt: Date.now() - 60_000,
+                }) as unknown as RuntimePersistenceClient,
+                createClient: () => releaseBClient,
+                stateId: "shared-install",
+            });
+
+            await releaseBManager.sendMessage({
+                userId: "user-1",
+                subscriberId: "socket-1",
+                command: createCommand(),
+                sendEvent: () => undefined,
+            });
+
+            expect(
+                releaseBClient.requests.map((request) => request.method),
+            ).toEqual(["thread/start", "turn/start"]);
+
+            const releaseAResumeClient = new FakeCodexClient({
+                resumedThreadId: "thread-a",
+            });
+            const releaseAResumeManager = new CodexRuntimeManager({
+                getConfig: () => releaseAConfig,
+                persistence: createPersistence({
+                    provider: "codex-default",
+                    providerThreadId: "thread-a",
+                    updatedAt: releaseAUpdatedAt,
+                }) as unknown as RuntimePersistenceClient,
+                createClient: () => releaseAResumeClient,
+                stateId: "shared-install",
+            });
+
+            await releaseAResumeManager.sendMessage({
+                userId: "user-1",
+                subscriberId: "socket-1",
+                command: createCommand(),
+                sendEvent: () => undefined,
+            });
+
+            expect(
+                releaseAResumeClient.requests.map((request) => request.method),
+            ).toEqual(["thread/resume", "turn/start"]);
+        });
+    });
+
     test("uses the selected Codex effort variant directly", async () => {
         const config = createConfig();
         const persistence = createPersistence(null);

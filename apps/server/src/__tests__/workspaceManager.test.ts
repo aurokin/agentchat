@@ -52,11 +52,13 @@ function makeAgent(overrides: Partial<AgentConfig> = {}): AgentConfig {
 function makeConfig(overrides: {
     sandboxRoot: string;
     agents?: AgentConfig[];
+    stateId?: string;
+    instanceKey?: string;
 }): AgentchatConfig {
     return {
         version: 1,
-        stateId: "test-state",
-        instanceKey: "instance-test",
+        stateId: overrides.stateId ?? "test-state",
+        instanceKey: overrides.instanceKey ?? "instance-test",
         sandboxRoot: overrides.sandboxRoot,
         auth: {
             defaultProviderId: "local-main",
@@ -147,6 +149,49 @@ describe("WorkspaceManager", () => {
                 process.env.XDG_STATE_HOME = originalXdgStateHome;
             }
         }
+    });
+
+    test("tracks active sandbox roots for parallel instances under one state id", () => {
+        const rootsRegistryPath = path.join(
+            makeTempDir("sandbox-roots-registry"),
+            "sandbox-roots.json",
+        );
+        const releaseARoot = makeTempDir("sandbox-a");
+        const releaseBRoot = makeTempDir("sandbox-b");
+        const releaseAConfig = makeConfig({
+            sandboxRoot: releaseARoot,
+            stateId: "shared-install",
+            instanceKey: "instance-a",
+        });
+        const releaseBConfig = makeConfig({
+            sandboxRoot: releaseBRoot,
+            stateId: "shared-install",
+            instanceKey: "instance-b",
+        });
+        const releaseAManager = new WorkspaceManager({
+            getConfig: () => releaseAConfig,
+            rootsRegistryPath,
+        });
+        const releaseBManager = new WorkspaceManager({
+            getConfig: () => releaseBConfig,
+            rootsRegistryPath,
+        });
+
+        const expectedRoots = [releaseARoot, releaseBRoot].sort((left, right) =>
+            left.localeCompare(right),
+        );
+
+        expect(releaseAManager.listCurrentSandboxRoots()).toEqual(
+            expectedRoots,
+        );
+        expect(releaseBManager.listCurrentSandboxRoots()).toEqual(
+            [releaseARoot, releaseBRoot].sort((left, right) =>
+                left.localeCompare(right),
+            ),
+        );
+        expect(releaseAManager.listCurrentSandboxRoots()).toEqual(
+            expectedRoots,
+        );
     });
 
     describe("ensureWorkspace", () => {
