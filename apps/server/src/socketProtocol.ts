@@ -8,7 +8,7 @@ export interface ConversationSendCommand {
     type: "conversation.send";
     payload: {
         conversationId: string;
-        agentId: string;
+        agentId?: string;
         modelId: string;
         variantId?: string | null;
         content: string;
@@ -23,7 +23,7 @@ export interface ConversationInterruptCommand {
     type: "conversation.interrupt";
     payload: {
         conversationId: string;
-        agentId: string;
+        agentId?: string;
     };
 }
 
@@ -32,7 +32,7 @@ export interface ConversationSubscribeCommand {
     type: "conversation.subscribe" | "conversation.unsubscribe";
     payload: {
         conversationId: string;
-        agentId: string;
+        agentId?: string;
     };
 }
 
@@ -106,7 +106,8 @@ export function parseClientCommand(raw: string): ClientCommand {
         if (
             !payload ||
             typeof payload.conversationId !== "string" ||
-            typeof payload.agentId !== "string"
+            (payload.agentId !== undefined &&
+                typeof payload.agentId !== "string")
         ) {
             throw new Error("Invalid conversation subscription payload");
         }
@@ -125,7 +126,8 @@ export function parseClientCommand(raw: string): ClientCommand {
         if (
             !payload ||
             typeof payload.conversationId !== "string" ||
-            typeof payload.agentId !== "string"
+            (payload.agentId !== undefined &&
+                typeof payload.agentId !== "string")
         ) {
             throw new Error("Invalid interrupt payload");
         }
@@ -164,7 +166,8 @@ export function parseClientCommand(raw: string): ClientCommand {
         if (
             !payload ||
             typeof payload.conversationId !== "string" ||
-            typeof payload.agentId !== "string" ||
+            (payload.agentId !== undefined &&
+                typeof payload.agentId !== "string") ||
             typeof payload.modelId !== "string" ||
             (payload.variantId !== undefined &&
                 payload.variantId !== null &&

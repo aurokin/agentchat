@@ -63,6 +63,31 @@ describe("websocketSession", () => {
         expect(sendJson).not.toHaveBeenCalled();
     });
 
+    test("routes legacy subscribe commands without agentId", async () => {
+        const runtimeManager = createRuntimeManager();
+
+        await handleConnectedSocketMessage({
+            runtimeManager,
+            session,
+            connectionId: "socket-1",
+            rawMessage: JSON.stringify({
+                id: "cmd-legacy-sub",
+                type: "conversation.subscribe",
+                payload: {
+                    conversationId: "chat-1",
+                },
+            }),
+            sendJson: () => undefined,
+        });
+
+        expect(runtimeManager.subscribe).toHaveBeenCalledWith(
+            expect.objectContaining({
+                conversationId: "chat-1",
+                agentId: undefined,
+            }),
+        );
+    });
+
     test("serializes subscribed runtime events back to the socket client", async () => {
         const runtimeManager = createRuntimeManager();
         const sendJson = mock(() => undefined);
@@ -196,6 +221,37 @@ describe("websocketSession", () => {
                 sendEvent: expect.any(Function),
             }),
         );
+    });
+
+    test("routes legacy send commands without agentId", async () => {
+        const runtimeManager = createRuntimeManager();
+
+        await handleConnectedSocketMessage({
+            runtimeManager,
+            session,
+            connectionId: "socket-1",
+            rawMessage: JSON.stringify({
+                id: "cmd-legacy-send",
+                type: "conversation.send",
+                payload: {
+                    conversationId: "chat-1",
+                    modelId: "gpt-5.3-codex",
+                    content: "Hello",
+                    userMessageId: "user-1",
+                    assistantMessageId: "assistant-1",
+                    history: [],
+                },
+            }),
+            sendJson: () => undefined,
+        });
+
+        const sendMessageCalls = runtimeManager.sendMessage.mock
+            .calls as unknown as Array<
+            [Parameters<RuntimeManagerLike["sendMessage"]>[0]]
+        >;
+        expect(
+            sendMessageCalls[0]?.[0]?.command.payload.agentId,
+        ).toBeUndefined();
     });
 
     test("parses typed-array websocket payloads through the full command path", async () => {

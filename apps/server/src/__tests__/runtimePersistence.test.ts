@@ -260,6 +260,41 @@ describe("RuntimePersistenceClient", () => {
         );
     });
 
+    test("resolves conversation identity for legacy websocket commands", async () => {
+        const fetchMock = mock(async () =>
+            Response.json({
+                agentId: "agent-1",
+                chatId: "chats:1",
+                ambiguous: false,
+            }),
+        );
+        globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+        const client = new RuntimePersistenceClient();
+        const result = await client.resolveConversationIdentity(
+            "user-1",
+            "chat-1",
+        );
+
+        expect(result).toEqual({
+            agentId: "agent-1",
+            chatId: "chats:1",
+            ambiguous: false,
+        });
+        const fetchCalls = fetchMock.mock.calls as unknown as Array<
+            [string | URL, RequestInit?]
+        >;
+        expect(fetchCalls[0]?.[0]).toBe(
+            "https://agentchat.convex.site/runtime/conversation-identity",
+        );
+        expect(fetchCalls[0]?.[1]?.body).toBe(
+            JSON.stringify({
+                userId: "user-1",
+                localId: "chat-1",
+            }),
+        );
+    });
+
     test("surfaces non-200 ingress responses", async () => {
         const fetchMock = mock(async () => {
             return new Response("bad request", { status: 400 });

@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useChat } from "@/contexts/ChatContext";
 import { useAgent } from "@/contexts/AgentContext";
+import { getScopedChatStateKey } from "@/contexts/chat-state";
 import { usePersistenceAdapter } from "@/contexts/WorkspaceContext";
 import { resolveConversationActivityState } from "@shared/core/conversation-activity";
 import { cn } from "@/lib/utils";
@@ -409,8 +410,12 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                             {chats.map((chat) => {
                                 const isActive = currentChat?.id === chat.id;
                                 const runtimeBinding =
-                                    conversationRuntimeBindings[chat.id] ??
-                                    null;
+                                    conversationRuntimeBindings[
+                                        getScopedChatStateKey(
+                                            chat.id,
+                                            chat.agentId,
+                                        )
+                                    ] ?? null;
                                 const sidebarState =
                                     resolveSidebarConversationState({
                                         isActiveConversation: isActive,

@@ -82,6 +82,15 @@ type RuntimeWorkspaceIdentity = {
     workspaceCwd: string;
 };
 
+type ResolvedConversationSendCommand = Omit<
+    ConversationSendCommand,
+    "payload"
+> & {
+    payload: Omit<ConversationSendCommand["payload"], "agentId"> & {
+        agentId: string;
+    };
+};
+
 type PendingRuntimeInitialization = {
     cancelReason: Error | null;
     client: CodexClient | null;
@@ -331,7 +340,11 @@ export class CodexRuntimeManager {
         command: ConversationSendCommand;
         sendEvent: (event: ServerEvent) => void;
     }): Promise<void> {
-        const { runtime, isNew } = await this.ensureRuntime(params);
+        const command = await this.resolveSendCommandAgent(params);
+        const { runtime, isNew } = await this.ensureRuntime({
+            ...params,
+            command,
+        });
         this.retainSubscriberForActiveTurn(
             runtime,
             params.subscriberId,
@@ -351,14 +364,14 @@ export class CodexRuntimeManager {
             runtime,
             createRuntimeServerEvent(runtime, "run.started", {
                 runId,
-                messageId: params.command.payload.assistantMessageId,
+                messageId: command.payload.assistantMessageId,
             }),
         );
         this.emitToSubscribers(
             runtime,
             createRuntimeServerEvent(runtime, "message.started", {
                 runId,
-                messageId: params.command.payload.assistantMessageId,
+                messageId: command.payload.assistantMessageId,
                 messageIndex: 0,
                 kind: "assistant_message",
                 content: "",
@@ -369,9 +382,9 @@ export class CodexRuntimeManager {
             runtime.activeTurn = {
                 runId,
                 userId: params.userId,
-                triggerMessageId: params.command.payload.userMessageId,
+                triggerMessageId: command.payload.userMessageId,
                 turnId: null,
-                currentMessageId: params.command.payload.assistantMessageId,
+                currentMessageId: command.payload.assistantMessageId,
                 currentMessageKind: "assistant_message",
                 currentMessageIndex: 0,
                 text: "",
@@ -401,8 +414,7 @@ export class CodexRuntimeManager {
                         chatId: runtime.chatId,
                         userId: params.userId,
                         agentId: runtime.agentId,
-                        conversationLocalId:
-                            params.command.payload.conversationId,
+                        conversationLocalId: command.payload.conversationId,
                         provider: runtime.provider.id,
                         status: "active",
                         providerThreadId: runtime.threadId,
@@ -419,10 +431,10 @@ export class CodexRuntimeManager {
 
                     const inputText = isNew
                         ? buildInitialTurnText(
-                              params.command.payload.history,
-                              params.command.payload.content,
+                              command.payload.history,
+                              command.payload.content,
                           )
-                        : params.command.payload.content;
+                        : command.payload.content;
 
                     const turnResult = await runtime.client.request(
                         "turn/start",
@@ -434,25 +446,23 @@ export class CodexRuntimeManager {
                             sandboxPolicy: {
                                 type: "dangerFullAccess",
                             },
-                            model: params.command.payload.modelId,
-                            effort: resolveCodexEffort(params.command),
+                            model: command.payload.modelId,
+                            effort: resolveCodexEffort(command),
                             personality: "pragmatic",
                         },
                     );
 
                     activeTurn.turnId = extractTurnId(turnResult);
-                    runtime.modelId = params.command.payload.modelId;
+                    runtime.modelId = command.payload.modelId;
 
                     await this.persistence.runStarted({
                         chatId: runtime.chatId,
                         userId: params.userId,
                         agentId: runtime.agentId,
-                        conversationLocalId:
-                            params.command.payload.conversationId,
-                        triggerMessageLocalId:
-                            params.command.payload.userMessageId,
+                        conversationLocalId: command.payload.conversationId,
+                        triggerMessageLocalId: command.payload.userMessageId,
                         assistantMessageLocalId:
-                            params.command.payload.assistantMessageId,
+                            command.payload.assistantMessageId,
                         externalRunId: runId,
                         provider: runtime.provider.id,
                         providerThreadId: runtime.threadId,
@@ -489,7 +499,7 @@ export class CodexRuntimeManager {
                                 userId: failedTurn.userId,
                                 agentId: runtime.agentId,
                                 conversationLocalId:
-                                    params.command.payload.conversationId,
+                                    command.payload.conversationId,
                                 assistantMessageLocalId:
                                     failedTurn.currentMessageId,
                                 externalRunId: failedTurn.runId,
@@ -510,8 +520,7 @@ export class CodexRuntimeManager {
                             chatId: runtime.chatId,
                             userId: params.userId,
                             agentId: runtime.agentId,
-                            conversationLocalId:
-                                params.command.payload.conversationId,
+                            conversationLocalId: command.payload.conversationId,
                             provider: runtime.provider.id,
                             status: "errored",
                             providerThreadId: runtime.threadId,
@@ -567,10 +576,16 @@ export class CodexRuntimeManager {
     async interrupt(params: {
         userId: string;
         conversationId: string;
-        agentId: string;
+        agentId?: string;
     }): Promise<void> {
+        const { agentId } = await this.resolveConversationIdentity({
+            userId: params.userId,
+            conversationId: params.conversationId,
+            agentId: params.agentId,
+            allowRuntimeFallback: true,
+        });
         const runtime = this.runtimes.get(
-            getRuntimeKey(params.userId, params.agentId, params.conversationId),
+            getRuntimeKey(params.userId, agentId, params.conversationId),
         );
         if (!runtime?.activeTurn?.turnId) {
             return;
@@ -666,13 +681,29 @@ export class CodexRuntimeManager {
     subscribe(params: {
         userId: string;
         conversationId: string;
-        agentId: string;
+        agentId?: string;
         subscriberId: string;
         sendEvent: (event: ServerEvent) => void;
     }): Promise<void> | void {
+        return this.subscribeResolved(params);
+    }
+
+    private async subscribeResolved(params: {
+        userId: string;
+        conversationId: string;
+        agentId?: string;
+        subscriberId: string;
+        sendEvent: (event: ServerEvent) => void;
+    }): Promise<void> {
+        const { agentId } = await this.resolveConversationIdentity({
+            userId: params.userId,
+            conversationId: params.conversationId,
+            agentId: params.agentId,
+            allowRuntimeFallback: true,
+        });
         const key = getRuntimeKey(
             params.userId,
-            params.agentId,
+            agentId,
             params.conversationId,
         );
         const runtime = this.runtimes.get(key);
@@ -685,7 +716,7 @@ export class CodexRuntimeManager {
             return this.recoverOrphanedActiveRun({
                 userId: params.userId,
                 conversationId: params.conversationId,
-                agentId: params.agentId,
+                agentId,
             });
         }
 
@@ -813,7 +844,7 @@ export class CodexRuntimeManager {
 
     private async ensureRuntime(params: {
         userId: string;
-        command: ConversationSendCommand;
+        command: ResolvedConversationSendCommand;
         sendEvent: (event: ServerEvent) => void;
     }): Promise<{ runtime: ConversationRuntime; isNew: boolean }> {
         const config = this.getConfig();
@@ -850,7 +881,7 @@ export class CodexRuntimeManager {
     private async initializeRuntime(
         params: {
             userId: string;
-            command: ConversationSendCommand;
+            command: ResolvedConversationSendCommand;
             sendEvent: (event: ServerEvent) => void;
         },
         key: string,
@@ -1249,6 +1280,114 @@ export class CodexRuntimeManager {
         }
 
         throw new Error("Conversation not found");
+    }
+
+    private async resolveSendCommandAgent(params: {
+        userId: string;
+        subscriberId: string;
+        command: ConversationSendCommand;
+        sendEvent: (event: ServerEvent) => void;
+    }): Promise<ResolvedConversationSendCommand> {
+        if (params.command.payload.agentId) {
+            return params.command as ResolvedConversationSendCommand;
+        }
+
+        const { agentId } = await this.resolveConversationIdentity({
+            userId: params.userId,
+            conversationId: params.command.payload.conversationId,
+            agentId: params.command.payload.agentId,
+            allowRuntimeFallback: false,
+        });
+
+        return {
+            ...params.command,
+            payload: {
+                ...params.command.payload,
+                agentId,
+            },
+        };
+    }
+
+    private async resolveConversationIdentity(params: {
+        userId: string;
+        conversationId: string;
+        agentId?: string;
+        allowRuntimeFallback: boolean;
+    }): Promise<{ agentId: string; chatId?: string }> {
+        if (params.agentId) {
+            return { agentId: params.agentId };
+        }
+
+        const persistedIdentity =
+            await this.persistence.resolveConversationIdentity(
+                params.userId,
+                params.conversationId,
+            );
+        if (persistedIdentity?.ambiguous) {
+            throw new Error(
+                "Legacy websocket command is ambiguous without agentId.",
+            );
+        }
+        if (persistedIdentity) {
+            return {
+                agentId: persistedIdentity.agentId,
+                chatId: persistedIdentity.chatId,
+            };
+        }
+        if (!params.allowRuntimeFallback) {
+            throw new Error(
+                "Legacy websocket command requires agentId because the conversation could not be resolved.",
+            );
+        }
+
+        const runtimeAgentId = this.resolveUniqueRuntimeAgentId(
+            params.userId,
+            params.conversationId,
+        );
+        if (runtimeAgentId) {
+            return { agentId: runtimeAgentId };
+        }
+
+        throw new Error(
+            "Legacy websocket command requires agentId because the conversation could not be resolved.",
+        );
+    }
+
+    private resolveUniqueRuntimeAgentId(
+        userId: string,
+        conversationId: string,
+    ): string | null {
+        const agentIds = new Set<string>();
+        for (const runtime of this.runtimes.values()) {
+            if (
+                runtime.userId === userId &&
+                runtime.conversationId === conversationId
+            ) {
+                agentIds.add(runtime.agentId);
+            }
+        }
+
+        for (const key of this.pendingRuntimeInitializations.keys()) {
+            try {
+                const parsed = JSON.parse(key) as [string, string, string];
+                if (
+                    Array.isArray(parsed) &&
+                    parsed[0] === userId &&
+                    parsed[2] === conversationId &&
+                    typeof parsed[1] === "string"
+                ) {
+                    agentIds.add(parsed[1]);
+                }
+            } catch {
+                continue;
+            }
+        }
+
+        if (agentIds.size !== 1) {
+            return null;
+        }
+
+        return agentIds.values().next().value ?? null;
     }
 
     private async recoverOrphanedActiveRun(params: {
@@ -2051,7 +2190,7 @@ export class CodexRuntimeManager {
 
 function resolveRuntimeResources(
     config: AgentchatConfig,
-    command: ConversationSendCommand,
+    command: ResolvedConversationSendCommand,
 ): ResolvedRuntimeResources {
     const agent =
         config.agents.find(

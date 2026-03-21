@@ -457,13 +457,17 @@ export function resolveConversationSocketEvent(params: {
     activeRun: ActiveRunState | null;
     messages: Message[];
 }): SocketEventResolution {
+    const eventAgentId =
+        "agentId" in params.event.payload &&
+        typeof params.event.payload.agentId === "string"
+            ? params.event.payload.agentId
+            : null;
     if (
         !params.currentChatId ||
         !params.currentAgentId ||
         !("conversationId" in params.event.payload) ||
         params.event.payload.conversationId !== params.currentChatId ||
-        !("agentId" in params.event.payload) ||
-        params.event.payload.agentId !== params.currentAgentId
+        (eventAgentId !== null && eventAgentId !== params.currentAgentId)
     ) {
         return { type: "ignore" };
     }

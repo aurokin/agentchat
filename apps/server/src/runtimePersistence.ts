@@ -20,6 +20,12 @@ export type PersistedConversationRuntimeState = {
     binding: PersistedRuntimeBinding | null;
 };
 
+export type ResolvedConversationIdentity = {
+    agentId: string;
+    chatId: string;
+    ambiguous: boolean;
+} | null;
+
 function trimTrailingSlash(value: string): string {
     return value.replace(/\/+$/, "");
 }
@@ -140,6 +146,17 @@ export class RuntimePersistenceClient {
             chatId,
         });
         return (await response.json()) as boolean;
+    }
+
+    async resolveConversationIdentity(
+        userId: string,
+        localId: string,
+    ): Promise<ResolvedConversationIdentity> {
+        const response = await this.post("/runtime/conversation-identity", {
+            userId,
+            localId,
+        });
+        return (await response.json()) as ResolvedConversationIdentity;
     }
 
     private async post(

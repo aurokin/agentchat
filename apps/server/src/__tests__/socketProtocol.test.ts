@@ -71,6 +71,26 @@ describe("socket protocol parsing", () => {
         });
     });
 
+    test("parses legacy interrupt commands without agentId", () => {
+        expect(
+            parseClientCommand(
+                JSON.stringify({
+                    id: "cmd-2-legacy",
+                    type: "conversation.interrupt",
+                    payload: {
+                        conversationId: "chat-1",
+                    },
+                }),
+            ),
+        ).toEqual({
+            id: "cmd-2-legacy",
+            type: "conversation.interrupt",
+            payload: {
+                conversationId: "chat-1",
+            },
+        });
+    });
+
     test("parses subscribe commands", () => {
         expect(
             parseClientCommand(
@@ -89,6 +109,52 @@ describe("socket protocol parsing", () => {
             payload: {
                 conversationId: "chat-1",
                 agentId: "agent-1",
+            },
+        });
+    });
+
+    test("parses legacy subscribe commands without agentId", () => {
+        expect(
+            parseClientCommand(
+                JSON.stringify({
+                    id: "cmd-3-legacy",
+                    type: "conversation.subscribe",
+                    payload: {
+                        conversationId: "chat-1",
+                    },
+                }),
+            ),
+        ).toEqual({
+            id: "cmd-3-legacy",
+            type: "conversation.subscribe",
+            payload: {
+                conversationId: "chat-1",
+            },
+        });
+    });
+
+    test("parses legacy send commands without agentId", () => {
+        expect(
+            parseClientCommand(
+                JSON.stringify({
+                    id: "cmd-legacy-send",
+                    type: "conversation.send",
+                    payload: {
+                        conversationId: "chat-1",
+                        modelId: "gpt-5.3-codex",
+                        content: "Hello",
+                        userMessageId: "user-1",
+                        assistantMessageId: "assistant-1",
+                        history: [],
+                    },
+                }),
+            ),
+        ).toMatchObject({
+            id: "cmd-legacy-send",
+            type: "conversation.send",
+            payload: {
+                conversationId: "chat-1",
+                modelId: "gpt-5.3-codex",
             },
         });
     });

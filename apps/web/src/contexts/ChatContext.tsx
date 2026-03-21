@@ -38,6 +38,10 @@ import {
     filterChatsForAgent,
     resolveCurrentChatForAgent,
 } from "@/contexts/chat-helpers";
+import {
+    buildConversationRuntimeBindingMap,
+    getScopedChatStateKey,
+} from "@/contexts/chat-state";
 import { deriveConversationRuntimeState } from "@/contexts/runtime-helpers";
 import * as storage from "@/lib/storage";
 import { getSharedAgentchatSocketClient } from "@/lib/agentchat-socket";
@@ -129,6 +133,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     const latestViewedAtRef = useRef<Record<string, number>>({});
     const markViewedTimeoutRef = useRef<number | null>(null);
     const pendingViewedChatRef = useRef<{
+        agentId: string;
         chatId: string;
         timestamp: number;
     } | null>(null);
@@ -216,12 +221,9 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     );
     const conversationRuntimeBindings = useMemo(
         () =>
-            Object.fromEntries(
-                (workspaceConversationRuntimeBindings ?? []).map((binding) => [
-                    binding.conversationId,
-                    binding,
-                ]),
-            ) as Record<string, ConversationRuntimeBindingSummary>,
+            buildConversationRuntimeBindingMap(
+                workspaceConversationRuntimeBindings,
+            ),
         [workspaceConversationRuntimeBindings],
     );
     const agentRuntimeActivitySummaries = useMemo(
@@ -343,8 +345,12 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         }
 
         const lastMessageAt = messages.at(-1)?.createdAt ?? 0;
+        const currentChatKey = getScopedChatStateKey(
+            currentChat.id,
+            currentChat.agentId,
+        );
         const lastRuntimeEventAt =
-            conversationRuntimeBindings[currentChat.id]?.lastEventAt ?? 0;
+            conversationRuntimeBindings[currentChatKey]?.lastEventAt ?? 0;
         const visibleAt = Math.max(
             lastMessageAt,
             lastRuntimeEventAt,
@@ -353,27 +359,30 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         );
         const alreadyViewedAt = Math.max(
             currentChat.lastViewedAt ?? 0,
-            latestViewedAtRef.current[currentChat.id] ?? 0,
+            latestViewedAtRef.current[currentChatKey] ?? 0,
         );
 
         if (visibleAt <= alreadyViewedAt) {
             return;
         }
 
-        latestViewedAtRef.current[currentChat.id] = visibleAt;
+        latestViewedAtRef.current[currentChatKey] = visibleAt;
         applyChatLastViewedAt(currentChat.id, visibleAt);
 
         const pendingViewed = pendingViewedChatRef.current;
         if (
             pendingViewed &&
-            pendingViewed.chatId !== currentChat.id &&
+            getScopedChatStateKey(
+                pendingViewed.chatId,
+                pendingViewed.agentId,
+            ) !== currentChatKey &&
             markViewedTimeoutRef.current !== null
         ) {
             window.clearTimeout(markViewedTimeoutRef.current);
             void persistenceAdapter.markChatViewed(
                 pendingViewed.chatId,
                 pendingViewed.timestamp,
-                currentChat.agentId,
+                pendingViewed.agentId,
             );
             markViewedTimeoutRef.current = null;
             pendingViewedChatRef.current = null;
@@ -382,6 +391,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         }
 
         pendingViewedChatRef.current = {
+            agentId: currentChat.agentId,
             chatId: currentChat.id,
             timestamp: visibleAt,
         };
@@ -394,7 +404,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             void persistenceAdapter.markChatViewed(
                 chatId,
                 timestamp,
-                currentChat.agentId,
+                pending.agentId,
             );
             pendingViewedChatRef.current = null;
             markViewedTimeoutRef.current = null;

@@ -20,6 +20,7 @@ const runtimeInternal = internal as unknown as {
         readRuntimeBinding: any;
         listAllChatLocalIds: any;
         chatExistsByLocalId: any;
+        resolveConversationIdentityByLocalId: unknown;
     };
 };
 
@@ -137,6 +138,10 @@ runtimeQueryRoute({
 runtimeQueryRoute({
     path: "/runtime/chat-exists",
     query: runtimeInternal.runtimeIngress.chatExistsByLocalId,
+});
+runtimeQueryRoute({
+    path: "/runtime/conversation-identity",
+    query: runtimeInternal.runtimeIngress.resolveConversationIdentityByLocalId,
 });
 
 export default http;

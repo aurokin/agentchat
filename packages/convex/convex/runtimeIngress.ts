@@ -131,20 +131,27 @@ async function getMessageByLocalId(
     ctx: RuntimeMutationCtx,
     args: { userId: Id<"users">; localId: string },
 ): Promise<Doc<"messages"> | null> {
-    return await ctx.db
+    const messages = await ctx.db
         .query("messages")
         .withIndex("by_local_id", (q) =>
             q.eq("userId", args.userId).eq("localId", args.localId),
         )
-        .unique();
+        .collect();
+    return messages.length === 1 ? (messages[0] ?? null) : null;
 }
 
 async function getMessageByLocalIdInChat(
     ctx: RuntimeMutationCtx,
     args: { userId: Id<"users">; chatId: Id<"chats">; localId: string },
 ): Promise<Doc<"messages"> | null> {
-    const message = await getMessageByLocalId(ctx, args);
-    if (!message || message.chatId !== args.chatId) {
+    const messages = await ctx.db
+        .query("messages")
+        .withIndex("by_chatId_and_localId", (q) =>
+            q.eq("chatId", args.chatId).eq("localId", args.localId),
+        )
+        .collect();
+    const message = messages.length === 1 ? (messages[0] ?? null) : null;
+    if (!message || message.userId !== args.userId) {
         return null;
     }
     return message;
@@ -332,14 +339,12 @@ async function createAssistantMessage(
         createdAt: number;
     },
 ): Promise<Doc<"messages">> {
-    const existing = await getMessageByLocalId(ctx, {
+    const existing = await getMessageByLocalIdInChat(ctx, {
         userId: args.userId,
+        chatId: args.chatId,
         localId: args.localId,
     });
     if (existing) {
-        if (existing.chatId !== args.chatId) {
-            throw new Error("Assistant message not found");
-        }
         await ctx.db.patch(existing._id, {
             role: "assistant",
             kind: args.kind,
@@ -1078,6 +1083,70 @@ export const chatExistsByLocalId = internalQuery({
                 chat.agentId === args.agentId &&
                 (chat.localId ?? chat._id) === args.localId,
         );
+    },
+});
+
+export const resolveConversationIdentityByLocalId = internalQuery({
+    args: {
+        userId: v.id("users"),
+        localId: v.string(),
+    },
+    handler: async (
+        ctx,
+        args,
+    ): Promise<{
+        agentId: string;
+        chatId: Id<"chats">;
+        ambiguous: boolean;
+    } | null> => {
+        const directChats = await ctx.db
+            .query("chats")
+            .withIndex("by_local_id", (q) =>
+                q.eq("userId", args.userId).eq("localId", args.localId),
+            )
+            .collect();
+        const legacyChats = await ctx.db
+            .query("chats")
+            .withIndex("by_user", (q) => q.eq("userId", args.userId))
+            .collect();
+        const allMatches = [
+            ...directChats,
+            ...legacyChats.filter(
+                (chat) =>
+                    (chat.localId ?? chat._id) === args.localId &&
+                    !directChats.some((existing) => existing._id === chat._id),
+            ),
+        ].sort((left, right) => {
+            const updatedAtDelta = right.updatedAt - left.updatedAt;
+            if (updatedAtDelta !== 0) {
+                return updatedAtDelta;
+            }
+
+            const createdAtDelta = right.createdAt - left.createdAt;
+            if (createdAtDelta !== 0) {
+                return createdAtDelta;
+            }
+
+            return String(right._id).localeCompare(String(left._id));
+        });
+
+        if (allMatches.length === 0) {
+            return null;
+        }
+
+        if (allMatches.length > 1) {
+            return {
+                agentId: allMatches[0]!.agentId,
+                chatId: allMatches[0]!._id,
+                ambiguous: true,
+            };
+        }
+
+        return {
+            agentId: allMatches[0]!.agentId,
+            chatId: allMatches[0]!._id,
+            ambiguous: false,
+        };
     },
 });
 

@@ -24,6 +24,7 @@ import { useAppContext } from "@/contexts/AppContext";
 import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AgentSwitcher } from "@/components/chat/AgentSwitcher";
+import { getScopedChatStateKey } from "@/contexts/chat-state";
 import { getPreferredHomeChatId } from "@/lib/home-chat-route";
 import { resolveResponsiveLayout } from "@/lib/responsive-layout";
 
@@ -324,8 +325,9 @@ export default function HomeScreen(): React.ReactElement {
                         const activityState = resolveConversationActivityState({
                             isActiveConversation: currentChat?.id === item.id,
                             activity:
-                                conversationRuntimeBindings[item.id]
-                                    ?.activity ?? null,
+                                conversationRuntimeBindings[
+                                    getScopedChatStateKey(item.id, item.agentId)
+                                ]?.activity ?? null,
                         });
                         return (
                             <TouchableOpacity

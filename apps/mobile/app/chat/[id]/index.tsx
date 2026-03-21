@@ -23,6 +23,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useChatContext } from "@/contexts/ChatContext";
+import { getScopedChatStateKey } from "@/contexts/chat-state";
 import { useModelContext } from "@/contexts/ModelContext";
 import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
 import { useAgentchatSocket } from "@/contexts/AgentchatSocketContext";
@@ -211,24 +212,37 @@ export default function ChatScreen(): ReactElement {
     }, [chatId, currentChat?.agentId]);
 
     useEffect(() => {
-        if (flatListRef.current && messages[chatId]) {
+        if (
+            flatListRef.current &&
+            currentChat?.agentId &&
+            messages[getScopedChatStateKey(chatId, currentChat.agentId)]
+        ) {
             setTimeout(() => {
                 scrollToEnd();
             }, 100);
         }
-    }, [messages, chatId, scrollToEnd]);
+    }, [messages, chatId, currentChat?.agentId, scrollToEnd]);
 
     const currentModel = models.find((m) => m.id === currentChat?.modelId);
     const reasoningSupported = modelSupportsReasoning(currentModel);
+    const currentChatAgentId = currentChat?.agentId ?? null;
     const chatMessages = useMemo(() => {
-        if (!chatId) return EMPTY_MESSAGES;
-        return messages[chatId] ?? EMPTY_MESSAGES;
-    }, [chatId, messages]);
+        if (!chatId || !currentChatAgentId) return EMPTY_MESSAGES;
+        return (
+            messages[getScopedChatStateKey(chatId, currentChatAgentId)] ??
+            EMPTY_MESSAGES
+        );
+    }, [chatId, currentChatAgentId, messages]);
     const displayedMessages = useMemo(
         () => applyStreamingMessageOverlay(chatMessages, streamingMessage),
         [chatMessages, streamingMessage],
     );
-    const hasLoadedMessages = Boolean(chatId && messages[chatId] !== undefined);
+    const hasLoadedMessages = Boolean(
+        chatId &&
+        currentChatAgentId &&
+        messages[getScopedChatStateKey(chatId, currentChatAgentId)] !==
+            undefined,
+    );
     const showSkeletons = !hasLoadedMessages;
     const showEmptyState = hasLoadedMessages && displayedMessages.length === 0;
 

@@ -79,7 +79,7 @@ export type AgentchatSocketEvent =
     | {
           type: "run.started";
           payload: {
-              agentId: string;
+              agentId?: string;
               conversationId: string;
               runId: string;
               messageId: string;
@@ -88,7 +88,7 @@ export type AgentchatSocketEvent =
     | {
           type: "message.started";
           payload: {
-              agentId: string;
+              agentId?: string;
               conversationId: string;
               runId: string;
               messageId: string;
@@ -102,7 +102,7 @@ export type AgentchatSocketEvent =
     | {
           type: "run.completed" | "run.interrupted";
           payload: {
-              agentId: string;
+              agentId?: string;
               conversationId: string;
               runId: string;
           };
@@ -110,7 +110,7 @@ export type AgentchatSocketEvent =
     | {
           type: "run.failed";
           payload: {
-              agentId: string;
+              agentId?: string;
               conversationId: string;
               runId: string;
               error: {
@@ -121,7 +121,7 @@ export type AgentchatSocketEvent =
     | {
           type: "message.delta";
           payload: {
-              agentId: string;
+              agentId?: string;
               conversationId: string;
               messageId: string;
               delta: string;
@@ -131,7 +131,7 @@ export type AgentchatSocketEvent =
     | {
           type: "message.completed";
           payload: {
-              agentId: string;
+              agentId?: string;
               conversationId: string;
               messageId: string;
               content: string;

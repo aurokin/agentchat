@@ -43,6 +43,14 @@ function pickMostRecentChat(chats: Doc<"chats">[]): Doc<"chats"> | null {
     );
 }
 
+function getStrictUniqueChat(chats: Doc<"chats">[]): Doc<"chats"> | null {
+    if (chats.length !== 1) {
+        return null;
+    }
+
+    return chats[0] ?? null;
+}
+
 async function getChatByAgentLocalId(
     ctx: Pick<QueryCtx | MutationCtx, "db">,
     args: {
@@ -60,7 +68,7 @@ async function getChatByAgentLocalId(
                 .eq("localId", args.localId),
         )
         .collect();
-    return pickMostRecentChat(chats);
+    return getStrictUniqueChat(chats);
 }
 
 // Get all chats for a user, sorted by updatedAt descending

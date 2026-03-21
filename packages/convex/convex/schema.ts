@@ -94,6 +94,7 @@ export default defineSchema({
     })
         .index("by_chat", ["chatId"])
         .index("by_chat_created", ["chatId", "createdAt"])
+        .index("by_chatId_and_localId", ["chatId", "localId"])
         .index("by_user", ["userId"])
         .index("by_local_id", ["userId", "localId"])
         .index("by_runId", ["runId"]),

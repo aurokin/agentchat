@@ -1,6 +1,11 @@
 import { describe, expect, mock, test } from "bun:test";
 
-import { create, markViewed, update as updateChat } from "../chats";
+import {
+    create,
+    getByLocalId,
+    markViewed,
+    update as updateChat,
+} from "../chats";
 
 const AUTH_USER_ID = "users:auth";
 const CHAT_ID = "chats:1";
@@ -184,5 +189,54 @@ describe("chat settings lock", () => {
         expect(patch).toHaveBeenCalledWith(CHAT_ID, {
             lastViewedAt: 75,
         });
+    });
+
+    test("fails safely when duplicate agent local ids already exist", async () => {
+        const ctx = {
+            auth: {
+                getUserIdentity: async () => ({
+                    subject: `${AUTH_USER_ID}|session:auth`,
+                }),
+            },
+            db: {
+                get: async (id: string) => {
+                    if (id === AUTH_USER_ID) {
+                        return { _id: AUTH_USER_ID };
+                    }
+
+                    return null;
+                },
+                query: mock(() => ({
+                    withIndex: mock(() => ({
+                        collect: mock(async () => [
+                            {
+                                _id: "chats:duplicate-1",
+                                userId: AUTH_USER_ID,
+                                localId: "chat-local-1",
+                                agentId: "agent-a",
+                                updatedAt: 200,
+                                createdAt: 100,
+                            },
+                            {
+                                _id: "chats:duplicate-2",
+                                userId: AUTH_USER_ID,
+                                localId: "chat-local-1",
+                                agentId: "agent-a",
+                                updatedAt: 100,
+                                createdAt: 50,
+                            },
+                        ]),
+                    })),
+                })),
+            },
+        };
+
+        await expect(
+            runHandler(getByLocalId as unknown as HandlerExport, ctx, {
+                userId: AUTH_USER_ID,
+                agentId: "agent-a",
+                localId: "chat-local-1",
+            }),
+        ).resolves.toBeNull();
     });
 });

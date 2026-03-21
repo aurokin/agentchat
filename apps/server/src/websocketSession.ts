@@ -12,7 +12,7 @@ export type RuntimeManagerLike = {
     subscribe(params: {
         userId: string;
         conversationId: string;
-        agentId: string;
+        agentId?: string;
         subscriberId: string;
         sendEvent: (event: ServerEvent) => void;
     }): Promise<void> | void;
@@ -24,7 +24,7 @@ export type RuntimeManagerLike = {
     interrupt(params: {
         userId: string;
         conversationId: string;
-        agentId: string;
+        agentId?: string;
     }): Promise<void>;
     sendMessage(params: {
         userId: string;

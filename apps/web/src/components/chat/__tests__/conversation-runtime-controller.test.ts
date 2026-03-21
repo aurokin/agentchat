@@ -621,6 +621,47 @@ describe("conversation runtime controller", () => {
         ).toEqual({ type: "ignore" });
     });
 
+    test("accepts legacy runtime events without agentId for the active chat", () => {
+        const event: AgentchatSocketEvent = {
+            type: "message.delta",
+            payload: {
+                conversationId: "chat-1",
+                messageId: "assistant-1",
+                delta: "x",
+                content: "x",
+            },
+        };
+
+        expect(
+            resolveConversationSocketEvent({
+                currentChatId: "chat-1",
+                currentAgentId: "agent-1",
+                event,
+                activeRun: {
+                    conversationId: "chat-1",
+                    assistantMessageId: "assistant-1",
+                    userContent: "Hello",
+                    content: "",
+                    runId: "run-1",
+                },
+                messages: createMessages(),
+            }),
+        ).toEqual({
+            type: "message.updated",
+            activeRun: {
+                conversationId: "chat-1",
+                assistantMessageId: "assistant-1",
+                userContent: "Hello",
+                content: "x",
+                runId: "run-1",
+            },
+            streamingMessage: {
+                id: "assistant-1",
+                content: "x",
+            },
+        });
+    });
+
     test("keeps title unchanged once a conversation already has history", () => {
         expect(
             getChatTitleUpdate(createChat({ title: "Pinned" }), "Prompt", 1),
