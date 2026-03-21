@@ -49,6 +49,33 @@ describe("background runtime subscriptions", () => {
         ]);
     });
 
+    test("retains background subscriptions while the active conversation query is temporarily unavailable", () => {
+        const calls: string[] = [];
+        const subscriptions = new Map<string, () => void>([
+            [
+                "agent-a:chat-1",
+                () => {
+                    calls.push("unsubscribe:agent-a:chat-1");
+                },
+            ],
+        ]);
+
+        const activeCount = reconcileBackgroundConversationSubscriptions({
+            subscriptions,
+            desiredConversations: undefined,
+            subscribeToConversation: ({ conversationId, agentId }) => {
+                calls.push(`subscribe:${agentId}:${conversationId}`);
+                return () => {
+                    calls.push(`unsubscribe:${agentId}:${conversationId}`);
+                };
+            },
+        });
+
+        expect(activeCount).toBe(1);
+        expect(calls).toEqual([]);
+        expect([...subscriptions.keys()]).toEqual(["agent-a:chat-1"]);
+    });
+
     test("clears all background subscriptions", () => {
         const calls: string[] = [];
         const subscriptions = new Map<string, () => void>([

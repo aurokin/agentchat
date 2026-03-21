@@ -46,7 +46,7 @@ export function BackgroundRuntimeSubscriptions() {
     }, []);
 
     useEffect(() => {
-        if (!isWorkspaceReady || !activeConversations) {
+        if (!isWorkspaceReady) {
             clearBackgroundConversationSubscriptions(subscriptionsRef.current);
             return;
         }

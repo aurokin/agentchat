@@ -208,7 +208,7 @@ export default function ChatScreen(): ReactElement {
     useEffect(() => {
         conversationSubscriptionCleanupRef.current?.();
         conversationSubscriptionCleanupRef.current = null;
-    }, [chatId]);
+    }, [chatId, currentChat?.agentId]);
 
     useEffect(() => {
         if (flatListRef.current && messages[chatId]) {
@@ -661,7 +661,9 @@ export default function ChatScreen(): ReactElement {
         if (
             !shouldApplyConversationScopedUpdate({
                 currentConversationId: currentChatRef.current?.id ?? null,
+                currentAgentId: currentChatRef.current?.agentId ?? null,
                 targetConversationId: startedConversationId,
+                targetAgentId: currentChat.agentId,
             })
         ) {
             return false;

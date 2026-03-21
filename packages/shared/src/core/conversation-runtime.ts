@@ -283,21 +283,35 @@ export function shouldClearPendingReconnectNoticeAfterRuntimeSync(params: {
 
 export function shouldApplyConversationScopedUpdate(params: {
     currentConversationId: string | null;
+    currentAgentId: string | null;
     targetConversationId: string;
+    targetAgentId: string;
 }): boolean {
-    return params.currentConversationId === params.targetConversationId;
+    return (
+        params.currentConversationId === params.targetConversationId &&
+        params.currentAgentId === params.targetAgentId
+    );
 }
 
 export function shouldResetPendingConversationSendOnConversationChange(params: {
     currentConversationId: string | null;
+    currentAgentId: string | null;
     pendingSendConversationId: string | null;
+    pendingSendAgentId: string | null;
     activeRun: ActiveRunState | null;
 }): boolean {
-    if (!params.pendingSendConversationId || params.activeRun) {
+    if (
+        !params.pendingSendConversationId ||
+        !params.pendingSendAgentId ||
+        params.activeRun
+    ) {
         return false;
     }
 
-    return params.currentConversationId !== params.pendingSendConversationId;
+    return (
+        params.currentConversationId !== params.pendingSendConversationId ||
+        params.currentAgentId !== params.pendingSendAgentId
+    );
 }
 
 export function buildInterruptCommand(

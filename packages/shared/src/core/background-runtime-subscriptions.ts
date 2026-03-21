@@ -21,11 +21,18 @@ export function clearBackgroundConversationSubscriptions(
 
 export function reconcileBackgroundConversationSubscriptions(params: {
     subscriptions: Map<string, ConversationUnsubscribe>;
-    desiredConversations: Iterable<ConversationSubscriptionTarget>;
+    desiredConversations:
+        | Iterable<ConversationSubscriptionTarget>
+        | null
+        | undefined;
     subscribeToConversation: (
         target: ConversationSubscriptionTarget,
     ) => ConversationUnsubscribe;
 }): number {
+    if (!params.desiredConversations) {
+        return params.subscriptions.size;
+    }
+
     const desiredConversations = new Map<
         string,
         ConversationSubscriptionTarget

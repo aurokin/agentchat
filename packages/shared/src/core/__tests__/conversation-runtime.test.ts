@@ -117,14 +117,27 @@ describe("conversation runtime helpers", () => {
         expect(
             shouldApplyConversationScopedUpdate({
                 currentConversationId: "chat-1",
+                currentAgentId: "agent-a",
                 targetConversationId: "chat-1",
+                targetAgentId: "agent-a",
             }),
         ).toBe(true);
 
         expect(
             shouldApplyConversationScopedUpdate({
                 currentConversationId: "chat-2",
+                currentAgentId: "agent-a",
                 targetConversationId: "chat-1",
+                targetAgentId: "agent-a",
+            }),
+        ).toBe(false);
+
+        expect(
+            shouldApplyConversationScopedUpdate({
+                currentConversationId: "chat-1",
+                currentAgentId: "agent-b",
+                targetConversationId: "chat-1",
+                targetAgentId: "agent-a",
             }),
         ).toBe(false);
     });
@@ -133,7 +146,9 @@ describe("conversation runtime helpers", () => {
         expect(
             shouldResetPendingConversationSendOnConversationChange({
                 currentConversationId: "chat-2",
+                currentAgentId: "agent-a",
                 pendingSendConversationId: "chat-1",
+                pendingSendAgentId: "agent-a",
                 activeRun: null,
             }),
         ).toBe(true);
@@ -141,7 +156,9 @@ describe("conversation runtime helpers", () => {
         expect(
             shouldResetPendingConversationSendOnConversationChange({
                 currentConversationId: "chat-1",
+                currentAgentId: "agent-a",
                 pendingSendConversationId: "chat-1",
+                pendingSendAgentId: "agent-a",
                 activeRun: null,
             }),
         ).toBe(false);
@@ -149,9 +166,21 @@ describe("conversation runtime helpers", () => {
         expect(
             shouldResetPendingConversationSendOnConversationChange({
                 currentConversationId: "chat-2",
+                currentAgentId: "agent-a",
                 pendingSendConversationId: "chat-1",
+                pendingSendAgentId: "agent-a",
                 activeRun: createActiveRun(),
             }),
         ).toBe(false);
+
+        expect(
+            shouldResetPendingConversationSendOnConversationChange({
+                currentConversationId: "chat-1",
+                currentAgentId: "agent-b",
+                pendingSendConversationId: "chat-1",
+                pendingSendAgentId: "agent-a",
+                activeRun: null,
+            }),
+        ).toBe(true);
     });
 });
