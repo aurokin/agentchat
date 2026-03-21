@@ -82,6 +82,19 @@ async function findChatByConversationId(
         chatId?: Id<"chats">;
     },
 ): Promise<Doc<"chats"> | null> {
+    const selectUnambiguousChat = (
+        matches: Doc<"chats">[],
+    ): Doc<"chats"> | null => {
+        if (args.chatId) {
+            return (
+                matches.find((candidate) => candidate._id === args.chatId) ??
+                null
+            );
+        }
+
+        return matches.length === 1 ? (matches[0] ?? null) : null;
+    };
+
     const chats = await ctx.db
         .query("chats")
         .withIndex("by_userId_and_agentId_and_localId", (q) =>
@@ -91,40 +104,24 @@ async function findChatByConversationId(
                 .eq("localId", args.conversationLocalId),
         )
         .collect();
-    const preferredChat =
-        chats.find((candidate) => candidate._id === args.chatId) ??
-        chats.slice().sort((left, right) => {
-            const updatedAtDelta = right.updatedAt - left.updatedAt;
-            if (updatedAtDelta !== 0) {
-                return updatedAtDelta;
-            }
-
-            const createdAtDelta = right.createdAt - left.createdAt;
-            if (createdAtDelta !== 0) {
-                return createdAtDelta;
-            }
-
-            return String(right._id).localeCompare(String(left._id));
-        })[0] ??
-        null;
+    const preferredChat = selectUnambiguousChat(chats);
     if (preferredChat) {
         return preferredChat;
+    }
+    if (chats.length > 1) {
+        return null;
     }
 
     const legacyChats = await ctx.db
         .query("chats")
         .withIndex("by_user", (q) => q.eq("userId", args.userId))
         .collect();
-    return (
-        legacyChats.find((candidate) => candidate._id === args.chatId) ??
-        legacyChats.find(
-            (candidate) =>
-                candidate.agentId === args.agentId &&
-                (candidate.localId ?? candidate._id) ===
-                    args.conversationLocalId,
-        ) ??
-        null
+    const matchingLegacyChats = legacyChats.filter(
+        (candidate) =>
+            candidate.agentId === args.agentId &&
+            (candidate.localId ?? candidate._id) === args.conversationLocalId,
     );
+    return selectUnambiguousChat(matchingLegacyChats);
 }
 
 async function getMessageByLocalId(
@@ -395,6 +392,68 @@ async function createAssistantMessage(
         throw new Error("Failed to create assistant message");
     }
     return message;
+}
+
+async function upsertStreamingAssistantMessage(
+    ctx: RuntimeMutationCtx,
+    args: {
+        userId: Id<"users">;
+        chatId: Id<"chats">;
+        localId: string;
+        kind?: "assistant_message" | "assistant_status";
+        content: string;
+        runId: string;
+        runMessageIndex?: number;
+        updatedAt: number;
+        defaultKind: "assistant_message" | "assistant_status";
+        defaultRunMessageIndex: number;
+    },
+): Promise<Doc<"messages">> {
+    const existing = await getMessageByLocalIdInChat(ctx, {
+        userId: args.userId,
+        chatId: args.chatId,
+        localId: args.localId,
+    });
+    if (existing) {
+        const kind = args.kind ?? existing.kind ?? args.defaultKind;
+        const runMessageIndex =
+            args.runMessageIndex ??
+            existing.runMessageIndex ??
+            args.defaultRunMessageIndex;
+        await ctx.db.patch(existing._id, {
+            kind,
+            content: args.content,
+            contextContent: args.content,
+            status: "streaming",
+            runId: args.runId,
+            runMessageIndex,
+            updatedAt: args.updatedAt,
+            completedAt: null,
+        });
+
+        return {
+            ...existing,
+            kind,
+            content: args.content,
+            contextContent: args.content,
+            status: "streaming",
+            runId: args.runId,
+            runMessageIndex,
+            updatedAt: args.updatedAt,
+            completedAt: null,
+        };
+    }
+
+    return await createAssistantMessage(ctx, {
+        userId: args.userId,
+        chatId: args.chatId,
+        localId: args.localId,
+        kind: args.kind ?? args.defaultKind,
+        content: args.content,
+        runId: args.runId,
+        runMessageIndex: args.runMessageIndex ?? args.defaultRunMessageIndex,
+        createdAt: args.updatedAt,
+    });
 }
 
 export const runStarted = internalMutation({
@@ -725,17 +784,17 @@ export const messageDelta = internalMutation({
             return;
         }
 
-        const assistantMessage = await updateAssistantMessage(ctx, {
+        const assistantMessage = await upsertStreamingAssistantMessage(ctx, {
             userId: args.userId,
             chatId: chat._id,
             localId: args.assistantMessageLocalId,
             kind: args.kind,
             content: args.content,
-            status: "streaming",
             runId: args.externalRunId,
             runMessageIndex: args.runMessageIndex,
             updatedAt: args.createdAt,
-            completedAt: null,
+            defaultKind: "assistant_message",
+            defaultRunMessageIndex: 0,
         });
 
         await appendRunEvent(ctx, {

@@ -23,7 +23,7 @@ export type CodexClient = {
         handler: (notification: JsonRpcNotification) => void,
     ) => void;
     onExit: (handler: (error: Error) => void) => void;
-    stop: () => void;
+    stop: () => Promise<void>;
 };
 
 export type CreateCodexClient = (params: {
@@ -51,9 +51,16 @@ export class CodexAppServerClient implements CodexClient {
     private exitHandler: ((error: Error) => void) | null = null;
     private isStopping = false;
     private hasExited = false;
+    private readonly exitPromise: Promise<void>;
+    private readonly resolveExitPromise: () => void;
 
     constructor(params: { provider: ProviderConfig; agent: AgentConfig }) {
         const { provider } = params;
+        let resolveExitPromise!: () => void;
+        this.exitPromise = new Promise<void>((resolve) => {
+            resolveExitPromise = resolve;
+        });
+        this.resolveExitPromise = resolveExitPromise;
         this.child = spawn(provider.codex.command, provider.codex.args, {
             cwd: provider.codex.cwd ?? params.agent.rootPath,
             env: {
@@ -115,6 +122,7 @@ export class CodexAppServerClient implements CodexClient {
                 return;
             }
             this.hasExited = true;
+            this.resolveExitPromise();
             for (const [, pending] of this.pending) {
                 pending.reject(error);
             }
@@ -129,6 +137,7 @@ export class CodexAppServerClient implements CodexClient {
                 return;
             }
             this.hasExited = true;
+            this.resolveExitPromise();
             const error = new Error(
                 `Codex app-server exited (${code ?? "null"} / ${signal ?? "null"})`,
             );
@@ -188,8 +197,12 @@ export class CodexAppServerClient implements CodexClient {
         );
     }
 
-    stop(): void {
+    async stop(): Promise<void> {
         this.isStopping = true;
+        if (this.hasExited) {
+            return;
+        }
         this.child.kill("SIGTERM");
+        await this.exitPromise;
     }
 }

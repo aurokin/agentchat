@@ -35,6 +35,10 @@ export function resolveDefaultStateId(
     return `${basename}-${getStableStateKey(seed)}`;
 }
 
+export function resolveDefaultInstanceKey(seed: string): string {
+    return `instance-${getStableStateKey(seed)}`;
+}
+
 export function getServerStateScopeKey(stateId: string): string {
     return `${sanitizeStateFileComponent(stateId)}-${getStableStateKey(stateId)}`;
 }

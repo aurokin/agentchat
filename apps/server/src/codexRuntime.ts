@@ -103,6 +103,9 @@ type LegacySharedRootHistoryEntry = {
 };
 
 type LegacySharedRootHistory = Record<string, LegacySharedRootHistoryEntry>;
+type LegacySharedRootHistoryStore = {
+    instances: Record<string, LegacySharedRootHistory>;
+};
 
 const LEGACY_SHARED_ROOT_HISTORY_DIRECTORY_NAME = "legacy-shared-roots";
 const PENDING_RUNTIME_DELETE_WAIT_MS = 1_000;
@@ -547,7 +550,7 @@ export class CodexRuntimeManager {
                                 persistError,
                             );
                         });
-                    this.disposeRuntime(runtime, {
+                    await this.disposeRuntime(runtime, {
                         removeFromMap: true,
                         reason:
                             error instanceof Error
@@ -648,7 +651,7 @@ export class CodexRuntimeManager {
 
         // Tear down any active runtime for this conversation
         if (runtime && shouldTearDownRuntime) {
-            this.disposeRuntime(runtime, {
+            await this.disposeRuntime(runtime, {
                 removeFromMap: true,
                 reason: new Error("Conversation deleted during active turn."),
             });
@@ -909,7 +912,7 @@ export class CodexRuntimeManager {
                     resources,
                     desiredCwd,
                 );
-                this.disposeRuntime(existing, {
+                await this.disposeRuntime(existing, {
                     removeFromMap: true,
                     reason: new Error("Conversation runtime recycled."),
                 });
@@ -1110,7 +1113,9 @@ export class CodexRuntimeManager {
             return;
         }
 
-        params.client?.stop();
+        if (params.client) {
+            await params.client.stop();
+        }
         if (
             params.cleanupWorkspace &&
             this.workspaceManager &&
@@ -1136,7 +1141,7 @@ export class CodexRuntimeManager {
         }
 
         pendingInitialization.cancelReason ??= reason;
-        pendingInitialization.client?.stop();
+        void pendingInitialization.client?.stop();
         return pendingInitialization;
     }
 
@@ -1161,7 +1166,9 @@ export class CodexRuntimeManager {
         client: CodexClient | null;
         cleanupWorkspace: boolean;
     }): Promise<void> {
-        params.client?.stop();
+        if (params.client) {
+            await params.client.stop();
+        }
         if (
             params.cleanupWorkspace &&
             this.workspaceManager &&
@@ -1469,7 +1476,7 @@ export class CodexRuntimeManager {
                 };
             } catch (error) {
                 if (!isRecoverableThreadResumeError(error)) {
-                    params.client.stop();
+                    await params.client.stop();
                     throw error;
                 }
             }
@@ -1993,7 +2000,7 @@ export class CodexRuntimeManager {
                         error,
                     );
                 });
-            runtime.client.stop();
+            void runtime.client.stop();
             this.runtimes.delete(runtime.key);
         }, runtime.provider.idleTtlSeconds * 1000);
         runtime.idleTimer = idleTimer;
@@ -2061,13 +2068,13 @@ export class CodexRuntimeManager {
         });
     }
 
-    private disposeRuntime(
+    private async disposeRuntime(
         runtime: ConversationRuntime,
         params: {
             removeFromMap: boolean;
             reason: Error;
         },
-    ): void {
+    ): Promise<void> {
         if (runtime.idleTimer) {
             clearTimeout(runtime.idleTimer);
             runtime.idleTimer = null;
@@ -2079,7 +2086,7 @@ export class CodexRuntimeManager {
             runtime.activeTurn = null;
         }
 
-        runtime.client.stop();
+        await runtime.client.stop();
         if (
             params.removeFromMap &&
             this.runtimes.get(runtime.key) === runtime
@@ -2100,7 +2107,9 @@ export class CodexRuntimeManager {
             const currentRootPath = canonicalizePathForComparison(
                 agent.rootPath,
             );
-            const history = this.readLegacySharedRootHistory();
+            const historyStore = this.readLegacySharedRootHistoryStore();
+            const history =
+                historyStore.instances[this.getCurrentInstanceKey()] ?? {};
             const existing = history[agent.id];
             if (!existing) {
                 const changedAt = Date.now();
@@ -2108,7 +2117,8 @@ export class CodexRuntimeManager {
                     rootPath: currentRootPath,
                     changedAt,
                 };
-                this.writeLegacySharedRootHistory(history);
+                historyStore.instances[this.getCurrentInstanceKey()] = history;
+                this.writeLegacySharedRootHistoryStore(historyStore);
                 return binding.updatedAt >= changedAt;
             }
 
@@ -2118,7 +2128,8 @@ export class CodexRuntimeManager {
                     rootPath: currentRootPath,
                     changedAt,
                 };
-                this.writeLegacySharedRootHistory(history);
+                historyStore.instances[this.getCurrentInstanceKey()] = history;
+                this.writeLegacySharedRootHistoryStore(historyStore);
                 return binding.updatedAt >= changedAt;
             }
 
@@ -2128,51 +2139,85 @@ export class CodexRuntimeManager {
         }
     }
 
-    private readLegacySharedRootHistory(): LegacySharedRootHistory {
+    private getCurrentInstanceKey(): string {
+        return this.getConfig().instanceKey;
+    }
+
+    private readLegacySharedRootHistoryStore(): LegacySharedRootHistoryStore {
         if (!this.stateId) {
-            return {};
+            return { instances: {} };
         }
 
         const historyPath = getLegacySharedRootHistoryPath(this.stateId);
         if (!existsSync(historyPath)) {
-            return {};
+            return { instances: {} };
         }
 
         try {
             const parsed = JSON.parse(
                 readFileSync(historyPath, "utf8"),
             ) as Record<string, unknown>;
-            const history: LegacySharedRootHistory = {};
-            for (const [agentId, value] of Object.entries(parsed)) {
-                if (
-                    !value ||
-                    typeof value !== "object" ||
-                    typeof (value as { rootPath?: unknown }).rootPath !==
-                        "string" ||
-                    typeof (value as { changedAt?: unknown }).changedAt !==
-                        "number"
-                ) {
-                    continue;
+            const normalizeHistory = (
+                value: unknown,
+            ): LegacySharedRootHistory => {
+                const history: LegacySharedRootHistory = {};
+                if (!value || typeof value !== "object") {
+                    return history;
                 }
+                for (const [agentId, entry] of Object.entries(
+                    value as Record<string, unknown>,
+                )) {
+                    if (
+                        !entry ||
+                        typeof entry !== "object" ||
+                        typeof (entry as { rootPath?: unknown }).rootPath !==
+                            "string" ||
+                        typeof (entry as { changedAt?: unknown }).changedAt !==
+                            "number"
+                    ) {
+                        continue;
+                    }
 
-                history[agentId] = {
-                    rootPath: canonicalizePathForComparison(
-                        (value as { rootPath: string }).rootPath,
-                    ),
-                    changedAt: Math.max(
-                        0,
-                        (value as { changedAt: number }).changedAt,
-                    ),
+                    history[agentId] = {
+                        rootPath: canonicalizePathForComparison(
+                            (entry as { rootPath: string }).rootPath,
+                        ),
+                        changedAt: Math.max(
+                            0,
+                            (entry as { changedAt: number }).changedAt,
+                        ),
+                    };
+                }
+                return history;
+            };
+
+            if (
+                !("instances" in parsed) ||
+                !parsed.instances ||
+                typeof parsed.instances !== "object"
+            ) {
+                return {
+                    instances: {
+                        [this.getCurrentInstanceKey()]:
+                            normalizeHistory(parsed),
+                    },
                 };
             }
-            return history;
+
+            const instances: LegacySharedRootHistoryStore["instances"] = {};
+            for (const [instanceKey, value] of Object.entries(
+                parsed.instances as Record<string, unknown>,
+            )) {
+                instances[instanceKey] = normalizeHistory(value);
+            }
+            return { instances };
         } catch {
-            return {};
+            return { instances: {} };
         }
     }
 
-    private writeLegacySharedRootHistory(
-        history: LegacySharedRootHistory,
+    private writeLegacySharedRootHistoryStore(
+        historyStore: LegacySharedRootHistoryStore,
     ): void {
         if (!this.stateId) {
             return;
@@ -2182,7 +2227,7 @@ export class CodexRuntimeManager {
         mkdirSync(path.dirname(historyPath), { recursive: true });
         writeFileSync(
             historyPath,
-            `${JSON.stringify(history, null, 2)}\n`,
+            `${JSON.stringify(historyStore, null, 2)}\n`,
             "utf8",
         );
     }

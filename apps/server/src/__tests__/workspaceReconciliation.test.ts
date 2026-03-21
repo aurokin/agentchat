@@ -104,7 +104,7 @@ describe("workspace reconciliation", () => {
                 {
                     copyOnConversationAgentIds: new Set(["copy-agent"]),
                     configuredAgentIds: new Set(["copy-agent", "shared-agent"]),
-                    currentSandboxRoot: "/tmp/current-sandbox",
+                    currentSandboxRoots: ["/tmp/current-sandbox"],
                     knownSandboxRoots: [
                         "/tmp/current-sandbox",
                         "/tmp/old-sandbox",

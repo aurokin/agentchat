@@ -115,7 +115,7 @@ export function useConversationRuntime({
         agentId: string;
     } | null>(null);
     const currentChatRef = useRef<ChatSession | null>(null);
-    const previousConversationIdRef = useRef<string | null>(null);
+    const previousConversationScopeRef = useRef<string | null>(null);
     const messagesRef = useRef<Message[]>([]);
 
     const queueStreamingMessageUpdate = useCallback(
@@ -161,10 +161,13 @@ export function useConversationRuntime({
     }, [currentChat]);
 
     useEffect(() => {
-        const currentConversationId = currentChat?.id ?? null;
+        const currentConversationScope =
+            currentChat?.id && currentChat?.agentId
+                ? `${currentChat.agentId}:${currentChat.id}`
+                : null;
         if (
-            previousConversationIdRef.current !== null &&
-            previousConversationIdRef.current !== currentConversationId
+            previousConversationScopeRef.current !== null &&
+            previousConversationScopeRef.current !== currentConversationScope
         ) {
             pendingInterruptRef.current = false;
             pendingReconnectNoticeRef.current = false;
@@ -175,8 +178,8 @@ export function useConversationRuntime({
             });
         }
 
-        previousConversationIdRef.current = currentConversationId;
-    }, [currentChat?.id]);
+        previousConversationScopeRef.current = currentConversationScope;
+    }, [currentChat?.agentId, currentChat?.id]);
 
     useEffect(() => {
         if (

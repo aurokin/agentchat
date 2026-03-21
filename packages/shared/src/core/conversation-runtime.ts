@@ -28,6 +28,7 @@ export interface StreamingMessageState {
 
 export interface ActiveRunState {
     conversationId: string;
+    agentId?: string;
     assistantMessageId: string;
     userContent: string;
     content: string;
@@ -179,6 +180,7 @@ export function prepareConversationSend(params: {
         effectiveReasoningEffort,
         activeRun: {
             conversationId: params.chat.id,
+            agentId: params.chat.agentId,
             assistantMessageId,
             userContent: params.content,
             content: "",
@@ -197,6 +199,7 @@ export function isConversationRuntimeSnapshotLive(
 
 export function shouldResetActiveRunForRuntimeSnapshot(params: {
     currentConversationId: string;
+    currentAgentId: string;
     runtimeState: ConversationRuntimeSnapshot;
     activeRun: ActiveRunState | null;
 }): boolean {
@@ -205,6 +208,10 @@ export function shouldResetActiveRunForRuntimeSnapshot(params: {
     }
 
     if (params.activeRun.conversationId !== params.currentConversationId) {
+        return true;
+    }
+
+    if (params.activeRun.agentId !== params.currentAgentId) {
         return true;
     }
 
@@ -233,6 +240,7 @@ export function shouldResetActiveRunForRuntimeSnapshot(params: {
 
 export function synchronizeActiveRunWithRuntimeSnapshot(params: {
     currentConversationId: string;
+    currentAgentId: string;
     runtimeState: ConversationRuntimeSnapshot;
     activeRun: ActiveRunState | null;
 }): ActiveRunState | null {
@@ -241,6 +249,10 @@ export function synchronizeActiveRunWithRuntimeSnapshot(params: {
     }
 
     if (params.activeRun.conversationId !== params.currentConversationId) {
+        return null;
+    }
+
+    if (params.activeRun.agentId !== params.currentAgentId) {
         return null;
     }
 
@@ -331,6 +343,7 @@ export function buildInterruptCommand(
 
 export function createRecoveredActiveRunFromSocket(params: {
     conversationId: string;
+    agentId: string;
     messageId: string;
     runId: string;
     messages: Message[];
@@ -344,6 +357,7 @@ export function createRecoveredActiveRunFromSocket(params: {
 
     return {
         conversationId: params.conversationId,
+        agentId: params.agentId,
         assistantMessageId: params.messageId,
         userContent: findLatestUserContentBeforeMessage(
             params.messages,
@@ -356,6 +370,7 @@ export function createRecoveredActiveRunFromSocket(params: {
 
 export function createRecoveredActiveRunFromRuntimeState(params: {
     conversationId: string;
+    agentId: string;
     messages: Message[];
     runtimeState: ConversationRuntimeSnapshot;
 }): ActiveRunState | null {
@@ -376,6 +391,7 @@ export function createRecoveredActiveRunFromRuntimeState(params: {
 
     return {
         conversationId: params.conversationId,
+        agentId: params.agentId,
         assistantMessageId: assistantMessage.id,
         userContent: findLatestUserContentBeforeMessage(
             params.messages,
@@ -476,6 +492,7 @@ export function resolveConversationSocketEvent(params: {
         if (!params.activeRun) {
             const recoveredRun = createRecoveredActiveRunFromSocket({
                 conversationId: params.event.payload.conversationId,
+                agentId: eventAgentId ?? params.currentAgentId,
                 messageId: params.event.payload.messageId,
                 runId: params.event.payload.runId,
                 messages: params.messages,
@@ -541,6 +558,7 @@ export function resolveConversationSocketEvent(params: {
               };
         const nextActiveRun: ActiveRunState = {
             conversationId: event.payload.conversationId,
+            agentId: eventAgentId ?? params.currentAgentId,
             assistantMessageId: event.payload.messageId,
             userContent:
                 params.activeRun?.userContent ??

@@ -31,10 +31,23 @@ const SANDBOX_STATE_DIRECTORY_NAME = ".agentchat-state";
 const SANDBOX_ROOTS_REGISTRY_DIRECTORY_NAME = "sandbox-roots";
 const WORKSPACE_METADATA_DIRECTORY_NAME = "workspace-metadata";
 const MANAGED_WORKSPACES_REGISTRY_NAME = "managed-workspaces.json";
+const SANDBOX_ROOT_REGISTRY_HEARTBEAT_MS = 60_000;
+const SANDBOX_ROOT_REGISTRY_INSTANCE_TTL_MS = 5 * 60_000;
 
 type WorkspaceMetadata = {
     sourceRootPath: string;
     state: "creating" | "ready";
+};
+
+type SandboxRootsRegistry = {
+    roots: string[];
+    activeInstances: Record<
+        string,
+        {
+            rootPath: string;
+            updatedAt: number;
+        }
+    >;
 };
 
 export function getSandboxStateRootPath(sandboxRoot: string): string {
@@ -109,6 +122,8 @@ export class WorkspaceManager {
         Promise<void>
     >();
     private readonly knownSandboxRoots = new Set<string>();
+    private lastPublishedInstanceKey: string | null = null;
+    private lastSandboxRootsRegistryHeartbeatAt = 0;
 
     constructor(params: {
         getConfig: () => AgentchatConfig;
@@ -128,8 +143,7 @@ export class WorkspaceManager {
                                 resolveDefaultStateId("agentchat.config.json"),
                         ),
                 ));
-        this.loadKnownSandboxRoots();
-        this.rememberSandboxRoot(this.getConfig().sandboxRoot);
+        this.syncSandboxRootsRegistry({ forceHeartbeat: true });
     }
 
     async ensureWorkspaceState(
@@ -137,6 +151,7 @@ export class WorkspaceManager {
         userId: string,
         conversationId: string,
     ): Promise<{ path: string; wasReset: boolean; cleanupOnFailure: boolean }> {
+        this.syncSandboxRootsRegistry();
         if (agent.workspaceMode === "shared") {
             return {
                 path: agent.rootPath,
@@ -285,6 +300,7 @@ export class WorkspaceManager {
         userId: string,
         conversationId: string,
     ): Promise<void> {
+        this.syncSandboxRootsRegistry();
         for (const sandboxRoot of this.getKnownSandboxRoots()) {
             const target = this.sandboxPathForRoot(
                 sandboxRoot,
@@ -382,10 +398,7 @@ export class WorkspaceManager {
      * active set. Call on startup and periodically as a safety net.
      */
     async reconcile(activeKeys: Set<string>): Promise<void> {
-        const protectedKeys = new Set(activeKeys);
-        for (const key of this.pendingWorkspaceCreations.keys()) {
-            protectedKeys.add(key);
-        }
+        this.syncSandboxRootsRegistry();
 
         for (const sandboxRoot of this.getKnownSandboxRoots()) {
             if (!existsSync(sandboxRoot)) {
@@ -428,22 +441,23 @@ export class WorkspaceManager {
                             userIdSegment: userDir,
                             conversationIdSegment: convDir,
                         });
-                        if (!protectedKeys.has(key)) {
-                            const target = path.join(userPath, convDir);
-                            await this.deleteWorkspacePathBySegments({
-                                sandboxRoot,
-                                targetPath: target,
-                                expectedTailSegments: [
-                                    agentDir,
-                                    userDir,
-                                    convDir,
-                                ],
-                            });
-                            if (!existsSync(target)) {
-                                console.log(
-                                    `[agentchat-server] reconcile: removed orphaned sandbox: ${target}`,
-                                );
-                            }
+                        if (
+                            activeKeys.has(key) ||
+                            this.pendingWorkspaceCreations.has(key)
+                        ) {
+                            continue;
+                        }
+
+                        const target = path.join(userPath, convDir);
+                        await this.deleteWorkspacePathBySegments({
+                            sandboxRoot,
+                            targetPath: target,
+                            expectedTailSegments: [agentDir, userDir, convDir],
+                        });
+                        if (!existsSync(target)) {
+                            console.log(
+                                `[agentchat-server] reconcile: removed orphaned sandbox: ${target}`,
+                            );
                         }
                     }
                 }
@@ -452,6 +466,7 @@ export class WorkspaceManager {
     }
 
     hasManagedWorkspaces(): boolean {
+        this.syncSandboxRootsRegistry();
         for (const sandboxRoot of this.getKnownSandboxRoots()) {
             const workspaceMetadataRootPath =
                 getWorkspaceMetadataRootPath(sandboxRoot);
@@ -492,6 +507,15 @@ export class WorkspaceManager {
 
     listKnownSandboxRoots(): string[] {
         return this.getKnownSandboxRoots();
+    }
+
+    listCurrentSandboxRoots(): string[] {
+        return Object.values(this.syncSandboxRootsRegistry().activeInstances)
+            .map((entry) => entry.rootPath)
+            .filter(
+                (rootPath, index, roots) => roots.indexOf(rootPath) === index,
+            )
+            .sort((left, right) => left.localeCompare(right));
     }
 
     private sandboxPath(
@@ -802,7 +826,7 @@ export class WorkspaceManager {
         userId: string,
         conversationId: string,
     ): string {
-        this.rememberSandboxRoot(sandboxRoot);
+        this.syncSandboxRootsRegistry();
         return getSandboxWorkspacePath({
             sandboxRoot,
             agentId,
@@ -811,48 +835,162 @@ export class WorkspaceManager {
         });
     }
 
-    private rememberSandboxRoot(sandboxRoot: string): void {
-        const resolvedRoot = canonicalizePathForComparison(sandboxRoot);
-        if (this.knownSandboxRoots.has(resolvedRoot)) {
-            return;
+    private getKnownSandboxRoots(): string[] {
+        const registry = this.syncSandboxRootsRegistry();
+        return registry.roots;
+    }
+
+    private syncSandboxRootsRegistry(params?: {
+        forceHeartbeat?: boolean;
+    }): SandboxRootsRegistry {
+        const now = Date.now();
+        const registry = this.readSandboxRootsRegistry();
+        let didMutateRegistry = false;
+        for (const [instanceKey, entry] of Object.entries(
+            registry.activeInstances,
+        )) {
+            if (entry.updatedAt < now - SANDBOX_ROOT_REGISTRY_INSTANCE_TTL_MS) {
+                delete registry.activeInstances[instanceKey];
+                didMutateRegistry = true;
+            }
         }
 
-        this.knownSandboxRoots.add(resolvedRoot);
-        this.persistKnownSandboxRoots();
+        const sandboxRoot = canonicalizePathForComparison(
+            this.getConfig().sandboxRoot,
+        );
+        if (!registry.roots.includes(sandboxRoot)) {
+            registry.roots.push(sandboxRoot);
+            didMutateRegistry = true;
+        }
+
+        const instanceKey = this.getConfig().instanceKey;
+        if (
+            this.lastPublishedInstanceKey &&
+            this.lastPublishedInstanceKey !== instanceKey &&
+            registry.activeInstances[this.lastPublishedInstanceKey]
+        ) {
+            delete registry.activeInstances[this.lastPublishedInstanceKey];
+            didMutateRegistry = true;
+        }
+
+        const previousEntry = registry.activeInstances[instanceKey];
+        const shouldHeartbeat =
+            params?.forceHeartbeat === true ||
+            now - this.lastSandboxRootsRegistryHeartbeatAt >=
+                SANDBOX_ROOT_REGISTRY_HEARTBEAT_MS;
+        if (
+            !previousEntry ||
+            previousEntry.rootPath !== sandboxRoot ||
+            shouldHeartbeat
+        ) {
+            registry.activeInstances[instanceKey] = {
+                rootPath: sandboxRoot,
+                updatedAt: now,
+            };
+            didMutateRegistry = true;
+            this.lastSandboxRootsRegistryHeartbeatAt = now;
+        }
+
+        const normalizedRoots = [...new Set(registry.roots)]
+            .map((rootPath) => canonicalizePathForComparison(rootPath))
+            .sort((left, right) => left.localeCompare(right));
+        registry.roots = normalizedRoots;
+        this.knownSandboxRoots.clear();
+        for (const rootPath of normalizedRoots) {
+            this.knownSandboxRoots.add(rootPath);
+        }
+
+        if (didMutateRegistry) {
+            this.writeSandboxRootsRegistry(registry);
+        }
+        this.lastPublishedInstanceKey = instanceKey;
+        return registry;
     }
 
-    private getKnownSandboxRoots(): string[] {
-        this.rememberSandboxRoot(this.getConfig().sandboxRoot);
-        return [...this.knownSandboxRoots];
-    }
-
-    private loadKnownSandboxRoots(): void {
+    private readSandboxRootsRegistry(): SandboxRootsRegistry {
         const rootsRegistryPath = this.getRootsRegistryPath();
         if (!existsSync(rootsRegistryPath)) {
-            return;
+            return {
+                roots: [],
+                activeInstances: {},
+            };
         }
 
         try {
             const raw = readFileSync(rootsRegistryPath, "utf8");
             const parsed = JSON.parse(raw) as unknown;
-            if (!Array.isArray(parsed)) {
-                return;
+            if (Array.isArray(parsed)) {
+                return {
+                    roots: parsed.filter(
+                        (value): value is string =>
+                            typeof value === "string" && value.length > 0,
+                    ),
+                    activeInstances: {},
+                };
+            }
+            if (!parsed || typeof parsed !== "object") {
+                return {
+                    roots: [],
+                    activeInstances: {},
+                };
             }
 
-            for (const value of parsed) {
-                if (typeof value === "string" && value.length > 0) {
-                    this.knownSandboxRoots.add(path.resolve(value));
+            const rawRoots = Array.isArray(
+                (parsed as { roots?: unknown }).roots,
+            )
+                ? ((parsed as { roots: unknown[] }).roots ?? [])
+                : [];
+            const activeInstances = (parsed as { activeInstances?: unknown })
+                .activeInstances;
+            const normalizedActiveInstances: SandboxRootsRegistry["activeInstances"] =
+                {};
+            if (activeInstances && typeof activeInstances === "object") {
+                for (const [instanceKey, value] of Object.entries(
+                    activeInstances as Record<string, unknown>,
+                )) {
+                    if (
+                        !value ||
+                        typeof value !== "object" ||
+                        typeof (value as { rootPath?: unknown }).rootPath !==
+                            "string" ||
+                        typeof (value as { updatedAt?: unknown }).updatedAt !==
+                            "number"
+                    ) {
+                        continue;
+                    }
+
+                    normalizedActiveInstances[instanceKey] = {
+                        rootPath: canonicalizePathForComparison(
+                            (value as { rootPath: string }).rootPath,
+                        ),
+                        updatedAt: Math.max(
+                            0,
+                            (value as { updatedAt: number }).updatedAt,
+                        ),
+                    };
                 }
             }
+
+            return {
+                roots: rawRoots.filter(
+                    (value): value is string =>
+                        typeof value === "string" && value.length > 0,
+                ),
+                activeInstances: normalizedActiveInstances,
+            };
         } catch (error) {
             console.error(
                 `[agentchat-server] failed to load sandbox root registry from ${rootsRegistryPath}:`,
                 error,
             );
+            return {
+                roots: [],
+                activeInstances: {},
+            };
         }
     }
 
-    private persistKnownSandboxRoots(): void {
+    private writeSandboxRootsRegistry(registry: SandboxRootsRegistry): void {
         const rootsRegistryPath = this.getRootsRegistryPath();
         try {
             mkdirSync(path.dirname(rootsRegistryPath), {
@@ -860,13 +998,7 @@ export class WorkspaceManager {
             });
             writeFileSync(
                 rootsRegistryPath,
-                `${JSON.stringify(
-                    [...this.knownSandboxRoots].sort((left, right) =>
-                        left.localeCompare(right),
-                    ),
-                    null,
-                    2,
-                )}\n`,
+                `${JSON.stringify(registry, null, 2)}\n`,
                 "utf8",
             );
         } catch (error) {

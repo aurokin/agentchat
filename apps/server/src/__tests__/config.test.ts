@@ -115,6 +115,9 @@ describe("server config", () => {
             expect(loadConfigFile(releaseAPath).stateId).toBe(
                 loadConfigFile(releaseBPath).stateId,
             );
+            expect(loadConfigFile(releaseAPath).instanceKey).not.toBe(
+                loadConfigFile(releaseBPath).instanceKey,
+            );
         } finally {
             rmSync(releaseADir, { recursive: true, force: true });
             rmSync(releaseBDir, { recursive: true, force: true });
@@ -182,6 +185,9 @@ describe("server config", () => {
 
         expect(parseConfig(oldRootConfig).stateId).toBe(
             parseConfig(newRootConfig).stateId,
+        );
+        expect(parseConfig(oldRootConfig).instanceKey).not.toBe(
+            parseConfig(newRootConfig).instanceKey,
         );
     });
 

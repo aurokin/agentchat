@@ -6,6 +6,7 @@ import type { AgentchatConfig } from "../config.ts";
 function createConfig(): AgentchatConfig {
     return {
         version: 1,
+        instanceKey: "instance-test",
         sandboxRoot: "/tmp/agentchat-sandboxes",
         auth: {
             defaultProviderId: "google-main",

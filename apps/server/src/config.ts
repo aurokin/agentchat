@@ -6,7 +6,10 @@ import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { pathsOverlap } from "./pathComparison.ts";
 import { isSafePathSegment } from "./sandboxPaths.ts";
-import { resolveDefaultStateId } from "./serverState.ts";
+import {
+    resolveDefaultInstanceKey,
+    resolveDefaultStateId,
+} from "./serverState.ts";
 
 const GoogleAuthProviderSchema = z.object({
     id: z.string().min(1),
@@ -230,6 +233,7 @@ export type AgentchatConfig = Omit<
     auth: AuthConfig;
     stateId?: string;
     sandboxRoot: string;
+    instanceKey: string;
 };
 export type AgentConfig = AgentchatConfig["agents"][number];
 export type ProviderConfig = AgentchatConfig["providers"][number];
@@ -304,6 +308,23 @@ function buildDefaultStateIdSeed(
     });
 }
 
+function buildDefaultInstanceKeySeed(
+    parsed: z.infer<typeof AgentchatConfigInputSchema>,
+): string {
+    return JSON.stringify({
+        sandboxRoot: parsed.sandboxRoot ?? DEFAULT_SANDBOX_ROOT,
+        providers: parsed.providers.map((provider) => ({
+            id: provider.id,
+            codexCwd: provider.codex.cwd ?? null,
+        })),
+        agents: parsed.agents.map((agent) => ({
+            id: agent.id,
+            rootPath: agent.rootPath,
+            workspaceMode: agent.workspaceMode ?? "shared",
+        })),
+    });
+}
+
 function normalizeParsedConfig(
     parsed: z.infer<typeof AgentchatConfigInputSchema>,
     params: {
@@ -328,6 +349,9 @@ function normalizeParsedConfig(
                 buildDefaultStateIdSeed(parsed, normalizedAuth),
             ),
         sandboxRoot,
+        instanceKey: resolveDefaultInstanceKey(
+            buildDefaultInstanceKeySeed(parsed),
+        ),
     };
 }
 

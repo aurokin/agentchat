@@ -1,5 +1,8 @@
 import { describe, expect, it } from "bun:test";
-import { getPreferredHomeChatId } from "../home-chat-route";
+import {
+    getPreferredHomeChatId,
+    resolveRouteChatSelection,
+} from "../home-chat-route";
 
 describe("getPreferredHomeChatId", () => {
     const chats = [
@@ -29,6 +32,7 @@ describe("getPreferredHomeChatId", () => {
         expect(
             getPreferredHomeChatId({
                 currentChatId: "chat-2",
+                currentChatAgentId: "agent-1",
                 chats,
             }),
         ).toBe("chat-2");
@@ -38,6 +42,7 @@ describe("getPreferredHomeChatId", () => {
         expect(
             getPreferredHomeChatId({
                 currentChatId: "chat-3",
+                currentChatAgentId: "agent-1",
                 chats,
             }),
         ).toBe("chat-1");
@@ -47,8 +52,56 @@ describe("getPreferredHomeChatId", () => {
         expect(
             getPreferredHomeChatId({
                 currentChatId: null,
+                currentChatAgentId: null,
                 chats: [],
             }),
         ).toBeNull();
+    });
+
+    it("does not preserve the old agent when the same local id exists under a new agent", () => {
+        const collidedChats = [
+            {
+                ...chats[0],
+                id: "shared-chat",
+            },
+            {
+                ...chats[1],
+                id: "shared-chat",
+                agentId: "agent-2",
+            },
+        ];
+
+        expect(
+            getPreferredHomeChatId({
+                currentChatId: "shared-chat",
+                currentChatAgentId: "agent-1",
+                chats: collidedChats.filter(
+                    (chat) => chat.agentId === "agent-2",
+                ),
+            }),
+        ).toBe("shared-chat");
+    });
+
+    it("reselects the route chat when the current chat belongs to another agent", () => {
+        const routeChat = resolveRouteChatSelection({
+            routeChatId: "shared-chat",
+            chats: [
+                {
+                    ...chats[0],
+                    id: "shared-chat",
+                    agentId: "agent-2",
+                },
+            ],
+            currentChat: {
+                ...chats[0],
+                id: "shared-chat",
+                agentId: "agent-1",
+            },
+        });
+
+        expect(routeChat).toMatchObject({
+            id: "shared-chat",
+            agentId: "agent-2",
+        });
     });
 });

@@ -166,6 +166,7 @@ export function resolveMobileConversationRuntimeSync(params: {
 
     const shouldReset = shouldResetActiveRunForRuntimeSnapshot({
         currentConversationId: params.currentChat.id,
+        currentAgentId: params.currentChat.agentId,
         runtimeState: params.runtimeState,
         activeRun: params.activeRun,
     });
@@ -175,6 +176,7 @@ export function resolveMobileConversationRuntimeSync(params: {
             shouldReset: false,
             recoveredRun: synchronizeActiveRunWithRuntimeSnapshot({
                 currentConversationId: params.currentChat.id,
+                currentAgentId: params.currentChat.agentId,
                 runtimeState: params.runtimeState,
                 activeRun: params.activeRun,
             }),
@@ -185,6 +187,7 @@ export function resolveMobileConversationRuntimeSync(params: {
         shouldReset,
         recoveredRun: createRecoveredActiveRunFromRuntimeState({
             conversationId: params.currentChat.id,
+            agentId: params.currentChat.agentId,
             messages: params.messages,
             runtimeState: params.runtimeState,
         }),
@@ -211,7 +214,7 @@ export function interruptMobileConversationRun(params: {
         params.sendCommand(
             buildInterruptCommand(
                 params.activeRun.conversationId,
-                params.agentId,
+                params.activeRun.agentId ?? params.agentId,
                 uuidv4,
             ),
         );

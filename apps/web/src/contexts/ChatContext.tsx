@@ -128,7 +128,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [loading, setLoading] = useState(true);
     const [isMessagesLoading, setIsMessagesLoading] = useState(false);
-    const currentChatIdRef = useRef<string | null>(null);
+    const currentChatRef = useRef<ChatSession | null>(null);
     const chatsRef = useRef<ChatSession[]>([]);
     const latestViewedAtRef = useRef<Record<string, number>>({});
     const markViewedTimeoutRef = useRef<number | null>(null);
@@ -232,8 +232,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     );
 
     useEffect(() => {
-        currentChatIdRef.current = currentChat?.id ?? null;
-    }, [currentChat?.id]);
+        currentChatRef.current = currentChat;
+    }, [currentChat]);
 
     useEffect(() => {
         chatsRef.current = chats;
@@ -455,7 +455,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             setChats(scopedChats);
 
             const storedChatId = storage.getSelectedChatId(selectedAgentId);
-            const activeChatId = currentChatIdRef.current ?? storedChatId;
+            const currentScopedChatId =
+                currentChatRef.current?.agentId === selectedAgentId
+                    ? currentChatRef.current.id
+                    : null;
+            const activeChatId = currentScopedChatId ?? storedChatId;
             if (!activeChatId) {
                 setCurrentChat(null);
                 setMessages([]);
@@ -473,7 +477,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 if (storedChatId === activeChatId) {
                     storage.clearSelectedChatId(selectedAgentId);
                 }
-                if (currentChatIdRef.current === activeChatId || storedChatId) {
+                if (currentScopedChatId === activeChatId || storedChatId) {
                     setCurrentChat(null);
                     setMessages([]);
                 }
@@ -485,10 +489,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                     refreshedChat.id,
                     refreshedChat.agentId,
                 );
-                if (
-                    currentChatIdRef.current === refreshedChat.id ||
-                    storedChatId
-                ) {
+                if (currentScopedChatId === refreshedChat.id || storedChatId) {
                     setMessages(chatMessages);
                 }
                 setIsMessagesLoading(false);

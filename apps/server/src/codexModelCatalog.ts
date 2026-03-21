@@ -301,7 +301,7 @@ export class CodexModelCatalog {
 
             return items;
         } finally {
-            client.stop();
+            await client.stop();
         }
     }
 }

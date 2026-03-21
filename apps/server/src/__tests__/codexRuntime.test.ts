@@ -53,6 +53,7 @@ function createConfig(): AgentchatConfig {
     return {
         version: 1,
         stateId: "test-state",
+        instanceKey: "instance-test",
         sandboxRoot: "/tmp/agentchat-sandboxes",
         auth: {
             defaultProviderId: "google-main",
@@ -199,7 +200,7 @@ class FakeCodexClient {
         this.exitHandler = handler;
     }
 
-    stop(): void {
+    async stop(): Promise<void> {
         this.stopped = true;
     }
 

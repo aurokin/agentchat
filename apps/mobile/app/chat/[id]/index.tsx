@@ -51,6 +51,7 @@ import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer";
 import { TopBar } from "@/components/ui/TopBar";
 import { consumePendingSharePayload } from "@/lib/share-intent/pending-share";
 import { resolveResponsiveLayout } from "@/lib/responsive-layout";
+import { resolveRouteChatSelection } from "@/lib/home-chat-route";
 import {
     flushPendingMobileConversationInterrupt,
     requestMobileConversationInterrupt,
@@ -133,7 +134,7 @@ export default function ChatScreen(): ReactElement {
     const sidebarWidth = Math.max(280, Math.min(360, windowWidth * 0.32));
     const suppressInputRef = useRef(false);
     const currentChatRef = useRef<ChatSession | null>(currentChat);
-    const previousConversationIdRef = useRef<string | null>(null);
+    const previousConversationScopeRef = useRef<string | null>(null);
     const chatMessagesRef = useRef<Message[]>(EMPTY_MESSAGES);
     const activeRunRef = useRef<ActiveRunState | null>(null);
     const pendingReconnectNoticeRef = useRef(false);
@@ -155,16 +156,17 @@ export default function ChatScreen(): ReactElement {
             return;
         }
 
-        if (currentChat?.id === chatId) {
+        const routeChat = resolveRouteChatSelection({
+            routeChatId: chatId,
+            chats,
+            currentChat,
+        });
+        if (!routeChat) {
             return;
         }
 
-        if (!chats.some((chat) => chat.id === chatId)) {
-            return;
-        }
-
-        void selectChat(chatId);
-    }, [chatId, chats, currentChat?.id, selectChat]);
+        void selectChat(routeChat.id);
+    }, [chatId, chats, currentChat, selectChat]);
 
     useEffect(() => {
         if (!chatId) {
@@ -251,10 +253,13 @@ export default function ChatScreen(): ReactElement {
     }, [currentChat]);
 
     useEffect(() => {
-        const currentConversationId = currentChat?.id ?? null;
+        const currentConversationScope =
+            currentChat?.id && currentChat?.agentId
+                ? getScopedChatStateKey(currentChat.id, currentChat.agentId)
+                : null;
         if (
-            previousConversationIdRef.current !== null &&
-            previousConversationIdRef.current !== currentConversationId
+            previousConversationScopeRef.current !== null &&
+            previousConversationScopeRef.current !== currentConversationScope
         ) {
             pendingInterruptRef.current = false;
             pendingReconnectNoticeRef.current = false;
@@ -265,8 +270,8 @@ export default function ChatScreen(): ReactElement {
             });
         }
 
-        previousConversationIdRef.current = currentConversationId;
-    }, [currentChat?.id]);
+        previousConversationScopeRef.current = currentConversationScope;
+    }, [currentChat?.agentId, currentChat?.id]);
 
     useEffect(() => {
         if (!currentChat) {

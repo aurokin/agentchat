@@ -18,12 +18,19 @@ export function resolveCurrentChatForAgent(params: {
 }): ChatSession | null {
     const { chats, currentChat, storedChatId } = params;
     if (currentChat) {
-        return chats.find((chat) => chat.id === currentChat.id) ?? null;
+        return (
+            chats.find(
+                (chat) =>
+                    chat.id === currentChat.id &&
+                    chat.agentId === currentChat.agentId,
+            ) ?? null
+        );
     }
 
     if (!storedChatId) {
         return null;
     }
 
-    return chats.find((chat) => chat.id === storedChatId) ?? null;
+    const matches = chats.filter((chat) => chat.id === storedChatId);
+    return matches.length === 1 ? (matches[0] ?? null) : null;
 }

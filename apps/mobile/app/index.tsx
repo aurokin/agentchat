@@ -45,7 +45,7 @@ export default function HomeScreen(): React.ReactElement {
     const { colors } = useTheme();
     const styles = useMemo(() => createStyles(colors), [colors]);
     const [isSelecting, setIsSelecting] = useState(false);
-    const [selectedChatIds, setSelectedChatIds] = useState<Set<string>>(
+    const [selectedChatKeys, setSelectedChatKeys] = useState<Set<string>>(
         new Set(),
     );
     const longPressTriggeredRef = useRef(false);
@@ -55,6 +55,25 @@ export default function HomeScreen(): React.ReactElement {
         width: windowWidth,
         height: windowHeight,
     });
+    const availableChatKeys = useMemo(
+        () =>
+            new Set(
+                chats.map((chat) =>
+                    getScopedChatStateKey(chat.id, chat.agentId),
+                ),
+            ),
+        [chats],
+    );
+    const effectiveSelectedChatKeys = useMemo(
+        () =>
+            new Set(
+                Array.from(selectedChatKeys).filter((key) =>
+                    availableChatKeys.has(key),
+                ),
+            ),
+        [availableChatKeys, selectedChatKeys],
+    );
+    const selectionMode = isSelecting && effectiveSelectedChatKeys.size > 0;
 
     useEffect(() => {
         if (isInitialized) {
@@ -67,12 +86,14 @@ export default function HomeScreen(): React.ReactElement {
         if (isLoading || chats.length === 0) return;
         const preferredChatId = getPreferredHomeChatId({
             currentChatId: currentChat?.id ?? null,
+            currentChatAgentId: currentChat?.agentId ?? null,
             chats,
         });
         if (!preferredChatId) return;
         router.replace(`/chat/${preferredChatId}`);
     }, [
         chats,
+        currentChat?.agentId,
         currentChat?.id,
         isInitialized,
         isLoading,
@@ -91,53 +112,63 @@ export default function HomeScreen(): React.ReactElement {
 
     const clearSelection = useCallback(() => {
         setIsSelecting(false);
-        setSelectedChatIds(new Set());
+        setSelectedChatKeys(new Set());
     }, []);
 
-    const toggleChatSelection = useCallback((chatId: string) => {
-        setSelectedChatIds((prev) => {
-            const next = new Set(prev);
-            if (next.has(chatId)) {
-                next.delete(chatId);
-            } else {
-                next.add(chatId);
-            }
-            if (next.size === 0) {
-                setIsSelecting(false);
-            }
-            return next;
-        });
-    }, []);
+    const toggleChatSelection = useCallback(
+        (chatId: string, agentId: string) => {
+            const chatKey = getScopedChatStateKey(chatId, agentId);
+            setSelectedChatKeys((prev) => {
+                const next = new Set(prev);
+                if (next.has(chatKey)) {
+                    next.delete(chatKey);
+                } else {
+                    next.add(chatKey);
+                }
+                if (next.size === 0) {
+                    setIsSelecting(false);
+                }
+                return next;
+            });
+        },
+        [],
+    );
 
-    const handleChatPress = (chatId: string) => {
+    const handleChatPress = (chatId: string, agentId: string) => {
         if (longPressTriggeredRef.current) {
             longPressTriggeredRef.current = false;
             return;
         }
 
-        if (isSelecting) {
-            toggleChatSelection(chatId);
+        if (selectionMode) {
+            toggleChatSelection(chatId, agentId);
             return;
         }
 
         void handleSelectChat(chatId);
     };
 
-    const handleChatLongPress = (chatId: string) => {
+    const handleChatLongPress = (chatId: string, agentId: string) => {
+        const chatKey = getScopedChatStateKey(chatId, agentId);
         longPressTriggeredRef.current = true;
-        if (!isSelecting) {
+        if (!selectionMode) {
             setIsSelecting(true);
-            setSelectedChatIds(new Set([chatId]));
+            setSelectedChatKeys(new Set([chatKey]));
             return;
         }
 
-        toggleChatSelection(chatId);
+        toggleChatSelection(chatId, agentId);
     };
 
     const handleDeleteSelected = useCallback(async () => {
-        if (selectedChatIds.size === 0) return;
+        if (effectiveSelectedChatKeys.size === 0) return;
 
-        const chatIds = Array.from(selectedChatIds);
+        const selectedChats = chats.filter((chat) =>
+            effectiveSelectedChatKeys.has(
+                getScopedChatStateKey(chat.id, chat.agentId),
+            ),
+        );
+        const chatIds = selectedChats.map((chat) => chat.id);
         const hasMessages = await hasMessagesInChats(chatIds);
 
         const performDelete = async () => {
@@ -166,17 +197,23 @@ export default function HomeScreen(): React.ReactElement {
         }
 
         await performDelete();
-    }, [selectedChatIds, deleteChats, clearSelection, hasMessagesInChats]);
+    }, [
+        effectiveSelectedChatKeys,
+        chats,
+        deleteChats,
+        clearSelection,
+        hasMessagesInChats,
+    ]);
 
     const handleHeaderLayout = useCallback(
         (event: LayoutChangeEvent) => {
-            if (isSelecting) return;
+            if (selectionMode) return;
             const nextHeight = event.nativeEvent.layout.height;
             if (nextHeight !== headerHeight) {
                 setHeaderHeight(nextHeight);
             }
         },
-        [isSelecting, headerHeight],
+        [selectionMode, headerHeight],
     );
 
     const formatDate = (timestamp: number): string => {
@@ -216,7 +253,7 @@ export default function HomeScreen(): React.ReactElement {
 
     return (
         <SafeAreaView style={styles.container}>
-            {isSelecting ? (
+            {selectionMode ? (
                 <View
                     style={[
                         styles.header,
@@ -229,7 +266,7 @@ export default function HomeScreen(): React.ReactElement {
                         numberOfLines={1}
                         ellipsizeMode="tail"
                     >
-                        {selectedChatIds.size} selected
+                        {effectiveSelectedChatKeys.size} selected
                     </Text>
                     <View style={styles.selectionActions}>
                         <TouchableOpacity
@@ -248,7 +285,7 @@ export default function HomeScreen(): React.ReactElement {
                         </TouchableOpacity>
                         <TouchableOpacity
                             accessibilityRole="button"
-                            accessibilityLabel={`Delete ${selectedChatIds.size} chats`}
+                            accessibilityLabel={`Delete ${effectiveSelectedChatKeys.size} chats`}
                             style={[
                                 styles.selectionButton,
                                 styles.deleteAction,
@@ -268,7 +305,7 @@ export default function HomeScreen(): React.ReactElement {
                                 numberOfLines={1}
                                 ellipsizeMode="tail"
                             >
-                                Delete ({selectedChatIds.size})
+                                Delete ({effectiveSelectedChatKeys.size})
                             </Text>
                         </TouchableOpacity>
                     </View>
@@ -321,9 +358,16 @@ export default function HomeScreen(): React.ReactElement {
                     data={chats}
                     keyExtractor={(item) => item.id}
                     renderItem={({ item }) => {
-                        const isSelected = selectedChatIds.has(item.id);
+                        const itemKey = getScopedChatStateKey(
+                            item.id,
+                            item.agentId,
+                        );
+                        const isSelected =
+                            effectiveSelectedChatKeys.has(itemKey);
                         const activityState = resolveConversationActivityState({
-                            isActiveConversation: currentChat?.id === item.id,
+                            isActiveConversation:
+                                currentChat?.id === item.id &&
+                                currentChat?.agentId === item.agentId,
                             activity:
                                 conversationRuntimeBindings[
                                     getScopedChatStateKey(item.id, item.agentId)
@@ -335,14 +379,18 @@ export default function HomeScreen(): React.ReactElement {
                                     styles.chatItem,
                                     isSelected && styles.chatItemSelected,
                                 ]}
-                                onPress={() => handleChatPress(item.id)}
-                                onLongPress={() => handleChatLongPress(item.id)}
+                                onPress={() =>
+                                    handleChatPress(item.id, item.agentId)
+                                }
+                                onLongPress={() =>
+                                    handleChatLongPress(item.id, item.agentId)
+                                }
                                 onPressOut={() => {
                                     longPressTriggeredRef.current = false;
                                 }}
                             >
                                 <View style={styles.chatItemRow}>
-                                    {isSelecting && (
+                                    {selectionMode && (
                                         <View style={styles.selectionIndicator}>
                                             <Feather
                                                 name={
@@ -432,7 +480,7 @@ export default function HomeScreen(): React.ReactElement {
                 />
             )}
 
-            {chats.length > 0 && !isSelecting && (
+            {chats.length > 0 && !selectionMode && (
                 <TouchableOpacity style={styles.fab} onPress={handleCreateChat}>
                     <Text style={styles.fabText}>+</Text>
                 </TouchableOpacity>

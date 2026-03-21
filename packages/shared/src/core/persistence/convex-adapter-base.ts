@@ -337,7 +337,34 @@ export abstract class ConvexAdapterBase implements PersistenceAdapter {
     }
 
     private getChatLookupKey(localId: string, agentId?: string): string {
-        return agentId ? `${agentId}:${localId}` : localId;
+        return JSON.stringify([agentId ?? null, localId]);
+    }
+
+    private parseChatLookupKey(
+        lookupKey: string,
+    ): { agentId?: string; localId: string } | null {
+        try {
+            const parsed = JSON.parse(lookupKey);
+            if (!Array.isArray(parsed) || parsed.length !== 2) {
+                return null;
+            }
+
+            const [agentId, localId] = parsed;
+            if (
+                localId === undefined ||
+                typeof localId !== "string" ||
+                (agentId !== null && typeof agentId !== "string")
+            ) {
+                return null;
+            }
+
+            return {
+                agentId: agentId ?? undefined,
+                localId,
+            };
+        } catch {
+            return null;
+        }
     }
 
     protected convexChatToLocal(chat: ConvexChatLike): ChatSession {
@@ -401,7 +428,8 @@ export abstract class ConvexAdapterBase implements PersistenceAdapter {
         const matchingChatIds = new Set<string>();
 
         for (const [lookupKey, convexId] of this.chatIdMap.entries()) {
-            if (lookupKey === localId || lookupKey.endsWith(`:${localId}`)) {
+            const parsed = this.parseChatLookupKey(lookupKey);
+            if (parsed?.localId === localId) {
                 matchingChatIds.add(convexId);
             }
         }

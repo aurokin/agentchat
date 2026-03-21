@@ -234,4 +234,60 @@ describe("ConvexAdapterBase", () => {
 
         expect(remove).not.toHaveBeenCalled();
     });
+
+    test("updateMessage does not suffix-match cached chat ids containing colons", async () => {
+        const { adapter, update } = createAdapter({
+            chats: [
+                createChat({
+                    id: "chat-1",
+                    convexId: "chats:plain",
+                    agentId: "agent-a",
+                }),
+                createChat({
+                    id: "legacy:chat-1",
+                    convexId: "chats:colon",
+                    agentId: "agent-b",
+                }),
+            ],
+            messagesByChatId: {
+                "chats:plain": [
+                    createMessage({
+                        id: "message-1",
+                        sessionId: "chat-1",
+                        content: "plain",
+                    }),
+                ],
+                "chats:colon": [
+                    createMessage({
+                        id: "message-1",
+                        sessionId: "legacy:chat-1",
+                        content: "colon",
+                    }),
+                ],
+            },
+        });
+
+        await adapter.getAllChats();
+        await adapter.getMessagesByChat("chat-1", "agent-a");
+        await adapter.getMessagesByChat("legacy:chat-1", "agent-b");
+
+        await expect(
+            adapter.updateMessage(
+                createMessage({
+                    id: "message-1",
+                    sessionId: "chat-1",
+                    content: "updated",
+                }),
+            ),
+        ).resolves.toBeUndefined();
+
+        expect(update).toHaveBeenCalledWith({
+            id: "chats:plain:message-1",
+            message: createMessage({
+                id: "message-1",
+                sessionId: "chat-1",
+                content: "updated",
+            }),
+        });
+    });
 });

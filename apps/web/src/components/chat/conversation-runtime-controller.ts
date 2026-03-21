@@ -190,7 +190,7 @@ export function interruptConversationRun(params: {
         params.sendCommand(
             buildInterruptCommand(
                 params.activeRun.conversationId,
-                params.agentId,
+                params.activeRun.agentId ?? params.agentId,
             ),
         );
         return null;
@@ -283,6 +283,7 @@ export function resolveConversationRuntimeSync(params: {
 
     const shouldReset = shouldResetActiveRunForRuntimeSnapshot({
         currentConversationId: params.currentChat.id,
+        currentAgentId: params.currentChat.agentId,
         runtimeState: params.runtimeState,
         activeRun: params.activeRun,
     });
@@ -292,6 +293,7 @@ export function resolveConversationRuntimeSync(params: {
             shouldReset: false,
             recoveredRun: synchronizeActiveRunWithRuntimeSnapshot({
                 currentConversationId: params.currentChat.id,
+                currentAgentId: params.currentChat.agentId,
                 runtimeState: params.runtimeState,
                 activeRun: params.activeRun,
             }),

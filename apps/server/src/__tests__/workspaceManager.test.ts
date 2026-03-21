@@ -56,6 +56,7 @@ function makeConfig(overrides: {
     return {
         version: 1,
         stateId: "test-state",
+        instanceKey: "instance-test",
         sandboxRoot: overrides.sandboxRoot,
         auth: {
             defaultProviderId: "local-main",
@@ -980,12 +981,14 @@ describe("WorkspaceManager", () => {
             );
 
             expect(existsSync(originalWorkspace)).toBe(false);
-            expect(JSON.parse(readFileSync(rootsRegistryPath, "utf8"))).toEqual(
-                expect.arrayContaining([
+            expect(
+                JSON.parse(readFileSync(rootsRegistryPath, "utf8")),
+            ).toMatchObject({
+                roots: expect.arrayContaining([
                     path.resolve(firstSandboxRoot),
                     path.resolve(secondSandboxRoot),
                 ]),
-            );
+            });
         });
 
         test("keeps metadata lookup stable when sandboxRoot changes only by symlink alias", async () => {

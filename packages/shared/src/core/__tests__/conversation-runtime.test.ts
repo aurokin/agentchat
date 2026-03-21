@@ -26,6 +26,7 @@ function createActiveRun(
 ): ActiveRunState {
     return {
         conversationId: "chat-1",
+        agentId: "agent-a",
         assistantMessageId: "assistant-1",
         userContent: "Hello",
         content: "Partial output",
@@ -57,6 +58,7 @@ describe("conversation runtime helpers", () => {
         expect(
             shouldResetActiveRunForRuntimeSnapshot({
                 currentConversationId: "chat-1",
+                currentAgentId: "agent-a",
                 runtimeState: createRuntimeState({
                     phase: "active",
                     runId: "run-2",
@@ -71,6 +73,7 @@ describe("conversation runtime helpers", () => {
         expect(
             shouldResetActiveRunForRuntimeSnapshot({
                 currentConversationId: "chat-1",
+                currentAgentId: "agent-a",
                 runtimeState: createRuntimeState({
                     phase: "recovering",
                     runId: "run-1",
@@ -85,6 +88,7 @@ describe("conversation runtime helpers", () => {
         expect(
             synchronizeActiveRunWithRuntimeSnapshot({
                 currentConversationId: "chat-1",
+                currentAgentId: "agent-a",
                 runtimeState: createRuntimeState({
                     phase: "active",
                     runId: "run-1",
@@ -109,6 +113,21 @@ describe("conversation runtime helpers", () => {
                 shouldReset: false,
                 recoveredRun: createActiveRun(),
                 runtimeState: createRuntimeState({ phase: "recovering" }),
+            }),
+        ).toBe(true);
+    });
+
+    test("resets a local active run when the user switches to the same chat id on another agent", () => {
+        expect(
+            shouldResetActiveRunForRuntimeSnapshot({
+                currentConversationId: "chat-1",
+                currentAgentId: "agent-b",
+                runtimeState: createRuntimeState({
+                    phase: "active",
+                    runId: "run-1",
+                    assistantMessageId: "assistant-1",
+                }),
+                activeRun: createActiveRun({ agentId: "agent-a" }),
             }),
         ).toBe(true);
     });

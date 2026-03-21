@@ -118,6 +118,7 @@ describe("conversation runtime controller", () => {
         });
         expect(sendPlan.activeRun).toEqual({
             conversationId: "chat-1",
+            agentId: "agent-1",
             assistantMessageId: "assistant-1",
             userContent: "New prompt",
             content: "",
@@ -469,6 +470,7 @@ describe("conversation runtime controller", () => {
             type: "run.started",
             activeRun: {
                 conversationId: "chat-1",
+                agentId: "agent-1",
                 assistantMessageId: "assistant-1",
                 userContent: "Recover this",
                 content: "Partial response",
@@ -505,6 +507,7 @@ describe("conversation runtime controller", () => {
                 event,
                 activeRun: {
                     conversationId: "chat-1",
+                    agentId: "agent-1",
                     assistantMessageId: "assistant-1",
                     userContent: "Recover this",
                     content: "Status update",
@@ -516,6 +519,7 @@ describe("conversation runtime controller", () => {
             type: "message.started",
             activeRun: {
                 conversationId: "chat-1",
+                agentId: "agent-1",
                 assistantMessageId: "assistant-2",
                 userContent: "Recover this",
                 content: "Report\n- Done",
@@ -740,6 +744,7 @@ describe("conversation runtime controller", () => {
             shouldReset: false,
             recoveredRun: {
                 conversationId: "chat-1",
+                agentId: "agent-1",
                 assistantMessageId: "assistant-1",
                 userContent: "Recover me",
                 content: "Partial persisted output",
@@ -790,6 +795,7 @@ describe("conversation runtime controller", () => {
             shouldReset: false,
             recoveredRun: {
                 conversationId: "chat-1",
+                agentId: "agent-1",
                 assistantMessageId: "assistant-1",
                 userContent: "Recover me",
                 content: "Recovering output",
@@ -816,6 +822,7 @@ describe("conversation runtime controller", () => {
                 },
                 activeRun: {
                     conversationId: "chat-1",
+                    agentId: "agent-1",
                     assistantMessageId: "assistant-1",
                     userContent: "Old prompt",
                     content: "Old output",
@@ -826,6 +833,7 @@ describe("conversation runtime controller", () => {
             shouldReset: false,
             recoveredRun: {
                 conversationId: "chat-1",
+                agentId: "agent-1",
                 assistantMessageId: "assistant-1",
                 userContent: "Old prompt",
                 content: "Old output",
@@ -852,6 +860,7 @@ describe("conversation runtime controller", () => {
                 },
                 activeRun: {
                     conversationId: "chat-1",
+                    agentId: "agent-1",
                     assistantMessageId: "assistant-1",
                     userContent: "Old prompt",
                     content: "Old output",
@@ -912,6 +921,7 @@ describe("conversation runtime controller", () => {
             shouldReset: true,
             recoveredRun: {
                 conversationId: "chat-1",
+                agentId: "agent-1",
                 assistantMessageId: "assistant-2",
                 userContent: "New prompt",
                 content: "New persisted output",
@@ -958,6 +968,7 @@ describe("conversation runtime controller", () => {
                 },
                 activeRun: {
                     conversationId: "chat-1",
+                    agentId: "agent-1",
                     assistantMessageId: "assistant-1",
                     userContent: "Old prompt",
                     content: "Old output",
@@ -968,6 +979,7 @@ describe("conversation runtime controller", () => {
             shouldReset: true,
             recoveredRun: {
                 conversationId: "chat-2",
+                agentId: "agent-2",
                 assistantMessageId: "assistant-2",
                 userContent: "New conversation prompt",
                 content: "Recovered output",

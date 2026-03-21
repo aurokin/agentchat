@@ -54,6 +54,26 @@ describe("chat helpers", () => {
         ).toBe("chat-a");
     });
 
+    test("does not preserve a different agent's chat when local ids collide", () => {
+        const sameLocalIdChats: ChatSession[] = [
+            {
+                ...chats[0]!,
+                id: "shared-chat",
+            },
+            {
+                ...chats[1]!,
+                id: "shared-chat",
+            },
+        ];
+
+        expect(
+            resolveCurrentChatForAgent({
+                chats: filterChatsForAgent(sameLocalIdChats, "agent-a"),
+                currentChat: sameLocalIdChats[1] ?? null,
+            }),
+        ).toBeNull();
+    });
+
     test("falls back to the stored chat when no current chat is loaded", () => {
         expect(
             resolveCurrentChatForAgent({
