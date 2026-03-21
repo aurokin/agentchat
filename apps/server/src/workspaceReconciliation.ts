@@ -1,4 +1,5 @@
 import type { AgentConfig } from "./config.ts";
+import { getWorkspaceActiveKey } from "./workspaceManager.ts";
 
 export type PersistedChatWorkspaceEntry = {
     agentId: string;
@@ -28,6 +29,35 @@ export function filterPersistedWorkspaceEntries(
             params.copyOnConversationAgentIds.has(entry.agentId) ||
             !params.configuredAgentIds.has(entry.agentId),
     );
+}
+
+export function getPersistedWorkspaceActiveKeys(
+    entries: PersistedChatWorkspaceEntry[],
+    params: {
+        copyOnConversationAgentIds: Set<string>;
+        configuredAgentIds: Set<string>;
+        currentSandboxRoot: string;
+        knownSandboxRoots: string[];
+    },
+): Set<string> {
+    const activeKeys = new Set<string>();
+    for (const entry of filterPersistedWorkspaceEntries(entries, params)) {
+        const sandboxRoots = params.configuredAgentIds.has(entry.agentId)
+            ? [params.currentSandboxRoot]
+            : params.knownSandboxRoots;
+        for (const sandboxRoot of sandboxRoots) {
+            activeKeys.add(
+                getWorkspaceActiveKey({
+                    sandboxRoot,
+                    agentId: entry.agentId,
+                    userId: entry.userId,
+                    conversationId: entry.localId,
+                }),
+            );
+        }
+    }
+
+    return activeKeys;
 }
 
 export function shouldSkipPersistedWorkspaceScan(params: {

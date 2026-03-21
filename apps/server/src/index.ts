@@ -9,11 +9,10 @@ import { createFetchHandler } from "./http.ts";
 import { RuntimePersistenceClient } from "./runtimePersistence.ts";
 import {
     getSandboxRootsRegistryPath,
-    getWorkspaceActiveKey,
     WorkspaceManager,
 } from "./workspaceManager.ts";
 import {
-    filterPersistedWorkspaceEntries,
+    getPersistedWorkspaceActiveKeys,
     getCopyOnConversationAgentIds,
     shouldSkipPersistedWorkspaceScan,
 } from "./workspaceReconciliation.ts";
@@ -154,20 +153,12 @@ async function runReconciliation(): Promise<void> {
         const entries = await runtimePersistence.listAllChatLocalIds();
         // Build composite keys so reconciliation can distinguish sandboxes
         // across agents, users, and client-supplied localIds.
-        const activeKeys = new Set<string>();
-        for (const entry of filterPersistedWorkspaceEntries(entries, {
+        const activeKeys = getPersistedWorkspaceActiveKeys(entries, {
             copyOnConversationAgentIds,
             configuredAgentIds,
-        })) {
-            activeKeys.add(
-                getWorkspaceActiveKey({
-                    sandboxRoot: configStore.snapshot.sandboxRoot,
-                    agentId: entry.agentId,
-                    userId: entry.userId,
-                    conversationId: entry.localId,
-                }),
-            );
-        }
+            currentSandboxRoot: configStore.snapshot.sandboxRoot,
+            knownSandboxRoots: workspaceManager.listKnownSandboxRoots(),
+        });
         // Include live runtimes to avoid deleting sandboxes for in-progress
         // sessions not yet persisted to Convex.
         for (const key of activeRuntimeKeys) {

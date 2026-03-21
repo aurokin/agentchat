@@ -475,6 +475,10 @@ export class WorkspaceManager {
         return false;
     }
 
+    listKnownSandboxRoots(): string[] {
+        return this.getKnownSandboxRoots();
+    }
+
     private sandboxPath(
         agentId: string,
         userId: string,

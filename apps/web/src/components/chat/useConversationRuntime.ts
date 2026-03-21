@@ -401,13 +401,15 @@ export function useConversationRuntime({
     }, [handleSocketEvent, socketClient]);
 
     useEffect(() => {
+        const currentConversationId = currentChat?.id ?? null;
+        const currentAgentId = currentChat?.agentId ?? null;
         return (
             connectConversationSocket({
                 currentChat:
-                    currentChat && currentChat.agentId
+                    currentConversationId && currentAgentId
                         ? {
-                              id: currentChat.id,
-                              agentId: currentChat.agentId,
+                              id: currentConversationId,
+                              agentId: currentAgentId,
                           }
                         : null,
                 dependencies: {
@@ -427,7 +429,12 @@ export function useConversationRuntime({
                 },
             }) ?? undefined
         );
-    }, [currentChat, getBackendSessionToken, socketClient]);
+    }, [
+        currentChat?.agentId,
+        currentChat?.id,
+        getBackendSessionToken,
+        socketClient,
+    ]);
 
     useEffect(() => {
         const syncPlan = planConversationRuntimeSync({

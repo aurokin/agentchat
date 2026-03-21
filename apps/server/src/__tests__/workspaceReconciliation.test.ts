@@ -4,6 +4,7 @@ import type { AgentConfig } from "../config.ts";
 import { getWorkspaceActiveKey } from "../workspaceManager.ts";
 import {
     filterPersistedWorkspaceEntries,
+    getPersistedWorkspaceActiveKeys,
     getCopyOnConversationAgentIds,
     shouldSkipPersistedWorkspaceScan,
 } from "../workspaceReconciliation.ts";
@@ -89,6 +90,55 @@ describe("workspace reconciliation", () => {
                 localId: "chat-3",
             },
         ]);
+    });
+
+    test("preserves missing-agent workspaces across known sandbox roots only", () => {
+        expect(
+            getPersistedWorkspaceActiveKeys(
+                [
+                    {
+                        agentId: "copy-agent",
+                        userId: "user-1",
+                        localId: "chat-1",
+                    },
+                    {
+                        agentId: "missing-agent",
+                        userId: "user-1",
+                        localId: "chat-2",
+                    },
+                ],
+                {
+                    copyOnConversationAgentIds: new Set(["copy-agent"]),
+                    configuredAgentIds: new Set(["copy-agent", "shared-agent"]),
+                    currentSandboxRoot: "/tmp/current-sandbox",
+                    knownSandboxRoots: [
+                        "/tmp/current-sandbox",
+                        "/tmp/old-sandbox",
+                    ],
+                },
+            ),
+        ).toEqual(
+            new Set([
+                getWorkspaceActiveKey({
+                    sandboxRoot: "/tmp/current-sandbox",
+                    agentId: "copy-agent",
+                    userId: "user-1",
+                    conversationId: "chat-1",
+                }),
+                getWorkspaceActiveKey({
+                    sandboxRoot: "/tmp/current-sandbox",
+                    agentId: "missing-agent",
+                    userId: "user-1",
+                    conversationId: "chat-2",
+                }),
+                getWorkspaceActiveKey({
+                    sandboxRoot: "/tmp/old-sandbox",
+                    agentId: "missing-agent",
+                    userId: "user-1",
+                    conversationId: "chat-2",
+                }),
+            ]),
+        );
     });
 
     test("skips the persisted workspace scan only when copied workspaces are unused", () => {
