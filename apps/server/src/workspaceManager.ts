@@ -26,6 +26,7 @@ import {
 const SANDBOX_STATE_DIRECTORY_NAME = ".agentchat-state";
 const SANDBOX_ROOTS_REGISTRY_DIRECTORY_NAME = "sandbox-roots";
 const WORKSPACE_METADATA_DIRECTORY_NAME = "workspace-metadata";
+const MANAGED_WORKSPACES_REGISTRY_NAME = "managed-workspaces.json";
 
 type WorkspaceMetadata = {
     sourceRootPath: string;
@@ -75,6 +76,13 @@ export function getWorkspaceMetadataRootPath(sandboxRoot: string): string {
     return path.join(
         getSandboxStateRootPath(sandboxRoot),
         WORKSPACE_METADATA_DIRECTORY_NAME,
+    );
+}
+
+function getManagedWorkspacesRegistryPath(sandboxRoot: string): string {
+    return path.join(
+        getSandboxStateRootPath(sandboxRoot),
+        MANAGED_WORKSPACES_REGISTRY_NAME,
     );
 }
 
@@ -185,7 +193,7 @@ export class WorkspaceManager {
 
             const canRecoverMissingMetadata =
                 !metadata &&
-                !this.hasManagedWorkspaces() &&
+                (await this.hasManagedWorkspaceRecord(sandboxPath)) &&
                 (await this.isReusableWorkspaceTarget(
                     this.getConfig().sandboxRoot,
                     sandboxPath,
@@ -352,6 +360,7 @@ export class WorkspaceManager {
 
         if (!existsSync(target)) {
             await this.deleteWorkspaceMetadata(target);
+            await this.removeManagedWorkspaceRecord(target);
             return;
         }
 
@@ -374,6 +383,7 @@ export class WorkspaceManager {
 
         await rm(target, { recursive: true, force: true });
         await this.deleteWorkspaceMetadata(target);
+        await this.removeManagedWorkspaceRecord(target);
         console.log(`[agentchat-server] deleted sandbox workspace: ${target}`);
     }
 
@@ -455,8 +465,12 @@ export class WorkspaceManager {
         for (const sandboxRoot of this.getKnownSandboxRoots()) {
             const workspaceMetadataRootPath =
                 getWorkspaceMetadataRootPath(sandboxRoot);
+            const managedWorkspacesRegistryPath =
+                getManagedWorkspacesRegistryPath(sandboxRoot);
             if (!existsSync(workspaceMetadataRootPath)) {
-                continue;
+                if (!existsSync(managedWorkspacesRegistryPath)) {
+                    continue;
+                }
             }
 
             try {
@@ -465,6 +479,17 @@ export class WorkspaceManager {
                         entry.endsWith(".json"),
                     )
                 ) {
+                    return true;
+                }
+            } catch {
+                // continue checking other sandbox roots
+            }
+
+            try {
+                const registry = JSON.parse(
+                    readFileSync(managedWorkspacesRegistryPath, "utf8"),
+                ) as unknown;
+                if (Array.isArray(registry) && registry.length > 0) {
                     return true;
                 }
             } catch {
@@ -512,6 +537,7 @@ export class WorkspaceManager {
                 sourceRootPath: resolvedSourcePath,
                 state: "ready",
             });
+            await this.recordManagedWorkspace(sandboxPath);
         } catch (error) {
             // Clean up the partially created directory so the next
             // attempt starts fresh rather than reusing a broken copy.
@@ -521,6 +547,7 @@ export class WorkspaceManager {
                 // best-effort cleanup
             }
             await this.deleteWorkspaceMetadata(sandboxPath);
+            await this.removeManagedWorkspaceRecord(sandboxPath);
             throw error;
         }
         console.log(
@@ -607,17 +634,47 @@ export class WorkspaceManager {
     private async hasManagedWorkspaceMetadata(
         sandboxPath: string,
     ): Promise<boolean> {
-        return (await this.readWorkspaceMetadata(sandboxPath)) !== null;
+        return (
+            (await this.readWorkspaceMetadata(sandboxPath)) !== null ||
+            (await this.hasManagedWorkspaceRecord(sandboxPath))
+        );
+    }
+
+    private async hasManagedWorkspaceRecord(
+        sandboxPath: string,
+    ): Promise<boolean> {
+        const registry = await this.readManagedWorkspaceRegistry(
+            this.getWorkspacePathInfo(sandboxPath),
+        );
+        return registry.has(this.getManagedWorkspaceRegistryKey(sandboxPath));
+    }
+
+    private async recordManagedWorkspace(sandboxPath: string): Promise<void> {
+        const workspacePathInfo = this.getWorkspacePathInfo(sandboxPath);
+        const registry =
+            await this.readManagedWorkspaceRegistry(workspacePathInfo);
+        registry.add(
+            path.join(
+                workspacePathInfo.sandboxRoot,
+                workspacePathInfo.relativeWorkspacePath,
+            ),
+        );
+        await this.writeManagedWorkspaceRegistry(workspacePathInfo, registry);
+    }
+
+    private async removeManagedWorkspaceRecord(
+        sandboxPath: string,
+    ): Promise<void> {
+        const workspacePathInfo = this.getWorkspacePathInfo(sandboxPath);
+        const registry =
+            await this.readManagedWorkspaceRegistry(workspacePathInfo);
+        registry.delete(this.getManagedWorkspaceRegistryKey(sandboxPath));
+        await this.writeManagedWorkspaceRegistry(workspacePathInfo, registry);
     }
 
     private getWorkspaceMetadataPath(sandboxPath: string): string {
-        const sandboxRoot = path.dirname(
-            path.dirname(path.dirname(sandboxPath)),
-        );
-        const relativeWorkspacePath = path.relative(
-            path.resolve(sandboxRoot),
-            path.resolve(sandboxPath),
-        );
+        const { sandboxRoot, relativeWorkspacePath } =
+            this.getWorkspacePathInfo(sandboxPath);
         return path.join(
             getWorkspaceMetadataRootPath(sandboxRoot),
             `${getStableStateKey(
@@ -626,6 +683,78 @@ export class WorkspaceManager {
                     relativeWorkspacePath,
                 ),
             )}.json`,
+        );
+    }
+
+    private getWorkspacePathInfo(sandboxPath: string): {
+        sandboxRoot: string;
+        relativeWorkspacePath: string;
+    } {
+        const sandboxRoot = path.dirname(
+            path.dirname(path.dirname(sandboxPath)),
+        );
+        return {
+            sandboxRoot: path.resolve(sandboxRoot),
+            relativeWorkspacePath: path.relative(
+                path.resolve(sandboxRoot),
+                path.resolve(sandboxPath),
+            ),
+        };
+    }
+
+    private getManagedWorkspaceRegistryKey(sandboxPath: string): string {
+        const { sandboxRoot, relativeWorkspacePath } =
+            this.getWorkspacePathInfo(sandboxPath);
+        return path.join(sandboxRoot, relativeWorkspacePath);
+    }
+
+    private async readManagedWorkspaceRegistry(workspacePathInfo: {
+        sandboxRoot: string;
+    }): Promise<Set<string>> {
+        const registryPath = getManagedWorkspacesRegistryPath(
+            workspacePathInfo.sandboxRoot,
+        );
+        try {
+            const raw = await readFile(registryPath, "utf8");
+            const parsed = JSON.parse(raw) as unknown;
+            if (!Array.isArray(parsed)) {
+                return new Set();
+            }
+
+            return new Set(
+                parsed.filter(
+                    (value): value is string =>
+                        typeof value === "string" && value.length > 0,
+                ),
+            );
+        } catch {
+            return new Set();
+        }
+    }
+
+    private async writeManagedWorkspaceRegistry(
+        workspacePathInfo: {
+            sandboxRoot: string;
+        },
+        registry: Set<string>,
+    ): Promise<void> {
+        const registryPath = getManagedWorkspacesRegistryPath(
+            workspacePathInfo.sandboxRoot,
+        );
+        await mkdir(path.dirname(registryPath), { recursive: true });
+        if (registry.size === 0) {
+            await rm(registryPath, { force: true });
+            return;
+        }
+
+        await writeFile(
+            registryPath,
+            `${JSON.stringify(
+                [...registry].sort((left, right) => left.localeCompare(right)),
+                null,
+                2,
+            )}\n`,
+            "utf8",
         );
     }
 

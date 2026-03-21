@@ -21,13 +21,10 @@ export function filterPersistedWorkspaceEntries(
     entries: PersistedChatWorkspaceEntry[],
     params: {
         copyOnConversationAgentIds: Set<string>;
-        configuredAgentIds: Set<string>;
     },
 ): PersistedChatWorkspaceEntry[] {
-    return entries.filter(
-        (entry) =>
-            params.copyOnConversationAgentIds.has(entry.agentId) ||
-            !params.configuredAgentIds.has(entry.agentId),
+    return entries.filter((entry) =>
+        params.copyOnConversationAgentIds.has(entry.agentId),
     );
 }
 
@@ -41,10 +38,16 @@ export function getPersistedWorkspaceActiveKeys(
     },
 ): Set<string> {
     const activeKeys = new Set<string>();
-    for (const entry of filterPersistedWorkspaceEntries(entries, params)) {
-        const sandboxRoots = params.configuredAgentIds.has(entry.agentId)
+    for (const entry of entries) {
+        const sandboxRoots = params.copyOnConversationAgentIds.has(
+            entry.agentId,
+        )
             ? [params.currentSandboxRoot]
-            : params.knownSandboxRoots;
+            : params.configuredAgentIds.has(entry.agentId)
+              ? []
+              : params.knownSandboxRoots.filter(
+                    (sandboxRoot) => sandboxRoot !== params.currentSandboxRoot,
+                );
         for (const sandboxRoot of sandboxRoots) {
             activeKeys.add(
                 getWorkspaceActiveKey({

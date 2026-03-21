@@ -690,6 +690,55 @@ describe("WorkspaceManager", () => {
             );
         });
 
+        test("recreates a copied workspace when only its metadata file is missing and other sandboxes still exist", async () => {
+            const sandboxRoot = makeTempDir("sandbox");
+            const rootPath = makeTempDir("agent-root");
+            writeFileSync(path.join(rootPath, "file.txt"), "source");
+
+            const agent = makeAgent({
+                id: "my-agent",
+                rootPath,
+                workspaceMode: "copy-on-conversation",
+            });
+            const manager = createWorkspaceManager(() =>
+                makeConfig({ sandboxRoot }),
+            );
+
+            const firstWorkspace = await manager.ensureWorkspace(
+                agent,
+                "user-1",
+                "conv-1",
+            );
+            const secondWorkspace = await manager.ensureWorkspace(
+                agent,
+                "user-1",
+                "conv-2",
+            );
+            writeFileSync(path.join(firstWorkspace, "file.txt"), "stale");
+
+            const metadataRoot = getWorkspaceMetadataRootPath(sandboxRoot);
+            expect(readdirSync(metadataRoot)).toHaveLength(2);
+            const firstWorkspaceMetadataPath = (
+                manager as unknown as {
+                    getWorkspaceMetadataPath: (sandboxPath: string) => string;
+                }
+            ).getWorkspaceMetadataPath(firstWorkspace);
+            rmSync(firstWorkspaceMetadataPath, { force: true });
+
+            const workspaceState = await manager.ensureWorkspaceState(
+                agent,
+                "user-1",
+                "conv-1",
+            );
+
+            expect(workspaceState.path).toBe(firstWorkspace);
+            expect(workspaceState.wasReset).toBe(true);
+            expect(
+                readFileSync(path.join(firstWorkspace, "file.txt"), "utf8"),
+            ).toBe("source");
+            expect(existsSync(secondWorkspace)).toBe(true);
+        });
+
         test("recreates copied workspaces with incomplete metadata", async () => {
             const sandboxRoot = makeTempDir("sandbox");
             const rootPath = makeTempDir("agent-root");

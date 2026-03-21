@@ -53,7 +53,7 @@ describe("workspace reconciliation", () => {
         ).toEqual(new Set(["copy-agent", "disabled-copy-agent"]));
     });
 
-    test("keeps copied workspaces and preserves entries for missing agents", () => {
+    test("filters persisted chat entries to configured copied workspaces only", () => {
         expect(
             filterPersistedWorkspaceEntries(
                 [
@@ -75,7 +75,6 @@ describe("workspace reconciliation", () => {
                 ],
                 {
                     copyOnConversationAgentIds: new Set(["copy-agent"]),
-                    configuredAgentIds: new Set(["copy-agent", "shared-agent"]),
                 },
             ),
         ).toEqual([
@@ -84,15 +83,10 @@ describe("workspace reconciliation", () => {
                 userId: "user-1",
                 localId: "chat-1",
             },
-            {
-                agentId: "missing-agent",
-                userId: "user-1",
-                localId: "chat-3",
-            },
         ]);
     });
 
-    test("preserves missing-agent workspaces across known sandbox roots only", () => {
+    test("preserves missing-agent workspaces only across older known sandbox roots", () => {
         expect(
             getPersistedWorkspaceActiveKeys(
                 [
@@ -124,12 +118,6 @@ describe("workspace reconciliation", () => {
                     agentId: "copy-agent",
                     userId: "user-1",
                     conversationId: "chat-1",
-                }),
-                getWorkspaceActiveKey({
-                    sandboxRoot: "/tmp/current-sandbox",
-                    agentId: "missing-agent",
-                    userId: "user-1",
-                    conversationId: "chat-2",
                 }),
                 getWorkspaceActiveKey({
                     sandboxRoot: "/tmp/old-sandbox",
