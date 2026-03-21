@@ -473,7 +473,7 @@ describe("CodexRuntimeManager", () => {
         ]);
     });
 
-    test("resumes legacy shared bindings without persisted workspace metadata", async () => {
+    test("does not resume legacy shared bindings before shared-root history exists", async () => {
         await withTempStateHome(async () => {
             const config = createConfig();
             const persistence = createPersistence({
@@ -499,7 +499,7 @@ describe("CodexRuntimeManager", () => {
 
             expect(
                 fakeClient.requests.map((request) => request.method),
-            ).toEqual(["thread/resume", "turn/start"]);
+            ).toEqual(["thread/start", "turn/start"]);
         });
     });
 
@@ -568,11 +568,11 @@ describe("CodexRuntimeManager", () => {
             const config = createConfig();
             const initialPersistence = createPersistence({
                 provider: "codex-default",
-                providerThreadId: "thread-existing",
-                updatedAt: Date.now() - 60_000,
+                providerThreadId: null,
+                updatedAt: Date.now(),
             });
             const initialClient = new FakeCodexClient({
-                resumedThreadId: "thread-existing",
+                startedThreadId: "thread-fresh",
             });
             const initialManager = new CodexRuntimeManager({
                 getConfig: () => config,
@@ -591,11 +591,11 @@ describe("CodexRuntimeManager", () => {
 
             const updatedPersistence = createPersistence({
                 provider: "codex-default",
-                providerThreadId: "thread-existing",
-                updatedAt: Date.now() - 60_000,
+                providerThreadId: "thread-fresh",
+                updatedAt: Date.now(),
             });
             const updatedClient = new FakeCodexClient({
-                resumedThreadId: "thread-existing",
+                resumedThreadId: "thread-fresh",
             });
             const updatedManager = new CodexRuntimeManager({
                 getConfig: () => config,

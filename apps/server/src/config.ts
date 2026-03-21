@@ -278,40 +278,73 @@ function normalizeAuthConfig(
 
 const DEFAULT_SANDBOX_ROOT = path.join(os.homedir(), ".agentchat", "sandboxes");
 
-export function parseConfig(input: unknown): AgentchatConfig {
-    const {
-        sandboxRoot: rawSandboxRoot,
-        stateId: rawStateId,
+function buildDefaultStateIdSeed(
+    parsed: z.infer<typeof AgentchatConfigInputSchema>,
+    auth: AuthConfig,
+    sandboxRoot: string,
+): string {
+    return JSON.stringify({
+        version: parsed.version,
         auth,
-        ...rest
-    } = AgentchatConfigInputSchema.parse(input);
-    return {
-        ...rest,
-        auth: normalizeAuthConfig(auth),
-        stateId:
-            rawStateId?.trim() ||
-            resolveDefaultStateId("agentchat.config.json"),
-        sandboxRoot: rawSandboxRoot ?? DEFAULT_SANDBOX_ROOT,
-    };
+        sandboxRoot,
+        providers: parsed.providers.map((provider) => ({
+            id: provider.id,
+            kind: provider.kind,
+            label: provider.label,
+            enabled: provider.enabled,
+            idleTtlSeconds: provider.idleTtlSeconds,
+            modelCacheTtlSeconds: provider.modelCacheTtlSeconds,
+            models: provider.models,
+            codex: {
+                command: provider.codex.command,
+                args: provider.codex.args,
+                baseEnvKeys: Object.keys(provider.codex.baseEnv).sort(),
+                hasCwd: Boolean(provider.codex.cwd),
+            },
+        })),
+        agents: parsed.agents.map(({ rootPath, ...agent }) => agent),
+    });
 }
 
-export function loadConfigFile(
-    configPath = resolveDefaultConfigPath(),
+function normalizeParsedConfig(
+    parsed: z.infer<typeof AgentchatConfigInputSchema>,
+    params: {
+        configPath?: string;
+    } = {},
 ): AgentchatConfig {
-    const raw = readFileSync(configPath, "utf8");
-    const parsed = AgentchatConfigInputSchema.parse(JSON.parse(raw) as unknown);
     const {
         sandboxRoot: rawSandboxRoot,
         stateId: rawStateId,
         auth,
         ...rest
     } = parsed;
+    const normalizedAuth = normalizeAuthConfig(auth);
+    const sandboxRoot = rawSandboxRoot ?? DEFAULT_SANDBOX_ROOT;
     return {
         ...rest,
-        auth: normalizeAuthConfig(auth),
-        stateId: rawStateId?.trim() || resolveDefaultStateId(configPath),
-        sandboxRoot: rawSandboxRoot ?? DEFAULT_SANDBOX_ROOT,
+        auth: normalizedAuth,
+        stateId:
+            rawStateId?.trim() ||
+            resolveDefaultStateId(
+                params.configPath ?? "agentchat.config.json",
+                buildDefaultStateIdSeed(parsed, normalizedAuth, sandboxRoot),
+            ),
+        sandboxRoot,
     };
+}
+
+export function parseConfig(input: unknown): AgentchatConfig {
+    return normalizeParsedConfig(AgentchatConfigInputSchema.parse(input));
+}
+
+export function loadConfigFile(
+    configPath = resolveDefaultConfigPath(),
+): AgentchatConfig {
+    const raw = readFileSync(configPath, "utf8");
+    return normalizeParsedConfig(
+        AgentchatConfigInputSchema.parse(JSON.parse(raw) as unknown),
+        { configPath },
+    );
 }
 
 export class ConfigStore {

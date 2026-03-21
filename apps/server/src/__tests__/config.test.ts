@@ -56,13 +56,61 @@ describe("server config", () => {
         const releaseBDir = mkdtempSync(path.join(os.tmpdir(), "release-b-"));
         const releaseAPath = path.join(releaseADir, "agentchat.config.json");
         const releaseBPath = path.join(releaseBDir, "agentchat.config.json");
-        const rawConfig = JSON.parse(
+        const releaseAConfig = JSON.parse(
             readFileSync(exampleConfigPath, "utf8"),
-        ) as unknown;
+        ) as Record<string, unknown>;
+        const releaseBConfig = JSON.parse(
+            readFileSync(exampleConfigPath, "utf8"),
+        ) as Record<string, unknown>;
+
+        const releaseAAgents = (
+            releaseAConfig.agents as Array<Record<string, unknown>>
+        ).map((agent) => ({
+            ...agent,
+            rootPath: "/srv/releases/a/agent-root",
+        }));
+        const releaseBAgents = (
+            releaseBConfig.agents as Array<Record<string, unknown>>
+        ).map((agent) => ({
+            ...agent,
+            rootPath: "/srv/releases/b/agent-root",
+        }));
+        const releaseAProviders = (
+            releaseAConfig.providers as Array<Record<string, unknown>>
+        ).map((provider) => ({
+            ...provider,
+            codex: {
+                ...(provider.codex as Record<string, unknown>),
+                cwd: "/srv/releases/a",
+            },
+        }));
+        const releaseBProviders = (
+            releaseBConfig.providers as Array<Record<string, unknown>>
+        ).map((provider) => ({
+            ...provider,
+            codex: {
+                ...(provider.codex as Record<string, unknown>),
+                cwd: "/srv/releases/b",
+            },
+        }));
 
         try {
-            writeFileSync(releaseAPath, JSON.stringify(rawConfig));
-            writeFileSync(releaseBPath, JSON.stringify(rawConfig));
+            writeFileSync(
+                releaseAPath,
+                JSON.stringify({
+                    ...releaseAConfig,
+                    agents: releaseAAgents,
+                    providers: releaseAProviders,
+                }),
+            );
+            writeFileSync(
+                releaseBPath,
+                JSON.stringify({
+                    ...releaseBConfig,
+                    agents: releaseBAgents,
+                    providers: releaseBProviders,
+                }),
+            );
 
             expect(loadConfigFile(releaseAPath).stateId).toBe(
                 loadConfigFile(releaseBPath).stateId,
@@ -71,6 +119,24 @@ describe("server config", () => {
             rmSync(releaseADir, { recursive: true, force: true });
             rmSync(releaseBDir, { recursive: true, force: true });
         }
+    });
+
+    test("separates default state ids for installs with different config identities", () => {
+        const baseConfig = JSON.parse(
+            readFileSync(exampleConfigPath, "utf8"),
+        ) as Record<string, unknown>;
+        const stagingConfig = {
+            ...baseConfig,
+            sandboxRoot: "/srv/agentchat/staging-sandboxes",
+        };
+        const productionConfig = {
+            ...baseConfig,
+            sandboxRoot: "/srv/agentchat/prod-sandboxes",
+        };
+
+        expect(parseConfig(stagingConfig).stateId).not.toBe(
+            parseConfig(productionConfig).stateId,
+        );
     });
 
     test("preserves an explicit state id from config", () => {

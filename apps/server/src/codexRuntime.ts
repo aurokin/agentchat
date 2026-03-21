@@ -1962,12 +1962,13 @@ export class CodexRuntimeManager {
             const history = this.readLegacySharedRootHistory();
             const existing = history[agent.id];
             if (!existing) {
+                const changedAt = Date.now();
                 history[agent.id] = {
                     rootPath: currentRootPath,
-                    changedAt: 0,
+                    changedAt,
                 };
                 this.writeLegacySharedRootHistory(history);
-                return true;
+                return binding.updatedAt >= changedAt;
             }
 
             if (existing.rootPath !== currentRootPath) {
@@ -1982,7 +1983,7 @@ export class CodexRuntimeManager {
 
             return binding.updatedAt >= existing.changedAt;
         } catch {
-            return true;
+            return false;
         }
     }
 

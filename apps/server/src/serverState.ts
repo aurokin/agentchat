@@ -21,8 +21,18 @@ export function getStableStateKey(value: string): string {
     return createHash("sha256").update(value).digest("hex").slice(0, 16);
 }
 
-export function resolveDefaultStateId(configPath: string): string {
-    return sanitizeStateFileComponent(path.basename(path.resolve(configPath)));
+export function resolveDefaultStateId(
+    configPath: string,
+    seed?: string,
+): string {
+    const basename = sanitizeStateFileComponent(
+        path.basename(path.resolve(configPath)),
+    );
+    if (!seed) {
+        return basename;
+    }
+
+    return `${basename}-${getStableStateKey(seed)}`;
 }
 
 export function getServerStateScopeKey(stateId: string): string {
