@@ -42,6 +42,7 @@ export interface ConversationDeleteCommand {
     payload: {
         conversationId: string;
         agentId: string;
+        chatId?: string;
     };
 }
 
@@ -272,6 +273,7 @@ export class AgentchatSocketClient {
         conversationId: string,
         agentId: string,
         tokenIssuer?: (() => Promise<string>) | null,
+        chatId?: string,
     ): Promise<void> {
         const effectiveTokenIssuer = tokenIssuer ?? this.tokenIssuer;
         if (
@@ -293,7 +295,7 @@ export class AgentchatSocketClient {
             JSON.stringify({
                 id: this.options.createId(),
                 type: "conversation.delete",
-                payload: { conversationId, agentId },
+                payload: { conversationId, agentId, chatId },
             } satisfies ConversationDeleteCommand),
         );
     }

@@ -56,6 +56,7 @@ export interface ConvexAdapterServices {
         get(args: { id: string }): Promise<ConvexChatLike | null>;
         getByLocalId(args: {
             userId: string;
+            agentId: string;
             localId: string;
         }): Promise<ConvexChatLike | null>;
         listByUser(args: { userId: string }): Promise<ConvexChatLike[]>;
@@ -103,21 +104,29 @@ export abstract class ConvexAdapterBase implements PersistenceAdapter {
             userId: this.userId,
             chat,
         });
-        this.chatIdMap.set(chat.id, convexId);
+        this.chatIdMap.set(
+            this.getChatLookupKey(chat.id, chat.agentId),
+            convexId,
+        );
         return chat.id;
     }
 
-    async getChat(id: string): Promise<ChatSession | undefined> {
-        let convexId = this.chatIdMap.get(id);
+    async getChat(
+        id: string,
+        agentId?: string,
+    ): Promise<ChatSession | undefined> {
+        let convexId = this.chatIdMap.get(this.getChatLookupKey(id, agentId));
 
         if (!convexId) {
+            if (!agentId) return undefined;
             const chat = await this.services.chats.getByLocalId({
                 userId: this.userId,
+                agentId,
                 localId: id,
             });
             if (!chat) return undefined;
             convexId = chat._id;
-            this.chatIdMap.set(id, convexId);
+            this.chatIdMap.set(this.getChatLookupKey(id, agentId), convexId);
         }
 
         const chat = await this.services.chats.get({ id: convexId });
@@ -132,35 +141,48 @@ export abstract class ConvexAdapterBase implements PersistenceAdapter {
         });
 
         return chats.map((chat) => {
-            this.chatIdMap.set(chat.localId ?? chat._id, chat._id);
+            this.chatIdMap.set(
+                this.getChatLookupKey(chat.localId ?? chat._id, chat.agentId),
+                chat._id,
+            );
             return this.convexChatToLocal(chat);
         });
     }
 
     async updateChat(chat: ChatSession): Promise<void> {
-        let convexId = this.chatIdMap.get(chat.id);
+        let convexId = this.chatIdMap.get(
+            this.getChatLookupKey(chat.id, chat.agentId),
+        );
 
         if (!convexId) {
             const existing = await this.services.chats.getByLocalId({
                 userId: this.userId,
+                agentId: chat.agentId,
                 localId: chat.id,
             });
             if (!existing) {
                 throw new Error(`Chat not found: ${chat.id}`);
             }
             convexId = existing._id;
-            this.chatIdMap.set(chat.id, convexId);
+            this.chatIdMap.set(
+                this.getChatLookupKey(chat.id, chat.agentId),
+                convexId,
+            );
         }
 
         await this.services.chats.update({ id: convexId, chat });
     }
 
-    async markChatViewed(chatId: string, timestamp: number): Promise<void> {
+    async markChatViewed(
+        chatId: string,
+        timestamp: number,
+        agentId?: string,
+    ): Promise<void> {
         if (!Number.isFinite(timestamp)) {
             return;
         }
 
-        const convexId = await this.getOrLookupChatId(chatId);
+        const convexId = await this.getOrLookupChatId(chatId, agentId);
         if (!convexId) {
             throw new Error(`Chat not found: ${chatId}`);
         }
@@ -168,24 +190,30 @@ export abstract class ConvexAdapterBase implements PersistenceAdapter {
         await this.services.chats.markViewed({ id: convexId, timestamp });
     }
 
-    async deleteChat(id: string): Promise<void> {
-        let convexId = this.chatIdMap.get(id);
+    async deleteChat(id: string, agentId?: string): Promise<string | null> {
+        let convexId = this.chatIdMap.get(this.getChatLookupKey(id, agentId));
 
         if (!convexId) {
+            if (!agentId) return null;
             const existing = await this.services.chats.getByLocalId({
                 userId: this.userId,
+                agentId,
                 localId: id,
             });
-            if (!existing) return;
+            if (!existing) return null;
             convexId = existing._id;
         }
 
         await this.services.chats.remove({ id: convexId });
-        this.chatIdMap.delete(id);
+        this.chatIdMap.delete(this.getChatLookupKey(id, agentId));
+        return convexId;
     }
 
-    async createMessage(message: Message): Promise<string> {
-        const chatConvexId = await this.getOrLookupChatId(message.sessionId);
+    async createMessage(message: Message, agentId?: string): Promise<string> {
+        const chatConvexId = await this.getOrLookupChatId(
+            message.sessionId,
+            agentId,
+        );
         if (!chatConvexId) {
             throw new Error(`Chat not found: ${message.sessionId}`);
         }
@@ -218,8 +246,11 @@ export abstract class ConvexAdapterBase implements PersistenceAdapter {
         await this.services.messages.update({ id: convexId, message });
     }
 
-    async getMessagesByChat(chatId: string): Promise<Message[]> {
-        const chatConvexId = await this.getOrLookupChatId(chatId);
+    async getMessagesByChat(
+        chatId: string,
+        agentId?: string,
+    ): Promise<Message[]> {
+        const chatConvexId = await this.getOrLookupChatId(chatId, agentId);
         if (!chatConvexId) return [];
 
         const messages = await this.services.messages.listByChat({
@@ -229,8 +260,11 @@ export abstract class ConvexAdapterBase implements PersistenceAdapter {
         return messages.map((msg) => this.convexMessageToLocal(msg, chatId));
     }
 
-    async deleteMessagesByChat(chatId: string): Promise<void> {
-        const chatConvexId = await this.getOrLookupChatId(chatId);
+    async deleteMessagesByChat(
+        chatId: string,
+        agentId?: string,
+    ): Promise<void> {
+        const chatConvexId = await this.getOrLookupChatId(chatId, agentId);
         if (!chatConvexId) return;
 
         await this.services.messages.deleteByChat({ chatId: chatConvexId });
@@ -252,21 +286,38 @@ export abstract class ConvexAdapterBase implements PersistenceAdapter {
         this.messageIdMap.delete(id);
     }
 
-    protected async getOrLookupChatId(localId: string): Promise<string | null> {
-        const cached = this.chatIdMap.get(localId);
+    protected async getOrLookupChatId(
+        localId: string,
+        agentId?: string,
+    ): Promise<string | null> {
+        const cached = this.chatIdMap.get(
+            this.getChatLookupKey(localId, agentId),
+        );
         if (cached) return cached;
+
+        if (!agentId) {
+            return null;
+        }
 
         const chat = await this.services.chats.getByLocalId({
             userId: this.userId,
+            agentId,
             localId,
         });
 
         if (chat) {
-            this.chatIdMap.set(localId, chat._id);
+            this.chatIdMap.set(
+                this.getChatLookupKey(localId, agentId),
+                chat._id,
+            );
             return chat._id;
         }
 
         return null;
+    }
+
+    private getChatLookupKey(localId: string, agentId?: string): string {
+        return agentId ? `${agentId}:${localId}` : localId;
     }
 
     protected convexChatToLocal(chat: ConvexChatLike): ChatSession {

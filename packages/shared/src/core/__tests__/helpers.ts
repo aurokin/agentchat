@@ -50,6 +50,7 @@ export function createMemoryAdapter(
             if (index >= 0) {
                 chats.splice(index, 1);
             }
+            return id;
         },
 
         async createMessage(message) {

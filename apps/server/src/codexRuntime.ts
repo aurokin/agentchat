@@ -586,6 +586,7 @@ export class CodexRuntimeManager {
         userId: string;
         conversationId: string;
         agentId: string;
+        chatId?: string;
     }): Promise<void> {
         // Verify the chat no longer exists in Convex before deleting
         try {
@@ -593,6 +594,7 @@ export class CodexRuntimeManager {
                 params.userId,
                 params.agentId,
                 params.conversationId,
+                params.chatId,
             );
             if (stillExists) {
                 console.warn(

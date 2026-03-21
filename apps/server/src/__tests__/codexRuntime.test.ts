@@ -479,6 +479,7 @@ describe("CodexRuntimeManager", () => {
             const persistence = createPersistence({
                 provider: "codex-default",
                 providerThreadId: "thread-existing",
+                updatedAt: Date.now() - 60_000,
             });
             const fakeClient = new FakeCodexClient({
                 resumedThreadId: "thread-existing",

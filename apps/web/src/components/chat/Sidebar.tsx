@@ -191,11 +191,16 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
 
     const requestDeleteChat = useCallback(
         async (chatId: string) => {
+            const targetChat = chats.find((chat) => chat.id === chatId) ?? null;
             const hasMessages =
                 currentChat?.id === chatId
                     ? messages.length > 0
-                    : (await persistenceAdapter.getMessagesByChat(chatId))
-                          .length > 0;
+                    : (
+                          await persistenceAdapter.getMessagesByChat(
+                              chatId,
+                              targetChat?.agentId,
+                          )
+                      ).length > 0;
 
             if (!hasMessages) {
                 await deleteChatAndSelectNext(chatId);
@@ -205,6 +210,7 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
             setPendingDeleteChatId(chatId);
         },
         [
+            chats,
             currentChat?.id,
             deleteChatAndSelectNext,
             messages.length,

@@ -156,8 +156,15 @@ export function ChatProvider({
     );
     const workspaceCurrentChat = useQuery(
         api.chats.getByLocalId,
-        isWorkspaceActive && workspaceUserId && currentChatId
-            ? { userId: workspaceUserId, localId: currentChatId }
+        isWorkspaceActive &&
+            workspaceUserId &&
+            currentChatId &&
+            currentChat?.agentId
+            ? {
+                  userId: workspaceUserId,
+                  agentId: currentChat.agentId,
+                  localId: currentChatId,
+              }
             : "skip",
     );
     const workspaceMessages = useQuery(
@@ -383,6 +390,7 @@ export function ChatProvider({
             void adapter.markChatViewed(
                 pendingViewed.chatId,
                 pendingViewed.timestamp,
+                currentChat.agentId,
             );
             markViewedTimeoutRef.current = null;
             pendingViewedChatRef.current = null;
@@ -400,7 +408,7 @@ export function ChatProvider({
                 return;
             }
             const { chatId, timestamp } = pending;
-            void adapter.markChatViewed(chatId, timestamp);
+            void adapter.markChatViewed(chatId, timestamp, currentChat.agentId);
             pendingViewedChatRef.current = null;
             markViewedTimeoutRef.current = null;
         }, 300);
@@ -457,7 +465,10 @@ export function ChatProvider({
         async (chatId: string) => {
             setIsMessagesLoading(true);
             try {
-                const loadedMessages = await adapter.getMessagesByChat(chatId);
+                const loadedMessages = await adapter.getMessagesByChat(
+                    chatId,
+                    selectedAgentId ?? undefined,
+                );
                 setMessages((prev) => ({ ...prev, [chatId]: loadedMessages }));
             } catch {
                 console.error("Failed to load messages");
@@ -465,7 +476,7 @@ export function ChatProvider({
                 setIsMessagesLoading(false);
             }
         },
-        [adapter],
+        [adapter, selectedAgentId],
     );
 
     useEffect(() => {
@@ -525,13 +536,17 @@ export function ChatProvider({
         async (chatId: string) => {
             const deletedChat = chats.find((c) => c.id === chatId) ?? null;
 
-            await adapter.deleteChat(chatId);
+            const deletedChatId = await adapter.deleteChat(
+                chatId,
+                deletedChat?.agentId ?? selectedAgentId ?? undefined,
+            );
 
             if (deletedChat) {
                 void getSharedAgentchatSocketClient().notifyConversationDeleted(
                     chatId,
                     deletedChat.agentId,
                     getBackendSessionToken,
+                    deletedChatId ?? undefined,
                 );
             }
 
@@ -556,12 +571,16 @@ export function ChatProvider({
             const socketClient = getSharedAgentchatSocketClient();
             for (const chatId of chatIds) {
                 const chat = chats.find((c) => c.id === chatId) ?? null;
-                await adapter.deleteChat(chatId);
+                const deletedChatId = await adapter.deleteChat(
+                    chatId,
+                    chat?.agentId ?? selectedAgentId ?? undefined,
+                );
                 if (chat) {
                     void socketClient.notifyConversationDeleted(
                         chatId,
                         chat.agentId,
                         getBackendSessionToken,
+                        deletedChatId ?? undefined,
                     );
                 }
             }
@@ -610,7 +629,7 @@ export function ChatProvider({
                 createdAt: Date.now(),
             };
 
-            await adapter.createMessage(message);
+            await adapter.createMessage(message, currentChat.agentId);
             if (isWorkspaceActive) {
                 pendingMessageIdsRef.current.add(message.id);
             }
@@ -640,7 +659,10 @@ export function ChatProvider({
                     continue;
                 }
 
-                const storedMessages = await adapter.getMessagesByChat(chatId);
+                const storedMessages = await adapter.getMessagesByChat(
+                    chatId,
+                    selectedAgentId ?? undefined,
+                );
                 if (storedMessages.length > 0) {
                     return true;
                 }
@@ -648,7 +670,7 @@ export function ChatProvider({
 
             return false;
         },
-        [adapter, messages],
+        [adapter, messages, selectedAgentId],
     );
 
     const updateMessage = useCallback(

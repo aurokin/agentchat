@@ -1043,8 +1043,22 @@ export const chatExistsByLocalId = internalQuery({
         userId: v.id("users"),
         agentId: v.string(),
         localId: v.string(),
+        chatId: v.optional(v.id("chats")),
     },
     handler: async (ctx, args): Promise<boolean> => {
+        if (args.chatId) {
+            const chat = await ctx.db.get(args.chatId);
+            if (!chat) {
+                return false;
+            }
+
+            return (
+                chat.userId === args.userId &&
+                chat.agentId === args.agentId &&
+                (chat.localId ?? chat._id) === args.localId
+            );
+        }
+
         const chats = await ctx.db
             .query("chats")
             .withIndex("by_local_id", (q) =>

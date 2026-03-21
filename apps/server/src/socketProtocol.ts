@@ -42,6 +42,7 @@ export interface ConversationDeleteCommand {
     payload: {
         conversationId: string;
         agentId: string;
+        chatId?: string;
     };
 }
 
@@ -143,7 +144,8 @@ export function parseClientCommand(raw: string): ClientCommand {
         if (
             !payload ||
             typeof payload.conversationId !== "string" ||
-            typeof payload.agentId !== "string"
+            typeof payload.agentId !== "string" ||
+            (payload.chatId !== undefined && typeof payload.chatId !== "string")
         ) {
             throw new Error("Invalid delete payload");
         }

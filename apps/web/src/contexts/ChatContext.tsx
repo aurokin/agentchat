@@ -160,8 +160,15 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     const workspaceChats = workspaceChatsPagination.results;
     const workspaceCurrentChat = useQuery(
         api.chats.getByLocalId,
-        isWorkspaceActive && workspaceUserId && currentChatId
-            ? { userId: workspaceUserId, localId: currentChatId }
+        isWorkspaceActive &&
+            workspaceUserId &&
+            currentChatId &&
+            currentChat?.agentId
+            ? {
+                  userId: workspaceUserId,
+                  agentId: currentChat.agentId,
+                  localId: currentChatId,
+              }
             : "skip",
     );
     const workspaceMessages = useQuery(
@@ -366,6 +373,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             void persistenceAdapter.markChatViewed(
                 pendingViewed.chatId,
                 pendingViewed.timestamp,
+                currentChat.agentId,
             );
             markViewedTimeoutRef.current = null;
             pendingViewedChatRef.current = null;
@@ -383,7 +391,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 return;
             }
             const { chatId, timestamp } = pending;
-            void persistenceAdapter.markChatViewed(chatId, timestamp);
+            void persistenceAdapter.markChatViewed(
+                chatId,
+                timestamp,
+                currentChat.agentId,
+            );
             pendingViewedChatRef.current = null;
             markViewedTimeoutRef.current = null;
         }, 300);
@@ -442,8 +454,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             }
 
             setIsMessagesLoading(true);
-            const refreshedChat =
-                await persistenceAdapter.getChat(activeChatId);
+            const refreshedChat = await persistenceAdapter.getChat(
+                activeChatId,
+                selectedAgentId,
+            );
 
             if (!refreshedChat || refreshedChat.agentId !== selectedAgentId) {
                 if (storedChatId === activeChatId) {
@@ -459,6 +473,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 setCurrentChat(refreshedChat);
                 const chatMessages = await persistenceAdapter.getMessagesByChat(
                     refreshedChat.id,
+                    refreshedChat.agentId,
                 );
                 if (
                     currentChatIdRef.current === refreshedChat.id ||
@@ -549,13 +564,18 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 return;
             }
 
-            const chat = await persistenceAdapter.getChat(chatId);
+            const chat = await persistenceAdapter.getChat(
+                chatId,
+                selectedAgentId ?? undefined,
+            );
             if (chat && chat.agentId === selectedAgentId) {
                 setCurrentChat(chat);
                 storage.setSelectedChatId(chat.agentId, chat.id);
                 setIsMessagesLoading(true);
-                const chatMessages =
-                    await persistenceAdapter.getMessagesByChat(chatId);
+                const chatMessages = await persistenceAdapter.getMessagesByChat(
+                    chatId,
+                    chat.agentId,
+                );
                 setMessages(chatMessages);
                 setIsMessagesLoading(false);
                 return;
@@ -573,7 +593,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                     : (chats.find((candidate) => candidate.id === chatId) ??
                       null);
 
-            await persistenceAdapter.deleteChat(chatId);
+            const deletedChatId = await persistenceAdapter.deleteChat(
+                chatId,
+                deletedChat?.agentId ?? selectedAgentId ?? undefined,
+            );
             setChats((prev) => prev.filter((c) => c.id !== chatId));
 
             if (deletedChat) {
@@ -583,6 +606,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                     chatId,
                     deletedChat.agentId,
                     getBackendSessionToken,
+                    deletedChatId ?? undefined,
                 );
             }
 
@@ -592,7 +616,13 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 setIsMessagesLoading(false);
             }
         },
-        [chats, currentChat, getBackendSessionToken, persistenceAdapter],
+        [
+            chats,
+            currentChat,
+            getBackendSessionToken,
+            persistenceAdapter,
+            selectedAgentId,
+        ],
     );
 
     const updateChat = useCallback(
@@ -639,7 +669,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 createdAt: Date.now(),
             };
 
-            await persistenceAdapter.createMessage(newMessage);
+            await persistenceAdapter.createMessage(
+                newMessage,
+                currentChat?.agentId,
+            );
             if (isWorkspaceActive) {
                 pendingMessageIdsRef.current.add(newMessage.id);
             }
@@ -647,7 +680,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 setMessages((prev) => [...prev, newMessage]);
             }
 
-            const baseChat = await persistenceAdapter.getChat(targetChatId);
+            const baseChat = await persistenceAdapter.getChat(
+                targetChatId,
+                currentChat?.agentId,
+            );
             if (baseChat ?? (currentChat?.id === targetChatId && currentChat)) {
                 const updated = {
                     ...(baseChat ?? currentChat!),
@@ -697,6 +733,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             if (currentChat) {
                 const chatMessages = await persistenceAdapter.getMessagesByChat(
                     currentChat.id,
+                    currentChat.agentId,
                 );
                 const message = chatMessages.find((m) => m.id === id);
                 if (message) {

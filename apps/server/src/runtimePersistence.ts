@@ -131,11 +131,13 @@ export class RuntimePersistenceClient {
         userId: string,
         agentId: string,
         localId: string,
+        chatId?: string,
     ): Promise<boolean> {
         const response = await this.post("/runtime/chat-exists", {
             userId,
             agentId,
             localId,
+            chatId,
         });
         return (await response.json()) as boolean;
     }

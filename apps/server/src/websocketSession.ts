@@ -39,6 +39,7 @@ export type RuntimeManagerLike = {
         userId: string;
         conversationId: string;
         agentId: string;
+        chatId?: string;
     }): Promise<void>;
 };
 
@@ -138,6 +139,7 @@ export async function handleConnectedSocketMessage(params: {
                 userId: params.session.userId,
                 conversationId: command.payload.conversationId,
                 agentId: command.payload.agentId,
+                chatId: command.payload.chatId,
             });
             return;
         }
