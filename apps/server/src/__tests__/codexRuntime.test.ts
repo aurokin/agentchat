@@ -2665,6 +2665,159 @@ describe("CodexRuntimeManager", () => {
         ]);
     });
 
+    test("does not publish a runtime cancelled immediately before registration", async () => {
+        const sandboxRoot = makeTempDir("sandbox");
+        const agentRoot = makeTempDir("agent-root");
+        writeFileSync(path.join(agentRoot, "version.txt"), "first");
+
+        const config = createConfig();
+        config.sandboxRoot = sandboxRoot;
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath: agentRoot,
+            workspaceMode: "copy-on-conversation",
+        };
+
+        const workspaceManager = createWorkspaceManager(() => config);
+        const persistence = createPersistence(null);
+        const client = new FakeCodexClient({
+            startedThreadId: "thread-started",
+            autoComplete: false,
+        });
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            workspaceManager,
+            createClient: () => client,
+        });
+        const command = createCommand();
+        const runtimeKey = JSON.stringify([
+            "user-1",
+            command.payload.agentId,
+            command.payload.conversationId,
+        ]);
+        const originalOnExit = client.onExit.bind(client);
+        client.onExit = (handler: (error: Error) => void) => {
+            originalOnExit(handler);
+            (
+                manager as unknown as {
+                    cancelPendingRuntimeInitialization: (
+                        key: string,
+                        reason: Error,
+                    ) => unknown;
+                }
+            ).cancelPendingRuntimeInitialization(
+                runtimeKey,
+                new Error(
+                    "Conversation deleted during runtime initialization.",
+                ),
+            );
+        };
+
+        await expect(
+            manager.sendMessage({
+                userId: "user-1",
+                subscriberId: "sub-1",
+                command,
+                sendEvent: () => undefined,
+            }),
+        ).rejects.toThrow(
+            "Conversation deleted during runtime initialization.",
+        );
+
+        expect(client.stopped).toBe(true);
+        expect(
+            (
+                manager as unknown as {
+                    runtimes: Map<string, unknown>;
+                }
+            ).runtimes.size,
+        ).toBe(0);
+        expect(
+            existsSync(
+                workspaceManager.getWorkspacePath(
+                    "agent-1",
+                    "user-1",
+                    command.payload.conversationId,
+                ),
+            ),
+        ).toBe(false);
+    });
+
+    test("conversation delete does not wait forever on a hung runtime initialization", async () => {
+        const sandboxRoot = makeTempDir("sandbox");
+        const agentRoot = makeTempDir("agent-root");
+        writeFileSync(path.join(agentRoot, "version.txt"), "first");
+
+        const config = createConfig();
+        config.sandboxRoot = sandboxRoot;
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath: agentRoot,
+            workspaceMode: "copy-on-conversation",
+        };
+
+        const workspaceManager = createWorkspaceManager(() => config);
+        const persistence = createPersistence(null);
+        const initializeDeferred = createDeferred<void>();
+        const client = new FakeCodexClient({
+            autoComplete: false,
+            initializePromise: initializeDeferred.promise,
+        });
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            workspaceManager,
+            createClient: () => client,
+            pendingRuntimeDeleteWaitMs: 10,
+        });
+        const command = createCommand();
+        const workspacePath = workspaceManager.getWorkspacePath(
+            "agent-1",
+            "user-1",
+            command.payload.conversationId,
+        );
+
+        const sendPromise = manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "sub-1",
+            command,
+            sendEvent: () => undefined,
+        });
+
+        await waitFor(
+            () =>
+                (
+                    manager as unknown as {
+                        pendingRuntimeInitializations: Map<string, unknown>;
+                    }
+                ).pendingRuntimeInitializations.size === 1 &&
+                existsSync(workspacePath),
+        );
+
+        const deleteResult = await Promise.race([
+            manager
+                .deleteConversationWorkspace({
+                    userId: "user-1",
+                    conversationId: command.payload.conversationId,
+                    agentId: command.payload.agentId,
+                })
+                .then(() => "deleted"),
+            new Promise<string>((resolve) => {
+                setTimeout(() => resolve("timed-out"), 200);
+            }),
+        ]);
+
+        expect(deleteResult).toBe("deleted");
+        expect(client.stopped).toBe(true);
+        expect(existsSync(workspacePath)).toBe(false);
+
+        initializeDeferred.resolve();
+        await expect(sendPromise).rejects.toThrow(
+            "Conversation deleted during runtime initialization.",
+        );
+    });
+
     test("cleans up copied workspace and client when conversation lookup fails during initialization", async () => {
         const sandboxRoot = makeTempDir("sandbox");
         const agentRoot = makeTempDir("agent-root");

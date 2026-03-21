@@ -82,6 +82,7 @@ type RuntimeWorkspaceIdentity = {
 
 type PendingRuntimeInitialization = {
     cancelReason: Error | null;
+    client: CodexClient | null;
     promise: Promise<{ runtime: ConversationRuntime; isNew: boolean }>;
 };
 
@@ -94,6 +95,7 @@ type LegacySharedRootHistory = Record<string, LegacySharedRootHistoryEntry>;
 
 const AGENTCHAT_STATE_DIRECTORY_NAME = ".agentchat-state";
 const LEGACY_SHARED_ROOT_HISTORY_DIRECTORY_NAME = "legacy-shared-roots";
+const PENDING_RUNTIME_DELETE_WAIT_MS = 1_000;
 
 function invariant(condition: unknown, message: string): asserts condition {
     if (!condition) {
@@ -322,6 +324,7 @@ export class CodexRuntimeManager {
     private readonly createClient: CreateCodexClient;
     private readonly workspaceManager: WorkspaceManager | null;
     private readonly configPath: string | null;
+    private readonly pendingRuntimeDeleteWaitMs: number;
 
     constructor(params: {
         getConfig: () => AgentchatConfig;
@@ -329,6 +332,7 @@ export class CodexRuntimeManager {
         createClient?: CreateCodexClient;
         workspaceManager?: WorkspaceManager;
         configPath?: string;
+        pendingRuntimeDeleteWaitMs?: number;
     }) {
         this.getConfig = params.getConfig;
         this.persistence = params.persistence;
@@ -337,6 +341,8 @@ export class CodexRuntimeManager {
             ((clientParams) => new CodexAppServerClient(clientParams));
         this.workspaceManager = params.workspaceManager ?? null;
         this.configPath = params.configPath ?? null;
+        this.pendingRuntimeDeleteWaitMs =
+            params.pendingRuntimeDeleteWaitMs ?? PENDING_RUNTIME_DELETE_WAIT_MS;
     }
 
     async sendMessage(params: {
@@ -630,11 +636,10 @@ export class CodexRuntimeManager {
         );
         const pendingInitialization =
             this.pendingRuntimeInitializations.get(key);
-        if (pendingInitialization) {
-            pendingInitialization.cancelReason ??= new Error(
-                "Conversation deleted during runtime initialization.",
-            );
-        }
+        this.cancelPendingRuntimeInitialization(
+            key,
+            new Error("Conversation deleted during runtime initialization."),
+        );
         const runtime = this.runtimes.get(key);
         const shouldTearDownRuntime =
             runtime?.agentId === params.agentId || !runtime;
@@ -656,7 +661,14 @@ export class CodexRuntimeManager {
             this.pendingSubscriptions.delete(key);
         }
         if (pendingInitialization) {
-            await pendingInitialization.promise.catch(() => undefined);
+            const settled = await this.waitForPendingRuntimeInitialization(
+                pendingInitialization,
+            );
+            if (!settled) {
+                console.warn(
+                    `[agentchat-server] conversation.delete: runtime initialization did not settle within ${this.pendingRuntimeDeleteWaitMs}ms for ${params.conversationId}; continuing workspace cleanup`,
+                );
+            }
         }
 
         // Delete the sandbox workspace if workspace manager is configured
@@ -836,6 +848,7 @@ export class CodexRuntimeManager {
         }
         const initializationState: PendingRuntimeInitialization = {
             cancelReason: null,
+            client: null,
             promise: Promise.resolve(null as never),
         };
         const initialization = this.initializeRuntime(
@@ -946,6 +959,7 @@ export class CodexRuntimeManager {
                 provider: resources.provider,
                 agent: { ...resources.agent, rootPath: cwd },
             });
+            initializationState.client = client;
             await client.initialize();
             await this.throwIfRuntimeInitializationCancelled({
                 initializationState,
@@ -1043,6 +1057,15 @@ export class CodexRuntimeManager {
                 this.handleRuntimeExit(runtime, error);
             });
 
+            await this.throwIfRuntimeInitializationCancelled({
+                initializationState,
+                client,
+                agent: resources.agent,
+                userId: params.userId,
+                conversationId: params.command.payload.conversationId,
+                cwd,
+                cleanupWorkspace: cleanupWorkspaceOnFailure,
+            });
             this.runtimes.set(key, runtime);
             return { runtime, isNew };
         } catch (error) {
@@ -1087,6 +1110,34 @@ export class CodexRuntimeManager {
             );
         }
         throw cancelReason;
+    }
+
+    private cancelPendingRuntimeInitialization(
+        key: string,
+        reason: Error,
+    ): PendingRuntimeInitialization | null {
+        const pendingInitialization =
+            this.pendingRuntimeInitializations.get(key) ?? null;
+        if (!pendingInitialization) {
+            return null;
+        }
+
+        pendingInitialization.cancelReason ??= reason;
+        pendingInitialization.client?.stop();
+        return pendingInitialization;
+    }
+
+    private async waitForPendingRuntimeInitialization(
+        pendingInitialization: PendingRuntimeInitialization,
+    ): Promise<boolean> {
+        const settledPromise = pendingInitialization.promise.then(
+            () => true,
+            () => true,
+        );
+        const timeoutPromise = new Promise<boolean>((resolve) => {
+            setTimeout(() => resolve(false), this.pendingRuntimeDeleteWaitMs);
+        });
+        return await Promise.race([settledPromise, timeoutPromise]);
     }
 
     private async cleanupFailedRuntimeInitialization(params: {
