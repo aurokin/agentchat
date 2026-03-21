@@ -127,15 +127,61 @@ describe("server config", () => {
         ) as Record<string, unknown>;
         const stagingConfig = {
             ...baseConfig,
-            sandboxRoot: "/srv/agentchat/staging-sandboxes",
+            auth: {
+                ...(baseConfig.auth as Record<string, unknown>),
+                defaultProviderId: "google-staging",
+                providers: [
+                    {
+                        id: "google-staging",
+                        kind: "google",
+                        enabled: true,
+                        allowlistMode: "email",
+                        allowedEmails: [],
+                        allowedDomains: [],
+                        googleHostedDomain: null,
+                    },
+                ],
+            },
         };
         const productionConfig = {
             ...baseConfig,
-            sandboxRoot: "/srv/agentchat/prod-sandboxes",
+            auth: {
+                ...(baseConfig.auth as Record<string, unknown>),
+                defaultProviderId: "google-prod",
+                providers: [
+                    {
+                        id: "google-prod",
+                        kind: "google",
+                        enabled: true,
+                        allowlistMode: "email",
+                        allowedEmails: [],
+                        allowedDomains: [],
+                        googleHostedDomain: null,
+                    },
+                ],
+            },
         };
 
         expect(parseConfig(stagingConfig).stateId).not.toBe(
             parseConfig(productionConfig).stateId,
+        );
+    });
+
+    test("keeps the default state id stable across sandboxRoot migrations", () => {
+        const baseConfig = JSON.parse(
+            readFileSync(exampleConfigPath, "utf8"),
+        ) as Record<string, unknown>;
+        const oldRootConfig = {
+            ...baseConfig,
+            sandboxRoot: "/srv/agentchat/old-sandboxes",
+        };
+        const newRootConfig = {
+            ...baseConfig,
+            sandboxRoot: "/srv/agentchat/new-sandboxes",
+        };
+
+        expect(parseConfig(oldRootConfig).stateId).toBe(
+            parseConfig(newRootConfig).stateId,
         );
     });
 

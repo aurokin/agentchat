@@ -281,12 +281,10 @@ const DEFAULT_SANDBOX_ROOT = path.join(os.homedir(), ".agentchat", "sandboxes");
 function buildDefaultStateIdSeed(
     parsed: z.infer<typeof AgentchatConfigInputSchema>,
     auth: AuthConfig,
-    sandboxRoot: string,
 ): string {
     return JSON.stringify({
         version: parsed.version,
         auth,
-        sandboxRoot,
         providers: parsed.providers.map((provider) => ({
             id: provider.id,
             kind: provider.kind,
@@ -327,7 +325,7 @@ function normalizeParsedConfig(
             rawStateId?.trim() ||
             resolveDefaultStateId(
                 params.configPath ?? "agentchat.config.json",
-                buildDefaultStateIdSeed(parsed, normalizedAuth, sandboxRoot),
+                buildDefaultStateIdSeed(parsed, normalizedAuth),
             ),
         sandboxRoot,
     };
