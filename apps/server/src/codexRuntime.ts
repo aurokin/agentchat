@@ -1,5 +1,7 @@
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
-import { statSync } from "node:fs";
 
 import type { AgentchatConfig, AgentConfig, ProviderConfig } from "./config.ts";
 import { canonicalizePathForComparison } from "./pathComparison.ts";
@@ -83,10 +85,49 @@ type PendingRuntimeInitialization = {
     promise: Promise<{ runtime: ConversationRuntime; isNew: boolean }>;
 };
 
+type LegacySharedRootHistoryEntry = {
+    rootPath: string;
+    changedAt: number;
+};
+
+type LegacySharedRootHistory = Record<string, LegacySharedRootHistoryEntry>;
+
+const AGENTCHAT_STATE_DIRECTORY_NAME = ".agentchat-state";
+const LEGACY_SHARED_ROOT_HISTORY_DIRECTORY_NAME = "legacy-shared-roots";
+
 function invariant(condition: unknown, message: string): asserts condition {
     if (!condition) {
         throw new Error(message);
     }
+}
+
+function getDefaultAgentchatStateBasePath(): string {
+    const xdgStateHome = process.env.XDG_STATE_HOME?.trim();
+    if (xdgStateHome) {
+        return path.join(xdgStateHome, "agentchat");
+    }
+
+    return path.join(os.homedir(), ".local", "state", "agentchat");
+}
+
+function sanitizeStateFileComponent(value: string): string {
+    return value.replace(/[^a-zA-Z0-9._-]/g, "_");
+}
+
+function getStableStateKey(value: string): string {
+    return createHash("sha256").update(value).digest("hex").slice(0, 16);
+}
+
+function getLegacySharedRootHistoryPath(configPath: string): string {
+    const resolvedConfigPath = path.resolve(configPath);
+    return path.join(
+        getDefaultAgentchatStateBasePath(),
+        AGENTCHAT_STATE_DIRECTORY_NAME,
+        LEGACY_SHARED_ROOT_HISTORY_DIRECTORY_NAME,
+        `${sanitizeStateFileComponent(path.basename(resolvedConfigPath))}-${getStableStateKey(
+            canonicalizePathForComparison(resolvedConfigPath),
+        )}.json`,
+    );
 }
 
 function getRuntimeKey(
@@ -943,7 +984,10 @@ export class CodexRuntimeManager {
                 !shouldResetPersistedRuntimeBinding(
                     persistedBinding,
                     workspaceIdentity,
-                    this.canReuseLegacySharedBinding(persistedBinding),
+                    this.canReuseLegacySharedBinding(
+                        resources.agent,
+                        persistedBinding,
+                    ),
                 )
                     ? persistedBinding
                     : null;
@@ -1873,6 +1917,7 @@ export class CodexRuntimeManager {
     }
 
     private canReuseLegacySharedBinding(
+        agent: AgentConfig,
         binding: PersistedRuntimeBinding,
     ): boolean {
         if (!this.configPath) {
@@ -1880,10 +1925,93 @@ export class CodexRuntimeManager {
         }
 
         try {
-            return statSync(this.configPath).mtimeMs <= binding.updatedAt;
+            const currentRootPath = canonicalizePathForComparison(
+                agent.rootPath,
+            );
+            const history = this.readLegacySharedRootHistory();
+            const existing = history[agent.id];
+            if (!existing) {
+                history[agent.id] = {
+                    rootPath: currentRootPath,
+                    changedAt: 0,
+                };
+                this.writeLegacySharedRootHistory(history);
+                return true;
+            }
+
+            if (existing.rootPath !== currentRootPath) {
+                const changedAt = Date.now();
+                history[agent.id] = {
+                    rootPath: currentRootPath,
+                    changedAt,
+                };
+                this.writeLegacySharedRootHistory(history);
+                return binding.updatedAt >= changedAt;
+            }
+
+            return binding.updatedAt >= existing.changedAt;
         } catch {
             return true;
         }
+    }
+
+    private readLegacySharedRootHistory(): LegacySharedRootHistory {
+        if (!this.configPath) {
+            return {};
+        }
+
+        const historyPath = getLegacySharedRootHistoryPath(this.configPath);
+        if (!existsSync(historyPath)) {
+            return {};
+        }
+
+        try {
+            const parsed = JSON.parse(
+                readFileSync(historyPath, "utf8"),
+            ) as Record<string, unknown>;
+            const history: LegacySharedRootHistory = {};
+            for (const [agentId, value] of Object.entries(parsed)) {
+                if (
+                    !value ||
+                    typeof value !== "object" ||
+                    typeof (value as { rootPath?: unknown }).rootPath !==
+                        "string" ||
+                    typeof (value as { changedAt?: unknown }).changedAt !==
+                        "number"
+                ) {
+                    continue;
+                }
+
+                history[agentId] = {
+                    rootPath: canonicalizePathForComparison(
+                        (value as { rootPath: string }).rootPath,
+                    ),
+                    changedAt: Math.max(
+                        0,
+                        (value as { changedAt: number }).changedAt,
+                    ),
+                };
+            }
+            return history;
+        } catch {
+            return {};
+        }
+    }
+
+    private writeLegacySharedRootHistory(
+        history: LegacySharedRootHistory,
+    ): void {
+        if (!this.configPath) {
+            return;
+        }
+
+        const historyPath = getLegacySharedRootHistoryPath(this.configPath);
+        mkdirSync(path.dirname(historyPath), { recursive: true });
+        writeFileSync(
+            historyPath,
+            `${JSON.stringify(history, null, 2)}\n`,
+            "utf8",
+        );
     }
 }
 

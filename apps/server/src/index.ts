@@ -134,6 +134,9 @@ const RECONCILE_INTERVAL_MS = 10 * 60 * 1000;
 
 async function runReconciliation(): Promise<void> {
     try {
+        const configuredAgentIds = new Set(
+            configStore.snapshot.agents.map((agent) => agent.id),
+        );
         const copyOnConversationAgentIds = getCopyOnConversationAgentIds(
             configStore.snapshot.agents,
         );
@@ -152,10 +155,10 @@ async function runReconciliation(): Promise<void> {
         // Build composite keys so reconciliation can distinguish sandboxes
         // across agents, users, and client-supplied localIds.
         const activeKeys = new Set<string>();
-        for (const entry of filterPersistedWorkspaceEntries(
-            entries,
+        for (const entry of filterPersistedWorkspaceEntries(entries, {
             copyOnConversationAgentIds,
-        )) {
+            configuredAgentIds,
+        })) {
             activeKeys.add(
                 getWorkspaceActiveKey({
                     sandboxRoot: configStore.snapshot.sandboxRoot,

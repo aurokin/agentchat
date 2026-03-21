@@ -18,10 +18,15 @@ export function getCopyOnConversationAgentIds(
 
 export function filterPersistedWorkspaceEntries(
     entries: PersistedChatWorkspaceEntry[],
-    copyOnConversationAgentIds: Set<string>,
+    params: {
+        copyOnConversationAgentIds: Set<string>;
+        configuredAgentIds: Set<string>;
+    },
 ): PersistedChatWorkspaceEntry[] {
-    return entries.filter((entry) =>
-        copyOnConversationAgentIds.has(entry.agentId),
+    return entries.filter(
+        (entry) =>
+            params.copyOnConversationAgentIds.has(entry.agentId) ||
+            !params.configuredAgentIds.has(entry.agentId),
     );
 }
 

@@ -35,6 +35,20 @@ afterEach(() => {
     }
 });
 
+async function withTempStateHome<T>(run: () => Promise<T>): Promise<T> {
+    const previousXdgStateHome = process.env.XDG_STATE_HOME;
+    process.env.XDG_STATE_HOME = makeTempDir("xdg-state");
+    try {
+        return await run();
+    } finally {
+        if (previousXdgStateHome === undefined) {
+            delete process.env.XDG_STATE_HOME;
+        } else {
+            process.env.XDG_STATE_HOME = previousXdgStateHome;
+        }
+    }
+}
+
 function createConfig(): AgentchatConfig {
     return {
         version: 1,
@@ -459,66 +473,169 @@ describe("CodexRuntimeManager", () => {
     });
 
     test("resumes legacy shared bindings without persisted workspace metadata", async () => {
-        const config = createConfig();
-        const configPath = path.join(makeTempDir("config"), "agentchat.json");
-        writeFileSync(configPath, JSON.stringify({ version: 1 }));
-        const persistence = createPersistence({
-            provider: "codex-default",
-            providerThreadId: "thread-existing",
-        });
-        const fakeClient = new FakeCodexClient({
-            resumedThreadId: "thread-existing",
-        });
-        const manager = new CodexRuntimeManager({
-            getConfig: () => config,
-            persistence: persistence as unknown as RuntimePersistenceClient,
-            createClient: () => fakeClient,
-            configPath,
-        });
+        await withTempStateHome(async () => {
+            const config = createConfig();
+            const configPath = path.join(
+                makeTempDir("config"),
+                "agentchat.json",
+            );
+            writeFileSync(configPath, JSON.stringify({ version: 1 }));
+            const persistence = createPersistence({
+                provider: "codex-default",
+                providerThreadId: "thread-existing",
+            });
+            const fakeClient = new FakeCodexClient({
+                resumedThreadId: "thread-existing",
+            });
+            const manager = new CodexRuntimeManager({
+                getConfig: () => config,
+                persistence: persistence as unknown as RuntimePersistenceClient,
+                createClient: () => fakeClient,
+                configPath,
+            });
 
-        await manager.sendMessage({
-            userId: "user-1",
-            subscriberId: "socket-1",
-            command: createCommand(),
-            sendEvent: () => undefined,
-        });
+            await manager.sendMessage({
+                userId: "user-1",
+                subscriberId: "socket-1",
+                command: createCommand(),
+                sendEvent: () => undefined,
+            });
 
-        expect(fakeClient.requests.map((request) => request.method)).toEqual([
-            "thread/resume",
-            "turn/start",
-        ]);
+            expect(
+                fakeClient.requests.map((request) => request.method),
+            ).toEqual(["thread/resume", "turn/start"]);
+        });
     });
 
-    test("does not resume legacy shared bindings after the config changes", async () => {
-        const config = createConfig();
-        const configPath = path.join(makeTempDir("config"), "agentchat.json");
-        writeFileSync(configPath, JSON.stringify({ version: 1 }));
-        const persistence = createPersistence({
-            provider: "codex-default",
-            providerThreadId: "thread-existing",
-            updatedAt: Date.now() - 60_000,
-        });
-        const fakeClient = new FakeCodexClient({
-            startedThreadId: "thread-new",
-        });
-        const manager = new CodexRuntimeManager({
-            getConfig: () => config,
-            persistence: persistence as unknown as RuntimePersistenceClient,
-            createClient: () => fakeClient,
-            configPath,
-        });
+    test("does not resume legacy shared bindings after the agent root path changes", async () => {
+        await withTempStateHome(async () => {
+            const configPath = path.join(
+                makeTempDir("config"),
+                "agentchat.json",
+            );
+            writeFileSync(configPath, JSON.stringify({ version: 1 }));
+            const initialConfig = createConfig();
+            const initialPersistence = createPersistence({
+                provider: "codex-default",
+                providerThreadId: "thread-existing",
+                updatedAt: Date.now() - 60_000,
+            });
+            const initialClient = new FakeCodexClient({
+                resumedThreadId: "thread-existing",
+            });
+            const initialManager = new CodexRuntimeManager({
+                getConfig: () => initialConfig,
+                persistence:
+                    initialPersistence as unknown as RuntimePersistenceClient,
+                createClient: () => initialClient,
+                configPath,
+            });
 
-        await manager.sendMessage({
-            userId: "user-1",
-            subscriberId: "socket-1",
-            command: createCommand(),
-            sendEvent: () => undefined,
-        });
+            await initialManager.sendMessage({
+                userId: "user-1",
+                subscriberId: "socket-1",
+                command: createCommand(),
+                sendEvent: () => undefined,
+            });
 
-        expect(fakeClient.requests.map((request) => request.method)).toEqual([
-            "thread/start",
-            "turn/start",
-        ]);
+            const updatedConfig = createConfig();
+            updatedConfig.agents[0] = {
+                ...updatedConfig.agents[0]!,
+                rootPath: "/tmp/agent-1-renamed",
+            };
+            const updatedPersistence = createPersistence({
+                provider: "codex-default",
+                providerThreadId: "thread-existing",
+                updatedAt: Date.now() - 60_000,
+            });
+            const updatedClient = new FakeCodexClient({
+                startedThreadId: "thread-new",
+            });
+            const updatedManager = new CodexRuntimeManager({
+                getConfig: () => updatedConfig,
+                persistence:
+                    updatedPersistence as unknown as RuntimePersistenceClient,
+                createClient: () => updatedClient,
+                configPath,
+            });
+
+            await updatedManager.sendMessage({
+                userId: "user-1",
+                subscriberId: "socket-1",
+                command: createCommand(),
+                sendEvent: () => undefined,
+            });
+
+            expect(
+                updatedClient.requests.map((request) => request.method),
+            ).toEqual(["thread/start", "turn/start"]);
+        });
+    });
+
+    test("keeps resuming legacy shared bindings across unrelated config edits", async () => {
+        await withTempStateHome(async () => {
+            const config = createConfig();
+            const configPath = path.join(
+                makeTempDir("config"),
+                "agentchat.json",
+            );
+            writeFileSync(configPath, JSON.stringify({ version: 1 }));
+
+            const initialPersistence = createPersistence({
+                provider: "codex-default",
+                providerThreadId: "thread-existing",
+                updatedAt: Date.now() - 60_000,
+            });
+            const initialClient = new FakeCodexClient({
+                resumedThreadId: "thread-existing",
+            });
+            const initialManager = new CodexRuntimeManager({
+                getConfig: () => config,
+                persistence:
+                    initialPersistence as unknown as RuntimePersistenceClient,
+                createClient: () => initialClient,
+                configPath,
+            });
+
+            await initialManager.sendMessage({
+                userId: "user-1",
+                subscriberId: "socket-1",
+                command: createCommand(),
+                sendEvent: () => undefined,
+            });
+
+            writeFileSync(
+                configPath,
+                JSON.stringify({ version: 1, note: "unrelated edit" }),
+            );
+
+            const updatedPersistence = createPersistence({
+                provider: "codex-default",
+                providerThreadId: "thread-existing",
+                updatedAt: Date.now() - 60_000,
+            });
+            const updatedClient = new FakeCodexClient({
+                resumedThreadId: "thread-existing",
+            });
+            const updatedManager = new CodexRuntimeManager({
+                getConfig: () => config,
+                persistence:
+                    updatedPersistence as unknown as RuntimePersistenceClient,
+                createClient: () => updatedClient,
+                configPath,
+            });
+
+            await updatedManager.sendMessage({
+                userId: "user-1",
+                subscriberId: "socket-1",
+                command: createCommand(),
+                sendEvent: () => undefined,
+            });
+
+            expect(
+                updatedClient.requests.map((request) => request.method),
+            ).toEqual(["thread/resume", "turn/start"]);
+        });
     });
 
     test("uses the selected Codex effort variant directly", async () => {

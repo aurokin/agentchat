@@ -52,7 +52,7 @@ describe("workspace reconciliation", () => {
         ).toEqual(new Set(["copy-agent", "disabled-copy-agent"]));
     });
 
-    test("filters persisted chat entries to copied workspaces only", () => {
+    test("keeps copied workspaces and preserves entries for missing agents", () => {
         expect(
             filterPersistedWorkspaceEntries(
                 [
@@ -66,14 +66,27 @@ describe("workspace reconciliation", () => {
                         userId: "user-1",
                         localId: "chat-2",
                     },
+                    {
+                        agentId: "missing-agent",
+                        userId: "user-1",
+                        localId: "chat-3",
+                    },
                 ],
-                new Set(["copy-agent"]),
+                {
+                    copyOnConversationAgentIds: new Set(["copy-agent"]),
+                    configuredAgentIds: new Set(["copy-agent", "shared-agent"]),
+                },
             ),
         ).toEqual([
             {
                 agentId: "copy-agent",
                 userId: "user-1",
                 localId: "chat-1",
+            },
+            {
+                agentId: "missing-agent",
+                userId: "user-1",
+                localId: "chat-3",
             },
         ]);
     });
