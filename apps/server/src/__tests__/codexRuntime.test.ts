@@ -2782,15 +2782,33 @@ describe("CodexRuntimeManager", () => {
             command,
             sendEvent: () => undefined,
         });
+        const sendResultPromise = sendPromise.then(
+            () => null,
+            (error) => error,
+        );
 
         await waitFor(
             () =>
-                (
-                    manager as unknown as {
-                        pendingRuntimeInitializations: Map<string, unknown>;
-                    }
-                ).pendingRuntimeInitializations.size === 1 &&
-                existsSync(workspacePath),
+                existsSync(workspacePath) &&
+                (() => {
+                    const pendingInitializations = (
+                        manager as unknown as {
+                            pendingRuntimeInitializations: Map<
+                                string,
+                                {
+                                    client: FakeCodexClient | null;
+                                }
+                            >;
+                        }
+                    ).pendingRuntimeInitializations;
+                    const pendingInitialization = [
+                        ...pendingInitializations.values(),
+                    ][0];
+                    return (
+                        pendingInitializations.size === 1 &&
+                        pendingInitialization?.client === client
+                    );
+                })(),
         );
 
         const deleteResult = await Promise.race([
