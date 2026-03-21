@@ -481,7 +481,11 @@ describe("runtime ingress", () => {
                     localId: "chat-1",
                 },
             ),
-        ).resolves.toBeNull();
+        ).resolves.toEqual({
+            agentId: null,
+            chatId: null,
+            ambiguous: true,
+        });
     });
 
     test("readRuntimeBinding resolves the matching agent when chats share a localId", async () => {

@@ -1151,6 +1151,115 @@ describe("CodexRuntimeManager", () => {
         expect(persistence.recoverStaleRunCalls).toHaveLength(0);
     });
 
+    test("does not fall back to a live runtime when legacy identity lookup is ambiguous", async () => {
+        const config = createConfig();
+        config.agents.push({
+            ...config.agents[0]!,
+            id: "agent-2",
+            name: "Agent 2",
+            rootPath: "/tmp/agent-2",
+        });
+        const fakeClient = new FakeCodexClient({
+            startedThreadId: "thread-fresh",
+            autoComplete: false,
+        });
+        const persistence = {
+            ...createPersistence(null),
+            async resolveConversationIdentity() {
+                return {
+                    agentId: null,
+                    chatId: null,
+                    ambiguous: true,
+                };
+            },
+        };
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: () => fakeClient,
+        });
+        const command = createCommand();
+        command.payload.agentId = "agent-2";
+
+        const sendPromise = manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command,
+            sendEvent: () => undefined,
+        });
+
+        await Bun.sleep(0);
+
+        await expect(
+            manager.interrupt({
+                userId: "user-1",
+                conversationId: "chat-1",
+            }),
+        ).rejects.toThrow("ambiguous");
+
+        expect(
+            fakeClient.requests.filter(
+                (request) => request.method === "turn/interrupt",
+            ),
+        ).toHaveLength(0);
+
+        fakeClient.emit({
+            method: "turn/completed",
+            params: {
+                turn: {
+                    status: "completed",
+                },
+            },
+        });
+        await sendPromise;
+    });
+
+    test("does not retain a subscriber that disconnects during async subscribe resolution", async () => {
+        const config = createConfig();
+        const identity = createDeferred<{
+            agentId: string | null;
+            chatId: string | null;
+            ambiguous: boolean;
+        }>();
+        const persistence = {
+            ...createPersistence(null),
+            async resolveConversationIdentity() {
+                return await identity.promise;
+            },
+        };
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: () => new FakeCodexClient(),
+        });
+
+        const subscribePromise = manager.subscribe({
+            userId: "user-1",
+            conversationId: "chat-1",
+            subscriberId: "socket-1",
+            sendEvent: () => undefined,
+        }) as Promise<void>;
+
+        manager.unsubscribe({
+            subscriberId: "socket-1",
+        });
+        identity.resolve({
+            agentId: "agent-1",
+            chatId: "chats:chat-1",
+            ambiguous: false,
+        });
+
+        await subscribePromise;
+
+        expect(
+            (
+                manager as unknown as {
+                    pendingSubscriptions: Map<string, Map<string, unknown>>;
+                }
+            ).pendingSubscriptions.size,
+        ).toBe(0);
+    });
+
     test("serializes concurrent runtime initialization for the same agent conversation", async () => {
         const config = createConfig();
         const persistence = createPersistence(null);

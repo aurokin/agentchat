@@ -103,6 +103,9 @@ describe("workspace reconciliation", () => {
                 ],
                 {
                     copyOnConversationAgentIds: new Set(["copy-agent"]),
+                    currentCopyOnConversationSandboxRootsByAgent: {
+                        "copy-agent": ["/tmp/current-sandbox"],
+                    },
                     configuredAgentIds: new Set(["copy-agent", "shared-agent"]),
                     currentSandboxRoots: ["/tmp/current-sandbox"],
                     knownSandboxRoots: [
@@ -124,6 +127,38 @@ describe("workspace reconciliation", () => {
                     agentId: "missing-agent",
                     userId: "user-1",
                     conversationId: "chat-2",
+                }),
+            ]),
+        );
+    });
+
+    test("preserves current copied sandboxes for configured agents during mixed-mode rollouts", () => {
+        expect(
+            getPersistedWorkspaceActiveKeys(
+                [
+                    {
+                        agentId: "copy-agent",
+                        userId: "user-1",
+                        localId: "chat-1",
+                    },
+                ],
+                {
+                    copyOnConversationAgentIds: new Set(),
+                    currentCopyOnConversationSandboxRootsByAgent: {
+                        "copy-agent": ["/tmp/other-instance-sandbox"],
+                    },
+                    configuredAgentIds: new Set(["copy-agent"]),
+                    currentSandboxRoots: ["/tmp/other-instance-sandbox"],
+                    knownSandboxRoots: ["/tmp/other-instance-sandbox"],
+                },
+            ),
+        ).toEqual(
+            new Set([
+                getWorkspaceActiveKey({
+                    sandboxRoot: "/tmp/other-instance-sandbox",
+                    agentId: "copy-agent",
+                    userId: "user-1",
+                    conversationId: "chat-1",
                 }),
             ]),
         );

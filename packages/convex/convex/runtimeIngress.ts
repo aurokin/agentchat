@@ -1207,8 +1207,8 @@ export const resolveConversationIdentityByLocalId = internalQuery({
         ctx,
         args,
     ): Promise<{
-        agentId: string;
-        chatId: Id<"chats">;
+        agentId: string | null;
+        chatId: Id<"chats"> | null;
         ambiguous: boolean;
     } | null> => {
         const directChats = await ctx.db
@@ -1218,7 +1218,11 @@ export const resolveConversationIdentityByLocalId = internalQuery({
             )
             .collect();
         if (directChats.length > 1) {
-            return null;
+            return {
+                agentId: null,
+                chatId: null,
+                ambiguous: true,
+            };
         }
         if (directChats.length === 1) {
             return {
@@ -1235,6 +1239,13 @@ export const resolveConversationIdentityByLocalId = internalQuery({
         const matchingLegacyChats = legacyChats.filter(
             (chat) => (chat.localId ?? chat._id) === args.localId,
         );
+        if (matchingLegacyChats.length > 1) {
+            return {
+                agentId: null,
+                chatId: null,
+                ambiguous: true,
+            };
+        }
         if (matchingLegacyChats.length !== 1) {
             return null;
         }

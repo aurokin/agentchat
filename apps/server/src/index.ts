@@ -162,6 +162,8 @@ async function runReconciliation(): Promise<void> {
         const activeKeys = getPersistedWorkspaceActiveKeys(entries, {
             copyOnConversationAgentIds,
             configuredAgentIds,
+            currentCopyOnConversationSandboxRootsByAgent:
+                workspaceManager.listCurrentCopyOnConversationSandboxRootsByAgent(),
             currentSandboxRoots: workspaceManager.listCurrentSandboxRoots(),
             knownSandboxRoots: workspaceManager.listKnownSandboxRoots(),
         });

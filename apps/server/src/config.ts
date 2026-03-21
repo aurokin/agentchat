@@ -4,7 +4,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { z } from "zod";
-import { pathsOverlap } from "./pathComparison.ts";
+import {
+    canonicalizePathForComparison,
+    pathsOverlap,
+} from "./pathComparison.ts";
 import { isSafePathSegment } from "./sandboxPaths.ts";
 import {
     resolveDefaultInstanceKey,
@@ -318,14 +321,18 @@ function buildDefaultInstanceKeySeed(
     parsed: z.infer<typeof AgentchatConfigInputSchema>,
 ): string {
     return JSON.stringify({
-        sandboxRoot: parsed.sandboxRoot ?? DEFAULT_SANDBOX_ROOT,
+        sandboxRoot: canonicalizePathForComparison(
+            parsed.sandboxRoot ?? DEFAULT_SANDBOX_ROOT,
+        ),
         providers: parsed.providers.map((provider) => ({
             id: provider.id,
-            codexCwd: provider.codex.cwd ?? null,
+            codexCwd: provider.codex.cwd
+                ? canonicalizePathForComparison(provider.codex.cwd)
+                : null,
         })),
         agents: parsed.agents.map((agent) => ({
             id: agent.id,
-            rootPath: agent.rootPath,
+            rootPath: canonicalizePathForComparison(agent.rootPath),
             workspaceMode: agent.workspaceMode ?? "shared",
         })),
     });

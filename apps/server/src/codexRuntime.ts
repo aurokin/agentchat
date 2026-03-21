@@ -307,6 +307,7 @@ export class CodexRuntimeManager {
         string,
         Map<string, RuntimeSubscriber>
     >();
+    private readonly closedSubscribers = new Set<string>();
     private readonly pendingRuntimeInitializations = new Map<
         string,
         PendingRuntimeInitialization
@@ -688,6 +689,7 @@ export class CodexRuntimeManager {
         subscriberId: string;
         sendEvent: (event: ServerEvent) => void;
     }): Promise<void> | void {
+        this.closedSubscribers.delete(params.subscriberId);
         return this.subscribeResolved(params);
     }
 
@@ -704,6 +706,9 @@ export class CodexRuntimeManager {
             agentId: params.agentId,
             allowRuntimeFallback: true,
         });
+        if (this.closedSubscribers.has(params.subscriberId)) {
+            return;
+        }
         const key = getRuntimeKey(
             params.userId,
             agentId,
@@ -728,6 +733,14 @@ export class CodexRuntimeManager {
             params.subscriberId,
             params.sendEvent,
         );
+        if (this.closedSubscribers.has(params.subscriberId)) {
+            this.unsubscribe({
+                subscriberId: params.subscriberId,
+                conversationId: params.conversationId,
+                agentId,
+            });
+            return;
+        }
         if (!runtime.activeTurn) {
             return;
         }
@@ -791,6 +804,9 @@ export class CodexRuntimeManager {
         conversationId?: string;
         agentId?: string;
     }): void {
+        if (!params.conversationId) {
+            this.closedSubscribers.add(params.subscriberId);
+        }
         for (const runtime of this.runtimes.values()) {
             if (
                 params.conversationId &&
@@ -1336,9 +1352,16 @@ export class CodexRuntimeManager {
             );
         }
         if (persistedIdentity) {
+            invariant(
+                typeof persistedIdentity.agentId === "string",
+                "Resolved conversation identity must include agentId.",
+            );
             return {
                 agentId: persistedIdentity.agentId,
-                chatId: persistedIdentity.chatId,
+                chatId:
+                    typeof persistedIdentity.chatId === "string"
+                        ? persistedIdentity.chatId
+                        : undefined,
             };
         }
         if (!params.allowRuntimeFallback) {

@@ -47,9 +47,17 @@ type SandboxRootsRegistry = {
         {
             rootPath: string;
             updatedAt: number;
+            copyOnConversationAgentIds: string[];
         }
     >;
 };
+
+function areSortedStringArraysEqual(left: string[], right: string[]): boolean {
+    return (
+        left.length === right.length &&
+        left.every((value, index) => value === right[index])
+    );
+}
 
 export function getSandboxStateRootPath(sandboxRoot: string): string {
     return path.join(
@@ -553,6 +561,29 @@ export class WorkspaceManager {
             .sort((left, right) => left.localeCompare(right));
     }
 
+    listCurrentCopyOnConversationSandboxRootsByAgent(): Record<
+        string,
+        string[]
+    > {
+        const rootsByAgent: Record<string, Set<string>> = {};
+        for (const entry of Object.values(
+            this.syncSandboxRootsRegistry().activeInstances,
+        )) {
+            for (const agentId of entry.copyOnConversationAgentIds) {
+                const roots = rootsByAgent[agentId] ?? new Set<string>();
+                roots.add(entry.rootPath);
+                rootsByAgent[agentId] = roots;
+            }
+        }
+
+        return Object.fromEntries(
+            Object.entries(rootsByAgent).map(([agentId, roots]) => [
+                agentId,
+                [...roots].sort((left, right) => left.localeCompare(right)),
+            ]),
+        );
+    }
+
     private sandboxPath(
         agentId: string,
         userId: string,
@@ -893,6 +924,12 @@ export class WorkspaceManager {
         const sandboxRoot = canonicalizePathForComparison(
             this.getConfig().sandboxRoot,
         );
+        const copyOnConversationAgentIds = this.getConfig()
+            .agents.filter(
+                (agent) => agent.workspaceMode === "copy-on-conversation",
+            )
+            .map((agent) => agent.id)
+            .sort((left, right) => left.localeCompare(right));
         if (!registry.roots.includes(sandboxRoot)) {
             registry.roots.push(sandboxRoot);
             didMutateRegistry = true;
@@ -916,11 +953,16 @@ export class WorkspaceManager {
         if (
             !previousEntry ||
             previousEntry.rootPath !== sandboxRoot ||
+            !areSortedStringArraysEqual(
+                previousEntry.copyOnConversationAgentIds,
+                copyOnConversationAgentIds,
+            ) ||
             shouldHeartbeat
         ) {
             registry.activeInstances[instanceKey] = {
                 rootPath: sandboxRoot,
                 updatedAt: now,
+                copyOnConversationAgentIds,
             };
             didMutateRegistry = true;
             this.lastSandboxRootsRegistryHeartbeatAt = now;
@@ -994,6 +1036,23 @@ export class WorkspaceManager {
                         continue;
                     }
 
+                    const copyOnConversationAgentIds = Array.isArray(
+                        (value as { copyOnConversationAgentIds?: unknown })
+                            .copyOnConversationAgentIds,
+                    )
+                        ? (
+                              value as {
+                                  copyOnConversationAgentIds: unknown[];
+                              }
+                          ).copyOnConversationAgentIds
+                              .filter(
+                                  (agentId): agentId is string =>
+                                      typeof agentId === "string" &&
+                                      agentId.length > 0,
+                              )
+                              .sort((left, right) => left.localeCompare(right))
+                        : [];
+
                     normalizedActiveInstances[instanceKey] = {
                         rootPath: canonicalizePathForComparison(
                             (value as { rootPath: string }).rootPath,
@@ -1002,6 +1061,7 @@ export class WorkspaceManager {
                             0,
                             (value as { updatedAt: number }).updatedAt,
                         ),
+                        copyOnConversationAgentIds,
                     };
                 }
             }

@@ -21,8 +21,8 @@ export type PersistedConversationRuntimeState = {
 };
 
 export type ResolvedConversationIdentity = {
-    agentId: string;
-    chatId: string;
+    agentId: string | null;
+    chatId: string | null;
     ambiguous: boolean;
 } | null;
 

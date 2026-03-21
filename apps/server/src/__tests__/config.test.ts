@@ -191,6 +191,62 @@ describe("server config", () => {
         );
     });
 
+    test("keeps the default instance key stable across path-alias-only changes", () => {
+        const releaseRoot = mkdtempSync(path.join(os.tmpdir(), "release-"));
+        const realRepoRoot = path.join(releaseRoot, "real-root");
+        const aliasRepoRoot = path.join(releaseRoot, "alias-root");
+        mkdirSync(realRepoRoot, { recursive: true });
+        symlinkSync(realRepoRoot, aliasRepoRoot, "dir");
+
+        const baseConfig = JSON.parse(
+            readFileSync(exampleConfigPath, "utf8"),
+        ) as Record<string, unknown>;
+        const realConfig = {
+            ...baseConfig,
+            providers: (
+                baseConfig.providers as Array<Record<string, unknown>>
+            ).map((provider) => ({
+                ...provider,
+                codex: {
+                    ...(provider.codex as Record<string, unknown>),
+                    cwd: realRepoRoot,
+                },
+            })),
+            agents: (baseConfig.agents as Array<Record<string, unknown>>).map(
+                (agent) => ({
+                    ...agent,
+                    rootPath: realRepoRoot,
+                }),
+            ),
+        };
+        const aliasedConfig = {
+            ...baseConfig,
+            providers: (
+                baseConfig.providers as Array<Record<string, unknown>>
+            ).map((provider) => ({
+                ...provider,
+                codex: {
+                    ...(provider.codex as Record<string, unknown>),
+                    cwd: aliasRepoRoot,
+                },
+            })),
+            agents: (baseConfig.agents as Array<Record<string, unknown>>).map(
+                (agent) => ({
+                    ...agent,
+                    rootPath: aliasRepoRoot,
+                }),
+            ),
+        };
+
+        try {
+            expect(parseConfig(realConfig).instanceKey).toBe(
+                parseConfig(aliasedConfig).instanceKey,
+            );
+        } finally {
+            rmSync(releaseRoot, { recursive: true, force: true });
+        }
+    });
+
     test("preserves an explicit state id from config", () => {
         const parsed = parseConfig({
             version: 1,

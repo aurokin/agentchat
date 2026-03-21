@@ -160,11 +160,23 @@ describe("WorkspaceManager", () => {
         const releaseBRoot = makeTempDir("sandbox-b");
         const releaseAConfig = makeConfig({
             sandboxRoot: releaseARoot,
+            agents: [
+                makeAgent({
+                    id: "copy-agent",
+                    workspaceMode: "copy-on-conversation",
+                }),
+            ],
             stateId: "shared-install",
             instanceKey: "instance-a",
         });
         const releaseBConfig = makeConfig({
             sandboxRoot: releaseBRoot,
+            agents: [
+                makeAgent({
+                    id: "copy-agent",
+                    workspaceMode: "shared",
+                }),
+            ],
             stateId: "shared-install",
             instanceKey: "instance-b",
         });
@@ -184,6 +196,11 @@ describe("WorkspaceManager", () => {
         expect(releaseAManager.listCurrentSandboxRoots()).toEqual(
             expectedRoots,
         );
+        expect(
+            releaseAManager.listCurrentCopyOnConversationSandboxRootsByAgent(),
+        ).toEqual({
+            "copy-agent": [releaseARoot],
+        });
         expect(releaseBManager.listCurrentSandboxRoots()).toEqual(
             [releaseARoot, releaseBRoot].sort((left, right) =>
                 left.localeCompare(right),
