@@ -33,6 +33,7 @@ const WORKSPACE_METADATA_DIRECTORY_NAME = "workspace-metadata";
 const MANAGED_WORKSPACES_REGISTRY_NAME = "managed-workspaces.json";
 const SANDBOX_ROOT_REGISTRY_HEARTBEAT_MS = 60_000;
 const SANDBOX_ROOT_REGISTRY_INSTANCE_TTL_MS = 5 * 60_000;
+const RECENT_WORKSPACE_TOUCH_TTL_MS = 5 * 60_000;
 
 type WorkspaceMetadata = {
     sourceRootPath: string;
@@ -117,6 +118,7 @@ export class WorkspaceManager {
         string,
         Promise<{ path: string; wasReset: boolean; cleanupOnFailure: boolean }>
     >();
+    private readonly recentWorkspaceTouches = new Map<string, number>();
     private readonly managedWorkspaceRegistryMutations = new Map<
         string,
         Promise<void>
@@ -152,6 +154,7 @@ export class WorkspaceManager {
         conversationId: string,
     ): Promise<{ path: string; wasReset: boolean; cleanupOnFailure: boolean }> {
         this.syncSandboxRootsRegistry();
+        this.pruneRecentWorkspaceTouches();
         if (agent.workspaceMode === "shared") {
             return {
                 path: agent.rootPath,
@@ -168,7 +171,9 @@ export class WorkspaceManager {
         });
         const pendingCreation = this.pendingWorkspaceCreations.get(creationKey);
         if (pendingCreation) {
-            return await pendingCreation;
+            const workspaceState = await pendingCreation;
+            this.noteWorkspaceTouch(creationKey);
+            return workspaceState;
         }
 
         const sandboxPath = this.sandboxPath(agent.id, userId, conversationId);
@@ -189,11 +194,13 @@ export class WorkspaceManager {
                     ],
                 ))
             ) {
-                return {
+                const workspaceState = {
                     path: sandboxPath,
                     wasReset: false,
                     cleanupOnFailure: false,
                 };
+                this.noteWorkspaceTouch(creationKey);
+                return workspaceState;
             }
 
             const canRecoverMissingMetadata =
@@ -242,7 +249,9 @@ export class WorkspaceManager {
             })();
             this.pendingWorkspaceCreations.set(creationKey, recreation);
             try {
-                return await recreation;
+                const workspaceState = await recreation;
+                this.noteWorkspaceTouch(creationKey);
+                return workspaceState;
             } finally {
                 this.pendingWorkspaceCreations.delete(creationKey);
             }
@@ -258,7 +267,9 @@ export class WorkspaceManager {
         })();
         this.pendingWorkspaceCreations.set(creationKey, creation);
         try {
-            return await creation;
+            const workspaceState = await creation;
+            this.noteWorkspaceTouch(creationKey);
+            return workspaceState;
         } finally {
             this.pendingWorkspaceCreations.delete(creationKey);
         }
@@ -399,6 +410,8 @@ export class WorkspaceManager {
      */
     async reconcile(activeKeys: Set<string>): Promise<void> {
         this.syncSandboxRootsRegistry();
+        const reconcileStartedAt = Date.now();
+        this.pruneRecentWorkspaceTouches(reconcileStartedAt);
 
         for (const sandboxRoot of this.getKnownSandboxRoots()) {
             if (!existsSync(sandboxRoot)) {
@@ -443,7 +456,11 @@ export class WorkspaceManager {
                         });
                         if (
                             activeKeys.has(key) ||
-                            this.pendingWorkspaceCreations.has(key)
+                            this.pendingWorkspaceCreations.has(key) ||
+                            this.wasWorkspaceTouchedAfter(
+                                key,
+                                reconcileStartedAt,
+                            )
                         ) {
                             continue;
                         }
@@ -461,6 +478,24 @@ export class WorkspaceManager {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    private noteWorkspaceTouch(key: string): void {
+        const now = Date.now();
+        this.recentWorkspaceTouches.set(key, now);
+        this.pruneRecentWorkspaceTouches(now);
+    }
+
+    private wasWorkspaceTouchedAfter(key: string, timestamp: number): boolean {
+        return (this.recentWorkspaceTouches.get(key) ?? 0) > timestamp;
+    }
+
+    private pruneRecentWorkspaceTouches(now = Date.now()): void {
+        for (const [key, touchedAt] of this.recentWorkspaceTouches) {
+            if (touchedAt < now - RECENT_WORKSPACE_TOUCH_TTL_MS) {
+                this.recentWorkspaceTouches.delete(key);
             }
         }
     }

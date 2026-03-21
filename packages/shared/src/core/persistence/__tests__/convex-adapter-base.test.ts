@@ -45,7 +45,7 @@ function createMessage(params: {
 
 function createAdapter(params: {
     chats: Array<ReturnType<typeof createChat>>;
-    messagesByChatId: Record<string, Message[]>;
+    messagesByChatId: Record<string, Array<Message & { convexId?: string }>>;
     update?: ReturnType<typeof mock>;
     remove?: ReturnType<typeof mock>;
 }) {
@@ -110,7 +110,7 @@ function createAdapter(params: {
             getByLocalId: async () => null,
             listByChat: async ({ chatId }) =>
                 (params.messagesByChatId[chatId] ?? []).map((message) => ({
-                    _id: `${chatId}:${message.id}`,
+                    _id: message.convexId ?? `${chatId}:${message.id}`,
                     localId: message.id,
                     chatId,
                     role: message.role,
@@ -286,6 +286,69 @@ describe("ConvexAdapterBase", () => {
             message: createMessage({
                 id: "message-1",
                 sessionId: "chat-1",
+                content: "updated",
+            }),
+        });
+    });
+
+    test("message-scoped cache keys do not collide when chat ids and message ids contain colons", async () => {
+        const { adapter, update } = createAdapter({
+            chats: [
+                createChat({
+                    id: "chat-a",
+                    convexId: "chats:one",
+                    agentId: "agent-a",
+                }),
+                createChat({
+                    id: "chat-b",
+                    convexId: "chats:one:message",
+                    agentId: "agent-b",
+                }),
+            ],
+            messagesByChatId: {
+                "chats:one": [
+                    {
+                        ...createMessage({
+                            id: "message:1",
+                            sessionId: "chat-a",
+                            content: "first",
+                        }),
+                        convexId: "messages:first",
+                    },
+                ],
+                "chats:one:message": [
+                    {
+                        ...createMessage({
+                            id: "1",
+                            sessionId: "chat-b",
+                            content: "second",
+                        }),
+                        convexId: "messages:second",
+                    },
+                ],
+            },
+        });
+
+        await adapter.getAllChats();
+        await adapter.getMessagesByChat("chat-a", "agent-a");
+        await adapter.getMessagesByChat("chat-b", "agent-b");
+
+        await expect(
+            adapter.updateMessage(
+                createMessage({
+                    id: "message:1",
+                    sessionId: "chat-a",
+                    content: "updated",
+                }),
+            ),
+        ).resolves.toBeUndefined();
+
+        expect(update).toHaveBeenCalledTimes(1);
+        expect(update).toHaveBeenCalledWith({
+            id: "messages:first",
+            message: createMessage({
+                id: "message:1",
+                sessionId: "chat-a",
                 content: "updated",
             }),
         });

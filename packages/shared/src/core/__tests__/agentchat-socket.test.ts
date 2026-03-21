@@ -238,6 +238,54 @@ describe("agentchat socket helpers", () => {
         ).toHaveLength(1);
     });
 
+    test("keeps distinct subscriptions when agent and conversation ids contain colons", async () => {
+        globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
+
+        const client = new AgentchatSocketClient({
+            getWebSocketUrl: () => "ws://localhost:3030/ws",
+            createId: () => "id-1",
+            notConfiguredMessage: "missing",
+        });
+
+        const connectPromise = client.ensureConnected(async () => "token-1");
+        await Promise.resolve();
+        const socket = FakeWebSocket.instances[0];
+        if (!socket) {
+            throw new Error("Expected a websocket connection");
+        }
+        socket.emitOpen();
+        socket.emitEvent({
+            type: "connection.ready",
+            payload: {
+                user: {
+                    sub: "sub-1",
+                    userId: "user-1",
+                    email: "user@example.com",
+                },
+                transport: "websocket",
+            },
+        });
+        await connectPromise;
+
+        const unsubscribeA = client.subscribeToConversation("foo:bar", "prod");
+        const unsubscribeB = client.subscribeToConversation("bar", "prod:foo");
+
+        expect(
+            socket.sentMessages.filter((message) =>
+                message.includes('"type":"conversation.subscribe"'),
+            ),
+        ).toHaveLength(2);
+
+        unsubscribeA();
+        unsubscribeB();
+
+        expect(
+            socket.sentMessages.filter((message) =>
+                message.includes('"type":"conversation.unsubscribe"'),
+            ),
+        ).toHaveLength(2);
+    });
+
     test("replays subscriptions that were requested before the first socket became ready", async () => {
         globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
 

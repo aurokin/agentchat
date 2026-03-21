@@ -1,3 +1,5 @@
+import { getConversationScopeKey } from "./conversation-scope-key";
+
 export interface ConversationHistoryEntry {
     role: "user" | "assistant" | "system";
     content: string;
@@ -424,7 +426,7 @@ export class AgentchatSocketClient {
         conversationId: string,
         agentId: string,
     ): string {
-        return `${agentId}:${conversationId}`;
+        return getConversationScopeKey(conversationId, agentId);
     }
 
     private sendConversationSubscription(

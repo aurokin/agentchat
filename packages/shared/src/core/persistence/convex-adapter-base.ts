@@ -421,7 +421,7 @@ export abstract class ConvexAdapterBase implements PersistenceAdapter {
     }
 
     private getMessageLookupKey(chatConvexId: string, localId: string): string {
-        return `${chatConvexId}:${localId}`;
+        return JSON.stringify([chatConvexId, localId]);
     }
 
     private getUniqueCachedChatIdForLocalId(localId: string): string | null {

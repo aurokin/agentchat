@@ -4,6 +4,7 @@ import {
     chatExistsByLocalId,
     listAllChatLocalIds,
     messageDelta,
+    messageStarted,
     readRuntimeBinding,
     resolveConversationIdentityByLocalId,
     runCompleted,
@@ -438,7 +439,7 @@ describe("runtime ingress", () => {
         });
     });
 
-    test("marks conversation identity as ambiguous when local id matches multiple chats", async () => {
+    test("fails safe when local id matches multiple chats", async () => {
         const localIdCollect = mock(async () => [
             {
                 _id: "chats:2",
@@ -480,11 +481,7 @@ describe("runtime ingress", () => {
                     localId: "chat-1",
                 },
             ),
-        ).resolves.toEqual({
-            agentId: "agent-2",
-            chatId: "chats:2",
-            ambiguous: true,
-        });
+        ).resolves.toBeNull();
     });
 
     test("readRuntimeBinding resolves the matching agent when chats share a localId", async () => {
@@ -1040,6 +1037,199 @@ describe("runtime ingress", () => {
             "messages:created",
             expect.anything(),
         );
+    });
+
+    test("messageStarted no-ops when a newer assistant message already exists", async () => {
+        const patch = mock(async () => undefined);
+        const insert = mock(async () => undefined);
+        const chatCollect = mock(async () => [
+            {
+                _id: "chats:current",
+                updatedAt: 100,
+                createdAt: 100,
+            },
+        ]);
+        const runUnique = mock(async () => ({
+            _id: "runs:1",
+            chatId: "chats:current",
+            provider: "codex",
+            status: "running",
+            providerThreadId: "thread-current",
+        }));
+        const triggerMessageCollect = mock(async () => [
+            {
+                _id: "messages:trigger",
+                chatId: "chats:current",
+                userId: "users:test",
+                updatedAt: 90,
+            },
+        ]);
+        const assistantMessageCollect = mock(async () => [
+            {
+                _id: "messages:assistant",
+                chatId: "chats:current",
+                userId: "users:test",
+                kind: "assistant_message",
+                content: "already newer",
+                contextContent: "already newer",
+                status: "streaming",
+                runId: "run:current",
+                runMessageIndex: 0,
+                updatedAt: 200,
+                completedAt: null,
+            },
+        ]);
+        const bindingUnique = mock(async () => null);
+        const query = mock((table: string) => {
+            if (table === "chats") {
+                return {
+                    withIndex: mock(() => ({
+                        collect: chatCollect,
+                    })),
+                };
+            }
+            if (table === "runs") {
+                return {
+                    withIndex: mock(() => ({
+                        unique: runUnique,
+                    })),
+                };
+            }
+            if (table === "messages") {
+                return {
+                    withIndex: mock((indexName: string) => ({
+                        collect:
+                            indexName === "by_chatId_and_localId"
+                                ? assistantMessageCollect
+                                : triggerMessageCollect,
+                    })),
+                };
+            }
+
+            return {
+                withIndex: mock(() => ({
+                    unique: bindingUnique,
+                })),
+            };
+        });
+        const ctx = {
+            db: {
+                query,
+                patch,
+                insert,
+            },
+        };
+
+        await expect(
+            runHandler(messageStarted as unknown as HandlerExport, ctx, {
+                chatId: "chats:current",
+                userId: "users:test",
+                agentId: "agent-1",
+                conversationLocalId: "chat-1",
+                previousAssistantMessageLocalId: "assistant-prev",
+                previousCompletedSequence: 2,
+                assistantMessageLocalId: "assistant-new",
+                messageStartedSequence: 3,
+                externalRunId: "run:current",
+                kind: "assistant_message",
+                runMessageIndex: 1,
+                previousContent: "old",
+                content: "new",
+                createdAt: 100,
+            }),
+        ).resolves.toBeUndefined();
+
+        expect(patch).not.toHaveBeenCalled();
+        expect(insert).not.toHaveBeenCalled();
+    });
+
+    test("messageDelta no-ops when a newer assistant message already exists", async () => {
+        const patch = mock(async () => undefined);
+        const insert = mock(async () => undefined);
+        const chatCollect = mock(async () => [
+            {
+                _id: "chats:current",
+                updatedAt: 100,
+                createdAt: 100,
+            },
+        ]);
+        const runUnique = mock(async () => ({
+            _id: "runs:1",
+            chatId: "chats:current",
+            provider: "codex",
+            status: "running",
+            providerThreadId: "thread-current",
+        }));
+        const messageCollect = mock(async () => [
+            {
+                _id: "messages:current",
+                chatId: "chats:current",
+                userId: "users:test",
+                kind: "assistant_message",
+                content: "already newer",
+                contextContent: "already newer",
+                status: "streaming",
+                runId: "run:current",
+                runMessageIndex: 0,
+                updatedAt: 200,
+                completedAt: null,
+            },
+        ]);
+        const bindingUnique = mock(async () => null);
+        const query = mock((table: string) => {
+            if (table === "chats") {
+                return {
+                    withIndex: mock(() => ({
+                        collect: chatCollect,
+                    })),
+                };
+            }
+            if (table === "runs") {
+                return {
+                    withIndex: mock(() => ({
+                        unique: runUnique,
+                    })),
+                };
+            }
+            if (table === "messages") {
+                return {
+                    withIndex: mock(() => ({
+                        collect: messageCollect,
+                    })),
+                };
+            }
+
+            return {
+                withIndex: mock(() => ({
+                    unique: bindingUnique,
+                })),
+            };
+        });
+        const ctx = {
+            db: {
+                query,
+                patch,
+                insert,
+            },
+        };
+
+        await expect(
+            runHandler(messageDelta as unknown as HandlerExport, ctx, {
+                chatId: "chats:current",
+                userId: "users:test",
+                agentId: "agent-1",
+                conversationLocalId: "chat-1",
+                assistantMessageLocalId: "assistant-1",
+                externalRunId: "run:current",
+                sequence: 3,
+                content: "new content",
+                delta: "delta",
+                createdAt: 100,
+            }),
+        ).resolves.toBeUndefined();
+
+        expect(patch).not.toHaveBeenCalled();
+        expect(insert).not.toHaveBeenCalled();
     });
 
     test("runtimeBinding prefers the provided chatId when bad duplicate tuples exist", async () => {

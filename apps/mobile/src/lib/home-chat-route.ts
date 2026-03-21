@@ -7,7 +7,7 @@ function getScopedChatKey(
     chatId: string,
     agentId: string | null | undefined,
 ): string {
-    return `${agentId ?? ""}:${chatId}`;
+    return JSON.stringify([agentId ?? null, chatId]);
 }
 
 export function buildChatRouteId(params: {

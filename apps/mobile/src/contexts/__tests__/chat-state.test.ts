@@ -13,6 +13,12 @@ describe("chat state helpers", () => {
         );
     });
 
+    test("keeps keys injective when ids contain separators", () => {
+        expect(getScopedChatStateKey("chat:1", "agent:one")).not.toBe(
+            getScopedChatStateKey("chat", "agent:one:1"),
+        );
+    });
+
     test("keeps runtime bindings for duplicate local ids under different agents", () => {
         const bindings = [
             {

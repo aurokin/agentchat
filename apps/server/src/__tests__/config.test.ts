@@ -514,32 +514,32 @@ describe("server config", () => {
         ).toThrow(/overlaps with sandboxRoot/);
     });
 
-    test("rejects config where sandboxRoot overlaps a shared-mode agent rootPath", () => {
-        expect(() =>
-            parseConfig({
-                version: 1,
-                sandboxRoot: "/projects/my-app/sandboxes",
-                auth: {
-                    defaultProviderId: "local-main",
-                    providers: [
-                        {
-                            id: "local-main",
-                            kind: "local",
-                            enabled: true,
-                            allowSignup: false,
-                        },
-                    ],
-                },
-                providers: exampleConfig.providers,
-                agents: [
+    test("allows shared-mode agents whose rootPath overlaps sandboxRoot", () => {
+        const config = parseConfig({
+            version: 1,
+            sandboxRoot: "/projects/my-app/sandboxes",
+            auth: {
+                defaultProviderId: "local-main",
+                providers: [
                     {
-                        ...exampleConfig.agents[0],
-                        rootPath: "/projects/my-app",
-                        workspaceMode: "shared",
+                        id: "local-main",
+                        kind: "local",
+                        enabled: true,
+                        allowSignup: false,
                     },
                 ],
-            }),
-        ).toThrow(/overlaps with sandboxRoot/);
+            },
+            providers: exampleConfig.providers,
+            agents: [
+                {
+                    ...exampleConfig.agents[0],
+                    rootPath: "/projects/my-app",
+                    workspaceMode: "shared",
+                },
+            ],
+        });
+
+        expect(config.agents[0]?.workspaceMode).toBe("shared");
     });
 
     test("rejects agent rootPath overlapping the implicit default sandboxRoot", () => {

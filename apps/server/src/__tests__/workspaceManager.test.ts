@@ -1552,5 +1552,49 @@ describe("WorkspaceManager", () => {
 
             expect(existsSync(workspace)).toBe(true);
         });
+
+        test("keeps workspaces that were touched after reconciliation started", async () => {
+            const sandboxRoot = makeTempDir("sandbox");
+            const rootPath = makeTempDir("agent-root");
+            writeFileSync(path.join(rootPath, "file.txt"), "data");
+
+            const agent = makeAgent({
+                id: "agent-a",
+                rootPath,
+                workspaceMode: "copy-on-conversation",
+            });
+            const manager = createWorkspaceManager(() =>
+                makeConfig({ sandboxRoot, agents: [agent] }),
+            );
+
+            const workspace = await manager.ensureWorkspace(
+                agent,
+                "user-1",
+                "conv-1",
+            );
+            const workspaceKey = getWorkspaceActiveKey({
+                sandboxRoot,
+                agentId: "agent-a",
+                userId: "user-1",
+                conversationId: "conv-1",
+            });
+            const reconcileStartedAt = Date.now() - 1;
+            (
+                manager as unknown as {
+                    recentWorkspaceTouches: Map<string, number>;
+                }
+            ).recentWorkspaceTouches.set(workspaceKey, Date.now() + 1_000);
+
+            await manager.reconcile(new Set());
+
+            expect(existsSync(workspace)).toBe(true);
+            expect(
+                (
+                    manager as unknown as {
+                        recentWorkspaceTouches: Map<string, number>;
+                    }
+                ).recentWorkspaceTouches.get(workspaceKey),
+            ).toBeGreaterThanOrEqual(reconcileStartedAt);
+        });
     });
 });

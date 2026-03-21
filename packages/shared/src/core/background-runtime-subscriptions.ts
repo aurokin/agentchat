@@ -1,3 +1,5 @@
+import { getConversationScopeKey } from "./conversation-scope-key";
+
 export type ConversationUnsubscribe = () => void;
 export type ConversationSubscriptionTarget = {
     conversationId: string;
@@ -7,7 +9,7 @@ export type ConversationSubscriptionTarget = {
 function getConversationSubscriptionKey(
     target: ConversationSubscriptionTarget,
 ): string {
-    return `${target.agentId}:${target.conversationId}`;
+    return getConversationScopeKey(target.conversationId, target.agentId);
 }
 
 export function clearBackgroundConversationSubscriptions(

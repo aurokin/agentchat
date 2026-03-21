@@ -11,6 +11,7 @@ import {
     type Message,
     type ProviderModel,
 } from "@/lib/types";
+import { getScopedChatStateKey } from "@/contexts/chat-state";
 import { trimTrailingEmptyLines } from "@shared/core/text";
 import {
     shouldApplyConversationScopedUpdate,
@@ -163,7 +164,7 @@ export function useConversationRuntime({
     useEffect(() => {
         const currentConversationScope =
             currentChat?.id && currentChat?.agentId
-                ? `${currentChat.agentId}:${currentChat.id}`
+                ? getScopedChatStateKey(currentChat.id, currentChat.agentId)
                 : null;
         if (
             previousConversationScopeRef.current !== null &&

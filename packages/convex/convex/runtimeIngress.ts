@@ -296,6 +296,9 @@ async function updateAssistantMessage(
     if (!message) {
         throw new Error("Assistant message not found");
     }
+    if (message.updatedAt > args.updatedAt) {
+        return message;
+    }
 
     await ctx.db.patch(message._id, {
         kind: args.kind ?? message.kind,
@@ -342,6 +345,9 @@ async function createAssistantMessage(
         localId: args.localId,
     });
     if (existing) {
+        if (existing.updatedAt > args.createdAt) {
+            return existing;
+        }
         await ctx.db.patch(existing._id, {
             role: "assistant",
             kind: args.kind,
@@ -415,6 +421,9 @@ async function upsertStreamingAssistantMessage(
         localId: args.localId,
     });
     if (existing) {
+        if (existing.updatedAt > args.updatedAt) {
+            return existing;
+        }
         const kind = args.kind ?? existing.kind ?? args.defaultKind;
         const runMessageIndex =
             args.runMessageIndex ??
@@ -479,6 +488,16 @@ export const runStarted = internalMutation({
         });
         if (!chat) {
             throw new Error("Conversation not found");
+        }
+        const currentAssistantMessage = await getMessageByLocalIdInChat(ctx, {
+            userId: args.userId,
+            chatId: chat._id,
+            localId: args.assistantMessageLocalId,
+        });
+        if (
+            (currentAssistantMessage?.updatedAt ?? -Infinity) > args.startedAt
+        ) {
+            return;
         }
         const triggerMessage = await getMessageByLocalIdInChat(ctx, {
             userId: args.userId,
@@ -633,6 +652,29 @@ export const messageStarted = internalMutation({
             return;
         }
 
+        const currentAssistantMessage = await getMessageByLocalIdInChat(ctx, {
+            userId: args.userId,
+            chatId: chat._id,
+            localId: args.assistantMessageLocalId,
+        });
+        if (
+            (currentAssistantMessage?.updatedAt ?? -Infinity) > args.createdAt
+        ) {
+            return;
+        }
+
+        const previousAssistantMessage = await getMessageByLocalIdInChat(ctx, {
+            userId: args.userId,
+            chatId: chat._id,
+            localId: args.previousAssistantMessageLocalId,
+        });
+        if (!previousAssistantMessage) {
+            throw new Error("Assistant message not found");
+        }
+        if (previousAssistantMessage.updatedAt > args.createdAt) {
+            return;
+        }
+
         const previousMessage = await updateAssistantMessage(ctx, {
             userId: args.userId,
             chatId: chat._id,
@@ -774,6 +816,17 @@ export const messageDelta = internalMutation({
             throw new Error("Run not found");
         }
         if (run.chatId !== chat._id) {
+            return;
+        }
+
+        const currentAssistantMessage = await getMessageByLocalIdInChat(ctx, {
+            userId: args.userId,
+            chatId: chat._id,
+            localId: args.assistantMessageLocalId,
+        });
+        if (
+            (currentAssistantMessage?.updatedAt ?? -Infinity) > args.createdAt
+        ) {
             return;
         }
 
@@ -1164,46 +1217,31 @@ export const resolveConversationIdentityByLocalId = internalQuery({
                 q.eq("userId", args.userId).eq("localId", args.localId),
             )
             .collect();
+        if (directChats.length > 1) {
+            return null;
+        }
+        if (directChats.length === 1) {
+            return {
+                agentId: directChats[0]!.agentId,
+                chatId: directChats[0]!._id,
+                ambiguous: false,
+            };
+        }
+
         const legacyChats = await ctx.db
             .query("chats")
             .withIndex("by_user", (q) => q.eq("userId", args.userId))
             .collect();
-        const allMatches = [
-            ...directChats,
-            ...legacyChats.filter(
-                (chat) =>
-                    (chat.localId ?? chat._id) === args.localId &&
-                    !directChats.some((existing) => existing._id === chat._id),
-            ),
-        ].sort((left, right) => {
-            const updatedAtDelta = right.updatedAt - left.updatedAt;
-            if (updatedAtDelta !== 0) {
-                return updatedAtDelta;
-            }
-
-            const createdAtDelta = right.createdAt - left.createdAt;
-            if (createdAtDelta !== 0) {
-                return createdAtDelta;
-            }
-
-            return String(right._id).localeCompare(String(left._id));
-        });
-
-        if (allMatches.length === 0) {
+        const matchingLegacyChats = legacyChats.filter(
+            (chat) => (chat.localId ?? chat._id) === args.localId,
+        );
+        if (matchingLegacyChats.length !== 1) {
             return null;
         }
 
-        if (allMatches.length > 1) {
-            return {
-                agentId: allMatches[0]!.agentId,
-                chatId: allMatches[0]!._id,
-                ambiguous: true,
-            };
-        }
-
         return {
-            agentId: allMatches[0]!.agentId,
-            chatId: allMatches[0]!._id,
+            agentId: matchingLegacyChats[0]!.agentId,
+            chatId: matchingLegacyChats[0]!._id,
             ambiguous: false,
         };
     },

@@ -140,6 +140,7 @@ export function ChatProvider({
         useWorkspace();
     const pendingChatIdsRef = React.useRef<Set<string>>(new Set());
     const pendingMessageIdsRef = React.useRef<Set<string>>(new Set());
+    const currentChatRef = useRef<ChatSession | null>(null);
     const currentChatScopeRef = useRef<string | null>(null);
     const latestViewedAtRef = useRef<Record<string, number>>({});
     const markViewedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -244,11 +245,17 @@ export function ChatProvider({
             : null;
     }, [currentChat]);
 
+    useEffect(() => {
+        currentChatRef.current = currentChat;
+    }, [currentChat]);
+
     const applyChatLastViewedAt = useCallback(
-        (chatId: string, timestamp: number) => {
+        (chatId: string, agentId: string, timestamp: number) => {
+            const scopedChatKey = getScopedChatStateKey(chatId, agentId);
             setChats((prev) =>
                 prev.map((chat) =>
-                    chat.id === chatId
+                    getScopedChatStateKey(chat.id, chat.agentId) ===
+                    scopedChatKey
                         ? {
                               ...chat,
                               lastViewedAt: Math.max(
@@ -260,7 +267,8 @@ export function ChatProvider({
                 ),
             );
             setCurrentChat((prev) =>
-                prev?.id === chatId
+                prev &&
+                getScopedChatStateKey(prev.id, prev.agentId) === scopedChatKey
                     ? {
                           ...prev,
                           lastViewedAt: Math.max(
@@ -394,7 +402,7 @@ export function ChatProvider({
         }
 
         latestViewedAtRef.current[currentChatKey] = visibleAt;
-        applyChatLastViewedAt(currentChat.id, visibleAt);
+        applyChatLastViewedAt(currentChat.id, currentChat.agentId, visibleAt);
 
         const pendingViewed = pendingViewedChatRef.current;
         if (
@@ -520,6 +528,7 @@ export function ChatProvider({
         }
 
         const currentChatStillInScope =
+            currentChatRef.current?.agentId === selectedAgentId &&
             currentChatScopeRef.current &&
             chats.some(
                 (chat) =>
@@ -533,7 +542,11 @@ export function ChatProvider({
         void (async () => {
             const storedChatId = await getSelectedChatId(selectedAgentId);
             const nextChat =
-                chats.find((chat) => chat.id === storedChatId) ??
+                chats.find(
+                    (chat) =>
+                        chat.id === storedChatId &&
+                        chat.agentId === selectedAgentId,
+                ) ??
                 chats[0] ??
                 null;
             if (cancelled) {
@@ -555,7 +568,9 @@ export function ChatProvider({
 
     const selectChat = useCallback(
         async (chatId: string) => {
-            const chat = chats.find((c) => c.id === chatId);
+            const chat = chats.find(
+                (c) => c.id === chatId && c.agentId === selectedAgentId,
+            );
             if (chat) {
                 setCurrentChat(chat);
                 if (selectedAgentId) {
@@ -569,11 +584,19 @@ export function ChatProvider({
 
     const deleteChat = useCallback(
         async (chatId: string) => {
-            const deletedChat = chats.find((c) => c.id === chatId) ?? null;
+            const deletedChat =
+                chats.find(
+                    (c) => c.id === chatId && c.agentId === selectedAgentId,
+                ) ?? null;
+            const deletedChatAgentId =
+                deletedChat?.agentId ??
+                selectedAgentId ??
+                currentChat?.agentId ??
+                null;
 
             const deletedChatId = await adapter.deleteChat(
                 chatId,
-                deletedChat?.agentId ?? selectedAgentId ?? undefined,
+                deletedChatAgentId ?? undefined,
             );
 
             if (deletedChat) {
@@ -585,8 +608,20 @@ export function ChatProvider({
                 );
             }
 
-            setChats((prev) => prev.filter((c) => c.id !== chatId));
-            setCurrentChat((prev) => (prev?.id === chatId ? null : prev));
+            setChats((prev) =>
+                prev.filter(
+                    (c) =>
+                        getScopedChatStateKey(c.id, c.agentId) !==
+                        getScopedChatStateKey(chatId, deletedChatAgentId),
+                ),
+            );
+            setCurrentChat((prev) =>
+                prev &&
+                getScopedChatStateKey(prev.id, prev.agentId) ===
+                    getScopedChatStateKey(chatId, deletedChatAgentId)
+                    ? null
+                    : prev,
+            );
             setMessages((prev) => {
                 const next = { ...prev };
                 if (deletedChat?.agentId) {
@@ -598,14 +633,14 @@ export function ChatProvider({
             });
             if (
                 selectedAgentId &&
-                deletedChat?.agentId &&
+                deletedChatAgentId &&
                 currentChatScopeRef.current ===
-                    getScopedChatStateKey(chatId, deletedChat.agentId)
+                    getScopedChatStateKey(chatId, deletedChatAgentId)
             ) {
                 await clearSelectedChatId(selectedAgentId);
             }
         },
-        [adapter, chats, selectedAgentId, getBackendSessionToken],
+        [adapter, chats, currentChat, selectedAgentId, getBackendSessionToken],
     );
 
     const deleteChats = useCallback(
@@ -629,10 +664,40 @@ export function ChatProvider({
                 }
             }
 
-            const chatIdSet = new Set(chatIds);
-            setChats((prev) => prev.filter((c) => !chatIdSet.has(c.id)));
+            const chatScopeKeys = new Set(
+                chatIds
+                    .map(
+                        (chatId) =>
+                            chats.find(
+                                (candidate) => candidate.id === chatId,
+                            ) ?? null,
+                    )
+                    .filter((chat): chat is ChatSession => chat !== null)
+                    .map((chat) =>
+                        getScopedChatStateKey(chat.id, chat.agentId),
+                    ),
+            );
+            setChats((prev) =>
+                prev.filter(
+                    (c) =>
+                        !chatScopeKeys.has(
+                            getScopedChatStateKey(c.id, c.agentId),
+                        ),
+                ),
+            );
             setCurrentChat((prev) =>
-                prev && chatIdSet.has(prev.id) ? null : prev,
+                prev &&
+                chatIds.some((id) => {
+                    const chat =
+                        chats.find((candidate) => candidate.id === id) ?? null;
+                    return (
+                        !!chat?.agentId &&
+                        getScopedChatStateKey(prev.id, prev.agentId) ===
+                            getScopedChatStateKey(id, chat.agentId)
+                    );
+                })
+                    ? null
+                    : prev,
             );
             setMessages((prev) => {
                 const next = { ...prev };
@@ -670,7 +735,14 @@ export function ChatProvider({
     const updateChat = useCallback(
         async (chat: ChatSession) => {
             await adapter.updateChat(chat);
-            setChats((prev) => prev.map((c) => (c.id === chat.id ? chat : c)));
+            setChats((prev) =>
+                prev.map((c) =>
+                    getScopedChatStateKey(c.id, c.agentId) ===
+                    getScopedChatStateKey(chat.id, chat.agentId)
+                        ? chat
+                        : c,
+                ),
+            );
             setCurrentChat((prev) =>
                 prev &&
                 getScopedChatStateKey(prev.id, prev.agentId) ===
