@@ -79,9 +79,10 @@ async function findChatByConversationId(
         userId: Id<"users">;
         agentId: string;
         conversationLocalId: string;
+        chatId?: Id<"chats">;
     },
 ): Promise<Doc<"chats"> | null> {
-    const chat = await ctx.db
+    const chats = await ctx.db
         .query("chats")
         .withIndex("by_userId_and_agentId_and_localId", (q) =>
             q
@@ -89,9 +90,25 @@ async function findChatByConversationId(
                 .eq("agentId", args.agentId)
                 .eq("localId", args.conversationLocalId),
         )
-        .unique();
-    if (chat) {
-        return chat;
+        .collect();
+    const preferredChat =
+        chats.find((candidate) => candidate._id === args.chatId) ??
+        chats.slice().sort((left, right) => {
+            const updatedAtDelta = right.updatedAt - left.updatedAt;
+            if (updatedAtDelta !== 0) {
+                return updatedAtDelta;
+            }
+
+            const createdAtDelta = right.createdAt - left.createdAt;
+            if (createdAtDelta !== 0) {
+                return createdAtDelta;
+            }
+
+            return String(right._id).localeCompare(String(left._id));
+        })[0] ??
+        null;
+    if (preferredChat) {
+        return preferredChat;
     }
 
     const legacyChats = await ctx.db
@@ -99,12 +116,14 @@ async function findChatByConversationId(
         .withIndex("by_user", (q) => q.eq("userId", args.userId))
         .collect();
     return (
+        legacyChats.find((candidate) => candidate._id === args.chatId) ??
         legacyChats.find(
             (candidate) =>
                 candidate.agentId === args.agentId &&
                 (candidate.localId ?? candidate._id) ===
                     args.conversationLocalId,
-        ) ?? null
+        ) ??
+        null
     );
 }
 
@@ -788,6 +807,24 @@ async function finalizeRun(
         throw new Error("Run not found");
     }
     if (run.chatId !== chat._id) {
+        return;
+    }
+    if (
+        isTerminalRunStatus(run.status) &&
+        (run.completedAt ?? 0) >= args.completedAt
+    ) {
+        return;
+    }
+
+    const currentAssistantMessage = await getMessageByLocalIdInChat(ctx, {
+        userId: args.userId,
+        chatId: chat._id,
+        localId: args.assistantMessageLocalId,
+    });
+    if (!currentAssistantMessage) {
+        throw new Error("Assistant message not found");
+    }
+    if (currentAssistantMessage.updatedAt > args.completedAt) {
         return;
     }
 

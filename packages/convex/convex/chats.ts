@@ -160,6 +160,23 @@ export const create = mutation({
         assertMaxLen(args.agentId, LIMITS.maxLocalIdChars, "agentId");
         assertMaxLen(args.title, LIMITS.maxChatTitleChars, "title");
 
+        if (args.localId) {
+            const existing = await ctx.db
+                .query("chats")
+                .withIndex("by_userId_and_agentId_and_localId", (q) =>
+                    q
+                        .eq("userId", authenticatedUserId)
+                        .eq("agentId", args.agentId)
+                        .eq("localId", args.localId),
+                )
+                .collect();
+            if (existing.length > 0) {
+                throw new Error(
+                    "Conversation localId already exists for this agent.",
+                );
+            }
+        }
+
         const usage = await ensureWorkspaceUsageCounters(
             ctx,
             authenticatedUserId,

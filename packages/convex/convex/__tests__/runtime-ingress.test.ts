@@ -5,6 +5,7 @@ import {
     listAllChatLocalIds,
     messageDelta,
     readRuntimeBinding,
+    runCompleted,
     runStarted,
     runtimeBinding,
 } from "../runtimeIngress";
@@ -24,7 +25,10 @@ describe("runtime ingress", () => {
         const unique = mock(async () => null);
         const collect = mock(async () => []);
         const withIndex = mock((indexName: string) =>
-            indexName === "by_user" ? { collect } : { unique },
+            indexName === "by_userId_and_agentId_and_localId" ||
+            indexName === "by_user"
+                ? { collect }
+                : { unique },
         );
         const query = mock(() => ({ withIndex }));
         const ctx = {
@@ -54,8 +58,8 @@ describe("runtime ingress", () => {
         ).resolves.toBeNull();
 
         expect(query).toHaveBeenCalledWith("chats");
-        expect(unique).toHaveBeenCalledTimes(1);
-        expect(collect).toHaveBeenCalledTimes(1);
+        expect(unique).not.toHaveBeenCalled();
+        expect(collect).toHaveBeenCalledTimes(2);
         expect(insert).not.toHaveBeenCalled();
         expect(patch).not.toHaveBeenCalled();
     });
@@ -63,9 +67,13 @@ describe("runtime ingress", () => {
     test("preserves existing workspace metadata when later binding writes omit it", async () => {
         const insert = mock(async () => undefined);
         const patch = mock(async () => undefined);
-        const chatUnique = mock(async () => ({
-            _id: "chats:1",
-        }));
+        const chatCollect = mock(async () => [
+            {
+                _id: "chats:1",
+                updatedAt: 100,
+                createdAt: 100,
+            },
+        ]);
         const bindingUnique = mock(async () => ({
             _id: "runtimeBindings:1",
             chatId: "chats:1",
@@ -86,7 +94,13 @@ describe("runtime ingress", () => {
         const query = (table: string) => {
             if (table === "chats") {
                 return {
-                    withIndex: mock(() => ({ unique: chatUnique })),
+                    withIndex: mock((indexName: string) => ({
+                        collect: chatCollect,
+                        unique:
+                            indexName === "by_userId_and_agentId_and_localId"
+                                ? undefined
+                                : bindingUnique,
+                    })),
                 };
             }
 
@@ -140,9 +154,13 @@ describe("runtime ingress", () => {
     });
 
     test("returns workspace metadata from readRuntimeBinding", async () => {
-        const chatUnique = mock(async () => ({
-            _id: "chats:1",
-        }));
+        const chatCollect = mock(async () => [
+            {
+                _id: "chats:1",
+                updatedAt: 100,
+                createdAt: 100,
+            },
+        ]);
         const bindingUnique = mock(async () => ({
             provider: "codex",
             status: "idle",
@@ -161,7 +179,7 @@ describe("runtime ingress", () => {
             if (table === "chats") {
                 return {
                     withIndex: mock(() => ({
-                        unique: chatUnique,
+                        collect: chatCollect,
                     })),
                 };
             }
@@ -204,15 +222,19 @@ describe("runtime ingress", () => {
     });
 
     test("returns the chat id even when no runtime binding exists yet", async () => {
-        const chatUnique = mock(async () => ({
-            _id: "chats:1",
-        }));
+        const chatCollect = mock(async () => [
+            {
+                _id: "chats:1",
+                updatedAt: 100,
+                createdAt: 100,
+            },
+        ]);
         const bindingUnique = mock(async () => null);
         const query = (table: string) => {
             if (table === "chats") {
                 return {
                     withIndex: mock(() => ({
-                        unique: chatUnique,
+                        collect: chatCollect,
                     })),
                 };
             }
@@ -374,9 +396,13 @@ describe("runtime ingress", () => {
     });
 
     test("readRuntimeBinding resolves the matching agent when chats share a localId", async () => {
-        const chatUnique = mock(async () => ({
-            _id: "chats:agent-b",
-        }));
+        const chatCollect = mock(async () => [
+            {
+                _id: "chats:agent-b",
+                updatedAt: 100,
+                createdAt: 100,
+            },
+        ]);
         const bindingUnique = mock(async () => ({
             provider: "codex",
             status: "idle",
@@ -395,7 +421,7 @@ describe("runtime ingress", () => {
             if (table === "chats") {
                 return {
                     withIndex: mock(() => ({
-                        unique: chatUnique,
+                        collect: chatCollect,
                     })),
                 };
             }
@@ -430,9 +456,13 @@ describe("runtime ingress", () => {
     test("runtimeBinding updates the matching agent when chats share a localId", async () => {
         const insert = mock(async () => undefined);
         const patch = mock(async () => undefined);
-        const chatUnique = mock(async () => ({
-            _id: "chats:agent-b",
-        }));
+        const chatCollect = mock(async () => [
+            {
+                _id: "chats:agent-b",
+                updatedAt: 100,
+                createdAt: 100,
+            },
+        ]);
         const bindingUnique = mock(async () => ({
             _id: "runtimeBindings:agent-b",
             chatId: "chats:agent-b",
@@ -451,7 +481,7 @@ describe("runtime ingress", () => {
             if (table === "chats") {
                 return {
                     withIndex: mock(() => ({
-                        unique: chatUnique,
+                        collect: chatCollect,
                     })),
                 };
             }
@@ -510,14 +540,18 @@ describe("runtime ingress", () => {
     test("runtimeBinding no-ops when the local id now points at a different chat", async () => {
         const insert = mock(async () => undefined);
         const patch = mock(async () => undefined);
-        const chatUnique = mock(async () => ({
-            _id: "chats:new",
-        }));
+        const chatCollect = mock(async () => [
+            {
+                _id: "chats:new",
+                updatedAt: 100,
+                createdAt: 100,
+            },
+        ]);
         const query = (table: string) => {
             if (table === "chats") {
                 return {
                     withIndex: mock(() => ({
-                        unique: chatUnique,
+                        collect: chatCollect,
                     })),
                 };
             }
@@ -561,10 +595,13 @@ describe("runtime ingress", () => {
     test("messageDelta no-ops when the run belongs to an older chat", async () => {
         const patch = mock(async () => undefined);
         const insert = mock(async () => undefined);
-        const chatUnique = mock(async () => ({
-            _id: "chats:new",
-            updatedAt: 100,
-        }));
+        const chatCollect = mock(async () => [
+            {
+                _id: "chats:new",
+                updatedAt: 100,
+                createdAt: 100,
+            },
+        ]);
         const runUnique = mock(async () => ({
             _id: "runs:1",
             chatId: "chats:old",
@@ -581,7 +618,7 @@ describe("runtime ingress", () => {
             if (table === "chats") {
                 return {
                     withIndex: mock(() => ({
-                        unique: chatUnique,
+                        collect: chatCollect,
                     })),
                 };
             }
@@ -633,12 +670,180 @@ describe("runtime ingress", () => {
         expect(insert).not.toHaveBeenCalled();
     });
 
+    test("runtimeBinding prefers the provided chatId when bad duplicate tuples exist", async () => {
+        const patch = mock(async () => undefined);
+        const insert = mock(async () => undefined);
+        const chatCollect = mock(async () => [
+            {
+                _id: "chats:newer",
+                updatedAt: 200,
+                createdAt: 200,
+            },
+            {
+                _id: "chats:current",
+                updatedAt: 100,
+                createdAt: 100,
+            },
+        ]);
+        const bindingUnique = mock(async () => ({
+            _id: "runtimeBindings:current",
+            chatId: "chats:current",
+            userId: "users:test",
+            provider: "codex",
+            status: "idle",
+            providerThreadId: "thread-current",
+            providerResumeToken: null,
+            activeRunId: null,
+            lastError: null,
+            lastEventAt: 100,
+            expiresAt: null,
+            updatedAt: 100,
+        }));
+        const query = (table: string) => {
+            if (table === "chats") {
+                return {
+                    withIndex: mock(() => ({
+                        collect: chatCollect,
+                    })),
+                };
+            }
+
+            return {
+                withIndex: mock(() => ({
+                    unique: bindingUnique,
+                })),
+            };
+        };
+        const ctx = {
+            db: {
+                query,
+                insert,
+                patch,
+            },
+        };
+
+        await expect(
+            runHandler(runtimeBinding as unknown as HandlerExport, ctx, {
+                userId: "users:test",
+                agentId: "agent-a",
+                conversationLocalId: "chat-1",
+                chatId: "chats:current",
+                provider: "codex",
+                status: "active",
+                providerThreadId: "thread-current",
+                providerResumeToken: null,
+                activeRunId: "run:test",
+                lastError: null,
+                lastEventAt: 123,
+                expiresAt: null,
+                updatedAt: 123,
+            }),
+        ).resolves.toBeNull();
+
+        expect(insert).not.toHaveBeenCalled();
+        expect(patch).toHaveBeenCalledWith("runtimeBindings:current", {
+            chatId: "chats:current",
+            userId: "users:test",
+            provider: "codex",
+            status: "active",
+            providerThreadId: "thread-current",
+            providerResumeToken: null,
+            activeRunId: "run:test",
+            lastError: null,
+            lastEventAt: 123,
+            expiresAt: null,
+            workspaceMode: undefined,
+            workspaceRootPath: undefined,
+            workspaceCwd: undefined,
+            updatedAt: 123,
+        });
+    });
+
+    test("runCompleted ignores an older terminal write", async () => {
+        const patch = mock(async () => undefined);
+        const insert = mock(async () => undefined);
+        const chatCollect = mock(async () => [
+            {
+                _id: "chats:1",
+                updatedAt: 100,
+                createdAt: 100,
+            },
+        ]);
+        const runUnique = mock(async () => ({
+            _id: "runs:1",
+            chatId: "chats:1",
+            provider: "codex",
+            status: "completed",
+            providerThreadId: "thread-1",
+            completedAt: 200,
+        }));
+        const messageUnique = mock(async () => ({
+            _id: "messages:1",
+            chatId: "chats:1",
+            localId: "assistant-1",
+            updatedAt: 200,
+        }));
+        const query = mock((table: string) => {
+            if (table === "chats") {
+                return {
+                    withIndex: mock(() => ({
+                        collect: chatCollect,
+                    })),
+                };
+            }
+            if (table === "runs") {
+                return {
+                    withIndex: mock(() => ({
+                        unique: runUnique,
+                    })),
+                };
+            }
+            if (table === "messages") {
+                return {
+                    withIndex: mock(() => ({
+                        unique: messageUnique,
+                    })),
+                };
+            }
+
+            throw new Error(`Unexpected table ${table}`);
+        });
+        const ctx = {
+            db: {
+                query,
+                patch,
+                insert,
+            },
+        };
+
+        await expect(
+            runHandler(runCompleted as unknown as HandlerExport, ctx, {
+                chatId: "chats:1",
+                userId: "users:test",
+                agentId: "agent-a",
+                conversationLocalId: "chat-1",
+                assistantMessageLocalId: "assistant-1",
+                externalRunId: "run-1",
+                sequence: 10,
+                content: "older",
+                completedAt: 150,
+            }),
+        ).resolves.toBeUndefined();
+
+        expect(patch).not.toHaveBeenCalled();
+        expect(insert).not.toHaveBeenCalled();
+    });
+
     test("runtimeBinding ignores older updates than the persisted binding", async () => {
         const insert = mock(async () => undefined);
         const patch = mock(async () => undefined);
-        const chatUnique = mock(async () => ({
-            _id: "chats:1",
-        }));
+        const chatCollect = mock(async () => [
+            {
+                _id: "chats:1",
+                updatedAt: 100,
+                createdAt: 100,
+            },
+        ]);
         const bindingUnique = mock(async () => ({
             _id: "runtimeBindings:1",
             chatId: "chats:1",
@@ -657,7 +862,7 @@ describe("runtime ingress", () => {
             if (table === "chats") {
                 return {
                     withIndex: mock(() => ({
-                        unique: chatUnique,
+                        collect: chatCollect,
                     })),
                 };
             }
@@ -699,10 +904,12 @@ describe("runtime ingress", () => {
     });
 
     test("readRuntimeBinding resolves legacy chats even when the _id has no colon", async () => {
-        const byConversationLocalIdUnique = mock(async () => null);
+        const byConversationLocalIdCollect = mock(async () => []);
         const byUserCollect = mock(async () => [
             {
                 _id: "legacychatid",
+                updatedAt: 100,
+                createdAt: 100,
                 agentId: "agent-1",
                 userId: "users:test",
                 localId: undefined,
@@ -725,7 +932,7 @@ describe("runtime ingress", () => {
                     withIndex: mock((indexName: string) => {
                         if (indexName === "by_userId_and_agentId_and_localId") {
                             return {
-                                unique: byConversationLocalIdUnique,
+                                collect: byConversationLocalIdCollect,
                             };
                         }
                         return { collect: byUserCollect };
@@ -760,14 +967,18 @@ describe("runtime ingress", () => {
     });
 
     test("runStarted throws when the conversation now resolves to a different chat", async () => {
-        const chatUnique = mock(async () => ({
-            _id: "chats:new",
-        }));
+        const chatCollect = mock(async () => [
+            {
+                _id: "chats:new",
+                updatedAt: 100,
+                createdAt: 100,
+            },
+        ]);
         const query = (table: string) => {
             if (table === "chats") {
                 return {
                     withIndex: mock(() => ({
-                        unique: chatUnique,
+                        collect: chatCollect,
                     })),
                 };
             }
