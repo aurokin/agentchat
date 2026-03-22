@@ -1236,7 +1236,7 @@ new WorkspaceManager({
             expect(existsSync(workspace)).toBe(false);
         });
 
-        test("removes copied workspaces created under an older sandboxRoot", async () => {
+        test("only deletes copied workspaces from the current sandbox root by default", async () => {
             const firstSandboxRoot = makeTempDir("sandbox-a");
             const secondSandboxRoot = makeTempDir("sandbox-b");
             const rootPath = makeTempDir("agent-root");
@@ -1280,7 +1280,7 @@ new WorkspaceManager({
                 "conv-1",
             );
 
-            expect(existsSync(originalWorkspace)).toBe(false);
+            expect(existsSync(originalWorkspace)).toBe(true);
             expect(
                 JSON.parse(readFileSync(rootsRegistryPath, "utf8")),
             ).toMatchObject({
@@ -1289,6 +1289,56 @@ new WorkspaceManager({
                     path.resolve(secondSandboxRoot),
                 ]),
             });
+        });
+
+        test("can explicitly delete copied workspaces from an older sandbox root", async () => {
+            const firstSandboxRoot = makeTempDir("sandbox-a");
+            const secondSandboxRoot = makeTempDir("sandbox-b");
+            const rootPath = makeTempDir("agent-root");
+            writeFileSync(path.join(rootPath, "file.txt"), "data");
+
+            const agent = makeAgent({
+                id: "my-agent",
+                rootPath,
+                workspaceMode: "copy-on-conversation",
+            });
+            const config = makeConfig({
+                sandboxRoot: firstSandboxRoot,
+                agents: [agent],
+            });
+            const rootsRegistryPath = path.join(
+                makeTempDir("sandbox-roots-registry"),
+                "sandbox-roots.json",
+            );
+            const manager = new WorkspaceManager({
+                getConfig: () => config,
+                rootsRegistryPath,
+            });
+
+            const originalWorkspace = await manager.ensureWorkspace(
+                agent,
+                "user-1",
+                "conv-1",
+            );
+            expect(existsSync(originalWorkspace)).toBe(true);
+
+            config.sandboxRoot = secondSandboxRoot;
+
+            const restartedManager = new WorkspaceManager({
+                getConfig: () => config,
+                rootsRegistryPath,
+            });
+
+            await restartedManager.deleteWorkspace(
+                "my-agent",
+                "user-1",
+                "conv-1",
+                {
+                    sandboxRoots: [firstSandboxRoot],
+                },
+            );
+
+            expect(existsSync(originalWorkspace)).toBe(false);
         });
 
         test("keeps metadata lookup stable when sandboxRoot changes only by symlink alias", async () => {
@@ -1856,6 +1906,53 @@ new WorkspaceManager({
                     conversationId: "conv-1",
                 }),
                 new Promise(() => {}),
+            );
+
+            await manager.reconcile(new Set());
+
+            expect(existsSync(workspace)).toBe(true);
+        });
+
+        test("keeps workspaces with on-disk creating metadata from another process during reconciliation", async () => {
+            const sandboxRoot = makeTempDir("sandbox");
+            const rootPath = makeTempDir("agent-root");
+            writeFileSync(path.join(rootPath, "file.txt"), "data");
+
+            const agent = makeAgent({
+                id: "agent-a",
+                rootPath,
+                workspaceMode: "copy-on-conversation",
+            });
+            const manager = createWorkspaceManager(() =>
+                makeConfig({ sandboxRoot, agents: [agent] }),
+            );
+
+            const workspace = await manager.ensureWorkspace(
+                agent,
+                "user-1",
+                "conv-1",
+            );
+            const workspaceMetadataDir = getWorkspaceMetadataRootPath(
+                sandboxRoot,
+            );
+            const metadataFile =
+                readdirSync(workspaceMetadataDir).find((entry) =>
+                    entry.endsWith(".json"),
+                ) ?? null;
+            if (!metadataFile) {
+                throw new Error("Expected workspace metadata file to exist.");
+            }
+
+            writeFileSync(
+                path.join(workspaceMetadataDir, metadataFile),
+                `${JSON.stringify(
+                    {
+                        sourceRootPath: path.resolve(rootPath),
+                        state: "creating",
+                    },
+                    null,
+                    2,
+                )}\n`,
             );
 
             await manager.reconcile(new Set());

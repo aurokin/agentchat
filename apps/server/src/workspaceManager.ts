@@ -467,6 +467,7 @@ export class WorkspaceManager {
         conversationId: string,
         options?: {
             force?: boolean;
+            sandboxRoots?: string[];
         },
     ): Promise<void> {
         const configuredAgent = this.getConfig().agents.find(
@@ -476,8 +477,10 @@ export class WorkspaceManager {
             return;
         }
 
-        this.syncSandboxRootsRegistry();
-        for (const sandboxRoot of this.getKnownSandboxRoots()) {
+        const sandboxRoots = options?.sandboxRoots?.map((sandboxRoot) =>
+            canonicalizePathForComparison(sandboxRoot),
+        ) ?? [canonicalizePathForComparison(this.getConfig().sandboxRoot)];
+        for (const sandboxRoot of sandboxRoots) {
             const target = this.sandboxPathForRoot(
                 sandboxRoot,
                 agentId,
@@ -613,6 +616,7 @@ export class WorkspaceManager {
                     }
 
                     for (const convDir of convDirs) {
+                        const target = path.join(userPath, convDir);
                         const key = getWorkspaceActiveKeyFromSegments({
                             sandboxRoot,
                             agentIdSegment: agentDir,
@@ -630,7 +634,13 @@ export class WorkspaceManager {
                             continue;
                         }
 
-                        const target = path.join(userPath, convDir);
+                        const metadata = await this.readWorkspaceMetadata(
+                            target,
+                        );
+                        if (metadata?.state === "creating") {
+                            continue;
+                        }
+
                         await this.deleteWorkspacePathBySegments({
                             sandboxRoot,
                             targetPath: target,

@@ -50,7 +50,7 @@ export function getPersistedWorkspaceActiveKeys(
                 ? activeCopyOnConversationSandboxRoots
                 : params.copyOnConversationAgentIds.has(entry.agentId) ||
                     params.configuredAgentIds.has(entry.agentId)
-                  ? []
+                  ? params.knownSandboxRoots
                   : params.knownSandboxRoots.filter(
                         (sandboxRoot) => !currentSandboxRoots.has(sandboxRoot),
                     );

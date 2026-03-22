@@ -464,6 +464,11 @@ export const runStarted = internalMutation({
         provider: v.string(),
         providerThreadId: v.union(v.string(), v.null()),
         providerTurnId: v.union(v.string(), v.null()),
+        workspaceMode: v.optional(
+            v.union(v.literal("shared"), v.literal("copy-on-conversation")),
+        ),
+        workspaceRootPath: v.optional(v.string()),
+        workspaceCwd: v.optional(v.string()),
         startedAt: v.number(),
     },
     handler: async (ctx, args) => {
@@ -584,6 +589,9 @@ export const runStarted = internalMutation({
             lastError: null,
             lastEventAt: args.startedAt,
             expiresAt: null,
+            workspaceMode: args.workspaceMode,
+            workspaceRootPath: args.workspaceRootPath,
+            workspaceCwd: args.workspaceCwd,
             updatedAt: args.startedAt,
         });
 
@@ -874,6 +882,11 @@ const terminalRunArgs = {
     sequence: v.number(),
     content: v.string(),
     completedAt: v.number(),
+    workspaceMode: v.optional(
+        v.union(v.literal("shared"), v.literal("copy-on-conversation")),
+    ),
+    workspaceRootPath: v.optional(v.string()),
+    workspaceCwd: v.optional(v.string()),
 };
 
 async function finalizeRun(
@@ -888,6 +901,9 @@ async function finalizeRun(
         sequence: number;
         content: string;
         completedAt: number;
+        workspaceMode?: "shared" | "copy-on-conversation";
+        workspaceRootPath?: string;
+        workspaceCwd?: string;
         runStatus: Exclude<RunStatus, "queued" | "starting" | "running">;
         messageStatus: Exclude<MessageStatus, "draft" | "streaming">;
         eventKind: Extract<
@@ -984,6 +1000,9 @@ async function finalizeRun(
         lastError: args.errorMessage,
         lastEventAt: args.completedAt,
         expiresAt: null,
+        workspaceMode: args.workspaceMode,
+        workspaceRootPath: args.workspaceRootPath,
+        workspaceCwd: args.workspaceCwd,
         updatedAt: args.completedAt,
     });
 }
@@ -1055,6 +1074,11 @@ export const recoverStaleRun = internalMutation({
         externalRunId: v.string(),
         completedAt: v.number(),
         errorMessage: v.string(),
+        workspaceMode: v.optional(
+            v.union(v.literal("shared"), v.literal("copy-on-conversation")),
+        ),
+        workspaceRootPath: v.optional(v.string()),
+        workspaceCwd: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
         const chat = await findCurrentChatByConversationId(ctx, {
@@ -1096,6 +1120,9 @@ export const recoverStaleRun = internalMutation({
             sequence,
             content: assistantMessage.content,
             completedAt: args.completedAt,
+            workspaceMode: args.workspaceMode,
+            workspaceRootPath: args.workspaceRootPath,
+            workspaceCwd: args.workspaceCwd,
             runStatus: "errored",
             messageStatus: "errored",
             eventKind: "run_failed",

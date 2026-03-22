@@ -406,6 +406,9 @@ export class CodexRuntimeManager {
                             provider: runtime.provider.id,
                             providerThreadId: runtime.threadId,
                             providerTurnId: activeTurn.turnId,
+                            workspaceMode: runtime.agent.workspaceMode,
+                            workspaceRootPath: runtime.agent.rootPath,
+                            workspaceCwd: runtime.cwd,
                             startedAt,
                         })
                         .finally(() => {
@@ -489,6 +492,9 @@ export class CodexRuntimeManager {
                                 externalRunId: failedTurn.runId,
                                 sequence: failedTurn.nextSequence,
                                 content: failedTurn.text,
+                                workspaceMode: runtime.agent.workspaceMode,
+                                workspaceRootPath: runtime.agent.rootPath,
+                                workspaceCwd: runtime.cwd,
                                 completedAt: Date.now(),
                                 errorMessage,
                             });
@@ -987,6 +993,11 @@ export class CodexRuntimeManager {
                 cwd,
                 cleanupWorkspace: cleanupWorkspaceOnFailure,
             });
+            await this.recoverOrphanedActiveRun({
+                userId: params.userId,
+                conversationId: params.command.payload.conversationId,
+                agentId: resources.agent.id,
+            });
             const persistedState = await this.readConversationPersistenceState({
                 userId: params.userId,
                 agentId: resources.agent.id,
@@ -1316,6 +1327,42 @@ export class CodexRuntimeManager {
             completedAt: Date.now(),
             errorMessage:
                 "This run was orphaned after the runtime disconnected before completion.",
+            workspaceMode: persistedBinding.workspaceMode,
+            workspaceRootPath: persistedBinding.workspaceRootPath,
+            workspaceCwd: persistedBinding.workspaceCwd,
+        }).catch(async (error) => {
+            console.error(
+                "[agentchat-server] failed to recover orphaned active run; clearing stale binding",
+                error,
+            );
+            try {
+                await this.persistence.runtimeBinding({
+                    chatId: persistedState.chatId,
+                    userId: params.userId,
+                    agentId: params.agentId,
+                    conversationLocalId: params.conversationId,
+                    provider: persistedBinding.provider,
+                    status: "errored",
+                    providerThreadId: persistedBinding.providerThreadId,
+                    providerResumeToken: persistedBinding.providerResumeToken,
+                    activeRunId: null,
+                    lastError:
+                        error instanceof Error
+                            ? error.message
+                            : "Failed to recover orphaned active run.",
+                    lastEventAt: Date.now(),
+                    expiresAt: null,
+                    workspaceMode: persistedBinding.workspaceMode,
+                    workspaceRootPath: persistedBinding.workspaceRootPath,
+                    workspaceCwd: persistedBinding.workspaceCwd,
+                    updatedAt: Date.now(),
+                });
+            } catch (bindingError) {
+                console.error(
+                    "[agentchat-server] failed to clear stale orphaned binding",
+                    bindingError,
+                );
+            }
         });
     }
 
@@ -1421,6 +1468,9 @@ export class CodexRuntimeManager {
                     externalRunId: activeTurn.runId,
                     sequence,
                     content: activeTurn.text,
+                    workspaceMode: runtime.agent.workspaceMode,
+                    workspaceRootPath: runtime.agent.rootPath,
+                    workspaceCwd: runtime.cwd,
                     completedAt: Date.now(),
                     errorMessage: error.message,
                 })
@@ -1757,6 +1807,9 @@ export class CodexRuntimeManager {
                     externalRunId: activeTurn.runId,
                     sequence,
                     content: activeTurn.text,
+                    workspaceMode: runtime.agent.workspaceMode,
+                    workspaceRootPath: runtime.agent.rootPath,
+                    workspaceCwd: runtime.cwd,
                     completedAt,
                 })
                 .catch((error) => {
@@ -1789,6 +1842,9 @@ export class CodexRuntimeManager {
                     externalRunId: activeTurn.runId,
                     sequence,
                     content: activeTurn.text,
+                    workspaceMode: runtime.agent.workspaceMode,
+                    workspaceRootPath: runtime.agent.rootPath,
+                    workspaceCwd: runtime.cwd,
                     completedAt,
                 })
                 .catch((error) => {
@@ -1826,6 +1882,9 @@ export class CodexRuntimeManager {
                 externalRunId: activeTurn.runId,
                 sequence,
                 content: activeTurn.text,
+                workspaceMode: runtime.agent.workspaceMode,
+                workspaceRootPath: runtime.agent.rootPath,
+                workspaceCwd: runtime.cwd,
                 completedAt,
                 errorMessage,
             })

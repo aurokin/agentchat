@@ -164,6 +164,45 @@ describe("workspace reconciliation", () => {
         );
     });
 
+    test("preserves configured agents across known roots when registry liveness is temporarily missing", () => {
+        expect(
+            getPersistedWorkspaceActiveKeys(
+                [
+                    {
+                        agentId: "copy-agent",
+                        userId: "user-1",
+                        localId: "chat-1",
+                    },
+                ],
+                {
+                    copyOnConversationAgentIds: new Set(["copy-agent"]),
+                    currentCopyOnConversationSandboxRootsByAgent: {},
+                    configuredAgentIds: new Set(["copy-agent"]),
+                    currentSandboxRoots: ["/tmp/current-sandbox"],
+                    knownSandboxRoots: [
+                        "/tmp/current-sandbox",
+                        "/tmp/other-live-sandbox",
+                    ],
+                },
+            ),
+        ).toEqual(
+            new Set([
+                getWorkspaceActiveKey({
+                    sandboxRoot: "/tmp/current-sandbox",
+                    agentId: "copy-agent",
+                    userId: "user-1",
+                    conversationId: "chat-1",
+                }),
+                getWorkspaceActiveKey({
+                    sandboxRoot: "/tmp/other-live-sandbox",
+                    agentId: "copy-agent",
+                    userId: "user-1",
+                    conversationId: "chat-1",
+                }),
+            ]),
+        );
+    });
+
     test("preserves current copied sandboxes for missing agents that remain active on another release", () => {
         expect(
             getPersistedWorkspaceActiveKeys(

@@ -6,6 +6,7 @@ import {
     messageDelta,
     messageStarted,
     readRuntimeBinding,
+    recoverStaleRun,
     runCompleted,
     runStarted,
     runtimeBinding,
@@ -149,6 +150,387 @@ describe("runtime ingress", () => {
             workspaceMode: "copy-on-conversation",
             workspaceRootPath: "/repos/agent-a",
             workspaceCwd: "/sandboxes/agent-a/user/chat",
+            updatedAt: 123,
+        });
+    });
+
+    test("runStarted writes workspace metadata into a new runtime binding", async () => {
+        const insert = mock(async (table: string) => {
+            if (table === "runs") {
+                return "runs:1";
+            }
+            return undefined;
+        });
+        const patch = mock(async () => undefined);
+        const chatCollect = mock(async () => [
+            {
+                _id: "chats:1",
+                updatedAt: 100,
+                createdAt: 100,
+                settingsLockedAt: null,
+            },
+        ]);
+        let messageLookupCount = 0;
+        const messageCollect = mock(async () => {
+            messageLookupCount += 1;
+            return [
+                {
+                    _id:
+                        messageLookupCount === 2
+                            ? "messages:trigger"
+                            : "messages:assistant",
+                    chatId: "chats:1",
+                    userId: "users:test",
+                    kind: "assistant_message",
+                    content: "",
+                    contextContent: "",
+                    status: "draft",
+                    runId: null,
+                    runMessageIndex: null,
+                    updatedAt: 100,
+                    completedAt: null,
+                },
+            ];
+        });
+        const runUnique = mock(async () => null);
+        const bindingUnique = mock(async () => null);
+        const query = mock((table: string) => {
+            if (table === "chats") {
+                return {
+                    withIndex: mock(() => ({
+                        collect: chatCollect,
+                    })),
+                };
+            }
+            if (table === "messages") {
+                return {
+                    withIndex: mock(() => ({
+                        collect: messageCollect,
+                    })),
+                };
+            }
+            if (table === "runs") {
+                return {
+                    withIndex: mock(() => ({
+                        unique: runUnique,
+                    })),
+                };
+            }
+
+            return {
+                withIndex: mock(() => ({
+                    unique: bindingUnique,
+                })),
+            };
+        });
+        const ctx = {
+            db: {
+                query,
+                insert,
+                patch,
+            },
+        };
+
+        await expect(
+            runHandler(runStarted as unknown as HandlerExport, ctx, {
+                chatId: "chats:1",
+                userId: "users:test",
+                agentId: "agent-1",
+                conversationLocalId: "chat-1",
+                triggerMessageLocalId: "user-1",
+                assistantMessageLocalId: "assistant-1",
+                externalRunId: "run:test",
+                provider: "codex",
+                providerThreadId: "thread-1",
+                providerTurnId: "turn-1",
+                workspaceMode: "copy-on-conversation",
+                workspaceRootPath: "/repos/agent-a",
+                workspaceCwd: "/sandboxes/agent-a/user/chat-1",
+                startedAt: 123,
+            }),
+        ).resolves.toEqual({
+            runId: "runs:1",
+        });
+
+        expect(insert).toHaveBeenCalledWith("runtime_bindings", {
+            chatId: "chats:1",
+            userId: "users:test",
+            provider: "codex",
+            status: "active",
+            providerThreadId: "thread-1",
+            providerResumeToken: null,
+            activeRunId: "run:test",
+            lastError: null,
+            lastEventAt: 123,
+            expiresAt: null,
+            workspaceMode: "copy-on-conversation",
+            workspaceRootPath: "/repos/agent-a",
+            workspaceCwd: "/sandboxes/agent-a/user/chat-1",
+            updatedAt: 123,
+        });
+    });
+
+    test("runCompleted keeps workspace metadata on terminal runtime binding updates", async () => {
+        const insert = mock(async () => undefined);
+        const patch = mock(async () => undefined);
+        const chatCollect = mock(async () => [
+            {
+                _id: "chats:1",
+                updatedAt: 100,
+                createdAt: 100,
+            },
+        ]);
+        const runUnique = mock(async () => ({
+            _id: "runs:1",
+            chatId: "chats:1",
+            userId: "users:test",
+            provider: "codex",
+            status: "running",
+            outputMessageId: "messages:assistant",
+            providerThreadId: "thread-1",
+        }));
+        const messageCollect = mock(async () => [
+            {
+                _id: "messages:assistant",
+                chatId: "chats:1",
+                userId: "users:test",
+                kind: "assistant_message",
+                content: "old",
+                contextContent: "old",
+                status: "streaming",
+                runId: "run:test",
+                runMessageIndex: 0,
+                updatedAt: 100,
+                completedAt: null,
+            },
+        ]);
+        const bindingUnique = mock(async () => ({
+            _id: "runtimeBindings:1",
+            chatId: "chats:1",
+            userId: "users:test",
+            provider: "codex",
+            status: "active",
+            providerThreadId: "thread-1",
+            providerResumeToken: null,
+            activeRunId: "run:test",
+            lastError: null,
+            lastEventAt: 100,
+            expiresAt: null,
+            workspaceMode: "copy-on-conversation",
+            workspaceRootPath: "/repos/agent-a",
+            workspaceCwd: "/sandboxes/agent-a/user/chat-1",
+            updatedAt: 100,
+        }));
+        const query = mock((table: string) => {
+            if (table === "chats") {
+                return {
+                    withIndex: mock(() => ({
+                        collect: chatCollect,
+                    })),
+                };
+            }
+            if (table === "runs") {
+                return {
+                    withIndex: mock(() => ({
+                        unique: runUnique,
+                    })),
+                };
+            }
+            if (table === "messages") {
+                return {
+                    withIndex: mock(() => ({
+                        collect: messageCollect,
+                    })),
+                };
+            }
+
+            return {
+                withIndex: mock(() => ({
+                    unique: bindingUnique,
+                })),
+            };
+        });
+        const ctx = {
+            db: {
+                query,
+                insert,
+                patch,
+            },
+        };
+
+        await expect(
+            runHandler(runCompleted as unknown as HandlerExport, ctx, {
+                chatId: "chats:1",
+                userId: "users:test",
+                agentId: "agent-1",
+                conversationLocalId: "chat-1",
+                assistantMessageLocalId: "assistant-1",
+                externalRunId: "run:test",
+                sequence: 3,
+                content: "done",
+                workspaceMode: "copy-on-conversation",
+                workspaceRootPath: "/repos/agent-a",
+                workspaceCwd: "/sandboxes/agent-a/user/chat-1",
+                completedAt: 123,
+            }),
+        ).resolves.toBeUndefined();
+
+        expect(patch).toHaveBeenCalledWith("runtimeBindings:1", {
+            chatId: "chats:1",
+            userId: "users:test",
+            provider: "codex",
+            status: "idle",
+            providerThreadId: "thread-1",
+            providerResumeToken: null,
+            activeRunId: null,
+            lastError: null,
+            lastEventAt: 123,
+            expiresAt: null,
+            workspaceMode: "copy-on-conversation",
+            workspaceRootPath: "/repos/agent-a",
+            workspaceCwd: "/sandboxes/agent-a/user/chat-1",
+            updatedAt: 123,
+        });
+    });
+
+    test("recoverStaleRun keeps workspace metadata on recovered terminal bindings", async () => {
+        const insert = mock(async () => undefined);
+        const patch = mock(async () => undefined);
+        const get = mock(async (id: string) => {
+            if (id === "messages:assistant") {
+                return {
+                    _id: "messages:assistant",
+                    localId: "assistant-1",
+                    content: "orphaned content",
+                };
+            }
+            return null;
+        });
+        const chatCollect = mock(async () => [
+            {
+                _id: "chats:1",
+                updatedAt: 100,
+                createdAt: 100,
+            },
+        ]);
+        const runUnique = mock(async () => ({
+            _id: "runs:1",
+            chatId: "chats:1",
+            userId: "users:test",
+            provider: "codex",
+            status: "running",
+            outputMessageId: "messages:assistant",
+            providerThreadId: "thread-1",
+        }));
+        const bindingUnique = mock(async () => ({
+            _id: "runtimeBindings:1",
+            chatId: "chats:1",
+            userId: "users:test",
+            provider: "codex",
+            status: "active",
+            providerThreadId: "thread-1",
+            providerResumeToken: null,
+            activeRunId: "run:test",
+            lastError: null,
+            lastEventAt: 100,
+            expiresAt: null,
+            workspaceMode: "copy-on-conversation",
+            workspaceRootPath: "/repos/agent-a",
+            workspaceCwd: "/sandboxes/agent-a/user/chat-1",
+            updatedAt: 100,
+        }));
+        const messageCollect = mock(async () => [
+            {
+                _id: "messages:assistant",
+                chatId: "chats:1",
+                userId: "users:test",
+                kind: "assistant_message",
+                content: "old",
+                contextContent: "old",
+                status: "streaming",
+                runId: "run:test",
+                runMessageIndex: 0,
+                updatedAt: 100,
+                completedAt: null,
+            },
+        ]);
+        const runEventsTake = mock(async () => []);
+        const query = mock((table: string) => {
+            if (table === "chats") {
+                return {
+                    withIndex: mock(() => ({
+                        collect: chatCollect,
+                    })),
+                };
+            }
+            if (table === "runs") {
+                return {
+                    withIndex: mock(() => ({
+                        unique: runUnique,
+                    })),
+                };
+            }
+            if (table === "messages") {
+                return {
+                    withIndex: mock(() => ({
+                        collect: messageCollect,
+                    })),
+                };
+            }
+            if (table === "run_events") {
+                return {
+                    withIndex: mock(() => ({
+                        order: mock(() => ({
+                            take: runEventsTake,
+                        })),
+                    })),
+                };
+            }
+
+            return {
+                withIndex: mock(() => ({
+                    unique: bindingUnique,
+                })),
+            };
+        });
+        const ctx = {
+            db: {
+                query,
+                patch,
+                insert,
+                get,
+            },
+        };
+
+        await expect(
+            runHandler(recoverStaleRun as unknown as HandlerExport, ctx, {
+                chatId: "chats:1",
+                userId: "users:test",
+                agentId: "agent-1",
+                conversationLocalId: "chat-1",
+                externalRunId: "run:test",
+                completedAt: 123,
+                errorMessage: "stale",
+                workspaceMode: "copy-on-conversation",
+                workspaceRootPath: "/repos/agent-a",
+                workspaceCwd: "/sandboxes/agent-a/user/chat-1",
+            }),
+        ).resolves.toBeUndefined();
+
+        expect(patch).toHaveBeenCalledWith("runtimeBindings:1", {
+            chatId: "chats:1",
+            userId: "users:test",
+            provider: "codex",
+            status: "errored",
+            providerThreadId: "thread-1",
+            providerResumeToken: null,
+            activeRunId: null,
+            lastError: "stale",
+            lastEventAt: 123,
+            expiresAt: null,
+            workspaceMode: "copy-on-conversation",
+            workspaceRootPath: "/repos/agent-a",
+            workspaceCwd: "/sandboxes/agent-a/user/chat-1",
             updatedAt: 123,
         });
     });

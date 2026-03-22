@@ -452,6 +452,11 @@ describe("CodexRuntimeManager", () => {
                 agentId: "agent-1",
                 conversationLocalId: "chat-1",
             },
+            {
+                userId: "user-1",
+                agentId: "agent-1",
+                conversationLocalId: "chat-1",
+            },
         ]);
         expect(events.map((event) => event.type)).toEqual([
             "run.started",
@@ -703,6 +708,11 @@ describe("CodexRuntimeManager", () => {
         await Bun.sleep(0);
 
         expect(persistence.runStartedCalls).toHaveLength(1);
+        expect(persistence.runStartedCalls[0]).toMatchObject({
+            workspaceMode: "shared",
+            workspaceRootPath: config.agents[0]!.rootPath,
+            workspaceCwd: config.agents[0]!.rootPath,
+        });
         expect(persistence.messageDeltaCalls).toHaveLength(0);
         expect(events).toEqual([]);
 
@@ -794,6 +804,9 @@ describe("CodexRuntimeManager", () => {
             providerThreadId: "thread-orphaned",
             status: "active",
             activeRunId: "run-orphaned",
+            workspaceMode: "shared",
+            workspaceRootPath: config.agents[0]!.rootPath,
+            workspaceCwd: config.agents[0]!.rootPath,
         });
         const manager = new CodexRuntimeManager({
             getConfig: () => config,
@@ -824,6 +837,86 @@ describe("CodexRuntimeManager", () => {
             externalRunId: "run-orphaned",
             errorMessage:
                 "This run was orphaned after the runtime disconnected before completion.",
+            workspaceMode: "shared",
+            workspaceRootPath: config.agents[0]!.rootPath,
+            workspaceCwd: config.agents[0]!.rootPath,
+        });
+    });
+
+    test("reconciles orphaned active runs before starting a new turn after runtime loss", async () => {
+        const config = createConfig();
+        const persistence = createPersistence({
+            provider: "codex-default",
+            providerThreadId: "thread-orphaned",
+            status: "active",
+            activeRunId: "run-orphaned",
+            workspaceMode: "shared",
+            workspaceRootPath: config.agents[0]!.rootPath,
+            workspaceCwd: config.agents[0]!.rootPath,
+        });
+        const fakeClient = new FakeCodexClient({
+            startedThreadId: "thread-new",
+        });
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: () => fakeClient,
+        });
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        expect(persistence.recoverStaleRunCalls).toHaveLength(1);
+        expect(persistence.recoverStaleRunCalls[0]).toMatchObject({
+            agentId: "agent-1",
+            conversationLocalId: "chat-1",
+            externalRunId: "run-orphaned",
+        });
+    });
+
+    test("fails closed when orphaned run recovery cannot finalize the stale run", async () => {
+        const config = createConfig();
+        const persistence = createPersistence({
+            provider: "codex-default",
+            providerThreadId: "thread-orphaned",
+            status: "active",
+            activeRunId: "run-orphaned",
+            workspaceMode: "shared",
+            workspaceRootPath: config.agents[0]!.rootPath,
+            workspaceCwd: config.agents[0]!.rootPath,
+        });
+        persistence.recoverStaleRun = async (payload: Record<string, unknown>) => {
+            persistence.recoverStaleRunCalls.push(payload);
+            throw new Error("Run not found");
+        };
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: () => new FakeCodexClient(),
+        });
+
+        await expect(
+            manager.subscribe({
+                userId: "user-1",
+                conversationId: "chat-1",
+                agentId: "agent-1",
+                subscriberId: "socket-2",
+                sendEvent: () => undefined,
+            }),
+        ).resolves.toBeUndefined();
+
+        expect(persistence.runtimeBindingCalls.at(-1)).toMatchObject({
+            conversationLocalId: "chat-1",
+            status: "errored",
+            activeRunId: null,
+            lastError: "Run not found",
+            workspaceMode: "shared",
+            workspaceRootPath: config.agents[0]!.rootPath,
+            workspaceCwd: config.agents[0]!.rootPath,
         });
     });
 
@@ -1305,6 +1398,9 @@ describe("CodexRuntimeManager", () => {
         expect(persistence.runCompletedCalls[0]).toMatchObject({
             assistantMessageLocalId: expect.any(String),
             content: "Hello!",
+            workspaceMode: "shared",
+            workspaceRootPath: config.agents[0]!.rootPath,
+            workspaceCwd: config.agents[0]!.rootPath,
         });
         expect(
             persistence.runCompletedCalls[0]?.assistantMessageLocalId,
@@ -1449,6 +1545,9 @@ describe("CodexRuntimeManager", () => {
             conversationLocalId: "chat-1",
             assistantMessageLocalId: "assistant-1",
             errorMessage: "turn/start failed: codex unavailable",
+            workspaceMode: "shared",
+            workspaceRootPath: config.agents[0]!.rootPath,
+            workspaceCwd: config.agents[0]!.rootPath,
         });
         expect(persistence.runtimeBindingCalls.at(-1)).toMatchObject({
             conversationLocalId: "chat-1",
