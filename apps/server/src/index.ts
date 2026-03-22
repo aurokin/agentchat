@@ -8,6 +8,16 @@ import { CodexRuntimeManager } from "./codexRuntime.ts";
 import { createFetchHandler } from "./http.ts";
 import { RuntimePersistenceClient } from "./runtimePersistence.ts";
 import {
+    getSandboxRootsRegistryPath,
+    WorkspaceManager,
+} from "./workspaceManager.ts";
+import { resolveDefaultStateId } from "./serverState.ts";
+import {
+    getPersistedWorkspaceActiveKeys,
+    getCopyOnConversationAgentIds,
+    shouldSkipPersistedWorkspaceScan,
+} from "./workspaceReconciliation.ts";
+import {
     handleConnectedSocketMessage,
     handleSocketClose,
     type BackendSession,
@@ -19,9 +29,18 @@ const runtimePersistence = new RuntimePersistenceClient();
 const modelCatalog = new CodexModelCatalog({
     getConfig: () => configStore.snapshot,
 });
+const workspaceManager = new WorkspaceManager({
+    getConfig: () => configStore.snapshot,
+    getRootsRegistryPath: () =>
+        getSandboxRootsRegistryPath(
+            configStore.snapshot.stateId ??
+                resolveDefaultStateId(configStore.path),
+        ),
+});
 const runtimeManager = new CodexRuntimeManager({
     getConfig: () => configStore.snapshot,
     persistence: runtimePersistence,
+    workspaceManager,
 });
 
 type WebSocketData = {
@@ -111,3 +130,59 @@ console.log(
     `[agentchat-server] listening on http://${server.hostname}:${server.port}`,
 );
 console.log(`[agentchat-server] using config ${configStore.path}`);
+
+// Sandbox workspace reconciliation — prune orphaned directories on startup
+// and every 10 minutes. Best-effort; failures are logged and ignored.
+const RECONCILE_INTERVAL_MS = 10 * 60 * 1000;
+const SANDBOX_ROOT_HEARTBEAT_INTERVAL_MS = 60_000;
+
+async function runReconciliation(): Promise<void> {
+    try {
+        const configuredAgentIds = new Set(
+            configStore.snapshot.agents.map((agent) => agent.id),
+        );
+        const copyOnConversationAgentIds = getCopyOnConversationAgentIds(
+            configStore.snapshot.agents,
+        );
+        const activeRuntimeKeys = runtimeManager.getActiveConversationKeys();
+        if (
+            shouldSkipPersistedWorkspaceScan({
+                copyOnConversationAgentIds,
+                activeWorkspaceKeys: activeRuntimeKeys,
+                hasManagedWorkspaces: workspaceManager.hasManagedWorkspaces(),
+            })
+        ) {
+            return;
+        }
+
+        const entries = await runtimePersistence.listAllChatLocalIds();
+        // Build composite keys so reconciliation can distinguish sandboxes
+        // across agents, users, and client-supplied localIds.
+        const activeKeys = getPersistedWorkspaceActiveKeys(entries, {
+            copyOnConversationAgentIds,
+            configuredAgentIds,
+            currentCopyOnConversationSandboxRootsByAgent:
+                workspaceManager.listCurrentCopyOnConversationSandboxRootsByAgent(),
+            currentSandboxRoots: workspaceManager.listCurrentSandboxRoots(),
+            knownSandboxRoots: workspaceManager.listKnownSandboxRoots(),
+        });
+        // Include live runtimes to avoid deleting sandboxes for in-progress
+        // sessions not yet persisted to Convex.
+        for (const key of activeRuntimeKeys) {
+            activeKeys.add(key);
+        }
+        await workspaceManager.reconcile(activeKeys);
+    } catch (error) {
+        console.error(
+            "[agentchat-server] workspace reconciliation failed:",
+            error,
+        );
+    }
+}
+
+void runReconciliation();
+setInterval(() => void runReconciliation(), RECONCILE_INTERVAL_MS);
+setInterval(
+    () => workspaceManager.refreshSandboxRootsHeartbeat(),
+    SANDBOX_ROOT_HEARTBEAT_INTERVAL_MS,
+);

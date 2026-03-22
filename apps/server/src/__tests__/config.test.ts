@@ -1,9 +1,16 @@
 import { describe, expect, mock, test } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+    mkdirSync,
+    mkdtempSync,
+    readFileSync,
+    rmSync,
+    symlinkSync,
+    writeFileSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { ConfigStore, parseConfig } from "../config.ts";
+import { ConfigStore, loadConfigFile, parseConfig } from "../config.ts";
 import { createFetchHandler } from "../http.ts";
 
 const exampleConfigPath = path.resolve(
@@ -42,6 +49,231 @@ describe("server config", () => {
         expect(exampleConfig.agents).toHaveLength(1);
         expect(exampleConfig.agents[0]?.defaultProviderId).toBe("codex-main");
         expect(exampleConfig.providers[0]?.models[0]?.id).toBe("gpt-5.4");
+    });
+
+    test("keeps the default state id stable across checkout relocations", () => {
+        const releaseADir = mkdtempSync(path.join(os.tmpdir(), "release-a-"));
+        const releaseBDir = mkdtempSync(path.join(os.tmpdir(), "release-b-"));
+        const releaseAPath = path.join(releaseADir, "agentchat.config.json");
+        const releaseBPath = path.join(releaseBDir, "agentchat.config.json");
+        const releaseAConfig = JSON.parse(
+            readFileSync(exampleConfigPath, "utf8"),
+        ) as Record<string, unknown>;
+        const releaseBConfig = JSON.parse(
+            readFileSync(exampleConfigPath, "utf8"),
+        ) as Record<string, unknown>;
+
+        const releaseAAgents = (
+            releaseAConfig.agents as Array<Record<string, unknown>>
+        ).map((agent) => ({
+            ...agent,
+            rootPath: "/srv/releases/a/agent-root",
+        }));
+        const releaseBAgents = (
+            releaseBConfig.agents as Array<Record<string, unknown>>
+        ).map((agent) => ({
+            ...agent,
+            rootPath: "/srv/releases/b/agent-root",
+        }));
+        const releaseAProviders = (
+            releaseAConfig.providers as Array<Record<string, unknown>>
+        ).map((provider) => ({
+            ...provider,
+            codex: {
+                ...(provider.codex as Record<string, unknown>),
+                cwd: "/srv/releases/a",
+            },
+        }));
+        const releaseBProviders = (
+            releaseBConfig.providers as Array<Record<string, unknown>>
+        ).map((provider) => ({
+            ...provider,
+            codex: {
+                ...(provider.codex as Record<string, unknown>),
+                cwd: "/srv/releases/b",
+            },
+        }));
+
+        try {
+            writeFileSync(
+                releaseAPath,
+                JSON.stringify({
+                    ...releaseAConfig,
+                    agents: releaseAAgents,
+                    providers: releaseAProviders,
+                }),
+            );
+            writeFileSync(
+                releaseBPath,
+                JSON.stringify({
+                    ...releaseBConfig,
+                    agents: releaseBAgents,
+                    providers: releaseBProviders,
+                }),
+            );
+
+            expect(loadConfigFile(releaseAPath).stateId).toBe(
+                loadConfigFile(releaseBPath).stateId,
+            );
+            expect(loadConfigFile(releaseAPath).instanceKey).not.toBe(
+                loadConfigFile(releaseBPath).instanceKey,
+            );
+        } finally {
+            rmSync(releaseADir, { recursive: true, force: true });
+            rmSync(releaseBDir, { recursive: true, force: true });
+        }
+    });
+
+    test("separates default state ids for installs with different config identities", () => {
+        const baseConfig = JSON.parse(
+            readFileSync(exampleConfigPath, "utf8"),
+        ) as Record<string, unknown>;
+        const stagingConfig = {
+            ...baseConfig,
+            auth: {
+                ...(baseConfig.auth as Record<string, unknown>),
+                defaultProviderId: "google-staging",
+                providers: [
+                    {
+                        id: "google-staging",
+                        kind: "google",
+                        enabled: true,
+                        allowlistMode: "email",
+                        allowedEmails: [],
+                        allowedDomains: [],
+                        googleHostedDomain: null,
+                    },
+                ],
+            },
+        };
+        const productionConfig = {
+            ...baseConfig,
+            auth: {
+                ...(baseConfig.auth as Record<string, unknown>),
+                defaultProviderId: "google-prod",
+                providers: [
+                    {
+                        id: "google-prod",
+                        kind: "google",
+                        enabled: true,
+                        allowlistMode: "email",
+                        allowedEmails: [],
+                        allowedDomains: [],
+                        googleHostedDomain: null,
+                    },
+                ],
+            },
+        };
+
+        expect(parseConfig(stagingConfig).stateId).not.toBe(
+            parseConfig(productionConfig).stateId,
+        );
+    });
+
+    test("rejects unsupported auth.mode configs", () => {
+        expect(() =>
+            parseConfig({
+                version: 1,
+                auth: {
+                    mode: "google",
+                    allowlistMode: "email",
+                    allowedEmails: [],
+                    allowedDomains: [],
+                    googleHostedDomain: null,
+                },
+                providers: [],
+                agents: [],
+            }),
+        ).toThrow();
+    });
+
+    test("keeps the default state id stable across sandboxRoot migrations", () => {
+        const baseConfig = JSON.parse(
+            readFileSync(exampleConfigPath, "utf8"),
+        ) as Record<string, unknown>;
+        const oldRootConfig = {
+            ...baseConfig,
+            sandboxRoot: "/srv/agentchat/old-sandboxes",
+        };
+        const newRootConfig = {
+            ...baseConfig,
+            sandboxRoot: "/srv/agentchat/new-sandboxes",
+        };
+
+        expect(parseConfig(oldRootConfig).stateId).toBe(
+            parseConfig(newRootConfig).stateId,
+        );
+        expect(parseConfig(oldRootConfig).instanceKey).not.toBe(
+            parseConfig(newRootConfig).instanceKey,
+        );
+    });
+
+    test("keeps the default instance key stable across path-alias-only changes", () => {
+        const releaseRoot = mkdtempSync(path.join(os.tmpdir(), "release-"));
+        const realRepoRoot = path.join(releaseRoot, "real-root");
+        const aliasRepoRoot = path.join(releaseRoot, "alias-root");
+        mkdirSync(realRepoRoot, { recursive: true });
+        symlinkSync(realRepoRoot, aliasRepoRoot, "dir");
+
+        const baseConfig = JSON.parse(
+            readFileSync(exampleConfigPath, "utf8"),
+        ) as Record<string, unknown>;
+        const realConfig = {
+            ...baseConfig,
+            providers: (
+                baseConfig.providers as Array<Record<string, unknown>>
+            ).map((provider) => ({
+                ...provider,
+                codex: {
+                    ...(provider.codex as Record<string, unknown>),
+                    cwd: realRepoRoot,
+                },
+            })),
+            agents: (baseConfig.agents as Array<Record<string, unknown>>).map(
+                (agent) => ({
+                    ...agent,
+                    rootPath: realRepoRoot,
+                }),
+            ),
+        };
+        const aliasedConfig = {
+            ...baseConfig,
+            providers: (
+                baseConfig.providers as Array<Record<string, unknown>>
+            ).map((provider) => ({
+                ...provider,
+                codex: {
+                    ...(provider.codex as Record<string, unknown>),
+                    cwd: aliasRepoRoot,
+                },
+            })),
+            agents: (baseConfig.agents as Array<Record<string, unknown>>).map(
+                (agent) => ({
+                    ...agent,
+                    rootPath: aliasRepoRoot,
+                }),
+            ),
+        };
+
+        try {
+            expect(parseConfig(realConfig).instanceKey).toBe(
+                parseConfig(aliasedConfig).instanceKey,
+            );
+        } finally {
+            rmSync(releaseRoot, { recursive: true, force: true });
+        }
+    });
+
+    test("preserves an explicit state id from config", () => {
+        const parsed = parseConfig({
+            version: 1,
+            stateId: "prod-self-host",
+            auth: exampleConfig.auth,
+            providers: exampleConfig.providers,
+            agents: exampleConfig.agents,
+        });
+
+        expect(parsed.stateId).toBe("prod-self-host");
     });
 
     test("serves bootstrap, provider models, and agent options routes", async () => {
@@ -164,6 +396,291 @@ describe("server config", () => {
                 },
             ],
         });
+    });
+
+    test("defaults sandboxRoot to ~/.agentchat/sandboxes when not specified", () => {
+        const config = parseConfig({
+            version: 1,
+            auth: {
+                defaultProviderId: "google-main",
+                providers: [
+                    {
+                        id: "google-main",
+                        kind: "google",
+                        enabled: true,
+                        allowlistMode: "email",
+                        allowedEmails: ["operator@example.com"],
+                        allowedDomains: [],
+                        googleHostedDomain: null,
+                    },
+                ],
+            },
+            providers: exampleConfig.providers,
+            agents: exampleConfig.agents,
+        });
+
+        expect(config.sandboxRoot).toBe(
+            path.join(os.homedir(), ".agentchat", "sandboxes"),
+        );
+    });
+
+    test("uses explicit sandboxRoot when specified", () => {
+        const config = parseConfig({
+            version: 1,
+            sandboxRoot: "/custom/sandbox/path",
+            auth: {
+                defaultProviderId: "google-main",
+                providers: [
+                    {
+                        id: "google-main",
+                        kind: "google",
+                        enabled: true,
+                        allowlistMode: "email",
+                        allowedEmails: ["operator@example.com"],
+                        allowedDomains: [],
+                        googleHostedDomain: null,
+                    },
+                ],
+            },
+            providers: exampleConfig.providers,
+            agents: exampleConfig.agents,
+        });
+
+        expect(config.sandboxRoot).toBe("/custom/sandbox/path");
+    });
+
+    test("defaults workspaceMode to shared when not specified", () => {
+        expect(exampleConfig.agents[0]?.workspaceMode).toBe("shared");
+    });
+
+    test("allows unsafe agent ids in shared mode", () => {
+        const config = parseConfig({
+            version: 1,
+            auth: {
+                defaultProviderId: "local-main",
+                providers: [
+                    {
+                        id: "local-main",
+                        kind: "local",
+                        enabled: true,
+                        allowSignup: false,
+                    },
+                ],
+            },
+            providers: exampleConfig.providers,
+            agents: [
+                {
+                    ...exampleConfig.agents[0],
+                    id: "team/frontend",
+                    workspaceMode: "shared",
+                },
+            ],
+        });
+
+        expect(config.agents[0]?.id).toBe("team/frontend");
+    });
+
+    test("rejects unsafe agent ids for copy-on-conversation workspaces", () => {
+        expect(() =>
+            parseConfig({
+                version: 1,
+                auth: {
+                    defaultProviderId: "local-main",
+                    providers: [
+                        {
+                            id: "local-main",
+                            kind: "local",
+                            enabled: true,
+                            allowSignup: false,
+                        },
+                    ],
+                },
+                providers: exampleConfig.providers,
+                agents: [
+                    {
+                        ...exampleConfig.agents[0],
+                        id: "team/frontend",
+                        workspaceMode: "copy-on-conversation",
+                    },
+                ],
+            }),
+        ).toThrow(/safe filesystem path segment/);
+    });
+
+    test("rejects agent ids with Windows-reserved names or characters", () => {
+        expect(() =>
+            parseConfig({
+                version: 1,
+                auth: {
+                    defaultProviderId: "local-main",
+                    providers: [
+                        {
+                            id: "local-main",
+                            kind: "local",
+                            enabled: true,
+                            allowSignup: false,
+                        },
+                    ],
+                },
+                providers: exampleConfig.providers,
+                agents: [
+                    {
+                        ...exampleConfig.agents[0],
+                        id: "frontend:api",
+                        workspaceMode: "copy-on-conversation",
+                    },
+                ],
+            }),
+        ).toThrow(/safe filesystem path segment/);
+
+        expect(() =>
+            parseConfig({
+                version: 1,
+                auth: {
+                    defaultProviderId: "local-main",
+                    providers: [
+                        {
+                            id: "local-main",
+                            kind: "local",
+                            enabled: true,
+                            allowSignup: false,
+                        },
+                    ],
+                },
+                providers: exampleConfig.providers,
+                agents: [
+                    {
+                        ...exampleConfig.agents[0],
+                        id: "CON",
+                        workspaceMode: "copy-on-conversation",
+                    },
+                ],
+            }),
+        ).toThrow(/safe filesystem path segment/);
+    });
+
+    test("rejects config where sandboxRoot overlaps an agent rootPath for copy-on-conversation", () => {
+        expect(() =>
+            parseConfig({
+                version: 1,
+                sandboxRoot: "/projects/my-app/sandboxes",
+                auth: {
+                    defaultProviderId: "local-main",
+                    providers: [
+                        {
+                            id: "local-main",
+                            kind: "local",
+                            enabled: true,
+                            allowSignup: false,
+                        },
+                    ],
+                },
+                providers: exampleConfig.providers,
+                agents: [
+                    {
+                        ...exampleConfig.agents[0],
+                        rootPath: "/projects/my-app",
+                        workspaceMode: "copy-on-conversation",
+                    },
+                ],
+            }),
+        ).toThrow(/overlaps with sandboxRoot/);
+    });
+
+    test("allows shared-mode agents whose rootPath overlaps sandboxRoot", () => {
+        const config = parseConfig({
+            version: 1,
+            sandboxRoot: "/projects/my-app/sandboxes",
+            auth: {
+                defaultProviderId: "local-main",
+                providers: [
+                    {
+                        id: "local-main",
+                        kind: "local",
+                        enabled: true,
+                        allowSignup: false,
+                    },
+                ],
+            },
+            providers: exampleConfig.providers,
+            agents: [
+                {
+                    ...exampleConfig.agents[0],
+                    rootPath: "/projects/my-app",
+                    workspaceMode: "shared",
+                },
+            ],
+        });
+
+        expect(config.agents[0]?.workspaceMode).toBe("shared");
+    });
+
+    test("rejects agent rootPath overlapping the implicit default sandboxRoot", () => {
+        // Agent rooted at ~/.agentchat contains the default sandboxRoot (~/.agentchat/sandboxes)
+        expect(() =>
+            parseConfig({
+                version: 1,
+                auth: {
+                    defaultProviderId: "local-main",
+                    providers: [
+                        {
+                            id: "local-main",
+                            kind: "local",
+                            enabled: true,
+                            allowSignup: false,
+                        },
+                    ],
+                },
+                providers: exampleConfig.providers,
+                agents: [
+                    {
+                        ...exampleConfig.agents[0],
+                        rootPath: path.join(os.homedir(), ".agentchat"),
+                        workspaceMode: "copy-on-conversation",
+                    },
+                ],
+            }),
+        ).toThrow(/overlaps with sandboxRoot/);
+    });
+
+    test("rejects sandboxRoot overlaps through symlinked path aliases", () => {
+        const tempDir = mkdtempSync(
+            path.join(os.tmpdir(), "agentchat-config-symlink-"),
+        );
+        const repoRoot = path.join(tempDir, "repo");
+        const aliasParent = path.join(tempDir, "aliases");
+        const sandboxAlias = path.join(aliasParent, "sandboxes");
+        mkdirSync(path.join(repoRoot, "sandboxes"), { recursive: true });
+        mkdirSync(aliasParent, { recursive: true });
+        symlinkSync(path.join(repoRoot, "sandboxes"), sandboxAlias);
+
+        expect(() =>
+            parseConfig({
+                version: 1,
+                sandboxRoot: sandboxAlias,
+                auth: {
+                    defaultProviderId: "local-main",
+                    providers: [
+                        {
+                            id: "local-main",
+                            kind: "local",
+                            enabled: true,
+                            allowSignup: false,
+                        },
+                    ],
+                },
+                providers: exampleConfig.providers,
+                agents: [
+                    {
+                        ...exampleConfig.agents[0],
+                        rootPath: repoRoot,
+                        workspaceMode: "copy-on-conversation",
+                    },
+                ],
+            }),
+        ).toThrow(/overlaps with sandboxRoot/);
+
+        rmSync(tempDir, { recursive: true, force: true });
     });
 
     test("parses local auth config", () => {

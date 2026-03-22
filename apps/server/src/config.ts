@@ -1,8 +1,18 @@
 import { existsSync, readFileSync, watch } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { z } from "zod";
+import {
+    canonicalizePathForComparison,
+    pathsOverlap,
+} from "./pathComparison.ts";
+import { isSafePathSegment } from "./sandboxPaths.ts";
+import {
+    resolveDefaultInstanceKey,
+    resolveDefaultStateId,
+} from "./serverState.ts";
 
 const GoogleAuthProviderSchema = z.object({
     id: z.string().min(1),
@@ -60,18 +70,6 @@ const ProviderAuthConfigSchema = z
         }
     });
 
-const LegacyGoogleAuthConfigSchema = z.object({
-    mode: z.literal("google"),
-    allowlistMode: z.literal("email"),
-    allowedEmails: z.array(z.email()),
-    allowedDomains: z.array(z.string()),
-    googleHostedDomain: z.union([z.string(), z.null()]),
-});
-
-const LegacyAuthConfigSchema = z.discriminatedUnion("mode", [
-    LegacyGoogleAuthConfigSchema,
-]);
-
 const ProviderVariantSchema = z.object({
     id: z.string().min(1),
     label: z.string().min(1),
@@ -120,12 +118,25 @@ const AgentSchema = z
         variantAllowlist: z.array(z.string()).default([]),
         tags: z.array(z.string()).default([]),
         sortOrder: z.number().int().default(0),
+        workspaceMode: z
+            .enum(["shared", "copy-on-conversation"])
+            .default("shared"),
     })
     .superRefine((agent, ctx) => {
         if (!path.isAbsolute(agent.rootPath)) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
                 message: `Agent '${agent.id}' rootPath must be absolute.`,
+            });
+        }
+
+        if (
+            agent.workspaceMode === "copy-on-conversation" &&
+            !isSafePathSegment(agent.id)
+        ) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: `Agent '${agent.id}' id must be a safe filesystem path segment when workspaceMode is copy-on-conversation.`,
             });
         }
 
@@ -140,11 +151,20 @@ const AgentSchema = z
 const AgentchatConfigInputSchema = z
     .object({
         version: z.literal(1),
-        auth: z.union([ProviderAuthConfigSchema, LegacyAuthConfigSchema]),
+        auth: ProviderAuthConfigSchema,
+        stateId: z.string().min(1).optional(),
+        sandboxRoot: z.string().min(1).optional(),
         providers: z.array(CodexProviderSchema),
         agents: z.array(AgentSchema),
     })
     .superRefine((config, ctx) => {
+        if (config.sandboxRoot && !path.isAbsolute(config.sandboxRoot)) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: `sandboxRoot must be an absolute path.`,
+            });
+        }
+
         const providerIds = new Set<string>();
         for (const provider of config.providers) {
             if (providerIds.has(provider.id)) {
@@ -162,6 +182,10 @@ const AgentchatConfigInputSchema = z
                 });
             }
         }
+
+        const resolvedSandboxRoot = path.resolve(
+            config.sandboxRoot ?? DEFAULT_SANDBOX_ROOT,
+        );
 
         const agentIds = new Set<string>();
         for (const agent of config.agents) {
@@ -181,6 +205,19 @@ const AgentchatConfigInputSchema = z
                     });
                 }
             }
+
+            const resolvedRootPath = path.resolve(agent.rootPath);
+            if (
+                agent.workspaceMode === "copy-on-conversation" &&
+                pathsOverlap(resolvedSandboxRoot, resolvedRootPath)
+            ) {
+                const effectiveSandboxRoot =
+                    config.sandboxRoot ?? DEFAULT_SANDBOX_ROOT;
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: `Agent '${agent.id}' rootPath '${agent.rootPath}' overlaps with sandboxRoot '${effectiveSandboxRoot}'. These must be disjoint to prevent recursive copies and accidental deletions.`,
+                });
+            }
         }
     });
 
@@ -188,9 +225,12 @@ export type AuthProviderConfig = z.infer<typeof AuthProviderSchema>;
 export type AuthConfig = z.infer<typeof ProviderAuthConfigSchema>;
 export type AgentchatConfig = Omit<
     z.infer<typeof AgentchatConfigInputSchema>,
-    "auth"
+    "auth" | "sandboxRoot" | "stateId"
 > & {
     auth: AuthConfig;
+    stateId?: string;
+    sandboxRoot: string;
+    instanceKey: string;
 };
 export type AgentConfig = AgentchatConfig["agents"][number];
 export type ProviderConfig = AgentchatConfig["providers"][number];
@@ -212,44 +252,96 @@ export function resolveDefaultConfigPath(): string {
     return exampleConfigPath;
 }
 
-function normalizeAuthConfig(
-    auth:
-        | z.infer<typeof ProviderAuthConfigSchema>
-        | z.infer<typeof LegacyAuthConfigSchema>,
-): AuthConfig {
-    if ("providers" in auth) {
-        return auth;
-    }
+const DEFAULT_SANDBOX_ROOT = path.join(os.homedir(), ".agentchat", "sandboxes");
 
-    return {
-        defaultProviderId: "google-main",
-        providers: [
-            {
-                id: "google-main",
-                kind: "google",
-                enabled: true,
-                allowlistMode: auth.allowlistMode,
-                allowedEmails: auth.allowedEmails,
-                allowedDomains: auth.allowedDomains,
-                googleHostedDomain: auth.googleHostedDomain,
+function buildDefaultStateIdSeed(
+    parsed: z.infer<typeof AgentchatConfigInputSchema>,
+    auth: AuthConfig,
+): string {
+    return JSON.stringify({
+        version: parsed.version,
+        auth,
+        providers: parsed.providers.map((provider) => ({
+            id: provider.id,
+            kind: provider.kind,
+            label: provider.label,
+            enabled: provider.enabled,
+            idleTtlSeconds: provider.idleTtlSeconds,
+            modelCacheTtlSeconds: provider.modelCacheTtlSeconds,
+            models: provider.models,
+            codex: {
+                command: provider.codex.command,
+                args: provider.codex.args,
+                baseEnvKeys: Object.keys(provider.codex.baseEnv).sort(),
+                hasCwd: Boolean(provider.codex.cwd),
             },
-        ],
+        })),
+        agents: parsed.agents.map(({ rootPath, ...agent }) => agent),
+    });
+}
+
+function buildDefaultInstanceKeySeed(
+    parsed: z.infer<typeof AgentchatConfigInputSchema>,
+): string {
+    return JSON.stringify({
+        sandboxRoot: canonicalizePathForComparison(
+            parsed.sandboxRoot ?? DEFAULT_SANDBOX_ROOT,
+        ),
+        providers: parsed.providers.map((provider) => ({
+            id: provider.id,
+            codexCwd: provider.codex.cwd
+                ? canonicalizePathForComparison(provider.codex.cwd)
+                : null,
+        })),
+        agents: parsed.agents.map((agent) => ({
+            id: agent.id,
+            rootPath: canonicalizePathForComparison(agent.rootPath),
+            workspaceMode: agent.workspaceMode ?? "shared",
+        })),
+    });
+}
+
+function normalizeParsedConfig(
+    parsed: z.infer<typeof AgentchatConfigInputSchema>,
+    params: {
+        configPath?: string;
+    } = {},
+): AgentchatConfig {
+    const {
+        sandboxRoot: rawSandboxRoot,
+        stateId: rawStateId,
+        auth,
+        ...rest
+    } = parsed;
+    const sandboxRoot = rawSandboxRoot ?? DEFAULT_SANDBOX_ROOT;
+    return {
+        ...rest,
+        auth,
+        stateId:
+            rawStateId?.trim() ||
+            resolveDefaultStateId(
+                params.configPath ?? "agentchat.config.json",
+                buildDefaultStateIdSeed(parsed, auth),
+            ),
+        sandboxRoot,
+        instanceKey: resolveDefaultInstanceKey(
+            buildDefaultInstanceKeySeed(parsed),
+        ),
     };
 }
 
 export function parseConfig(input: unknown): AgentchatConfig {
-    const parsed = AgentchatConfigInputSchema.parse(input);
-    return {
-        ...parsed,
-        auth: normalizeAuthConfig(parsed.auth),
-    };
+    return normalizeParsedConfig(AgentchatConfigInputSchema.parse(input));
 }
 
 export function loadConfigFile(
     configPath = resolveDefaultConfigPath(),
 ): AgentchatConfig {
     const raw = readFileSync(configPath, "utf8");
-    return parseConfig(JSON.parse(raw) as unknown);
+    return normalizeParsedConfig(
+        AgentchatConfigInputSchema.parse(JSON.parse(raw) as unknown),
+        { configPath },
+    );
 }
 
 export class ConfigStore {

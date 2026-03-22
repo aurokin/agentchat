@@ -1,16 +1,46 @@
-import { describe, expect, test } from "bun:test";
+import {
+    existsSync,
+    mkdtempSync,
+    readFileSync,
+    rmSync,
+    symlinkSync,
+    writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+
+import { afterEach, describe, expect, test } from "bun:test";
 
 import type { AgentchatConfig } from "../config.ts";
 import type { RuntimePersistenceClient } from "../runtimePersistence.ts";
+import type { ServerEvent } from "../socketProtocol.ts";
+import { WorkspaceManager } from "../workspaceManager.ts";
 import {
     buildInitialTurnText,
     CodexRuntimeManager,
     isRecoverableThreadResumeError,
 } from "../codexRuntime.ts";
 
+const tempRoots: string[] = [];
+
+function makeTempDir(name: string): string {
+    const dir = mkdtempSync(path.join(tmpdir(), `${name}-`));
+    tempRoots.push(dir);
+    return dir;
+}
+
+afterEach(() => {
+    for (const tempRoot of tempRoots.splice(0)) {
+        rmSync(tempRoot, { force: true, recursive: true });
+    }
+});
+
 function createConfig(): AgentchatConfig {
     return {
         version: 1,
+        stateId: "test-state",
+        instanceKey: "instance-test",
+        sandboxRoot: "/tmp/agentchat-sandboxes",
         auth: {
             defaultProviderId: "google-main",
             providers: [
@@ -64,6 +94,7 @@ function createConfig(): AgentchatConfig {
                 variantAllowlist: [],
                 tags: [],
                 sortOrder: 0,
+                workspaceMode: "shared",
             },
         ],
     };
@@ -76,6 +107,7 @@ type FakeClientOptions = {
     turnId?: string;
     autoComplete?: boolean;
     turnStartError?: Error;
+    initializePromise?: Promise<void>;
 };
 
 class FakeCodexClient {
@@ -90,6 +122,7 @@ class FakeCodexClient {
     }
 
     async initialize(): Promise<void> {
+        await this.options.initializePromise;
         return undefined;
     }
 
@@ -153,7 +186,7 @@ class FakeCodexClient {
         this.exitHandler = handler;
     }
 
-    stop(): void {
+    async stop(): Promise<void> {
         this.stopped = true;
     }
 
@@ -172,12 +205,23 @@ function createPersistence(
         providerThreadId: string | null;
         status?: "idle" | "active" | "expired" | "errored";
         activeRunId?: string | null;
+        workspaceMode?: "shared" | "copy-on-conversation";
+        workspaceRootPath?: string;
+        workspaceCwd?: string;
+        updatedAt?: number;
     } | null,
 ) {
+    const chatId = "chats:chat-1";
     return {
         readRuntimeBindingCalls: [] as Array<{
             userId: string;
+            agentId: string;
             conversationLocalId: string;
+        }>,
+        chatExistsCalls: [] as Array<{
+            userId: string;
+            agentId: string;
+            localId: string;
         }>,
         runtimeBindingCalls: [] as Array<Record<string, unknown>>,
         runStartedCalls: [] as Array<Record<string, unknown>>,
@@ -188,24 +232,33 @@ function createPersistence(
         recoverStaleRunCalls: [] as Array<Record<string, unknown>>,
         async readRuntimeBinding(payload: {
             userId: string;
+            agentId: string;
             conversationLocalId: string;
         }) {
             this.readRuntimeBindingCalls.push(payload);
-            if (!binding) {
-                return null;
-            }
-
             return {
-                provider: binding.provider,
-                status: binding.status ?? ("expired" as const),
-                providerThreadId: binding.providerThreadId,
-                providerResumeToken: null,
-                activeRunId: binding.activeRunId ?? null,
-                lastError: null,
-                lastEventAt: null,
-                expiresAt: null,
-                updatedAt: Date.now(),
+                chatId,
+                binding: binding
+                    ? {
+                          provider: binding.provider,
+                          status: binding.status ?? ("expired" as const),
+                          providerThreadId: binding.providerThreadId,
+                          providerResumeToken: null,
+                          activeRunId: binding.activeRunId ?? null,
+                          lastError: null,
+                          lastEventAt: null,
+                          expiresAt: null,
+                          workspaceMode: binding.workspaceMode,
+                          workspaceRootPath: binding.workspaceRootPath,
+                          workspaceCwd: binding.workspaceCwd,
+                          updatedAt: binding.updatedAt ?? Date.now(),
+                      }
+                    : null,
             };
+        },
+        async chatExists(userId: string, agentId: string, localId: string) {
+            this.chatExistsCalls.push({ userId, localId, agentId });
+            return false;
         },
         async runtimeBinding(payload: Record<string, unknown>) {
             this.runtimeBindingCalls.push(payload);
@@ -232,6 +285,43 @@ function createPersistence(
             this.recoverStaleRunCalls.push(payload);
         },
     };
+}
+
+function createWorkspaceManager(
+    getConfig: () => AgentchatConfig,
+): WorkspaceManager {
+    return new WorkspaceManager({
+        getConfig,
+        rootsRegistryPath: path.join(
+            makeTempDir("sandbox-roots-registry"),
+            "sandbox-roots.json",
+        ),
+    });
+}
+
+function createDeferred<T>(): {
+    promise: Promise<T>;
+    resolve: (value: T | PromiseLike<T>) => void;
+    reject: (reason?: unknown) => void;
+} {
+    let resolve!: (value: T | PromiseLike<T>) => void;
+    let reject!: (reason?: unknown) => void;
+    const promise = new Promise<T>((promiseResolve, promiseReject) => {
+        resolve = promiseResolve;
+        reject = promiseReject;
+    });
+    return { promise, resolve, reject };
+}
+
+async function waitFor(condition: () => boolean): Promise<void> {
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+        if (condition()) {
+            return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+
+    throw new Error("Timed out waiting for test condition.");
 }
 
 function createCommand() {
@@ -318,6 +408,9 @@ describe("CodexRuntimeManager", () => {
         const persistence = createPersistence({
             provider: "codex-default",
             providerThreadId: "thread-existing",
+            workspaceMode: "shared",
+            workspaceRootPath: config.agents[0]!.rootPath,
+            workspaceCwd: config.agents[0]!.rootPath,
         });
         const fakeClient = new FakeCodexClient({
             resumedThreadId: "thread-existing",
@@ -355,6 +448,7 @@ describe("CodexRuntimeManager", () => {
         expect(persistence.readRuntimeBindingCalls).toEqual([
             {
                 userId: "user-1",
+                agentId: "agent-1",
                 conversationLocalId: "chat-1",
             },
         ]);
@@ -405,6 +499,9 @@ describe("CodexRuntimeManager", () => {
         const persistence = createPersistence({
             provider: "codex-default",
             providerThreadId: "thread-stale",
+            workspaceMode: "shared",
+            workspaceRootPath: config.agents[0]!.rootPath,
+            workspaceCwd: config.agents[0]!.rootPath,
         });
         const fakeClient = new FakeCodexClient({
             resumeError: new Error("thread/resume failed: thread not found"),
@@ -447,6 +544,9 @@ describe("CodexRuntimeManager", () => {
         const persistence = createPersistence({
             provider: "codex-default",
             providerThreadId: "thread-stale",
+            workspaceMode: "shared",
+            workspaceRootPath: config.agents[0]!.rootPath,
+            workspaceCwd: config.agents[0]!.rootPath,
         });
         const fakeClient = new FakeCodexClient({
             resumeError: new Error(
@@ -509,6 +609,7 @@ describe("CodexRuntimeManager", () => {
         await manager.subscribe({
             userId: "user-1",
             conversationId: "chat-1",
+            agentId: "agent-1",
             subscriberId: "socket-2",
             sendEvent: (event) => {
                 replayedEvents.push(event);
@@ -519,6 +620,7 @@ describe("CodexRuntimeManager", () => {
             {
                 type: "run.started",
                 payload: {
+                    agentId: "agent-1",
                     conversationId: "chat-1",
                     runId: expect.any(String),
                     messageId: "assistant-1",
@@ -527,6 +629,7 @@ describe("CodexRuntimeManager", () => {
             {
                 type: "message.started",
                 payload: {
+                    agentId: "agent-1",
                     conversationId: "chat-1",
                     runId: expect.any(String),
                     messageId: "assistant-1",
@@ -538,6 +641,7 @@ describe("CodexRuntimeManager", () => {
             {
                 type: "message.delta",
                 payload: {
+                    agentId: "agent-1",
                     conversationId: "chat-1",
                     messageId: "assistant-1",
                     delta: "Working on it",
@@ -587,6 +691,7 @@ describe("CodexRuntimeManager", () => {
         manager.unsubscribe({
             subscriberId: "socket-1",
             conversationId: "chat-1",
+            agentId: "agent-1",
         });
 
         fakeClient.emit({
@@ -632,6 +737,7 @@ describe("CodexRuntimeManager", () => {
         await manager.subscribe({
             userId: "user-1",
             conversationId: "chat-1",
+            agentId: "agent-1",
             subscriberId: "socket-2",
             sendEvent: () => undefined,
         });
@@ -639,12 +745,14 @@ describe("CodexRuntimeManager", () => {
         expect(persistence.readRuntimeBindingCalls).toEqual([
             {
                 userId: "user-1",
+                agentId: "agent-1",
                 conversationLocalId: "chat-1",
             },
         ]);
         expect(persistence.recoverStaleRunCalls).toHaveLength(1);
         expect(persistence.recoverStaleRunCalls[0]).toMatchObject({
             userId: "user-1",
+            agentId: "agent-1",
             conversationLocalId: "chat-1",
             externalRunId: "run-orphaned",
             errorMessage:
@@ -688,6 +796,7 @@ describe("CodexRuntimeManager", () => {
         await manager.subscribe({
             userId: "user-1",
             conversationId: "chat-1",
+            agentId: "agent-1",
             subscriberId: "socket-2",
             sendEvent: (event) => {
                 reconnectedEvents.push(event);
@@ -738,6 +847,7 @@ describe("CodexRuntimeManager", () => {
         await manager.subscribe({
             userId: "user-1",
             conversationId: "chat-1",
+            agentId: "agent-1",
             subscriberId: "socket-2",
             sendEvent: (event) => {
                 observerEvents.push(event);
@@ -786,6 +896,205 @@ describe("CodexRuntimeManager", () => {
             "run.completed",
         ]);
         expect(persistence.recoverStaleRunCalls).toHaveLength(0);
+    });
+
+    test("does not retain a subscriber that disconnects during async subscribe resolution", async () => {
+        const config = createConfig();
+        const readRuntimeBinding = createDeferred<{
+            chatId: string;
+            binding: null;
+        } | null>();
+        const persistence = {
+            ...createPersistence(null),
+            async readRuntimeBinding(payload: {
+                userId: string;
+                agentId: string;
+                conversationLocalId: string;
+            }) {
+                this.readRuntimeBindingCalls.push(payload);
+                return await readRuntimeBinding.promise;
+            },
+        };
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: () => new FakeCodexClient(),
+        });
+
+        const subscribePromise = manager.subscribe({
+            userId: "user-1",
+            conversationId: "chat-1",
+            agentId: "agent-1",
+            subscriberId: "socket-1",
+            sendEvent: () => undefined,
+        }) as Promise<void>;
+
+        manager.unsubscribe({
+            subscriberId: "socket-1",
+        });
+        readRuntimeBinding.resolve(null);
+
+        await subscribePromise;
+
+        expect(
+            (
+                manager as unknown as {
+                    pendingSubscriptions: Map<string, Map<string, unknown>>;
+                }
+            ).pendingSubscriptions.size,
+        ).toBe(0);
+    });
+
+    test("serializes concurrent runtime initialization for the same agent conversation", async () => {
+        const config = createConfig();
+        const persistence = createPersistence(null);
+        const clients: FakeCodexClient[] = [];
+        let releaseInitialization!: () => void;
+        const initializationGate = new Promise<void>((resolve) => {
+            releaseInitialization = resolve;
+        });
+
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: () => {
+                const client = new FakeCodexClient({
+                    startedThreadId: "thread-fresh",
+                    autoComplete: false,
+                });
+                client.initialize = async () => {
+                    await initializationGate;
+                };
+                clients.push(client);
+                return client;
+            },
+        });
+
+        const firstSend = manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+        await Bun.sleep(0);
+
+        const secondSendError = manager
+            .sendMessage({
+                userId: "user-1",
+                subscriberId: "socket-2",
+                command: createCommand(),
+                sendEvent: () => undefined,
+            })
+            .then(
+                () => null,
+                (error) =>
+                    error instanceof Error ? error.message : String(error),
+            );
+
+        await Bun.sleep(0);
+        expect(clients).toHaveLength(1);
+
+        releaseInitialization();
+        await Bun.sleep(0);
+
+        expect(await secondSendError).toBe(
+            "Conversation already has an active run.",
+        );
+
+        clients[0]?.emit({
+            method: "turn/completed",
+            params: {
+                turn: {
+                    status: "completed",
+                },
+            },
+        });
+
+        await firstSend;
+        expect(clients).toHaveLength(1);
+    });
+
+    test("ignores queued idle-expiration callbacks after a new run starts", async () => {
+        const originalSetTimeout = globalThis.setTimeout;
+        const originalClearTimeout = globalThis.clearTimeout;
+        const scheduledCallbacks: Array<() => void> = [];
+
+        globalThis.setTimeout = ((handler: TimerHandler) => {
+            if (typeof handler === "function") {
+                scheduledCallbacks.push(handler as () => void);
+            }
+            return Symbol("timeout") as unknown as ReturnType<
+                typeof setTimeout
+            >;
+        }) as unknown as typeof setTimeout;
+        globalThis.clearTimeout = (() => undefined) as typeof clearTimeout;
+
+        try {
+            const config = createConfig();
+            const persistence = createPersistence(null);
+            const fakeClient = new FakeCodexClient({
+                startedThreadId: "thread-fresh",
+                autoComplete: false,
+            });
+            const manager = new CodexRuntimeManager({
+                getConfig: () => config,
+                persistence: persistence as unknown as RuntimePersistenceClient,
+                createClient: () => fakeClient,
+            });
+            const runtime: Record<string, unknown> = {
+                key: JSON.stringify(["user-1", "agent-1", "chat-1"]),
+                userId: "user-1",
+                conversationId: "chat-1",
+                agentId: "agent-1",
+                modelId: "gpt-5.3-codex",
+                provider: config.providers[0]!,
+                agent: config.agents[0]!,
+                cwd: config.agents[0]!.rootPath,
+                client: fakeClient,
+                threadId: "thread-fresh",
+                activeTurn: null,
+                idleTimer: null,
+                subscribers: new Map(),
+            };
+
+            (
+                manager as unknown as {
+                    runtimes: Map<string, Record<string, unknown>>;
+                    scheduleIdleExpiration: (
+                        runtime: Record<string, unknown>,
+                    ) => void;
+                }
+            ).runtimes.set(runtime.key as string, runtime);
+            (
+                manager as unknown as {
+                    scheduleIdleExpiration: (
+                        runtime: Record<string, unknown>,
+                    ) => void;
+                }
+            ).scheduleIdleExpiration(runtime);
+
+            const queuedIdleCallback = scheduledCallbacks[0];
+            expect(queuedIdleCallback).toBeDefined();
+
+            runtime.idleTimer = null;
+            runtime.activeTurn = {
+                reject: () => undefined,
+            };
+
+            queuedIdleCallback?.();
+
+            expect(fakeClient.stopped).toBe(false);
+            expect(
+                (
+                    manager as unknown as {
+                        runtimes: Map<string, unknown>;
+                    }
+                ).runtimes.get(runtime.key as string),
+            ).toBe(runtime);
+        } finally {
+            globalThis.setTimeout = originalSetTimeout;
+            globalThis.clearTimeout = originalClearTimeout;
+        }
     });
 
     test("promotes Codex agent reasoning into an assistant status message before output", async () => {
@@ -1143,6 +1452,77 @@ describe("CodexRuntimeManager", () => {
         });
     });
 
+    test("does not complete a turn after the runtime was deleted mid-finalization", async () => {
+        const config = createConfig();
+        const persistence = createPersistence(null);
+        const fakeClient = new FakeCodexClient({
+            startedThreadId: "thread-fresh",
+            autoComplete: false,
+        });
+        const messageStartedDeferred = createDeferred<void>();
+        persistence.messageStarted = async (
+            payload: Record<string, unknown>,
+        ) => {
+            persistence.messageStartedCalls.push(payload);
+            await messageStartedDeferred.promise;
+        };
+        const eventTypes: ServerEvent["type"][] = [];
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: () => fakeClient,
+        });
+
+        const sendPromise = manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: (event) => {
+                eventTypes.push(event.type);
+            },
+        });
+        await Bun.sleep(0);
+
+        fakeClient.emit({
+            method: "codex/event/agent_reasoning",
+            params: {
+                msg: {
+                    text: "Thinking",
+                },
+            },
+        });
+        fakeClient.emit({
+            method: "item/agentMessage/delta",
+            params: {
+                delta: "Final answer",
+            },
+        });
+        fakeClient.emit({
+            method: "turn/completed",
+            params: {
+                turn: {
+                    status: "completed",
+                },
+            },
+        });
+
+        await waitFor(() => persistence.messageStartedCalls.length === 1);
+
+        const deletePromise = manager.deleteConversationWorkspace({
+            userId: "user-1",
+            conversationId: "chat-1",
+            agentId: "agent-1",
+        });
+        messageStartedDeferred.resolve();
+
+        await sendPromise;
+        await deletePromise;
+
+        expect(persistence.runCompletedCalls).toHaveLength(0);
+        expect(eventTypes.includes("run.completed")).toBe(false);
+        expect(fakeClient.stopped).toBe(true);
+    });
+
     test("interrupt is a no-op when no active run exists", async () => {
         const manager = new CodexRuntimeManager({
             getConfig: () => createConfig(),
@@ -1156,6 +1536,7 @@ describe("CodexRuntimeManager", () => {
             manager.interrupt({
                 userId: "user-1",
                 conversationId: "chat-1",
+                agentId: "agent-1",
             }),
         ).resolves.toBeUndefined();
     });
@@ -1201,5 +1582,1264 @@ describe("CodexRuntimeManager", () => {
         expect(clients).toHaveLength(2);
         expect(clients[0]?.stopped).toBe(true);
         expect(clients[1]?.stopped).toBe(false);
+    });
+
+    test("preserves existing subscribers when recycling an idle runtime", async () => {
+        const config = createConfig();
+        const clients: FakeCodexClient[] = [];
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: createPersistence(
+                null,
+            ) as unknown as RuntimePersistenceClient,
+            createClient: () => {
+                const client = new FakeCodexClient();
+                clients.push(client);
+                return client;
+            },
+        });
+
+        const subscriberEvents: ServerEvent[] = [];
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+        await manager.subscribe({
+            userId: "user-1",
+            conversationId: "chat-1",
+            agentId: "agent-1",
+            subscriberId: "socket-2",
+            sendEvent: (event) => {
+                subscriberEvents.push(event);
+            },
+        });
+
+        const currentAgent = config.agents[0];
+        if (!currentAgent) {
+            throw new Error("Expected agent config");
+        }
+
+        config.agents[0] = {
+            ...currentAgent,
+            rootPath: "/tmp/agent-1-next",
+        };
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        expect(clients).toHaveLength(2);
+        expect(
+            subscriberEvents.some(
+                (event) =>
+                    event.type === "run.started" &&
+                    event.payload.agentId === "agent-1" &&
+                    event.payload.conversationId === "chat-1",
+            ),
+        ).toBe(true);
+    });
+
+    test("does not recycle an active runtime during config reload", async () => {
+        const config = createConfig();
+        const clients: FakeCodexClient[] = [];
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: createPersistence(
+                null,
+            ) as unknown as RuntimePersistenceClient,
+            createClient: () => {
+                const client = new FakeCodexClient({ autoComplete: false });
+                clients.push(client);
+                return client;
+            },
+        });
+
+        const firstSendPromise = manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        await waitFor(
+            () =>
+                (
+                    manager as unknown as {
+                        runtimes: Map<
+                            string,
+                            { activeTurn: Record<string, unknown> | null }
+                        >;
+                    }
+                ).runtimes.get(JSON.stringify(["user-1", "agent-1", "chat-1"]))
+                    ?.activeTurn !== null,
+        );
+
+        const currentAgent = config.agents[0];
+        if (!currentAgent) {
+            throw new Error("Expected agent config");
+        }
+
+        config.agents[0] = {
+            ...currentAgent,
+            rootPath: "/tmp/agent-1-next",
+        };
+
+        await expect(
+            manager.sendMessage({
+                userId: "user-1",
+                subscriberId: "socket-1",
+                command: createCommand(),
+                sendEvent: () => undefined,
+            }),
+        ).rejects.toThrow("Conversation already has an active run.");
+
+        expect(clients).toHaveLength(1);
+        expect(clients[0]?.stopped).toBe(false);
+        expect(
+            (
+                manager as unknown as {
+                    runtimes: Map<
+                        string,
+                        { activeTurn: Record<string, unknown> | null }
+                    >;
+                }
+            ).runtimes.get(JSON.stringify(["user-1", "agent-1", "chat-1"]))
+                ?.activeTurn,
+        ).not.toBeNull();
+
+        clients[0]?.emit({
+            method: "turn/completed",
+            params: {
+                turn: {
+                    status: "completed",
+                },
+            },
+        });
+        await firstSendPromise;
+    });
+
+    test("rebuilds copied workspaces when the agent rootPath changes in config", async () => {
+        const sandboxRoot = makeTempDir("sandbox");
+        const firstRoot = makeTempDir("agent-root-a");
+        const secondRoot = makeTempDir("agent-root-b");
+        writeFileSync(path.join(firstRoot, "version.txt"), "first");
+        writeFileSync(path.join(secondRoot, "version.txt"), "second");
+
+        const config = createConfig();
+        config.sandboxRoot = sandboxRoot;
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath: firstRoot,
+            workspaceMode: "copy-on-conversation",
+        };
+
+        const workspaceManager = createWorkspaceManager(() => config);
+        const persistence = createPersistence(null);
+        const sandboxesUsed: string[] = [];
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            workspaceManager,
+            createClient: (params) => {
+                sandboxesUsed.push(params.agent.rootPath);
+                return new FakeCodexClient();
+            },
+        });
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        const sandboxPath = sandboxesUsed[0];
+        if (!sandboxPath) {
+            throw new Error("Expected the first sandbox path");
+        }
+
+        expect(existsSync(sandboxPath)).toBe(true);
+        expect(
+            readFileSync(path.join(sandboxPath, "version.txt"), "utf8"),
+        ).toBe("first");
+
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath: secondRoot,
+        };
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        expect(sandboxesUsed).toHaveLength(2);
+        expect(sandboxesUsed[1]).toBe(sandboxPath);
+        expect(
+            readFileSync(path.join(sandboxPath, "version.txt"), "utf8"),
+        ).toBe("second");
+    });
+
+    test("does not resume persisted threads after resetting a copied workspace", async () => {
+        const sandboxRoot = makeTempDir("sandbox");
+        const firstRoot = makeTempDir("agent-root-a");
+        const secondRoot = makeTempDir("agent-root-b");
+        writeFileSync(path.join(firstRoot, "version.txt"), "first");
+        writeFileSync(path.join(secondRoot, "version.txt"), "second");
+
+        const config = createConfig();
+        config.sandboxRoot = sandboxRoot;
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath: firstRoot,
+            workspaceMode: "copy-on-conversation",
+        };
+
+        const workspaceManager = createWorkspaceManager(() => config);
+        const persistence = createPersistence(null);
+        let bindingThreadId: string | null = null;
+        persistence.readRuntimeBinding = async (payload) => {
+            persistence.readRuntimeBindingCalls.push(payload);
+            return {
+                chatId: "chats:chat-1",
+                binding: bindingThreadId
+                    ? {
+                          provider: "codex-default",
+                          status: "idle" as const,
+                          providerThreadId: bindingThreadId,
+                          providerResumeToken: null,
+                          activeRunId: null,
+                          lastError: null,
+                          lastEventAt: null,
+                          expiresAt: null,
+                          workspaceMode: undefined,
+                          workspaceRootPath: undefined,
+                          workspaceCwd: undefined,
+                          updatedAt: Date.now(),
+                      }
+                    : null,
+            };
+        };
+
+        const clients: FakeCodexClient[] = [];
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            workspaceManager,
+            createClient: () => {
+                const client = new FakeCodexClient();
+                clients.push(client);
+                return client;
+            },
+        });
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        bindingThreadId = "thread-stale";
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath: secondRoot,
+        };
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        expect(clients).toHaveLength(2);
+        expect(clients[1]?.requests.map((request) => request.method)).toEqual([
+            "thread/start",
+            "turn/start",
+        ]);
+    });
+
+    test("recycles copied runtimes when sandboxRoot changes", async () => {
+        const firstSandboxRoot = makeTempDir("sandbox-a");
+        const secondSandboxRoot = makeTempDir("sandbox-b");
+        const agentRoot = makeTempDir("agent-root");
+        writeFileSync(path.join(agentRoot, "version.txt"), "shared");
+
+        const config = createConfig();
+        config.sandboxRoot = firstSandboxRoot;
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath: agentRoot,
+            workspaceMode: "copy-on-conversation",
+        };
+
+        const workspaceManager = createWorkspaceManager(() => config);
+        const sandboxesUsed: string[] = [];
+        const clients: FakeCodexClient[] = [];
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: createPersistence(
+                null,
+            ) as unknown as RuntimePersistenceClient,
+            workspaceManager,
+            createClient: (params) => {
+                sandboxesUsed.push(params.agent.rootPath);
+                const client = new FakeCodexClient();
+                clients.push(client);
+                return client;
+            },
+        });
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        const firstSandboxPath = sandboxesUsed[0];
+        if (!firstSandboxPath) {
+            throw new Error("Expected the first sandbox path");
+        }
+
+        config.sandboxRoot = secondSandboxRoot;
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        const secondSandboxPath = sandboxesUsed[1];
+        if (!secondSandboxPath) {
+            throw new Error("Expected the second sandbox path");
+        }
+
+        expect(clients).toHaveLength(2);
+        expect(clients[0]?.stopped).toBe(true);
+        expect(secondSandboxPath).not.toBe(firstSandboxPath);
+        expect(secondSandboxPath).toBe(
+            path.join(secondSandboxRoot, "agent-1", "user-1", "chat-1"),
+        );
+        expect(existsSync(firstSandboxPath)).toBe(false);
+        expect(existsSync(secondSandboxPath)).toBe(true);
+    });
+
+    test("does not recycle copied runtimes when sandboxRoot changes only by symlink alias", async () => {
+        const sandboxRoot = makeTempDir("sandbox-real");
+        const sandboxAliasParent = makeTempDir("sandbox-alias");
+        const sandboxAlias = path.join(sandboxAliasParent, "linked-sandbox");
+        symlinkSync(sandboxRoot, sandboxAlias, "dir");
+        const agentRoot = makeTempDir("agent-root");
+        writeFileSync(path.join(agentRoot, "version.txt"), "shared");
+
+        const config = createConfig();
+        config.sandboxRoot = sandboxAlias;
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath: agentRoot,
+            workspaceMode: "copy-on-conversation",
+        };
+
+        const workspaceManager = createWorkspaceManager(() => config);
+        const sandboxesUsed: string[] = [];
+        const clients: FakeCodexClient[] = [];
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: createPersistence(
+                null,
+            ) as unknown as RuntimePersistenceClient,
+            workspaceManager,
+            createClient: (params) => {
+                sandboxesUsed.push(params.agent.rootPath);
+                const client = new FakeCodexClient();
+                clients.push(client);
+                return client;
+            },
+        });
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        const sandboxPath = sandboxesUsed[0];
+        if (!sandboxPath) {
+            throw new Error("Expected the copied sandbox path");
+        }
+        writeFileSync(path.join(sandboxPath, "session.txt"), "keep");
+
+        config.sandboxRoot = sandboxRoot;
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        expect(clients).toHaveLength(1);
+        expect(clients[0]?.stopped).toBe(false);
+        expect(sandboxesUsed).toEqual([sandboxPath]);
+        expect(
+            readFileSync(path.join(sandboxPath, "session.txt"), "utf8"),
+        ).toBe("keep");
+    });
+
+    test("does not delete another agent's copied workspace during runtime recycle", async () => {
+        const sandboxRoot = makeTempDir("sandbox");
+        const agentRootA = makeTempDir("agent-root-a");
+        const agentRootB = makeTempDir("agent-root-b");
+        writeFileSync(path.join(agentRootA, "version.txt"), "a");
+        writeFileSync(path.join(agentRootB, "version.txt"), "b");
+
+        const config = createConfig();
+        config.sandboxRoot = sandboxRoot;
+        config.agents = [
+            {
+                ...config.agents[0]!,
+                id: "agent-1",
+                rootPath: agentRootA,
+                workspaceMode: "copy-on-conversation",
+            },
+            {
+                ...config.agents[0]!,
+                id: "agent-2",
+                rootPath: agentRootB,
+                workspaceMode: "copy-on-conversation",
+            },
+        ];
+
+        const workspaceManager = createWorkspaceManager(() => config);
+        const persistence = createPersistence(null);
+        const clients: FakeCodexClient[] = [];
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            workspaceManager,
+            createClient: () => {
+                const client = new FakeCodexClient();
+                clients.push(client);
+                return client;
+            },
+        });
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+        const firstWorkspace = await workspaceManager.ensureWorkspace(
+            config.agents[0]!,
+            "user-1",
+            "chat-1",
+        );
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: {
+                ...createCommand(),
+                payload: {
+                    ...createCommand().payload,
+                    agentId: "agent-2",
+                },
+            },
+            sendEvent: () => undefined,
+        });
+
+        const secondWorkspace = await workspaceManager.ensureWorkspace(
+            config.agents[1]!,
+            "user-1",
+            "chat-1",
+        );
+
+        expect(clients).toHaveLength(2);
+        expect(clients[0]?.stopped).toBe(false);
+        expect(existsSync(firstWorkspace)).toBe(true);
+        expect(existsSync(secondWorkspace)).toBe(true);
+        expect(firstWorkspace).not.toBe(secondWorkspace);
+        expect(
+            readFileSync(path.join(firstWorkspace, "version.txt"), "utf8"),
+        ).toBe("a");
+        expect(
+            readFileSync(path.join(secondWorkspace, "version.txt"), "utf8"),
+        ).toBe("b");
+    });
+
+    test("does not resume persisted threads after reopening a shared runtime with a changed rootPath", async () => {
+        const firstRoot = makeTempDir("agent-root-a");
+        const secondRoot = makeTempDir("agent-root-b");
+
+        const config = createConfig();
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath: secondRoot,
+            workspaceMode: "shared",
+        };
+
+        const persistence = createPersistence({
+            provider: "codex-default",
+            status: "idle",
+            providerThreadId: "thread-stale",
+            workspaceMode: "shared",
+            workspaceRootPath: firstRoot,
+            workspaceCwd: firstRoot,
+        });
+        const clients: FakeCodexClient[] = [];
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: () => {
+                const client = new FakeCodexClient();
+                clients.push(client);
+                return client;
+            },
+        });
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        expect(clients).toHaveLength(1);
+        expect(clients[0]?.requests.map((request) => request.method)).toEqual([
+            "thread/start",
+            "turn/start",
+        ]);
+    });
+
+    test("does not resume persisted threads after reopening a copied runtime with a changed rootPath", async () => {
+        const sandboxRoot = makeTempDir("sandbox");
+        const firstRoot = makeTempDir("agent-root-a");
+        const secondRoot = makeTempDir("agent-root-b");
+        writeFileSync(path.join(firstRoot, "version.txt"), "first");
+        writeFileSync(path.join(secondRoot, "version.txt"), "second");
+
+        const config = createConfig();
+        config.sandboxRoot = sandboxRoot;
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath: firstRoot,
+            workspaceMode: "copy-on-conversation",
+        };
+
+        const workspaceManager = createWorkspaceManager(() => config);
+        const initialWorkspace = await workspaceManager.ensureWorkspace(
+            config.agents[0]!,
+            "user-1",
+            "chat-1",
+        );
+
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath: secondRoot,
+        };
+
+        const persistence = createPersistence({
+            provider: "codex-default",
+            status: "idle",
+            providerThreadId: "thread-stale",
+            workspaceMode: "copy-on-conversation",
+            workspaceRootPath: firstRoot,
+            workspaceCwd: initialWorkspace,
+        });
+        const clients: FakeCodexClient[] = [];
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            workspaceManager,
+            createClient: () => {
+                const client = new FakeCodexClient();
+                clients.push(client);
+                return client;
+            },
+        });
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        expect(clients).toHaveLength(1);
+        expect(clients[0]?.requests.map((request) => request.method)).toEqual([
+            "thread/start",
+            "turn/start",
+        ]);
+        expect(
+            readFileSync(path.join(initialWorkspace, "version.txt"), "utf8"),
+        ).toBe("second");
+    });
+
+    test("resumes persisted threads after reopening a shared runtime when rootPath changes only by symlink alias", async () => {
+        const realRoot = makeTempDir("agent-root-real");
+        const aliasParent = makeTempDir("agent-root-alias");
+        const aliasRoot = path.join(aliasParent, "linked-root");
+        symlinkSync(realRoot, aliasRoot, "dir");
+
+        const config = createConfig();
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath: realRoot,
+            workspaceMode: "shared",
+        };
+
+        const persistence = createPersistence({
+            provider: "codex-default",
+            status: "idle",
+            providerThreadId: "thread-existing",
+            workspaceMode: "shared",
+            workspaceRootPath: aliasRoot,
+            workspaceCwd: aliasRoot,
+        });
+        const clients: FakeCodexClient[] = [];
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: () => {
+                const client = new FakeCodexClient({
+                    resumedThreadId: "thread-existing",
+                });
+                clients.push(client);
+                return client;
+            },
+        });
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        expect(clients).toHaveLength(1);
+        expect(clients[0]?.requests.map((request) => request.method)).toEqual([
+            "thread/resume",
+            "turn/start",
+        ]);
+    });
+
+    test("does not resume persisted threads after a copied workspace is recreated", async () => {
+        const sandboxRoot = makeTempDir("sandbox");
+        const agentRoot = makeTempDir("agent-root");
+        writeFileSync(path.join(agentRoot, "version.txt"), "shared");
+
+        const config = createConfig();
+        config.sandboxRoot = sandboxRoot;
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath: agentRoot,
+            workspaceMode: "copy-on-conversation",
+        };
+
+        const workspaceManager = createWorkspaceManager(() => config);
+        const initialWorkspace = await workspaceManager.ensureWorkspace(
+            config.agents[0]!,
+            "user-1",
+            "chat-1",
+        );
+        rmSync(initialWorkspace, { force: true, recursive: true });
+
+        const persistence = createPersistence({
+            provider: "codex-default",
+            status: "idle",
+            providerThreadId: "thread-stale",
+            workspaceMode: "copy-on-conversation",
+            workspaceRootPath: agentRoot,
+            workspaceCwd: initialWorkspace,
+        });
+        const clients: FakeCodexClient[] = [];
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            workspaceManager,
+            createClient: () => {
+                const client = new FakeCodexClient();
+                clients.push(client);
+                return client;
+            },
+        });
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        expect(clients).toHaveLength(1);
+        expect(clients[0]?.requests.map((request) => request.method)).toEqual([
+            "thread/start",
+            "turn/start",
+        ]);
+        expect(existsSync(initialWorkspace)).toBe(true);
+        expect(
+            readFileSync(path.join(initialWorkspace, "version.txt"), "utf8"),
+        ).toBe("shared");
+    });
+
+    test("deletes copied workspaces even after the agent is disabled", async () => {
+        const sandboxRoot = makeTempDir("sandbox");
+        const agentRoot = makeTempDir("agent-root");
+        writeFileSync(path.join(agentRoot, "version.txt"), "first");
+
+        const config = createConfig();
+        config.sandboxRoot = sandboxRoot;
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath: agentRoot,
+            workspaceMode: "copy-on-conversation",
+        };
+
+        const workspaceManager = createWorkspaceManager(() => config);
+        const persistence = createPersistence(null);
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            workspaceManager,
+        });
+        const workspacePath = await workspaceManager.ensureWorkspace(
+            config.agents[0]!,
+            "user-1",
+            "chat-1",
+        );
+        const client = new FakeCodexClient();
+        let rejectedMessage: string | null = null;
+
+        (
+            manager as unknown as {
+                runtimes: Map<string, Record<string, unknown>>;
+            }
+        ).runtimes.set(JSON.stringify(["user-1", "agent-1", "chat-1"]), {
+            agentId: "agent-1",
+            activeTurn: {
+                pendingDeltaFlush: null,
+                reject: (error: Error) => {
+                    rejectedMessage = error.message;
+                },
+            },
+            idleTimer: null,
+            client,
+        });
+
+        expect(existsSync(workspacePath)).toBe(true);
+
+        config.agents[0] = {
+            ...config.agents[0]!,
+            enabled: false,
+        };
+
+        await manager.deleteConversationWorkspace({
+            userId: "user-1",
+            conversationId: "chat-1",
+            agentId: "agent-1",
+        });
+
+        if (rejectedMessage === null) {
+            throw new Error("Expected the active turn to be rejected.");
+        }
+        if (rejectedMessage !== "Conversation deleted during active turn.") {
+            throw new Error(
+                `Expected active turn rejection, received ${String(rejectedMessage)}`,
+            );
+        }
+        expect(client.stopped).toBe(true);
+        expect(existsSync(workspacePath)).toBe(false);
+        expect(persistence.chatExistsCalls).toEqual([
+            {
+                userId: "user-1",
+                agentId: "agent-1",
+                localId: "chat-1",
+            },
+        ]);
+    });
+
+    test("deletes the requested agent workspace even when another agent runtime is live for the same conversation id", async () => {
+        const sandboxRoot = makeTempDir("sandbox");
+        const agentRootA = makeTempDir("agent-root-a");
+        const agentRootB = makeTempDir("agent-root-b");
+        writeFileSync(path.join(agentRootA, "version.txt"), "a");
+        writeFileSync(path.join(agentRootB, "version.txt"), "b");
+
+        const config = createConfig();
+        config.sandboxRoot = sandboxRoot;
+        config.agents = [
+            {
+                ...config.agents[0]!,
+                id: "agent-1",
+                rootPath: agentRootA,
+                workspaceMode: "copy-on-conversation",
+            },
+            {
+                ...config.agents[0]!,
+                id: "agent-2",
+                rootPath: agentRootB,
+                workspaceMode: "copy-on-conversation",
+            },
+        ];
+
+        const workspaceManager = createWorkspaceManager(() => config);
+        const persistence = createPersistence(null);
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            workspaceManager,
+        });
+        const workspacePath = await workspaceManager.ensureWorkspace(
+            config.agents[1]!,
+            "user-1",
+            "chat-1",
+        );
+        const client = new FakeCodexClient();
+
+        (
+            manager as unknown as {
+                runtimes: Map<string, Record<string, unknown>>;
+            }
+        ).runtimes.set("user-1:chat-1", {
+            agentId: "agent-1",
+            activeTurn: null,
+            idleTimer: null,
+            client,
+        });
+
+        expect(existsSync(workspacePath)).toBe(true);
+
+        await manager.deleteConversationWorkspace({
+            userId: "user-1",
+            conversationId: "chat-1",
+            agentId: "agent-2",
+        });
+
+        expect(client.stopped).toBe(false);
+        expect(existsSync(workspacePath)).toBe(false);
+        expect(persistence.chatExistsCalls).toEqual([
+            {
+                userId: "user-1",
+                agentId: "agent-2",
+                localId: "chat-1",
+            },
+        ]);
+    });
+
+    test("cancels pending runtime initialization when the conversation is deleted", async () => {
+        const sandboxRoot = makeTempDir("sandbox");
+        const agentRoot = makeTempDir("agent-root");
+        writeFileSync(path.join(agentRoot, "version.txt"), "first");
+
+        const config = createConfig();
+        config.sandboxRoot = sandboxRoot;
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath: agentRoot,
+            workspaceMode: "copy-on-conversation",
+        };
+
+        const workspaceManager = createWorkspaceManager(() => config);
+        const persistence = createPersistence(null);
+        const initializeDeferred = createDeferred<void>();
+        const client = new FakeCodexClient({
+            autoComplete: false,
+            initializePromise: initializeDeferred.promise,
+        });
+        let createClientCalls = 0;
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            workspaceManager,
+            createClient: () => {
+                createClientCalls += 1;
+                return client;
+            },
+        });
+        const command = createCommand();
+        const workspacePath = workspaceManager.getWorkspacePath(
+            "agent-1",
+            "user-1",
+            command.payload.conversationId,
+        );
+
+        const sendPromise = manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "sub-1",
+            command,
+            sendEvent: () => undefined,
+        });
+        const sendResultPromise = sendPromise.then(
+            () => null,
+            (error) => error,
+        );
+
+        await waitFor(
+            () =>
+                existsSync(workspacePath) &&
+                (() => {
+                    const pendingInitializations = (
+                        manager as unknown as {
+                            pendingRuntimeInitializations: Map<
+                                string,
+                                {
+                                    client: FakeCodexClient | null;
+                                }
+                            >;
+                        }
+                    ).pendingRuntimeInitializations;
+                    const pendingInitialization = [
+                        ...pendingInitializations.values(),
+                    ][0];
+                    return (
+                        pendingInitializations.size === 1 &&
+                        pendingInitialization?.client === client
+                    );
+                })(),
+        );
+
+        const deletePromise = manager.deleteConversationWorkspace({
+            userId: "user-1",
+            conversationId: command.payload.conversationId,
+            agentId: command.payload.agentId,
+        });
+
+        initializeDeferred.resolve();
+
+        await expect(sendPromise).rejects.toThrow(
+            "Conversation deleted during runtime initialization.",
+        );
+        await deletePromise;
+
+        if (createClientCalls > 0) {
+            expect(client.stopped).toBe(true);
+        }
+        expect(client.requests).toEqual([]);
+        expect(existsSync(workspacePath)).toBe(false);
+        expect(
+            (
+                manager as unknown as {
+                    runtimes: Map<string, unknown>;
+                }
+            ).runtimes.size,
+        ).toBe(0);
+        expect(
+            (
+                manager as unknown as {
+                    pendingRuntimeInitializations: Map<string, unknown>;
+                }
+            ).pendingRuntimeInitializations.size,
+        ).toBe(0);
+        expect(persistence.chatExistsCalls).toEqual([
+            {
+                userId: "user-1",
+                agentId: "agent-1",
+                localId: "chat-1",
+            },
+        ]);
+    });
+
+    test("does not publish a runtime cancelled immediately before registration", async () => {
+        const sandboxRoot = makeTempDir("sandbox");
+        const agentRoot = makeTempDir("agent-root");
+        writeFileSync(path.join(agentRoot, "version.txt"), "first");
+
+        const config = createConfig();
+        config.sandboxRoot = sandboxRoot;
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath: agentRoot,
+            workspaceMode: "copy-on-conversation",
+        };
+
+        const workspaceManager = createWorkspaceManager(() => config);
+        const persistence = createPersistence(null);
+        const client = new FakeCodexClient({
+            startedThreadId: "thread-started",
+            autoComplete: false,
+        });
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            workspaceManager,
+            createClient: () => client,
+        });
+        const command = createCommand();
+        const runtimeKey = JSON.stringify([
+            "user-1",
+            command.payload.agentId,
+            command.payload.conversationId,
+        ]);
+        const originalOnExit = client.onExit.bind(client);
+        client.onExit = (handler: (error: Error) => void) => {
+            originalOnExit(handler);
+            (
+                manager as unknown as {
+                    cancelPendingRuntimeInitialization: (
+                        key: string,
+                        reason: Error,
+                    ) => unknown;
+                }
+            ).cancelPendingRuntimeInitialization(
+                runtimeKey,
+                new Error(
+                    "Conversation deleted during runtime initialization.",
+                ),
+            );
+        };
+
+        await expect(
+            manager.sendMessage({
+                userId: "user-1",
+                subscriberId: "sub-1",
+                command,
+                sendEvent: () => undefined,
+            }),
+        ).rejects.toThrow(
+            "Conversation deleted during runtime initialization.",
+        );
+
+        expect(client.stopped).toBe(true);
+        expect(
+            (
+                manager as unknown as {
+                    runtimes: Map<string, unknown>;
+                }
+            ).runtimes.size,
+        ).toBe(0);
+        expect(
+            existsSync(
+                workspaceManager.getWorkspacePath(
+                    "agent-1",
+                    "user-1",
+                    command.payload.conversationId,
+                ),
+            ),
+        ).toBe(false);
+    });
+
+    test("conversation delete does not wait forever on a hung runtime initialization", async () => {
+        const sandboxRoot = makeTempDir("sandbox");
+        const agentRoot = makeTempDir("agent-root");
+        writeFileSync(path.join(agentRoot, "version.txt"), "first");
+
+        const config = createConfig();
+        config.sandboxRoot = sandboxRoot;
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath: agentRoot,
+            workspaceMode: "copy-on-conversation",
+        };
+
+        const workspaceManager = createWorkspaceManager(() => config);
+        const persistence = createPersistence(null);
+        const initializeDeferred = createDeferred<void>();
+        const client = new FakeCodexClient({
+            autoComplete: false,
+            initializePromise: initializeDeferred.promise,
+        });
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            workspaceManager,
+            createClient: () => client,
+            pendingRuntimeDeleteWaitMs: 10,
+        });
+        const command = createCommand();
+        const workspacePath = workspaceManager.getWorkspacePath(
+            "agent-1",
+            "user-1",
+            command.payload.conversationId,
+        );
+
+        const sendPromise = manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "sub-1",
+            command,
+            sendEvent: () => undefined,
+        });
+        const sendResultPromise = sendPromise.then(
+            () => null,
+            (error) => error,
+        );
+
+        await waitFor(
+            () =>
+                existsSync(workspacePath) &&
+                (() => {
+                    const pendingInitializations = (
+                        manager as unknown as {
+                            pendingRuntimeInitializations: Map<
+                                string,
+                                {
+                                    client: FakeCodexClient | null;
+                                }
+                            >;
+                        }
+                    ).pendingRuntimeInitializations;
+                    const pendingInitialization = [
+                        ...pendingInitializations.values(),
+                    ][0];
+                    return (
+                        pendingInitializations.size === 1 &&
+                        pendingInitialization?.client === client
+                    );
+                })(),
+        );
+
+        const deleteResult = await Promise.race([
+            manager
+                .deleteConversationWorkspace({
+                    userId: "user-1",
+                    conversationId: command.payload.conversationId,
+                    agentId: command.payload.agentId,
+                })
+                .then(() => "deleted"),
+            new Promise<string>((resolve) => {
+                setTimeout(() => resolve("timed-out"), 200);
+            }),
+        ]);
+
+        expect(deleteResult).toBe("deleted");
+        expect(client.stopped).toBe(true);
+        expect(existsSync(workspacePath)).toBe(false);
+
+        initializeDeferred.resolve();
+        const sendError = await sendResultPromise;
+        expect(sendError).toBeInstanceOf(Error);
+        expect((sendError as Error).message).toContain(
+            "Conversation deleted during runtime initialization.",
+        );
+    });
+
+    test("cleans up copied workspace and client when conversation lookup fails during initialization", async () => {
+        const sandboxRoot = makeTempDir("sandbox");
+        const agentRoot = makeTempDir("agent-root");
+        writeFileSync(path.join(agentRoot, "version.txt"), "first");
+
+        const config = createConfig();
+        config.sandboxRoot = sandboxRoot;
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath: agentRoot,
+            workspaceMode: "copy-on-conversation",
+        };
+
+        const workspaceManager = createWorkspaceManager(() => config);
+        const persistence = createPersistence(null);
+        persistence.readRuntimeBinding = (async (
+            payload: Parameters<typeof persistence.readRuntimeBinding>[0],
+        ) => {
+            persistence.readRuntimeBindingCalls.push(payload);
+            return null;
+        }) as unknown as typeof persistence.readRuntimeBinding;
+        const client = new FakeCodexClient({
+            autoComplete: false,
+        });
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            workspaceManager,
+            createClient: () => client,
+        });
+        const command = createCommand();
+        const workspacePath = workspaceManager.getWorkspacePath(
+            "agent-1",
+            "user-1",
+            command.payload.conversationId,
+        );
+
+        await expect(
+            manager.sendMessage({
+                userId: "user-1",
+                subscriberId: "sub-1",
+                command,
+                sendEvent: () => undefined,
+            }),
+        ).rejects.toThrow("Conversation not found");
+
+        expect(client.stopped).toBe(true);
+        expect(client.requests).toEqual([]);
+        expect(existsSync(workspacePath)).toBe(false);
+        expect(
+            (
+                manager as unknown as {
+                    runtimes: Map<string, unknown>;
+                }
+            ).runtimes.size,
+        ).toBe(0);
+    });
+
+    test("preserves a reused copied workspace when runtime startup fails", async () => {
+        const sandboxRoot = makeTempDir("sandbox");
+        const agentRoot = makeTempDir("agent-root");
+        writeFileSync(path.join(agentRoot, "version.txt"), "first");
+
+        const config = createConfig();
+        config.sandboxRoot = sandboxRoot;
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath: agentRoot,
+            workspaceMode: "copy-on-conversation",
+        };
+
+        const workspaceManager = createWorkspaceManager(() => config);
+        const command = createCommand();
+        const workspaceState = await workspaceManager.ensureWorkspaceState(
+            config.agents[0]!,
+            "user-1",
+            command.payload.conversationId,
+        );
+        const workspacePath = workspaceState.path;
+        writeFileSync(path.join(workspacePath, "user-note.txt"), "keep me");
+
+        const initializeDeferred = createDeferred<void>();
+        let createClientCalls = 0;
+        const client = new FakeCodexClient({
+            autoComplete: false,
+            initializePromise: initializeDeferred.promise,
+        });
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: createPersistence(
+                null,
+            ) as unknown as RuntimePersistenceClient,
+            workspaceManager,
+            createClient: () => {
+                createClientCalls += 1;
+                return client;
+            },
+        });
+
+        const sendPromise = manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "sub-1",
+            command,
+            sendEvent: () => undefined,
+        });
+
+        await waitFor(() => createClientCalls === 1);
+        initializeDeferred.reject(new Error("initialize failed"));
+
+        await expect(sendPromise).rejects.toThrow("initialize failed");
+
+        expect(client.stopped).toBe(true);
+        expect(existsSync(workspacePath)).toBe(true);
+        expect(
+            readFileSync(path.join(workspacePath, "user-note.txt"), "utf8"),
+        ).toBe("keep me");
     });
 });

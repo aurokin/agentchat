@@ -9,7 +9,15 @@ export type PersistedRuntimeBinding = {
     lastError: string | null;
     lastEventAt: number | null;
     expiresAt: number | null;
+    workspaceMode?: "shared" | "copy-on-conversation";
+    workspaceRootPath?: string;
+    workspaceCwd?: string;
     updatedAt: number;
+};
+
+export type PersistedConversationRuntimeState = {
+    chatId: string;
+    binding: PersistedRuntimeBinding | null;
 };
 
 function trimTrailingSlash(value: string): string {
@@ -75,15 +83,63 @@ export class RuntimePersistenceClient {
 
     async readRuntimeBinding(payload: {
         userId: string;
+        agentId: string;
         conversationLocalId: string;
-    }): Promise<PersistedRuntimeBinding | null> {
+    }): Promise<PersistedConversationRuntimeState | null> {
         const response = await this.post(
             "/runtime/runtime-binding/read",
             payload,
         );
         const result =
-            (await response.json()) as PersistedRuntimeBinding | null;
+            (await response.json()) as PersistedConversationRuntimeState | null;
         return result;
+    }
+
+    async listAllChatLocalIds(): Promise<
+        Array<{ agentId: string; userId: string; localId: string }>
+    > {
+        const entries: Array<{
+            agentId: string;
+            userId: string;
+            localId: string;
+        }> = [];
+        let cursor: string | null = null;
+        let isDone = false;
+
+        while (!isDone) {
+            const response = await this.post("/runtime/chat-local-ids", {
+                cursor,
+            });
+            const page = (await response.json()) as {
+                entries: Array<{
+                    agentId: string;
+                    userId: string;
+                    localId: string;
+                }>;
+                continueCursor: string;
+                isDone: boolean;
+            };
+            entries.push(...page.entries);
+            cursor = page.continueCursor;
+            isDone = page.isDone;
+        }
+
+        return entries;
+    }
+
+    async chatExists(
+        userId: string,
+        agentId: string,
+        localId: string,
+        chatId?: string,
+    ): Promise<boolean> {
+        const response = await this.post("/runtime/chat-exists", {
+            userId,
+            agentId,
+            localId,
+            chatId,
+        });
+        return (await response.json()) as boolean;
     }
 
     private async post(

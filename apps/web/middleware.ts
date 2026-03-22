@@ -25,7 +25,7 @@ function applyCommonSecurityHeaders(response: NextResponse): void {
     // Prevent this origin from being persisted in a less-isolated agent cluster.
     response.headers.set("Origin-Agent-Cluster", "?1");
 
-    // Disable legacy/buggy XSS auditor behavior.
+    // Disable deprecated browser XSS auditor behavior.
     response.headers.set("X-XSS-Protection", "0");
 
     // Lock down powerful features in embedded contexts; keep top-level behavior.

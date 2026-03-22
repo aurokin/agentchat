@@ -11,6 +11,7 @@ import {
     type Message,
     type ProviderModel,
 } from "@/lib/types";
+import { getScopedChatStateKey } from "@/contexts/chat-state";
 import { trimTrailingEmptyLines } from "@shared/core/text";
 import {
     shouldApplyConversationScopedUpdate,
@@ -110,9 +111,12 @@ export function useConversationRuntime({
     const activeRunRef = useRef<ActiveRunState | null>(null);
     const pendingInterruptRef = useRef(false);
     const pendingReconnectNoticeRef = useRef(false);
-    const pendingSendConversationIdRef = useRef<string | null>(null);
+    const pendingSendConversationRef = useRef<{
+        conversationId: string;
+        agentId: string;
+    } | null>(null);
     const currentChatRef = useRef<ChatSession | null>(null);
-    const previousConversationIdRef = useRef<string | null>(null);
+    const previousConversationScopeRef = useRef<string | null>(null);
     const messagesRef = useRef<Message[]>([]);
 
     const queueStreamingMessageUpdate = useCallback(
@@ -158,10 +162,13 @@ export function useConversationRuntime({
     }, [currentChat]);
 
     useEffect(() => {
-        const currentConversationId = currentChat?.id ?? null;
+        const currentConversationScope =
+            currentChat?.id && currentChat?.agentId
+                ? getScopedChatStateKey(currentChat.id, currentChat.agentId)
+                : null;
         if (
-            previousConversationIdRef.current !== null &&
-            previousConversationIdRef.current !== currentConversationId
+            previousConversationScopeRef.current !== null &&
+            previousConversationScopeRef.current !== currentConversationScope
         ) {
             pendingInterruptRef.current = false;
             pendingReconnectNoticeRef.current = false;
@@ -172,25 +179,29 @@ export function useConversationRuntime({
             });
         }
 
-        previousConversationIdRef.current = currentConversationId;
-    }, [currentChat?.id]);
+        previousConversationScopeRef.current = currentConversationScope;
+    }, [currentChat?.agentId, currentChat?.id]);
 
     useEffect(() => {
         if (
             !shouldResetPendingConversationSendOnConversationChange({
                 currentConversationId: currentChat?.id ?? null,
-                pendingSendConversationId: pendingSendConversationIdRef.current,
+                currentAgentId: currentChat?.agentId ?? null,
+                pendingSendConversationId:
+                    pendingSendConversationRef.current?.conversationId ?? null,
+                pendingSendAgentId:
+                    pendingSendConversationRef.current?.agentId ?? null,
                 activeRun: activeRunRef.current,
             })
         ) {
             return;
         }
 
-        pendingSendConversationIdRef.current = null;
+        pendingSendConversationRef.current = null;
         queueMicrotask(() => {
             setSending(false);
         });
-    }, [currentChat]);
+    }, [currentChat?.agentId, currentChat?.id]);
 
     useEffect(() => {
         messagesRef.current = messages;
@@ -217,7 +228,7 @@ export function useConversationRuntime({
     const clearActiveRun = useCallback(() => {
         activeRunRef.current = null;
         pendingInterruptRef.current = false;
-        pendingSendConversationIdRef.current = null;
+        pendingSendConversationRef.current = null;
         clearStreamingMessage();
         setRecoveredRunNotice(false);
         setSending(false);
@@ -232,6 +243,7 @@ export function useConversationRuntime({
 
             const resolution = resolveConversationSocketEvent({
                 currentChatId: currentChatRef.current?.id ?? null,
+                currentAgentId: currentChatRef.current?.agentId ?? null,
                 event,
                 activeRun: activeRunRef.current,
                 messages: messagesRef.current,
@@ -246,6 +258,7 @@ export function useConversationRuntime({
                     {
                         pendingInterrupt: pendingInterruptRef.current,
                         activeRun: resolution.activeRun,
+                        agentId: currentChatRef.current?.agentId ?? null,
                         sendCommand: (command) => socketClient.send(command),
                     },
                 );
@@ -399,12 +412,23 @@ export function useConversationRuntime({
     }, [handleSocketEvent, socketClient]);
 
     useEffect(() => {
+        const currentConversationId = currentChat?.id ?? null;
+        const currentAgentId = currentChat?.agentId ?? null;
         return (
             connectConversationSocket({
-                currentChatId: currentChat?.id ?? null,
+                currentChat:
+                    currentConversationId && currentAgentId
+                        ? {
+                              id: currentConversationId,
+                              agentId: currentAgentId,
+                          }
+                        : null,
                 dependencies: {
-                    subscribeToConversation: (conversationId) =>
-                        socketClient.subscribeToConversation(conversationId),
+                    subscribeToConversation: (conversationId, agentId) =>
+                        socketClient.subscribeToConversation(
+                            conversationId,
+                            agentId,
+                        ),
                     ensureConnected: () =>
                         socketClient.ensureConnected(getBackendSessionToken),
                     onConnectionError: (connectError) => {
@@ -416,7 +440,12 @@ export function useConversationRuntime({
                 },
             }) ?? undefined
         );
-    }, [currentChat?.id, getBackendSessionToken, socketClient]);
+    }, [
+        currentChat?.agentId,
+        currentChat?.id,
+        getBackendSessionToken,
+        socketClient,
+    ]);
 
     useEffect(() => {
         const syncPlan = planConversationRuntimeSync({
@@ -488,7 +517,10 @@ export function useConversationRuntime({
             setRetryChat(null);
             setRecoveredRunNotice(false);
             pendingInterruptRef.current = false;
-            pendingSendConversationIdRef.current = chatSnapshot.id;
+            pendingSendConversationRef.current = {
+                conversationId: chatSnapshot.id,
+                agentId: chatSnapshot.agentId,
+            };
             clearStreamingMessage();
 
             const result = await runConversationSend({
@@ -507,11 +539,13 @@ export function useConversationRuntime({
                 },
             });
 
-            pendingSendConversationIdRef.current = null;
+            pendingSendConversationRef.current = null;
             if (
                 !shouldApplyConversationScopedUpdate({
                     currentConversationId: currentChatRef.current?.id ?? null,
+                    currentAgentId: currentChatRef.current?.agentId ?? null,
                     targetConversationId: chatSnapshot.id,
+                    targetAgentId: chatSnapshot.agentId,
                 })
             ) {
                 return;
@@ -545,6 +579,7 @@ export function useConversationRuntime({
     const handleCancel = useCallback(() => {
         const result = requestConversationInterrupt({
             activeRun: activeRunRef.current,
+            agentId: currentChatRef.current?.agentId ?? null,
             isSending: sending,
             queuePendingInterrupt: () => {
                 pendingInterruptRef.current = true;

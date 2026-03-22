@@ -3,6 +3,7 @@ import { useRouter } from "expo-router";
 import { parse, useURL } from "expo-linking";
 import { useAppContext } from "@/contexts/AppContext";
 import { useChatContext } from "@/contexts/ChatContext";
+import { buildChatRouteId } from "@/lib/home-chat-route";
 import { setPendingSharePayload } from "@/lib/share-intent/pending-share";
 
 interface ParsedSharePayload {
@@ -56,7 +57,12 @@ export function ShareIntentBridge(): ReactElement | null {
         void (async () => {
             const chat = await createChat();
             setPendingSharePayload(chat.id, { text: payload.text });
-            router.replace(`/chat/${chat.id}`);
+            router.replace(
+                `/chat/${buildChatRouteId({
+                    chatId: chat.id,
+                    agentId: chat.agentId,
+                })}`,
+            );
         })()
             .catch((shareError) => {
                 lastHandledRef.current = null;

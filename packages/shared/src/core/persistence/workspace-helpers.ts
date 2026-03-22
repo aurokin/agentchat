@@ -46,7 +46,7 @@ export function mergeByIdWithPending<T extends { id: string }>(
 export interface ConvexChatLike {
     _id: string;
     localId?: string | null;
-    agentId?: string | null;
+    agentId: string;
     title: string;
     modelId: string;
     variantId?: string | null;
@@ -78,7 +78,7 @@ export interface ConvexMessageLike {
 export function mapConvexChatToSession(chat: ConvexChatLike): ChatSession {
     return {
         id: chat.localId ?? chat._id,
-        agentId: chat.agentId ?? "",
+        agentId: chat.agentId,
         title: chat.title,
         modelId: chat.modelId,
         variantId: chat.variantId ?? null,

@@ -113,10 +113,7 @@ export function getAgentchatServerUrl(): string | null {
     return resolveBrowserReachableUrl(trimTrailingSlash(value));
 }
 
-async function fetchJson<T>(
-    path: string,
-    token?: string | null,
-): Promise<T> {
+async function fetchJson<T>(path: string, token?: string | null): Promise<T> {
     const baseUrl = getAgentchatServerUrl();
     if (!baseUrl) {
         throw new Error(

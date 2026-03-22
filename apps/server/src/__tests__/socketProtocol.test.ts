@@ -57,6 +57,7 @@ describe("socket protocol parsing", () => {
                     type: "conversation.interrupt",
                     payload: {
                         conversationId: "chat-1",
+                        agentId: "agent-1",
                     },
                 }),
             ),
@@ -65,8 +66,23 @@ describe("socket protocol parsing", () => {
             type: "conversation.interrupt",
             payload: {
                 conversationId: "chat-1",
+                agentId: "agent-1",
             },
         });
+    });
+
+    test("rejects interrupt commands without agentId", () => {
+        expect(() =>
+            parseClientCommand(
+                JSON.stringify({
+                    id: "cmd-2-missing-agent",
+                    type: "conversation.interrupt",
+                    payload: {
+                        conversationId: "chat-1",
+                    },
+                }),
+            ),
+        ).toThrow("Invalid interrupt payload");
     });
 
     test("parses subscribe commands", () => {
@@ -77,6 +93,7 @@ describe("socket protocol parsing", () => {
                     type: "conversation.subscribe",
                     payload: {
                         conversationId: "chat-1",
+                        agentId: "agent-1",
                     },
                 }),
             ),
@@ -85,8 +102,42 @@ describe("socket protocol parsing", () => {
             type: "conversation.subscribe",
             payload: {
                 conversationId: "chat-1",
+                agentId: "agent-1",
             },
         });
+    });
+
+    test("rejects subscribe commands without agentId", () => {
+        expect(() =>
+            parseClientCommand(
+                JSON.stringify({
+                    id: "cmd-3-missing-agent",
+                    type: "conversation.subscribe",
+                    payload: {
+                        conversationId: "chat-1",
+                    },
+                }),
+            ),
+        ).toThrow("Invalid conversation subscription payload");
+    });
+
+    test("rejects send commands without agentId", () => {
+        expect(() =>
+            parseClientCommand(
+                JSON.stringify({
+                    id: "cmd-missing-agent-send",
+                    type: "conversation.send",
+                    payload: {
+                        conversationId: "chat-1",
+                        modelId: "gpt-5.3-codex",
+                        content: "Hello",
+                        userMessageId: "user-1",
+                        assistantMessageId: "assistant-1",
+                        history: [],
+                    },
+                }),
+            ),
+        ).toThrow("Invalid send payload");
     });
 
     test("rejects send commands with invalid history entries", () => {
@@ -107,6 +158,42 @@ describe("socket protocol parsing", () => {
                 }),
             ),
         ).toThrow("Invalid send payload");
+    });
+
+    test("parses delete commands", () => {
+        expect(
+            parseClientCommand(
+                JSON.stringify({
+                    id: "cmd-6",
+                    type: "conversation.delete",
+                    payload: {
+                        conversationId: "chat-1",
+                        agentId: "agent-1",
+                    },
+                }),
+            ),
+        ).toEqual({
+            id: "cmd-6",
+            type: "conversation.delete",
+            payload: {
+                conversationId: "chat-1",
+                agentId: "agent-1",
+            },
+        });
+    });
+
+    test("rejects delete commands with missing agentId", () => {
+        expect(() =>
+            parseClientCommand(
+                JSON.stringify({
+                    id: "cmd-7",
+                    type: "conversation.delete",
+                    payload: {
+                        conversationId: "chat-1",
+                    },
+                }),
+            ),
+        ).toThrow("Invalid delete payload");
     });
 
     test("rejects unsupported command types", () => {

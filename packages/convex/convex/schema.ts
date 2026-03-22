@@ -45,6 +45,11 @@ export default defineSchema({
     })
         .index("by_user", ["userId"])
         .index("by_user_updated", ["userId", "updatedAt"])
+        .index("by_userId_and_agentId_and_localId", [
+            "userId",
+            "agentId",
+            "localId",
+        ])
         .index("by_userId_and_agentId_and_updatedAt", [
             "userId",
             "agentId",
@@ -89,6 +94,7 @@ export default defineSchema({
     })
         .index("by_chat", ["chatId"])
         .index("by_chat_created", ["chatId", "createdAt"])
+        .index("by_chatId_and_localId", ["chatId", "localId"])
         .index("by_user", ["userId"])
         .index("by_local_id", ["userId", "localId"])
         .index("by_runId", ["runId"]),
@@ -161,6 +167,11 @@ export default defineSchema({
         lastError: v.union(v.string(), v.null()),
         lastEventAt: v.union(v.number(), v.null()),
         expiresAt: v.union(v.number(), v.null()),
+        workspaceMode: v.optional(
+            v.union(v.literal("shared"), v.literal("copy-on-conversation")),
+        ),
+        workspaceRootPath: v.optional(v.string()),
+        workspaceCwd: v.optional(v.string()),
         updatedAt: v.number(),
     })
         .index("by_chatId", ["chatId"])

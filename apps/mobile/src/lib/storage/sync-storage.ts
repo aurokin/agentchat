@@ -1,4 +1,4 @@
-import * as SecureStore from "expo-secure-store";
+import { getItemAsync, setItemAsync } from "./secure-store";
 
 export type UserTheme = "light" | "dark" | "system";
 
@@ -9,8 +9,8 @@ const ONBOARDING_KEY = "agentchat-has-completed-onboarding";
 export async function getTheme(): Promise<UserTheme> {
     try {
         const [theme, hasExplicitSelection] = await Promise.all([
-            SecureStore.getItemAsync(THEME_KEY),
-            SecureStore.getItemAsync(THEME_SELECTION_KEY),
+            getItemAsync(THEME_KEY),
+            getItemAsync(THEME_SELECTION_KEY),
         ]);
         if (hasExplicitSelection !== "true") {
             return "system";
@@ -27,8 +27,8 @@ export async function getTheme(): Promise<UserTheme> {
 export async function setTheme(theme: UserTheme): Promise<void> {
     try {
         await Promise.all([
-            SecureStore.setItemAsync(THEME_KEY, theme),
-            SecureStore.setItemAsync(THEME_SELECTION_KEY, "true"),
+            setItemAsync(THEME_KEY, theme),
+            setItemAsync(THEME_SELECTION_KEY, "true"),
         ]);
     } catch (error) {
         console.error("Failed to save theme:", error);
@@ -37,7 +37,7 @@ export async function setTheme(theme: UserTheme): Promise<void> {
 
 export async function getHasCompletedOnboarding(): Promise<boolean> {
     try {
-        const result = await SecureStore.getItemAsync(ONBOARDING_KEY);
+        const result = await getItemAsync(ONBOARDING_KEY);
         return result === "true";
     } catch {
         return false;
@@ -46,7 +46,7 @@ export async function getHasCompletedOnboarding(): Promise<boolean> {
 
 export async function setHasCompletedOnboarding(): Promise<void> {
     try {
-        await SecureStore.setItemAsync(ONBOARDING_KEY, "true");
+        await setItemAsync(ONBOARDING_KEY, "true");
     } catch (error) {
         console.error("Failed to save onboarding state:", error);
     }

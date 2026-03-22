@@ -28,6 +28,7 @@ export function createRecoveredActiveRunFromRuntimeState(params: {
 }): ActiveRunState | null {
     return createRecoveredActiveRunFromRuntimeStateBase({
         conversationId: params.currentChat.id,
+        agentId: params.currentChat.agentId,
         messages: params.messages,
         runtimeState: params.runtimeState,
     });

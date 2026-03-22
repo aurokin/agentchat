@@ -1,4 +1,7 @@
+import path from "node:path";
+
 import type { AgentchatConfig, AgentConfig, ProviderConfig } from "./config.ts";
+import { canonicalizePathForComparison } from "./pathComparison.ts";
 import {
     CodexAppServerClient,
     type CodexClient,
@@ -11,9 +14,16 @@ import type {
     ServerEvent,
 } from "./socketProtocol.ts";
 import type {
+    PersistedConversationRuntimeState,
     PersistedRuntimeBinding,
     RuntimePersistenceClient,
 } from "./runtimePersistence.ts";
+import {
+    getSandboxConversationPathSegment,
+    getSandboxUserPathSegment,
+} from "./sandboxPaths.ts";
+import type { WorkspaceManager } from "./workspaceManager.ts";
+import { getWorkspaceActiveKeyFromSegments } from "./workspaceManager.ts";
 
 type ActiveTurn = {
     runId: string;
@@ -35,12 +45,14 @@ type ActiveTurn = {
 
 type ConversationRuntime = {
     key: string;
+    chatId: string;
     userId: string;
     conversationId: string;
     agentId: string;
     modelId: string;
     provider: ProviderConfig;
     agent: AgentConfig;
+    cwd: string;
     client: CodexClient;
     threadId: string;
     activeTurn: ActiveTurn | null;
@@ -59,14 +71,63 @@ type ResolvedRuntimeResources = {
     provider: ProviderConfig;
 };
 
+type RuntimeWorkspaceIdentity = {
+    workspaceMode: "shared" | "copy-on-conversation";
+    workspaceRootPath: string;
+    workspaceCwd: string;
+};
+
+type PendingRuntimeInitialization = {
+    cancelReason: Error | null;
+    client: CodexClient | null;
+    promise: Promise<{ runtime: ConversationRuntime; isNew: boolean }>;
+};
+
+const PENDING_RUNTIME_DELETE_WAIT_MS = 1_000;
+
 function invariant(condition: unknown, message: string): asserts condition {
     if (!condition) {
         throw new Error(message);
     }
 }
 
-function getRuntimeKey(userId: string, conversationId: string): string {
-    return `${userId}:${conversationId}`;
+function getRuntimeKey(
+    userId: string,
+    agentId: string,
+    conversationId: string,
+): string {
+    return JSON.stringify([userId, agentId, conversationId]);
+}
+
+function runtimeKeyMatchesConversation(params: {
+    runtimeKey: string;
+    conversationId: string;
+    agentId?: string;
+}): boolean {
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(params.runtimeKey);
+    } catch {
+        return false;
+    }
+
+    if (!Array.isArray(parsed) || parsed.length !== 3) {
+        return false;
+    }
+
+    const [, keyAgentId, keyConversationId] = parsed;
+    if (
+        typeof keyAgentId !== "string" ||
+        typeof keyConversationId !== "string"
+    ) {
+        return false;
+    }
+
+    if (keyConversationId !== params.conversationId) {
+        return false;
+    }
+
+    return params.agentId === undefined || keyAgentId === params.agentId;
 }
 
 function createServerEvent(
@@ -74,6 +135,43 @@ function createServerEvent(
     payload: ServerEvent["payload"],
 ): ServerEvent {
     return { type, payload };
+}
+
+function createRuntimeServerEvent(
+    runtime: Pick<ConversationRuntime, "agentId" | "conversationId">,
+    type: ServerEvent["type"],
+    payload: Record<string, unknown>,
+): ServerEvent {
+    return createServerEvent(type, {
+        agentId: runtime.agentId,
+        conversationId: runtime.conversationId,
+        ...payload,
+    });
+}
+
+function mergeRuntimeSubscribers(
+    primary: Map<string, RuntimeSubscriber>,
+    secondary: Map<string, RuntimeSubscriber> | undefined,
+): Map<string, RuntimeSubscriber> {
+    const merged = new Map(primary);
+    if (!secondary) {
+        return merged;
+    }
+
+    for (const [subscriberId, subscriber] of secondary) {
+        const existing = merged.get(subscriberId);
+        merged.set(subscriberId, {
+            sendEvent: subscriber.sendEvent,
+            subscriptionCount:
+                (existing?.subscriptionCount ?? 0) +
+                subscriber.subscriptionCount,
+            retainDuringActiveTurn:
+                (existing?.retainDuringActiveTurn ?? false) ||
+                subscriber.retainDuringActiveTurn,
+        });
+    }
+
+    return merged;
 }
 
 function extractThreadId(result: unknown): string {
@@ -176,20 +274,32 @@ export class CodexRuntimeManager {
         string,
         Map<string, RuntimeSubscriber>
     >();
+    private readonly closedSubscribers = new Set<string>();
+    private readonly pendingRuntimeInitializations = new Map<
+        string,
+        PendingRuntimeInitialization
+    >();
     private readonly getConfig: () => AgentchatConfig;
     private readonly persistence: RuntimePersistenceClient;
     private readonly createClient: CreateCodexClient;
+    private readonly workspaceManager: WorkspaceManager | null;
+    private readonly pendingRuntimeDeleteWaitMs: number;
 
     constructor(params: {
         getConfig: () => AgentchatConfig;
         persistence: RuntimePersistenceClient;
         createClient?: CreateCodexClient;
+        workspaceManager?: WorkspaceManager;
+        pendingRuntimeDeleteWaitMs?: number;
     }) {
         this.getConfig = params.getConfig;
         this.persistence = params.persistence;
         this.createClient =
             params.createClient ??
             ((clientParams) => new CodexAppServerClient(clientParams));
+        this.workspaceManager = params.workspaceManager ?? null;
+        this.pendingRuntimeDeleteWaitMs =
+            params.pendingRuntimeDeleteWaitMs ?? PENDING_RUNTIME_DELETE_WAIT_MS;
     }
 
     async sendMessage(params: {
@@ -198,7 +308,10 @@ export class CodexRuntimeManager {
         command: ConversationSendCommand;
         sendEvent: (event: ServerEvent) => void;
     }): Promise<void> {
-        const { runtime, isNew } = await this.ensureRuntime(params);
+        const { runtime, isNew } = await this.ensureRuntime({
+            ...params,
+            command: params.command,
+        });
         this.retainSubscriberForActiveTurn(
             runtime,
             params.subscriberId,
@@ -216,16 +329,14 @@ export class CodexRuntimeManager {
         const runId = crypto.randomUUID();
         this.emitToSubscribers(
             runtime,
-            createServerEvent("run.started", {
-                conversationId: params.command.payload.conversationId,
+            createRuntimeServerEvent(runtime, "run.started", {
                 runId,
                 messageId: params.command.payload.assistantMessageId,
             }),
         );
         this.emitToSubscribers(
             runtime,
-            createServerEvent("message.started", {
-                conversationId: params.command.payload.conversationId,
+            createRuntimeServerEvent(runtime, "message.started", {
                 runId,
                 messageId: params.command.payload.assistantMessageId,
                 messageIndex: 0,
@@ -267,7 +378,9 @@ export class CodexRuntimeManager {
 
                     const startedAt = Date.now();
                     await this.persistence.runtimeBinding({
+                        chatId: runtime.chatId,
                         userId: params.userId,
+                        agentId: runtime.agentId,
                         conversationLocalId:
                             params.command.payload.conversationId,
                         provider: runtime.provider.id,
@@ -278,6 +391,9 @@ export class CodexRuntimeManager {
                         lastError: null,
                         lastEventAt: startedAt,
                         expiresAt: null,
+                        workspaceMode: runtime.agent.workspaceMode,
+                        workspaceRootPath: runtime.agent.rootPath,
+                        workspaceCwd: runtime.cwd,
                         updatedAt: startedAt,
                     });
 
@@ -293,7 +409,7 @@ export class CodexRuntimeManager {
                         {
                             threadId: runtime.threadId,
                             input: [{ type: "text", text: inputText }],
-                            cwd: runtime.agent.rootPath,
+                            cwd: runtime.cwd,
                             approvalPolicy: "never",
                             sandboxPolicy: {
                                 type: "dangerFullAccess",
@@ -308,7 +424,9 @@ export class CodexRuntimeManager {
                     runtime.modelId = params.command.payload.modelId;
 
                     await this.persistence.runStarted({
+                        chatId: runtime.chatId,
                         userId: params.userId,
+                        agentId: runtime.agentId,
                         conversationLocalId:
                             params.command.payload.conversationId,
                         triggerMessageLocalId:
@@ -347,7 +465,9 @@ export class CodexRuntimeManager {
                     if (failedTurn) {
                         try {
                             await this.persistence.runFailed({
+                                chatId: runtime.chatId,
                                 userId: failedTurn.userId,
+                                agentId: runtime.agentId,
                                 conversationLocalId:
                                     params.command.payload.conversationId,
                                 assistantMessageLocalId:
@@ -367,7 +487,9 @@ export class CodexRuntimeManager {
                     }
                     void this.persistence
                         .runtimeBinding({
+                            chatId: runtime.chatId,
                             userId: params.userId,
+                            agentId: runtime.agentId,
                             conversationLocalId:
                                 params.command.payload.conversationId,
                             provider: runtime.provider.id,
@@ -378,6 +500,9 @@ export class CodexRuntimeManager {
                             lastError: errorMessage,
                             lastEventAt: Date.now(),
                             expiresAt: null,
+                            workspaceMode: runtime.agent.workspaceMode,
+                            workspaceRootPath: runtime.agent.rootPath,
+                            workspaceCwd: runtime.cwd,
                             updatedAt: Date.now(),
                         })
                         .catch((persistError) => {
@@ -393,13 +518,16 @@ export class CodexRuntimeManager {
                                 persistError,
                             );
                         });
-                    runtime.client.stop();
-                    this.runtimes.delete(runtime.key);
+                    await this.disposeRuntime(runtime, {
+                        removeFromMap: true,
+                        reason:
+                            error instanceof Error
+                                ? error
+                                : new Error(errorMessage),
+                    });
                     this.emitToSubscribers(
                         runtime,
-                        createServerEvent("run.failed", {
-                            conversationId:
-                                params.command.payload.conversationId,
+                        createRuntimeServerEvent(runtime, "run.failed", {
                             runId,
                             error: {
                                 message: errorMessage,
@@ -419,9 +547,10 @@ export class CodexRuntimeManager {
     async interrupt(params: {
         userId: string;
         conversationId: string;
+        agentId: string;
     }): Promise<void> {
         const runtime = this.runtimes.get(
-            getRuntimeKey(params.userId, params.conversationId),
+            getRuntimeKey(params.userId, params.agentId, params.conversationId),
         );
         if (!runtime?.activeTurn?.turnId) {
             return;
@@ -433,13 +562,113 @@ export class CodexRuntimeManager {
         });
     }
 
+    async deleteConversationWorkspace(params: {
+        userId: string;
+        conversationId: string;
+        agentId: string;
+        chatId?: string;
+    }): Promise<void> {
+        // Verify the chat no longer exists in Convex before deleting
+        try {
+            const stillExists = await this.persistence.chatExists(
+                params.userId,
+                params.agentId,
+                params.conversationId,
+                params.chatId,
+            );
+            if (stillExists) {
+                console.warn(
+                    `[agentchat-server] conversation.delete: chat still exists in Convex for ${params.conversationId}; ignoring`,
+                );
+                return;
+            }
+        } catch (error) {
+            console.error(
+                `[agentchat-server] conversation.delete: failed to verify chat deletion in Convex; ignoring`,
+                error,
+            );
+            return;
+        }
+
+        // If there's a live runtime, verify the agentId matches before tearing down
+        const key = getRuntimeKey(
+            params.userId,
+            params.agentId,
+            params.conversationId,
+        );
+        const pendingInitialization =
+            this.pendingRuntimeInitializations.get(key);
+        this.cancelPendingRuntimeInitialization(
+            key,
+            new Error("Conversation deleted during runtime initialization."),
+        );
+        const runtime = this.runtimes.get(key);
+        const shouldTearDownRuntime =
+            runtime?.agentId === params.agentId || !runtime;
+        if (runtime && !shouldTearDownRuntime) {
+            console.warn(
+                `[agentchat-server] conversation.delete: agentId mismatch (runtime=${runtime.agentId}, request=${params.agentId}); skipping runtime teardown but continuing workspace deletion`,
+            );
+        }
+
+        // Tear down any active runtime for this conversation
+        if (runtime && shouldTearDownRuntime) {
+            await this.disposeRuntime(runtime, {
+                removeFromMap: true,
+                reason: new Error("Conversation deleted during active turn."),
+            });
+            this.pendingSubscriptions.delete(key);
+        }
+        if (!runtime) {
+            this.pendingSubscriptions.delete(key);
+        }
+        if (pendingInitialization) {
+            const settled = await this.waitForPendingRuntimeInitialization(
+                pendingInitialization,
+            );
+            if (!settled) {
+                console.warn(
+                    `[agentchat-server] conversation.delete: runtime initialization did not settle within ${this.pendingRuntimeDeleteWaitMs}ms for ${params.conversationId}; continuing workspace cleanup`,
+                );
+            }
+        }
+
+        // Delete the sandbox workspace if workspace manager is configured
+        if (this.workspaceManager) {
+            await this.workspaceManager.deleteWorkspace(
+                params.agentId,
+                params.userId,
+                params.conversationId,
+            );
+        }
+    }
+
     subscribe(params: {
         userId: string;
         conversationId: string;
+        agentId: string;
         subscriberId: string;
         sendEvent: (event: ServerEvent) => void;
     }): Promise<void> | void {
-        const key = getRuntimeKey(params.userId, params.conversationId);
+        this.closedSubscribers.delete(params.subscriberId);
+        return this.subscribeResolved(params);
+    }
+
+    private async subscribeResolved(params: {
+        userId: string;
+        conversationId: string;
+        agentId: string;
+        subscriberId: string;
+        sendEvent: (event: ServerEvent) => void;
+    }): Promise<void> {
+        if (this.closedSubscribers.has(params.subscriberId)) {
+            return;
+        }
+        const key = getRuntimeKey(
+            params.userId,
+            params.agentId,
+            params.conversationId,
+        );
         const runtime = this.runtimes.get(key);
         if (!runtime) {
             this.addPendingSubscription(
@@ -450,6 +679,7 @@ export class CodexRuntimeManager {
             return this.recoverOrphanedActiveRun({
                 userId: params.userId,
                 conversationId: params.conversationId,
+                agentId: params.agentId,
             });
         }
 
@@ -458,20 +688,26 @@ export class CodexRuntimeManager {
             params.subscriberId,
             params.sendEvent,
         );
+        if (this.closedSubscribers.has(params.subscriberId)) {
+            this.unsubscribe({
+                subscriberId: params.subscriberId,
+                conversationId: params.conversationId,
+                agentId: params.agentId,
+            });
+            return;
+        }
         if (!runtime.activeTurn) {
             return;
         }
 
         params.sendEvent(
-            createServerEvent("run.started", {
-                conversationId: runtime.conversationId,
+            createRuntimeServerEvent(runtime, "run.started", {
                 runId: runtime.activeTurn.runId,
                 messageId: runtime.activeTurn.currentMessageId,
             }),
         );
         params.sendEvent(
-            createServerEvent("message.started", {
-                conversationId: runtime.conversationId,
+            createRuntimeServerEvent(runtime, "message.started", {
                 runId: runtime.activeTurn.runId,
                 messageId: runtime.activeTurn.currentMessageId,
                 messageIndex: runtime.activeTurn.currentMessageIndex,
@@ -482,8 +718,7 @@ export class CodexRuntimeManager {
 
         if (runtime.activeTurn.text) {
             params.sendEvent(
-                createServerEvent("message.delta", {
-                    conversationId: runtime.conversationId,
+                createRuntimeServerEvent(runtime, "message.delta", {
                     messageId: runtime.activeTurn.currentMessageId,
                     delta: runtime.activeTurn.text,
                     content: runtime.activeTurn.text,
@@ -492,14 +727,47 @@ export class CodexRuntimeManager {
         }
     }
 
+    /**
+     * Returns composite agentId:userId:conversationId keys for live copied
+     * workspaces that should be preserved during reconciliation.
+     */
+    getActiveConversationKeys(): Set<string> {
+        const keys = new Set<string>();
+        for (const runtime of this.runtimes.values()) {
+            if (runtime.agent.workspaceMode !== "copy-on-conversation") {
+                continue;
+            }
+            const sandboxRoot = path.dirname(
+                path.dirname(path.dirname(runtime.cwd)),
+            );
+            keys.add(
+                getWorkspaceActiveKeyFromSegments({
+                    sandboxRoot,
+                    agentIdSegment: runtime.agentId,
+                    userIdSegment: getSandboxUserPathSegment(runtime.userId),
+                    conversationIdSegment: getSandboxConversationPathSegment(
+                        runtime.conversationId,
+                    ),
+                }),
+            );
+        }
+        return keys;
+    }
+
     unsubscribe(params: {
         subscriberId: string;
         conversationId?: string;
+        agentId?: string;
     }): void {
+        if (!params.conversationId) {
+            this.closedSubscribers.add(params.subscriberId);
+        }
         for (const runtime of this.runtimes.values()) {
             if (
                 params.conversationId &&
-                runtime.conversationId !== params.conversationId
+                (runtime.conversationId !== params.conversationId ||
+                    (params.agentId !== undefined &&
+                        runtime.agentId !== params.agentId))
             ) {
                 continue;
             }
@@ -523,7 +791,11 @@ export class CodexRuntimeManager {
         for (const [key, subscribers] of this.pendingSubscriptions) {
             if (
                 params.conversationId &&
-                !key.endsWith(`:${params.conversationId}`)
+                !runtimeKeyMatchesConversation({
+                    runtimeKey: key,
+                    conversationId: params.conversationId,
+                    agentId: params.agentId,
+                })
             ) {
                 continue;
             }
@@ -553,13 +825,84 @@ export class CodexRuntimeManager {
         const resources = resolveRuntimeResources(config, params.command);
         const key = getRuntimeKey(
             params.userId,
+            params.command.payload.agentId,
             params.command.payload.conversationId,
         );
+        const pendingInitialization =
+            this.pendingRuntimeInitializations.get(key);
+        if (pendingInitialization) {
+            return await pendingInitialization.promise;
+        }
+        const initializationState: PendingRuntimeInitialization = {
+            cancelReason: null,
+            client: null,
+            promise: Promise.resolve(null as never),
+        };
+        const initialization = this.initializeRuntime(
+            params,
+            key,
+            initializationState,
+        );
+        initializationState.promise = initialization;
+        this.pendingRuntimeInitializations.set(key, initializationState);
+        try {
+            return await initialization;
+        } finally {
+            this.pendingRuntimeInitializations.delete(key);
+        }
+    }
+
+    private async initializeRuntime(
+        params: {
+            userId: string;
+            command: ConversationSendCommand;
+            sendEvent: (event: ServerEvent) => void;
+        },
+        key: string,
+        initializationState: PendingRuntimeInitialization,
+    ): Promise<{ runtime: ConversationRuntime; isNew: boolean }> {
+        const config = this.getConfig();
+        const resources = resolveRuntimeResources(config, params.command);
+        const desiredCwd = getDesiredRuntimeCwd({
+            workspaceManager: this.workspaceManager,
+            agent: resources.agent,
+            userId: params.userId,
+            conversationId: params.command.payload.conversationId,
+        });
         const existing = this.runtimes.get(key);
+        let shouldResetConversationState = false;
+        let recycledSubscribers: Map<string, RuntimeSubscriber> | null = null;
         if (existing) {
-            if (shouldRecycleRuntime(existing, resources)) {
-                existing.client.stop();
-                this.runtimes.delete(key);
+            if (shouldRecycleRuntime(existing, resources, desiredCwd)) {
+                if (existing.activeTurn) {
+                    return { runtime: existing, isNew: false };
+                }
+                recycledSubscribers = new Map(existing.subscribers);
+                shouldResetConversationState = shouldResetRuntimeState(
+                    existing,
+                    resources,
+                    desiredCwd,
+                );
+                await this.disposeRuntime(existing, {
+                    removeFromMap: true,
+                    reason: new Error("Conversation runtime recycled."),
+                });
+                if (
+                    this.workspaceManager &&
+                    existing.agent.workspaceMode === "copy-on-conversation" &&
+                    existing.agent.id === resources.agent.id &&
+                    shouldResetConversationState
+                ) {
+                    await this.workspaceManager.deleteWorkspacePath({
+                        sandboxRoot: path.dirname(
+                            path.dirname(path.dirname(existing.cwd)),
+                        ),
+                        targetPath: existing.cwd,
+                        agentId: existing.agent.id,
+                        userId: params.userId,
+                        conversationId: params.command.payload.conversationId,
+                    });
+                }
             } else {
                 existing.agent = resources.agent;
                 existing.provider = resources.provider;
@@ -568,52 +911,242 @@ export class CodexRuntimeManager {
             }
         }
 
-        const client = this.createClient({
-            provider: resources.provider,
-            agent: resources.agent,
-        });
-        await client.initialize();
-        const persistedBinding = await this.persistence.readRuntimeBinding({
-            userId: params.userId,
-            conversationLocalId: params.command.payload.conversationId,
-        });
-        const { threadId, isNew } = await this.openThread({
-            client,
-            resources,
-            binding: persistedBinding,
-            modelId: params.command.payload.modelId,
-        });
+        let cwd = resources.agent.rootPath;
+        let client: CodexClient | null = null;
+        let cleanupWorkspaceOnFailure = false;
+        try {
+            const workspaceState = this.workspaceManager
+                ? await this.workspaceManager.ensureWorkspaceState(
+                      resources.agent,
+                      params.userId,
+                      params.command.payload.conversationId,
+                  )
+                : {
+                      path: resources.agent.rootPath,
+                      wasReset: false,
+                      cleanupOnFailure: false,
+                  };
+            cwd = workspaceState.path;
+            cleanupWorkspaceOnFailure = workspaceState.cleanupOnFailure;
+            await this.throwIfRuntimeInitializationCancelled({
+                initializationState,
+                client: null,
+                agent: resources.agent,
+                userId: params.userId,
+                conversationId: params.command.payload.conversationId,
+                cwd,
+                cleanupWorkspace: cleanupWorkspaceOnFailure,
+            });
+            const workspaceIdentity = getRuntimeWorkspaceIdentity(
+                resources.agent,
+                cwd,
+            );
 
-        const runtime: ConversationRuntime = {
-            key,
-            userId: params.userId,
-            conversationId: params.command.payload.conversationId,
-            agentId: resources.agent.id,
-            modelId: params.command.payload.modelId,
-            provider: resources.provider,
-            agent: resources.agent,
-            client,
-            threadId,
-            activeTurn: null,
-            idleTimer: null,
-            subscribers: new Map(),
-        };
+            client = this.createClient({
+                provider: resources.provider,
+                agent: { ...resources.agent, rootPath: cwd },
+            });
+            initializationState.client = client;
+            await client.initialize();
+            await this.throwIfRuntimeInitializationCancelled({
+                initializationState,
+                client,
+                agent: resources.agent,
+                userId: params.userId,
+                conversationId: params.command.payload.conversationId,
+                cwd,
+                cleanupWorkspace: cleanupWorkspaceOnFailure,
+            });
+            const persistedState = await this.readConversationPersistenceState({
+                userId: params.userId,
+                agentId: resources.agent.id,
+                conversationId: params.command.payload.conversationId,
+                allowMissingConversation: false,
+            });
+            await this.throwIfRuntimeInitializationCancelled({
+                initializationState,
+                client,
+                agent: resources.agent,
+                userId: params.userId,
+                conversationId: params.command.payload.conversationId,
+                cwd,
+                cleanupWorkspace: cleanupWorkspaceOnFailure,
+            });
+            invariant(
+                persistedState,
+                "Conversation not found during runtime initialization.",
+            );
+            const persistedBinding =
+                shouldResetConversationState || workspaceState.wasReset
+                    ? null
+                    : persistedState.binding;
+            const resumableBinding =
+                persistedBinding &&
+                !shouldResetPersistedRuntimeBinding(
+                    persistedBinding,
+                    workspaceIdentity,
+                )
+                    ? persistedBinding
+                    : null;
+            const { threadId, isNew } = await this.openThread({
+                client,
+                resources,
+                binding: resumableBinding,
+                modelId: params.command.payload.modelId,
+                cwd,
+            });
+            await this.throwIfRuntimeInitializationCancelled({
+                initializationState,
+                client,
+                agent: resources.agent,
+                userId: params.userId,
+                conversationId: params.command.payload.conversationId,
+                cwd,
+                cleanupWorkspace: cleanupWorkspaceOnFailure,
+            });
 
-        const pendingSubscribers = this.pendingSubscriptions.get(key);
-        if (pendingSubscribers) {
-            runtime.subscribers = new Map(pendingSubscribers);
-            this.pendingSubscriptions.delete(key);
+            const runtime: ConversationRuntime = {
+                key,
+                chatId: persistedState.chatId,
+                userId: params.userId,
+                conversationId: params.command.payload.conversationId,
+                agentId: resources.agent.id,
+                modelId: params.command.payload.modelId,
+                provider: resources.provider,
+                agent: resources.agent,
+                cwd,
+                client,
+                threadId,
+                activeTurn: null,
+                idleTimer: null,
+                subscribers: recycledSubscribers
+                    ? new Map(recycledSubscribers)
+                    : new Map(),
+            };
+
+            const pendingSubscribers = this.pendingSubscriptions.get(key);
+            if (pendingSubscribers) {
+                runtime.subscribers = mergeRuntimeSubscribers(
+                    runtime.subscribers,
+                    pendingSubscribers,
+                );
+                this.pendingSubscriptions.delete(key);
+            }
+
+            client.onNotification((notification) => {
+                this.handleNotification(runtime, notification);
+            });
+            client.onExit((error) => {
+                this.handleRuntimeExit(runtime, error);
+            });
+
+            await this.throwIfRuntimeInitializationCancelled({
+                initializationState,
+                client,
+                agent: resources.agent,
+                userId: params.userId,
+                conversationId: params.command.payload.conversationId,
+                cwd,
+                cleanupWorkspace: cleanupWorkspaceOnFailure,
+            });
+            this.runtimes.set(key, runtime);
+            return { runtime, isNew };
+        } catch (error) {
+            if (initializationState.cancelReason !== error) {
+                await this.cleanupFailedRuntimeInitialization({
+                    agent: resources.agent,
+                    userId: params.userId,
+                    conversationId: params.command.payload.conversationId,
+                    cwd,
+                    client,
+                    cleanupWorkspace: cleanupWorkspaceOnFailure,
+                });
+            }
+            throw error;
+        }
+    }
+
+    private async throwIfRuntimeInitializationCancelled(params: {
+        initializationState: PendingRuntimeInitialization;
+        client: CodexClient | null;
+        agent: AgentConfig;
+        userId: string;
+        conversationId: string;
+        cwd: string;
+        cleanupWorkspace: boolean;
+    }): Promise<void> {
+        const cancelReason = params.initializationState.cancelReason;
+        if (!cancelReason) {
+            return;
         }
 
-        client.onNotification((notification) => {
-            this.handleNotification(runtime, notification);
-        });
-        client.onExit((error) => {
-            this.handleRuntimeExit(runtime, error);
-        });
+        if (params.client) {
+            await params.client.stop();
+        }
+        if (
+            params.cleanupWorkspace &&
+            this.workspaceManager &&
+            params.agent.workspaceMode === "copy-on-conversation"
+        ) {
+            await this.workspaceManager.deleteWorkspace(
+                params.agent.id,
+                params.userId,
+                params.conversationId,
+            );
+        }
+        throw cancelReason;
+    }
 
-        this.runtimes.set(key, runtime);
-        return { runtime, isNew };
+    private cancelPendingRuntimeInitialization(
+        key: string,
+        reason: Error,
+    ): PendingRuntimeInitialization | null {
+        const pendingInitialization =
+            this.pendingRuntimeInitializations.get(key) ?? null;
+        if (!pendingInitialization) {
+            return null;
+        }
+
+        pendingInitialization.cancelReason ??= reason;
+        void pendingInitialization.client?.stop();
+        return pendingInitialization;
+    }
+
+    private async waitForPendingRuntimeInitialization(
+        pendingInitialization: PendingRuntimeInitialization,
+    ): Promise<boolean> {
+        const settledPromise = pendingInitialization.promise.then(
+            () => true,
+            () => true,
+        );
+        const timeoutPromise = new Promise<boolean>((resolve) => {
+            setTimeout(() => resolve(false), this.pendingRuntimeDeleteWaitMs);
+        });
+        return await Promise.race([settledPromise, timeoutPromise]);
+    }
+
+    private async cleanupFailedRuntimeInitialization(params: {
+        agent: AgentConfig;
+        userId: string;
+        conversationId: string;
+        cwd: string;
+        client: CodexClient | null;
+        cleanupWorkspace: boolean;
+    }): Promise<void> {
+        if (params.client) {
+            await params.client.stop();
+        }
+        if (
+            params.cleanupWorkspace &&
+            this.workspaceManager &&
+            params.agent.workspaceMode === "copy-on-conversation"
+        ) {
+            await this.workspaceManager.deleteWorkspace(
+                params.agent.id,
+                params.userId,
+                params.conversationId,
+            );
+        }
     }
 
     private addConversationSubscription(
@@ -702,15 +1235,41 @@ export class CodexRuntimeManager {
         }
     }
 
+    private async readConversationPersistenceState(params: {
+        userId: string;
+        agentId: string;
+        conversationId: string;
+        allowMissingConversation: boolean;
+    }): Promise<PersistedConversationRuntimeState | null> {
+        const persistedState = await this.persistence.readRuntimeBinding({
+            userId: params.userId,
+            agentId: params.agentId,
+            conversationLocalId: params.conversationId,
+        });
+        if (persistedState) {
+            return persistedState;
+        }
+        if (params.allowMissingConversation) {
+            return null;
+        }
+
+        throw new Error("Conversation not found");
+    }
+
     private async recoverOrphanedActiveRun(params: {
         userId: string;
         conversationId: string;
+        agentId: string;
     }): Promise<void> {
-        const persistedBinding = await this.persistence.readRuntimeBinding({
+        const persistedState = await this.readConversationPersistenceState({
             userId: params.userId,
-            conversationLocalId: params.conversationId,
+            agentId: params.agentId,
+            conversationId: params.conversationId,
+            allowMissingConversation: true,
         });
+        const persistedBinding = persistedState?.binding ?? null;
         if (
+            !persistedState ||
             !persistedBinding ||
             persistedBinding.status !== "active" ||
             !persistedBinding.activeRunId
@@ -719,7 +1278,9 @@ export class CodexRuntimeManager {
         }
 
         await this.persistence.recoverStaleRun({
+            chatId: persistedState.chatId,
             userId: params.userId,
+            agentId: params.agentId,
             conversationLocalId: params.conversationId,
             externalRunId: persistedBinding.activeRunId,
             completedAt: Date.now(),
@@ -742,10 +1303,11 @@ export class CodexRuntimeManager {
         resources: ResolvedRuntimeResources;
         binding: PersistedRuntimeBinding | null;
         modelId: string;
+        cwd?: string;
     }): Promise<{ threadId: string; isNew: boolean }> {
         const threadOpenParams = {
             model: params.modelId,
-            cwd: params.resources.agent.rootPath,
+            cwd: params.cwd ?? params.resources.agent.rootPath,
             approvalPolicy: "never",
             sandbox: "danger-full-access",
             personality: "pragmatic",
@@ -773,7 +1335,7 @@ export class CodexRuntimeManager {
                 };
             } catch (error) {
                 if (!isRecoverableThreadResumeError(error)) {
-                    params.client.stop();
+                    await params.client.stop();
                     throw error;
                 }
             }
@@ -793,6 +1355,10 @@ export class CodexRuntimeManager {
         runtime: ConversationRuntime,
         error: Error,
     ): void {
+        if (this.runtimes.get(runtime.key) !== runtime) {
+            return;
+        }
+
         if (runtime.idleTimer) {
             clearTimeout(runtime.idleTimer);
             runtime.idleTimer = null;
@@ -806,8 +1372,7 @@ export class CodexRuntimeManager {
             if (activeTurn.text) {
                 this.emitToSubscribers(
                     runtime,
-                    createServerEvent("message.completed", {
-                        conversationId: runtime.conversationId,
+                    createRuntimeServerEvent(runtime, "message.completed", {
                         messageId: activeTurn.currentMessageId,
                         content: activeTurn.text,
                     }),
@@ -818,7 +1383,9 @@ export class CodexRuntimeManager {
             activeTurn.nextSequence += 2;
             void this.persistence
                 .runFailed({
+                    chatId: runtime.chatId,
                     userId: activeTurn.userId,
+                    agentId: runtime.agentId,
                     conversationLocalId: runtime.conversationId,
                     assistantMessageLocalId: activeTurn.currentMessageId,
                     externalRunId: activeTurn.runId,
@@ -836,8 +1403,7 @@ export class CodexRuntimeManager {
 
             this.emitToSubscribers(
                 runtime,
-                createServerEvent("run.failed", {
-                    conversationId: runtime.conversationId,
+                createRuntimeServerEvent(runtime, "run.failed", {
                     runId: activeTurn.runId,
                     error: {
                         message: error.message,
@@ -850,7 +1416,9 @@ export class CodexRuntimeManager {
 
         void this.persistence
             .runtimeBinding({
+                chatId: runtime.chatId,
                 userId: runtime.userId,
+                agentId: runtime.agentId,
                 conversationLocalId: runtime.conversationId,
                 provider: runtime.provider.id,
                 status: "errored",
@@ -860,6 +1428,9 @@ export class CodexRuntimeManager {
                 lastError: error.message,
                 lastEventAt: Date.now(),
                 expiresAt: null,
+                workspaceMode: runtime.agent.workspaceMode,
+                workspaceRootPath: runtime.agent.rootPath,
+                workspaceCwd: runtime.cwd,
                 updatedAt: Date.now(),
             })
             .catch((persistError) => {
@@ -911,8 +1482,7 @@ export class CodexRuntimeManager {
 
                 this.emitToSubscribers(
                     runtime,
-                    createServerEvent("message.started", {
-                        conversationId: runtime.conversationId,
+                    createRuntimeServerEvent(runtime, "message.started", {
                         runId: activeTurn.runId,
                         messageId: activeTurn.currentMessageId,
                         messageIndex: activeTurn.currentMessageIndex,
@@ -925,8 +1495,7 @@ export class CodexRuntimeManager {
                 activeTurn.lastPersistedContent = activeTurn.text;
                 this.emitToSubscribers(
                     runtime,
-                    createServerEvent("message.delta", {
-                        conversationId: runtime.conversationId,
+                    createRuntimeServerEvent(runtime, "message.delta", {
                         messageId: activeTurn.currentMessageId,
                         delta,
                         content: activeTurn.text,
@@ -941,7 +1510,9 @@ export class CodexRuntimeManager {
 
             void this.persistence
                 .messageDelta({
+                    chatId: runtime.chatId,
                     userId: activeTurn.userId,
+                    agentId: runtime.agentId,
                     conversationLocalId: runtime.conversationId,
                     assistantMessageLocalId: activeTurn.currentMessageId,
                     externalRunId: activeTurn.runId,
@@ -977,8 +1548,7 @@ export class CodexRuntimeManager {
             activeTurn.text += delta;
             this.emitToSubscribers(
                 runtime,
-                createServerEvent("message.delta", {
-                    conversationId: runtime.conversationId,
+                createRuntimeServerEvent(runtime, "message.delta", {
                     messageId: activeTurn.currentMessageId,
                     delta,
                     content: activeTurn.text,
@@ -1047,8 +1617,7 @@ export class CodexRuntimeManager {
 
         this.emitToSubscribers(
             runtime,
-            createServerEvent("message.completed", {
-                conversationId: runtime.conversationId,
+            createRuntimeServerEvent(runtime, "message.completed", {
                 messageId: previousMessageId,
                 content: previousContent,
             }),
@@ -1062,8 +1631,7 @@ export class CodexRuntimeManager {
 
         this.emitToSubscribers(
             runtime,
-            createServerEvent("message.started", {
-                conversationId: runtime.conversationId,
+            createRuntimeServerEvent(runtime, "message.started", {
                 runId: activeTurn.runId,
                 messageId: activeTurn.currentMessageId,
                 messageIndex: activeTurn.currentMessageIndex,
@@ -1076,7 +1644,9 @@ export class CodexRuntimeManager {
 
         const pendingMessageStartPersistence = this.persistence
             .messageStarted({
+                chatId: runtime.chatId,
                 userId: activeTurn.userId,
+                agentId: runtime.agentId,
                 conversationLocalId: runtime.conversationId,
                 previousAssistantMessageLocalId: previousMessageId,
                 previousCompletedSequence,
@@ -1122,8 +1692,7 @@ export class CodexRuntimeManager {
     ): Promise<void> {
         this.emitToSubscribers(
             runtime,
-            createServerEvent("message.completed", {
-                conversationId: runtime.conversationId,
+            createRuntimeServerEvent(runtime, "message.completed", {
                 messageId: activeTurn.currentMessageId,
                 content: activeTurn.text,
             }),
@@ -1132,6 +1701,12 @@ export class CodexRuntimeManager {
         this.cancelPendingMessageDelta(activeTurn);
         await activeTurn.inFlightDeltaFlush;
         await activeTurn.pendingMessageStartPersistence;
+        if (
+            this.runtimes.get(runtime.key) !== runtime ||
+            runtime.activeTurn !== activeTurn
+        ) {
+            return;
+        }
 
         const sequence = activeTurn.nextSequence;
         activeTurn.nextSequence += 2;
@@ -1140,7 +1715,9 @@ export class CodexRuntimeManager {
         if (params.finalStatus === "completed") {
             void this.persistence
                 .runCompleted({
+                    chatId: runtime.chatId,
                     userId: activeTurn.userId,
+                    agentId: runtime.agentId,
                     conversationLocalId: runtime.conversationId,
                     assistantMessageLocalId: activeTurn.currentMessageId,
                     externalRunId: activeTurn.runId,
@@ -1156,8 +1733,7 @@ export class CodexRuntimeManager {
                 });
             this.emitToSubscribers(
                 runtime,
-                createServerEvent("run.completed", {
-                    conversationId: runtime.conversationId,
+                createRuntimeServerEvent(runtime, "run.completed", {
                     runId: activeTurn.runId,
                 }),
             );
@@ -1171,7 +1747,9 @@ export class CodexRuntimeManager {
         if (params.finalStatus === "interrupted") {
             void this.persistence
                 .runInterrupted({
+                    chatId: runtime.chatId,
                     userId: activeTurn.userId,
+                    agentId: runtime.agentId,
                     conversationLocalId: runtime.conversationId,
                     assistantMessageLocalId: activeTurn.currentMessageId,
                     externalRunId: activeTurn.runId,
@@ -1187,8 +1765,7 @@ export class CodexRuntimeManager {
                 });
             this.emitToSubscribers(
                 runtime,
-                createServerEvent("run.interrupted", {
-                    conversationId: runtime.conversationId,
+                createRuntimeServerEvent(runtime, "run.interrupted", {
                     runId: activeTurn.runId,
                 }),
             );
@@ -1207,7 +1784,9 @@ export class CodexRuntimeManager {
 
         void this.persistence
             .runFailed({
+                chatId: runtime.chatId,
                 userId: activeTurn.userId,
+                agentId: runtime.agentId,
                 conversationLocalId: runtime.conversationId,
                 assistantMessageLocalId: activeTurn.currentMessageId,
                 externalRunId: activeTurn.runId,
@@ -1224,8 +1803,7 @@ export class CodexRuntimeManager {
             });
         this.emitToSubscribers(
             runtime,
-            createServerEvent("run.failed", {
-                conversationId: runtime.conversationId,
+            createRuntimeServerEvent(runtime, "run.failed", {
                 runId: activeTurn.runId,
                 error: {
                     message: errorMessage,
@@ -1243,10 +1821,21 @@ export class CodexRuntimeManager {
             clearTimeout(runtime.idleTimer);
         }
 
-        runtime.idleTimer = setTimeout(() => {
+        const idleTimer = setTimeout(() => {
+            if (
+                this.runtimes.get(runtime.key) !== runtime ||
+                runtime.idleTimer !== idleTimer ||
+                runtime.activeTurn
+            ) {
+                return;
+            }
+            runtime.idleTimer = null;
+
             void this.persistence
                 .runtimeBinding({
+                    chatId: runtime.chatId,
                     userId: runtime.userId,
+                    agentId: runtime.agentId,
                     conversationLocalId: runtime.conversationId,
                     provider: runtime.provider.id,
                     status: "expired",
@@ -1256,6 +1845,9 @@ export class CodexRuntimeManager {
                     lastError: null,
                     lastEventAt: Date.now(),
                     expiresAt: Date.now(),
+                    workspaceMode: runtime.agent.workspaceMode,
+                    workspaceRootPath: runtime.agent.rootPath,
+                    workspaceCwd: runtime.cwd,
                     updatedAt: Date.now(),
                 })
                 .catch((error) => {
@@ -1267,9 +1859,10 @@ export class CodexRuntimeManager {
                         error,
                     );
                 });
-            runtime.client.stop();
+            void runtime.client.stop();
             this.runtimes.delete(runtime.key);
         }, runtime.provider.idleTtlSeconds * 1000);
+        runtime.idleTimer = idleTimer;
     }
 
     private scheduleMessageDeltaPersistence(
@@ -1321,7 +1914,9 @@ export class CodexRuntimeManager {
         activeTurn.lastPersistedContent = activeTurn.text;
 
         await this.persistence.messageDelta({
+            chatId: runtime.chatId,
             userId: activeTurn.userId,
+            agentId: runtime.agentId,
             conversationLocalId: runtime.conversationId,
             assistantMessageLocalId: activeTurn.currentMessageId,
             externalRunId: activeTurn.runId,
@@ -1330,6 +1925,33 @@ export class CodexRuntimeManager {
             delta,
             createdAt: Date.now(),
         });
+    }
+
+    private async disposeRuntime(
+        runtime: ConversationRuntime,
+        params: {
+            removeFromMap: boolean;
+            reason: Error;
+        },
+    ): Promise<void> {
+        if (runtime.idleTimer) {
+            clearTimeout(runtime.idleTimer);
+            runtime.idleTimer = null;
+        }
+
+        if (runtime.activeTurn) {
+            this.cancelPendingMessageDelta(runtime.activeTurn);
+            runtime.activeTurn.reject(params.reason);
+            runtime.activeTurn = null;
+        }
+
+        await runtime.client.stop();
+        if (
+            params.removeFromMap &&
+            this.runtimes.get(runtime.key) === runtime
+        ) {
+            this.runtimes.delete(runtime.key);
+        }
     }
 }
 
@@ -1371,12 +1993,18 @@ function resolveRuntimeResources(
 function shouldRecycleRuntime(
     runtime: ConversationRuntime,
     resources: ResolvedRuntimeResources,
+    desiredCwd: string,
 ): boolean {
     if (runtime.agent.id !== resources.agent.id) {
         return true;
     }
 
-    if (runtime.agent.rootPath !== resources.agent.rootPath) {
+    if (
+        !runtimeWorkspaceMatches(
+            getRuntimeWorkspaceIdentity(runtime.agent, runtime.cwd),
+            getRuntimeWorkspaceIdentity(resources.agent, desiredCwd),
+        )
+    ) {
         return true;
     }
 
@@ -1391,5 +2019,102 @@ function shouldRecycleRuntime(
         JSON.stringify(runtime.provider.codex.baseEnv) !==
             JSON.stringify(resources.provider.codex.baseEnv) ||
         runtime.provider.codex.cwd !== resources.provider.codex.cwd
+    );
+}
+
+function shouldResetRuntimeState(
+    runtime: ConversationRuntime,
+    resources: ResolvedRuntimeResources,
+    desiredCwd: string,
+): boolean {
+    return (
+        runtime.agent.id !== resources.agent.id ||
+        !runtimeWorkspaceMatches(
+            getRuntimeWorkspaceIdentity(runtime.agent, runtime.cwd),
+            getRuntimeWorkspaceIdentity(resources.agent, desiredCwd),
+        )
+    );
+}
+
+function getRuntimeWorkspaceIdentity(
+    agent: AgentConfig,
+    cwd: string,
+): RuntimeWorkspaceIdentity {
+    return {
+        workspaceMode: agent.workspaceMode,
+        workspaceRootPath: canonicalizePathForComparison(agent.rootPath),
+        workspaceCwd: canonicalizePathForComparison(cwd),
+    };
+}
+
+function shouldResetPersistedRuntimeBinding(
+    binding: PersistedRuntimeBinding,
+    desired: RuntimeWorkspaceIdentity,
+): boolean {
+    if (
+        desired.workspaceMode === "shared" &&
+        binding.workspaceMode === undefined &&
+        binding.workspaceRootPath === undefined &&
+        binding.workspaceCwd === undefined
+    ) {
+        return true;
+    }
+
+    return !runtimeWorkspaceMatches(
+        {
+            workspaceMode: binding.workspaceMode,
+            workspaceRootPath: binding.workspaceRootPath,
+            workspaceCwd: binding.workspaceCwd,
+        },
+        desired,
+    );
+}
+
+function runtimeWorkspaceMatches(
+    current:
+        | RuntimeWorkspaceIdentity
+        | {
+              workspaceMode?: "shared" | "copy-on-conversation";
+              workspaceRootPath?: string;
+              workspaceCwd?: string;
+          },
+    desired: RuntimeWorkspaceIdentity,
+): boolean {
+    return (
+        current.workspaceMode === desired.workspaceMode &&
+        canonicalizeRuntimeWorkspacePath(current.workspaceRootPath) ===
+            desired.workspaceRootPath &&
+        canonicalizeRuntimeWorkspacePath(current.workspaceCwd) ===
+            desired.workspaceCwd
+    );
+}
+
+function canonicalizeRuntimeWorkspacePath(
+    targetPath: string | undefined,
+): string | undefined {
+    if (targetPath === undefined) {
+        return undefined;
+    }
+
+    return canonicalizePathForComparison(targetPath);
+}
+
+function getDesiredRuntimeCwd(params: {
+    workspaceManager: WorkspaceManager | null;
+    agent: AgentConfig;
+    userId: string;
+    conversationId: string;
+}): string {
+    if (
+        !params.workspaceManager ||
+        params.agent.workspaceMode !== "copy-on-conversation"
+    ) {
+        return params.agent.rootPath;
+    }
+
+    return params.workspaceManager.getWorkspacePath(
+        params.agent.id,
+        params.userId,
+        params.conversationId,
     );
 }

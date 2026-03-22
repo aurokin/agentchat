@@ -61,7 +61,7 @@ Key outcomes:
 - `providerIds` and `defaultProviderId` are removed from agent config
 - model and variant selection remain user-facing, sourced from the agent's runtime
 - a `KindRuntime` interface is extracted from the current `CodexRuntimeManager`
-- config version bumps to `2` with v1 backward compatibility during transition
+- config version bumps to `2` during transition
 
 ## Next Phase: Multi-Runtime Support
 

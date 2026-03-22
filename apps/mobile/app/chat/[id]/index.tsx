@@ -23,6 +23,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useChatContext } from "@/contexts/ChatContext";
+import { getScopedChatStateKey } from "@/contexts/chat-state";
 import { useModelContext } from "@/contexts/ModelContext";
 import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
 import { useAgentchatSocket } from "@/contexts/AgentchatSocketContext";
@@ -51,6 +52,12 @@ import { TopBar } from "@/components/ui/TopBar";
 import { consumePendingSharePayload } from "@/lib/share-intent/pending-share";
 import { resolveResponsiveLayout } from "@/lib/responsive-layout";
 import {
+    buildChatRouteId,
+    getPreferredHomeChatRouteId,
+    parseChatRouteId,
+    resolveRouteChatSelection,
+} from "@/lib/home-chat-route";
+import {
     flushPendingMobileConversationInterrupt,
     requestMobileConversationInterrupt,
     resolveMobileConversationRuntimeSync,
@@ -68,7 +75,9 @@ const EMPTY_MESSAGES: Message[] = [];
 export default function ChatScreen(): ReactElement {
     const params = useLocalSearchParams();
     const router = useRouter();
-    const chatId = params.id as string;
+    const routeId = params.id as string;
+    const routeSelection = useMemo(() => parseChatRouteId(routeId), [routeId]);
+    const chatId = routeSelection?.chatId ?? null;
     const {
         chats,
         currentChat,
@@ -98,7 +107,7 @@ export default function ChatScreen(): ReactElement {
         favoriteModels,
         toggleFavoriteModel,
     } = useModelContext();
-    const { selectedAgent } = useAgent();
+    const { selectedAgent, selectedAgentId, setSelectedAgentId } = useAgent();
     const { colors } = useTheme();
     const styles = useMemo(() => createStyles(colors), [colors]);
     const { socketClient, ensureConnected, connectionError, isConfigured } =
@@ -132,7 +141,7 @@ export default function ChatScreen(): ReactElement {
     const sidebarWidth = Math.max(280, Math.min(360, windowWidth * 0.32));
     const suppressInputRef = useRef(false);
     const currentChatRef = useRef<ChatSession | null>(currentChat);
-    const previousConversationIdRef = useRef<string | null>(null);
+    const previousConversationScopeRef = useRef<string | null>(null);
     const chatMessagesRef = useRef<Message[]>(EMPTY_MESSAGES);
     const activeRunRef = useRef<ActiveRunState | null>(null);
     const pendingReconnectNoticeRef = useRef(false);
@@ -150,20 +159,58 @@ export default function ChatScreen(): ReactElement {
     }, []);
 
     useEffect(() => {
+        if (routeSelection) {
+            return;
+        }
+
+        const preferredChatRouteId = getPreferredHomeChatRouteId({
+            currentChatId: currentChat?.id ?? null,
+            currentChatAgentId: currentChat?.agentId ?? null,
+            chats,
+        });
+        if (preferredChatRouteId) {
+            router.replace(`/chat/${preferredChatRouteId}`);
+            return;
+        }
+
+        router.replace("/");
+    }, [chats, currentChat?.agentId, currentChat?.id, routeSelection, router]);
+
+    useEffect(() => {
+        if (!routeSelection) {
+            return;
+        }
+
         if (!chatId) {
             return;
         }
 
-        if (currentChat?.id === chatId) {
+        if (routeSelection.agentId !== selectedAgentId) {
+            void setSelectedAgentId(routeSelection.agentId);
             return;
         }
 
-        if (!chats.some((chat) => chat.id === chatId)) {
+        const routeChat = resolveRouteChatSelection({
+            routeChatId: chatId,
+            routeAgentId: routeSelection.agentId,
+            chats,
+            currentChat,
+        });
+        if (!routeChat) {
             return;
         }
 
-        void selectChat(chatId);
-    }, [chatId, chats, currentChat?.id, selectChat]);
+        void selectChat(routeChat.id);
+    }, [
+        chatId,
+        chats,
+        currentChat,
+        routeSelection?.agentId,
+        routeSelection,
+        selectChat,
+        selectedAgentId,
+        setSelectedAgentId,
+    ]);
 
     useEffect(() => {
         if (!chatId) {
@@ -192,8 +239,13 @@ export default function ChatScreen(): ReactElement {
     useEffect(() => {
         if (!useTabletLandscapeLayout) return;
         if (currentChat || chats.length === 0) return;
-        router.replace(`/chat/${chats[0].id}`);
-    }, [chats, currentChat, useTabletLandscapeLayout, router]);
+        router.replace(
+            `/chat/${buildChatRouteId({
+                chatId: chats[0].id,
+                agentId: chats[0].agentId,
+            })}`,
+        );
+    }, [chats, currentChat, router, useTabletLandscapeLayout]);
 
     useEffect(() => {
         return () => {
@@ -208,27 +260,41 @@ export default function ChatScreen(): ReactElement {
     useEffect(() => {
         conversationSubscriptionCleanupRef.current?.();
         conversationSubscriptionCleanupRef.current = null;
-    }, [chatId]);
+    }, [chatId, currentChat?.agentId]);
 
     useEffect(() => {
-        if (flatListRef.current && messages[chatId]) {
+        if (
+            flatListRef.current &&
+            chatId &&
+            currentChat?.agentId &&
+            messages[getScopedChatStateKey(chatId, currentChat.agentId)]
+        ) {
             setTimeout(() => {
                 scrollToEnd();
             }, 100);
         }
-    }, [messages, chatId, scrollToEnd]);
+    }, [messages, chatId, currentChat?.agentId, scrollToEnd]);
 
     const currentModel = models.find((m) => m.id === currentChat?.modelId);
     const reasoningSupported = modelSupportsReasoning(currentModel);
+    const currentChatAgentId = currentChat?.agentId ?? null;
     const chatMessages = useMemo(() => {
-        if (!chatId) return EMPTY_MESSAGES;
-        return messages[chatId] ?? EMPTY_MESSAGES;
-    }, [chatId, messages]);
+        if (!chatId || !currentChatAgentId) return EMPTY_MESSAGES;
+        return (
+            messages[getScopedChatStateKey(chatId, currentChatAgentId)] ??
+            EMPTY_MESSAGES
+        );
+    }, [chatId, currentChatAgentId, messages]);
     const displayedMessages = useMemo(
         () => applyStreamingMessageOverlay(chatMessages, streamingMessage),
         [chatMessages, streamingMessage],
     );
-    const hasLoadedMessages = Boolean(chatId && messages[chatId] !== undefined);
+    const hasLoadedMessages = Boolean(
+        chatId &&
+        currentChatAgentId &&
+        messages[getScopedChatStateKey(chatId, currentChatAgentId)] !==
+            undefined,
+    );
     const showSkeletons = !hasLoadedMessages;
     const showEmptyState = hasLoadedMessages && displayedMessages.length === 0;
 
@@ -237,10 +303,13 @@ export default function ChatScreen(): ReactElement {
     }, [currentChat]);
 
     useEffect(() => {
-        const currentConversationId = currentChat?.id ?? null;
+        const currentConversationScope =
+            currentChat?.id && currentChat?.agentId
+                ? getScopedChatStateKey(currentChat.id, currentChat.agentId)
+                : null;
         if (
-            previousConversationIdRef.current !== null &&
-            previousConversationIdRef.current !== currentConversationId
+            previousConversationScopeRef.current !== null &&
+            previousConversationScopeRef.current !== currentConversationScope
         ) {
             pendingInterruptRef.current = false;
             pendingReconnectNoticeRef.current = false;
@@ -251,8 +320,8 @@ export default function ChatScreen(): ReactElement {
             });
         }
 
-        previousConversationIdRef.current = currentConversationId;
-    }, [currentChat?.id]);
+        previousConversationScopeRef.current = currentConversationScope;
+    }, [currentChat?.agentId, currentChat?.id]);
 
     useEffect(() => {
         if (!currentChat) {
@@ -392,6 +461,7 @@ export default function ChatScreen(): ReactElement {
 
             const resolution = resolveConversationSocketEvent({
                 currentChatId: currentChatRef.current?.id ?? null,
+                currentAgentId: currentChatRef.current?.agentId ?? null,
                 event,
                 activeRun: activeRunRef.current,
                 messages: chatMessagesRef.current,
@@ -406,6 +476,7 @@ export default function ChatScreen(): ReactElement {
                     flushPendingMobileConversationInterrupt({
                         pendingInterrupt: pendingInterruptRef.current,
                         activeRun: resolution.activeRun,
+                        agentId: currentChatRef.current?.agentId ?? null,
                         sendCommand: (command) => {
                             socketClient.send(command);
                         },
@@ -639,6 +710,7 @@ export default function ChatScreen(): ReactElement {
                         conversationSubscriptionCleanupRef.current =
                             socketClient.subscribeToConversation(
                                 currentChat.id,
+                                currentChat.agentId,
                             );
                     }
                     try {
@@ -658,7 +730,9 @@ export default function ChatScreen(): ReactElement {
         if (
             !shouldApplyConversationScopedUpdate({
                 currentConversationId: currentChatRef.current?.id ?? null,
+                currentAgentId: currentChatRef.current?.agentId ?? null,
                 targetConversationId: startedConversationId,
+                targetAgentId: currentChat.agentId,
             })
         ) {
             return false;
@@ -715,6 +789,7 @@ export default function ChatScreen(): ReactElement {
     const handleCancel = useCallback(() => {
         const result = requestMobileConversationInterrupt({
             activeRun,
+            agentId: currentChat?.agentId ?? null,
             isLoading,
             queuePendingInterrupt: () => {
                 pendingInterruptRef.current = true;
@@ -726,13 +801,31 @@ export default function ChatScreen(): ReactElement {
         if (result.error) {
             setError(result.error);
         }
-    }, [activeRun, isLoading, socketClient]);
+    }, [activeRun, currentChat?.agentId, isLoading, socketClient]);
 
     const handleDeleteChat = async () => {
-        const fallbackChatId = chats.find((chat) => chat.id !== chatId)?.id;
+        if (!chatId || !routeSelection) {
+            router.replace("/");
+            return;
+        }
+
+        const fallbackChat =
+            chats.find(
+                (chat) =>
+                    !(
+                        chat.id === chatId &&
+                        chat.agentId === routeSelection.agentId
+                    ),
+            ) ?? null;
+        const fallbackChatId = fallbackChat?.id ?? null;
         const navigateAfterDelete = () => {
-            if (useTabletLandscapeLayout && fallbackChatId) {
-                router.replace(`/chat/${fallbackChatId}`);
+            if (useTabletLandscapeLayout && fallbackChatId && fallbackChat) {
+                router.replace(
+                    `/chat/${buildChatRouteId({
+                        chatId: fallbackChatId,
+                        agentId: fallbackChat.agentId,
+                    })}`,
+                );
                 return;
             }
             router.replace("/");
@@ -761,12 +854,28 @@ export default function ChatScreen(): ReactElement {
 
     const handleStartNewChat = async () => {
         const chat = await createChat();
-        router.replace(`/chat/${chat.id}`);
+        router.replace(
+            `/chat/${buildChatRouteId({
+                chatId: chat.id,
+                agentId: chat.agentId,
+            })}`,
+        );
     };
 
     const handleSelectChatFromSidebar = (nextChatId: string) => {
         if (nextChatId === chatId) return;
-        router.replace(`/chat/${nextChatId}`);
+        const nextChat =
+            chats.find((candidate) => candidate.id === nextChatId) ?? null;
+        if (!nextChat) {
+            return;
+        }
+
+        router.replace(
+            `/chat/${buildChatRouteId({
+                chatId: nextChatId,
+                agentId: nextChat.agentId,
+            })}`,
+        );
     };
 
     const formatChatListDate = (timestamp: number): string => {

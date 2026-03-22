@@ -56,6 +56,7 @@ export interface ConvexAdapterServices {
         get(args: { id: string }): Promise<ConvexChatLike | null>;
         getByLocalId(args: {
             userId: string;
+            agentId: string;
             localId: string;
         }): Promise<ConvexChatLike | null>;
         listByUser(args: { userId: string }): Promise<ConvexChatLike[]>;
@@ -87,6 +88,7 @@ export abstract class ConvexAdapterBase implements PersistenceAdapter {
 
     private chatIdMap: Map<string, string> = new Map();
     private messageIdMap: Map<string, string> = new Map();
+    private messageScopedIdMap: Map<string, string> = new Map();
 
     constructor(params: {
         client: ConvexClientLike;
@@ -103,21 +105,28 @@ export abstract class ConvexAdapterBase implements PersistenceAdapter {
             userId: this.userId,
             chat,
         });
-        this.chatIdMap.set(chat.id, convexId);
+        this.chatIdMap.set(
+            this.getChatLookupKey(chat.id, chat.agentId),
+            convexId,
+        );
         return chat.id;
     }
 
-    async getChat(id: string): Promise<ChatSession | undefined> {
-        let convexId = this.chatIdMap.get(id);
+    async getChat(
+        id: string,
+        agentId: string,
+    ): Promise<ChatSession | undefined> {
+        let convexId = this.chatIdMap.get(this.getChatLookupKey(id, agentId));
 
         if (!convexId) {
             const chat = await this.services.chats.getByLocalId({
                 userId: this.userId,
+                agentId,
                 localId: id,
             });
             if (!chat) return undefined;
             convexId = chat._id;
-            this.chatIdMap.set(id, convexId);
+            this.chatIdMap.set(this.getChatLookupKey(id, agentId), convexId);
         }
 
         const chat = await this.services.chats.get({ id: convexId });
@@ -132,35 +141,48 @@ export abstract class ConvexAdapterBase implements PersistenceAdapter {
         });
 
         return chats.map((chat) => {
-            this.chatIdMap.set(chat.localId ?? chat._id, chat._id);
+            this.chatIdMap.set(
+                this.getChatLookupKey(chat.localId ?? chat._id, chat.agentId),
+                chat._id,
+            );
             return this.convexChatToLocal(chat);
         });
     }
 
     async updateChat(chat: ChatSession): Promise<void> {
-        let convexId = this.chatIdMap.get(chat.id);
+        let convexId = this.chatIdMap.get(
+            this.getChatLookupKey(chat.id, chat.agentId),
+        );
 
         if (!convexId) {
             const existing = await this.services.chats.getByLocalId({
                 userId: this.userId,
+                agentId: chat.agentId,
                 localId: chat.id,
             });
             if (!existing) {
                 throw new Error(`Chat not found: ${chat.id}`);
             }
             convexId = existing._id;
-            this.chatIdMap.set(chat.id, convexId);
+            this.chatIdMap.set(
+                this.getChatLookupKey(chat.id, chat.agentId),
+                convexId,
+            );
         }
 
         await this.services.chats.update({ id: convexId, chat });
     }
 
-    async markChatViewed(chatId: string, timestamp: number): Promise<void> {
+    async markChatViewed(
+        chatId: string,
+        timestamp: number,
+        agentId: string,
+    ): Promise<void> {
         if (!Number.isFinite(timestamp)) {
             return;
         }
 
-        const convexId = await this.getOrLookupChatId(chatId);
+        const convexId = await this.getOrLookupChatId(chatId, agentId);
         if (!convexId) {
             throw new Error(`Chat not found: ${chatId}`);
         }
@@ -168,24 +190,29 @@ export abstract class ConvexAdapterBase implements PersistenceAdapter {
         await this.services.chats.markViewed({ id: convexId, timestamp });
     }
 
-    async deleteChat(id: string): Promise<void> {
-        let convexId = this.chatIdMap.get(id);
+    async deleteChat(id: string, agentId: string): Promise<string | null> {
+        let convexId = this.chatIdMap.get(this.getChatLookupKey(id, agentId));
 
         if (!convexId) {
             const existing = await this.services.chats.getByLocalId({
                 userId: this.userId,
+                agentId,
                 localId: id,
             });
-            if (!existing) return;
+            if (!existing) return null;
             convexId = existing._id;
         }
 
         await this.services.chats.remove({ id: convexId });
-        this.chatIdMap.delete(id);
+        this.chatIdMap.delete(this.getChatLookupKey(id, agentId));
+        return convexId;
     }
 
-    async createMessage(message: Message): Promise<string> {
-        const chatConvexId = await this.getOrLookupChatId(message.sessionId);
+    async createMessage(message: Message, agentId: string): Promise<string> {
+        const chatConvexId = await this.getOrLookupChatId(
+            message.sessionId,
+            agentId,
+        );
         if (!chatConvexId) {
             throw new Error(`Chat not found: ${message.sessionId}`);
         }
@@ -196,30 +223,57 @@ export abstract class ConvexAdapterBase implements PersistenceAdapter {
             message,
         });
 
-        this.messageIdMap.set(message.id, convexId);
+        this.cacheMessageId(message.id, convexId, chatConvexId);
         return message.id;
     }
 
     async updateMessage(message: Message): Promise<void> {
-        let convexId = this.messageIdMap.get(message.id);
+        const cachedChatId = this.getUniqueCachedChatIdForLocalId(
+            message.sessionId,
+        );
+        let convexId = cachedChatId
+            ? this.messageScopedIdMap.get(
+                  this.getMessageLookupKey(cachedChatId, message.id),
+              )
+            : this.messageIdMap.get(message.id);
 
         if (!convexId) {
-            const existing = await this.services.messages.getByLocalId({
-                userId: this.userId,
-                localId: message.id,
-            });
-            if (!existing) {
+            if (!cachedChatId) {
+                throw new Error(
+                    `Message not found or ambiguous: ${message.id}`,
+                );
+            }
+            const existing = (
+                await this.services.messages.listByChat({
+                    chatId: cachedChatId,
+                })
+            ).filter(
+                (candidate) =>
+                    (candidate.localId ?? candidate._id) === message.id,
+            );
+            if (existing.length === 0) {
                 throw new Error(`Message not found: ${message.id}`);
             }
-            convexId = existing._id;
-            this.messageIdMap.set(message.id, convexId);
+            if (existing.length !== 1) {
+                throw new Error(
+                    `Message not found or ambiguous: ${message.id}`,
+                );
+            }
+            convexId = existing[0]?._id;
+            if (!convexId) {
+                throw new Error(`Message not found: ${message.id}`);
+            }
+            this.cacheMessageId(message.id, convexId, cachedChatId);
         }
 
         await this.services.messages.update({ id: convexId, message });
     }
 
-    async getMessagesByChat(chatId: string): Promise<Message[]> {
-        const chatConvexId = await this.getOrLookupChatId(chatId);
+    async getMessagesByChat(
+        chatId: string,
+        agentId: string,
+    ): Promise<Message[]> {
+        const chatConvexId = await this.getOrLookupChatId(chatId, agentId);
         if (!chatConvexId) return [];
 
         const messages = await this.services.messages.listByChat({
@@ -229,8 +283,8 @@ export abstract class ConvexAdapterBase implements PersistenceAdapter {
         return messages.map((msg) => this.convexMessageToLocal(msg, chatId));
     }
 
-    async deleteMessagesByChat(chatId: string): Promise<void> {
-        const chatConvexId = await this.getOrLookupChatId(chatId);
+    async deleteMessagesByChat(chatId: string, agentId: string): Promise<void> {
+        const chatConvexId = await this.getOrLookupChatId(chatId, agentId);
         if (!chatConvexId) return;
 
         await this.services.messages.deleteByChat({ chatId: chatConvexId });
@@ -240,33 +294,68 @@ export abstract class ConvexAdapterBase implements PersistenceAdapter {
         let convexId = this.messageIdMap.get(id);
 
         if (!convexId) {
-            const existing = await this.services.messages.getByLocalId({
-                userId: this.userId,
-                localId: id,
-            });
-            if (!existing) return;
-            convexId = existing._id;
+            return;
         }
 
         await this.services.messages.remove({ id: convexId });
         this.messageIdMap.delete(id);
     }
 
-    protected async getOrLookupChatId(localId: string): Promise<string | null> {
-        const cached = this.chatIdMap.get(localId);
+    protected async getOrLookupChatId(
+        localId: string,
+        agentId: string,
+    ): Promise<string | null> {
+        const cached = this.chatIdMap.get(
+            this.getChatLookupKey(localId, agentId),
+        );
         if (cached) return cached;
 
         const chat = await this.services.chats.getByLocalId({
             userId: this.userId,
+            agentId,
             localId,
         });
 
         if (chat) {
-            this.chatIdMap.set(localId, chat._id);
+            this.chatIdMap.set(
+                this.getChatLookupKey(localId, agentId),
+                chat._id,
+            );
             return chat._id;
         }
 
         return null;
+    }
+
+    private getChatLookupKey(localId: string, agentId: string): string {
+        return JSON.stringify([agentId, localId]);
+    }
+
+    private parseChatLookupKey(
+        lookupKey: string,
+    ): { agentId: string; localId: string } | null {
+        try {
+            const parsed = JSON.parse(lookupKey);
+            if (!Array.isArray(parsed) || parsed.length !== 2) {
+                return null;
+            }
+
+            const [agentId, localId] = parsed;
+            if (
+                typeof agentId !== "string" ||
+                localId === undefined ||
+                typeof localId !== "string"
+            ) {
+                return null;
+            }
+
+            return {
+                agentId,
+                localId,
+            };
+        } catch {
+            return null;
+        }
     }
 
     protected convexChatToLocal(chat: ConvexChatLike): ChatSession {
@@ -287,7 +376,7 @@ export abstract class ConvexAdapterBase implements PersistenceAdapter {
         chatLocalId: string,
     ): Message {
         const localId = msg.localId ?? msg._id;
-        this.messageIdMap.set(localId, msg._id);
+        this.cacheMessageId(localId, msg._id, msg.chatId);
 
         return {
             id: localId,
@@ -303,5 +392,43 @@ export abstract class ConvexAdapterBase implements PersistenceAdapter {
             reasoningEffort: msg.reasoningEffort,
             createdAt: msg.createdAt,
         };
+    }
+
+    private cacheMessageId(
+        localId: string,
+        convexId: string,
+        chatConvexId: string,
+    ): void {
+        const scopedKey = this.getMessageLookupKey(chatConvexId, localId);
+        this.messageScopedIdMap.set(scopedKey, convexId);
+
+        const existing = this.messageIdMap.get(localId);
+        if (existing && existing !== convexId) {
+            this.messageIdMap.delete(localId);
+            return;
+        }
+
+        this.messageIdMap.set(localId, convexId);
+    }
+
+    private getMessageLookupKey(chatConvexId: string, localId: string): string {
+        return JSON.stringify([chatConvexId, localId]);
+    }
+
+    private getUniqueCachedChatIdForLocalId(localId: string): string | null {
+        const matchingChatIds = new Set<string>();
+
+        for (const [lookupKey, convexId] of this.chatIdMap.entries()) {
+            const parsed = this.parseChatLookupKey(lookupKey);
+            if (parsed?.localId === localId) {
+                matchingChatIds.add(convexId);
+            }
+        }
+
+        if (matchingChatIds.size !== 1) {
+            return null;
+        }
+
+        return matchingChatIds.values().next().value ?? null;
     }
 }

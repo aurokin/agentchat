@@ -18,6 +18,8 @@ const runtimeInternal = internal as unknown as {
         recoverStaleRun: any;
         runtimeBinding: any;
         readRuntimeBinding: any;
+        listAllChatLocalIds: any;
+        chatExistsByLocalId: any;
     };
 };
 
@@ -40,6 +42,54 @@ function ok(): Response {
     return Response.json({ ok: true });
 }
 
+function getRuntimeIngressErrorMessage(error: unknown): string {
+    if (error instanceof Error && error.message.trim().length > 0) {
+        return error.message;
+    }
+
+    return "Runtime ingress request failed";
+}
+
+function isUnauthorizedRuntimeIngressError(error: unknown): boolean {
+    return (
+        error instanceof Error &&
+        error.message.trim() === "Unauthorized runtime ingress request"
+    );
+}
+
+function isRuntimeIngressContractError(error: unknown): boolean {
+    if (error instanceof SyntaxError) {
+        return true;
+    }
+
+    return (
+        error instanceof Error &&
+        (/ArgumentValidationError/i.test(error.name) ||
+            /ArgumentValidationError/i.test(error.message))
+    );
+}
+
+export function buildRuntimeIngressErrorResponse(error: unknown): Response {
+    if (isUnauthorizedRuntimeIngressError(error)) {
+        return Response.json(
+            { error: getRuntimeIngressErrorMessage(error) },
+            { status: 401 },
+        );
+    }
+
+    if (isRuntimeIngressContractError(error)) {
+        return Response.json(
+            { error: getRuntimeIngressErrorMessage(error) },
+            { status: 400 },
+        );
+    }
+
+    return Response.json(
+        { error: getRuntimeIngressErrorMessage(error) },
+        { status: 500 },
+    );
+}
+
 function runtimeRoute(params: { path: string; mutation: any }) {
     http.route({
         path: params.path,
@@ -47,21 +97,12 @@ function runtimeRoute(params: { path: string; mutation: any }) {
         handler: httpAction(async (ctx, request) => {
             try {
                 assertRuntimeIngressAuthorized(request);
+                const payload = (await request.json()) as unknown;
+                await ctx.runMutation(params.mutation, payload as any);
+                return ok();
             } catch (error) {
-                return Response.json(
-                    {
-                        error:
-                            error instanceof Error
-                                ? error.message
-                                : "Unauthorized",
-                    },
-                    { status: 401 },
-                );
+                return buildRuntimeIngressErrorResponse(error);
             }
-
-            const payload = (await request.json()) as unknown;
-            await ctx.runMutation(params.mutation, payload as any);
-            return ok();
         }),
     });
 }
@@ -73,21 +114,12 @@ function runtimeQueryRoute(params: { path: string; query: any }) {
         handler: httpAction(async (ctx, request) => {
             try {
                 assertRuntimeIngressAuthorized(request);
+                const payload = (await request.json()) as unknown;
+                const result = await ctx.runQuery(params.query, payload as any);
+                return Response.json(result);
             } catch (error) {
-                return Response.json(
-                    {
-                        error:
-                            error instanceof Error
-                                ? error.message
-                                : "Unauthorized",
-                    },
-                    { status: 401 },
-                );
+                return buildRuntimeIngressErrorResponse(error);
             }
-
-            const payload = (await request.json()) as unknown;
-            const result = await ctx.runQuery(params.query, payload as any);
-            return Response.json(result);
         }),
     });
 }
@@ -127,6 +159,14 @@ runtimeRoute({
 runtimeQueryRoute({
     path: "/runtime/runtime-binding/read",
     query: runtimeInternal.runtimeIngress.readRuntimeBinding,
+});
+runtimeQueryRoute({
+    path: "/runtime/chat-local-ids",
+    query: runtimeInternal.runtimeIngress.listAllChatLocalIds,
+});
+runtimeQueryRoute({
+    path: "/runtime/chat-exists",
+    query: runtimeInternal.runtimeIngress.chatExistsByLocalId,
 });
 
 export default http;
