@@ -126,7 +126,11 @@ export interface ConvexAPI {
         >;
         getByLocalId: ConvexFunctionReference<
             "query",
-            { userId: ConvexId<"users">; localId: string },
+            {
+                userId: ConvexId<"users">;
+                agentId: string;
+                localId: string;
+            },
             ConvexChat | null
         >;
         listByUser: ConvexFunctionReference<

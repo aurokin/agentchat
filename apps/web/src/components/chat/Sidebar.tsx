@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useChat } from "@/contexts/ChatContext";
 import { useAgent } from "@/contexts/AgentContext";
+import { getScopedChatStateKey } from "@/contexts/chat-state";
 import { usePersistenceAdapter } from "@/contexts/WorkspaceContext";
 import { resolveConversationActivityState } from "@shared/core/conversation-activity";
 import { cn } from "@/lib/utils";
@@ -191,11 +192,19 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
 
     const requestDeleteChat = useCallback(
         async (chatId: string) => {
+            const targetChat = chats.find((chat) => chat.id === chatId) ?? null;
+            if (!targetChat && currentChat?.id !== chatId) {
+                return;
+            }
             const hasMessages =
                 currentChat?.id === chatId
                     ? messages.length > 0
-                    : (await persistenceAdapter.getMessagesByChat(chatId))
-                          .length > 0;
+                    : (
+                          await persistenceAdapter.getMessagesByChat(
+                              chatId,
+                              targetChat!.agentId,
+                          )
+                      ).length > 0;
 
             if (!hasMessages) {
                 await deleteChatAndSelectNext(chatId);
@@ -205,6 +214,7 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
             setPendingDeleteChatId(chatId);
         },
         [
+            chats,
             currentChat?.id,
             deleteChatAndSelectNext,
             messages.length,
@@ -403,8 +413,12 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                             {chats.map((chat) => {
                                 const isActive = currentChat?.id === chat.id;
                                 const runtimeBinding =
-                                    conversationRuntimeBindings[chat.id] ??
-                                    null;
+                                    conversationRuntimeBindings[
+                                        getScopedChatStateKey(
+                                            chat.id,
+                                            chat.agentId,
+                                        )
+                                    ] ?? null;
                                 const sidebarState =
                                     resolveSidebarConversationState({
                                         isActiveConversation: isActive,

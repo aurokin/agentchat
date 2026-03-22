@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 
+import { __setStore } from "../secure-store";
+
 const store = new Map<string, string>();
 
 const getItemAsync = mock(async (key: string) => {
@@ -9,10 +11,11 @@ const setItemAsync = mock(async (key: string, value: string) => {
     store.set(key, value);
 });
 
-await mock.module("expo-secure-store", () => ({
+__setStore({
     getItemAsync,
     setItemAsync,
-}));
+    deleteItemAsync: mock(async () => undefined),
+});
 
 const storage = await import("../sync-storage");
 
@@ -27,7 +30,7 @@ describe("sync-storage", () => {
         expect(await storage.getTheme()).toBe("system");
     });
 
-    it("treats legacy stored theme values as system until explicitly set", async () => {
+    it("requires an explicit theme selection before honoring stored theme values", async () => {
         store.set("agentchat-theme", "light");
 
         expect(await storage.getTheme()).toBe("system");

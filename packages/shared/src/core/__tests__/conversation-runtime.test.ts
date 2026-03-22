@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
     isConversationRuntimeSnapshotLive,
+    resolveConversationSocketEvent,
     shouldApplyConversationScopedUpdate,
     shouldClearPendingReconnectNoticeAfterRuntimeSync,
     shouldResetPendingConversationSendOnConversationChange,
@@ -26,6 +27,7 @@ function createActiveRun(
 ): ActiveRunState {
     return {
         conversationId: "chat-1",
+        agentId: "agent-a",
         assistantMessageId: "assistant-1",
         userContent: "Hello",
         content: "Partial output",
@@ -57,6 +59,7 @@ describe("conversation runtime helpers", () => {
         expect(
             shouldResetActiveRunForRuntimeSnapshot({
                 currentConversationId: "chat-1",
+                currentAgentId: "agent-a",
                 runtimeState: createRuntimeState({
                     phase: "active",
                     runId: "run-2",
@@ -71,6 +74,7 @@ describe("conversation runtime helpers", () => {
         expect(
             shouldResetActiveRunForRuntimeSnapshot({
                 currentConversationId: "chat-1",
+                currentAgentId: "agent-a",
                 runtimeState: createRuntimeState({
                     phase: "recovering",
                     runId: "run-1",
@@ -85,6 +89,7 @@ describe("conversation runtime helpers", () => {
         expect(
             synchronizeActiveRunWithRuntimeSnapshot({
                 currentConversationId: "chat-1",
+                currentAgentId: "agent-a",
                 runtimeState: createRuntimeState({
                     phase: "active",
                     runId: "run-1",
@@ -113,18 +118,46 @@ describe("conversation runtime helpers", () => {
         ).toBe(true);
     });
 
+    test("resets a local active run when the user switches to the same chat id on another agent", () => {
+        expect(
+            shouldResetActiveRunForRuntimeSnapshot({
+                currentConversationId: "chat-1",
+                currentAgentId: "agent-b",
+                runtimeState: createRuntimeState({
+                    phase: "active",
+                    runId: "run-1",
+                    assistantMessageId: "assistant-1",
+                }),
+                activeRun: createActiveRun({ agentId: "agent-a" }),
+            }),
+        ).toBe(true);
+    });
+
     test("applies conversation-scoped updates only for the current conversation", () => {
         expect(
             shouldApplyConversationScopedUpdate({
                 currentConversationId: "chat-1",
+                currentAgentId: "agent-a",
                 targetConversationId: "chat-1",
+                targetAgentId: "agent-a",
             }),
         ).toBe(true);
 
         expect(
             shouldApplyConversationScopedUpdate({
                 currentConversationId: "chat-2",
+                currentAgentId: "agent-a",
                 targetConversationId: "chat-1",
+                targetAgentId: "agent-a",
+            }),
+        ).toBe(false);
+
+        expect(
+            shouldApplyConversationScopedUpdate({
+                currentConversationId: "chat-1",
+                currentAgentId: "agent-b",
+                targetConversationId: "chat-1",
+                targetAgentId: "agent-a",
             }),
         ).toBe(false);
     });
@@ -133,7 +166,9 @@ describe("conversation runtime helpers", () => {
         expect(
             shouldResetPendingConversationSendOnConversationChange({
                 currentConversationId: "chat-2",
+                currentAgentId: "agent-a",
                 pendingSendConversationId: "chat-1",
+                pendingSendAgentId: "agent-a",
                 activeRun: null,
             }),
         ).toBe(true);
@@ -141,7 +176,9 @@ describe("conversation runtime helpers", () => {
         expect(
             shouldResetPendingConversationSendOnConversationChange({
                 currentConversationId: "chat-1",
+                currentAgentId: "agent-a",
                 pendingSendConversationId: "chat-1",
+                pendingSendAgentId: "agent-a",
                 activeRun: null,
             }),
         ).toBe(false);
@@ -149,9 +186,21 @@ describe("conversation runtime helpers", () => {
         expect(
             shouldResetPendingConversationSendOnConversationChange({
                 currentConversationId: "chat-2",
+                currentAgentId: "agent-a",
                 pendingSendConversationId: "chat-1",
+                pendingSendAgentId: "agent-a",
                 activeRun: createActiveRun(),
             }),
         ).toBe(false);
+
+        expect(
+            shouldResetPendingConversationSendOnConversationChange({
+                currentConversationId: "chat-1",
+                currentAgentId: "agent-b",
+                pendingSendConversationId: "chat-1",
+                pendingSendAgentId: "agent-a",
+                activeRun: null,
+            }),
+        ).toBe(true);
     });
 });

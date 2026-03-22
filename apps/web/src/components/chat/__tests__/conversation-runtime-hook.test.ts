@@ -29,6 +29,15 @@ function createSyncResolution(
     };
 }
 
+const recoveredRun = {
+    conversationId: "chat-1",
+    agentId: "agent-1",
+    assistantMessageId: "assistant-1",
+    userContent: "hello",
+    content: "Recovered output",
+    runId: "run-1",
+} as const;
+
 describe("conversation runtime hook planning", () => {
     test("retains the reconnect notice during the post-reset grace pass", () => {
         expect(
@@ -53,13 +62,7 @@ describe("conversation runtime hook planning", () => {
         expect(
             planConversationRuntimeSync({
                 syncResolution: createSyncResolution({
-                    recoveredRun: {
-                        conversationId: "chat-1",
-                        assistantMessageId: "assistant-1",
-                        userContent: "hello",
-                        content: "Recovered output",
-                        runId: "run-1",
-                    },
+                    recoveredRun,
                 }),
                 runtimeState: createRuntimeState({
                     phase: "recovering",
@@ -70,13 +73,7 @@ describe("conversation runtime hook planning", () => {
             }),
         ).toEqual({
             shouldReset: false,
-            recoveredRun: {
-                conversationId: "chat-1",
-                assistantMessageId: "assistant-1",
-                userContent: "hello",
-                content: "Recovered output",
-                runId: "run-1",
-            },
+            recoveredRun,
             recoveredRunNotice: true,
             clearPendingReconnectNotice: true,
         });
@@ -86,13 +83,7 @@ describe("conversation runtime hook planning", () => {
         expect(
             planConversationRuntimeSync({
                 syncResolution: createSyncResolution({
-                    recoveredRun: {
-                        conversationId: "chat-1",
-                        assistantMessageId: "assistant-1",
-                        userContent: "hello",
-                        content: "Recovered output",
-                        runId: "run-1",
-                    },
+                    recoveredRun,
                 }),
                 runtimeState: createRuntimeState({
                     phase: "recovering",
@@ -103,13 +94,7 @@ describe("conversation runtime hook planning", () => {
             }),
         ).toEqual({
             shouldReset: false,
-            recoveredRun: {
-                conversationId: "chat-1",
-                assistantMessageId: "assistant-1",
-                userContent: "hello",
-                content: "Recovered output",
-                runId: "run-1",
-            },
+            recoveredRun,
             recoveredRunNotice: false,
             clearPendingReconnectNotice: true,
         });

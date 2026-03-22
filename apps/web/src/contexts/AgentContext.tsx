@@ -72,65 +72,62 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
     const issueBackendToken = useActionSafe(convexApi.backendTokens.issue);
     const backendTokenRef = useRef<string | null>(null);
 
-    const refreshBootstrap = useCallback(
-        async (token?: string | null) => {
-            setLoadingAgents(true);
-            try {
-                const nextBootstrap = await fetchBootstrap(token);
-                setBootstrapIssue(null);
-                setBootstrap(nextBootstrap);
+    const refreshBootstrap = useCallback(async (token?: string | null) => {
+        setLoadingAgents(true);
+        try {
+            const nextBootstrap = await fetchBootstrap(token);
+            setBootstrapIssue(null);
+            setBootstrap(nextBootstrap);
 
-                const nextSelectedAgentId = resolveSelectedAgentId({
-                    agents: nextBootstrap.agents,
-                    storedAgentId: storage.getSelectedAgentId(),
-                });
+            const nextSelectedAgentId = resolveSelectedAgentId({
+                agents: nextBootstrap.agents,
+                storedAgentId: storage.getSelectedAgentId(),
+            });
 
-                setSelectedAgentIdState(nextSelectedAgentId);
-                if (nextSelectedAgentId) {
-                    storage.setSelectedAgentId(nextSelectedAgentId);
-                } else {
-                    storage.clearSelectedAgentId();
-                }
-            } catch (error) {
-                console.error("Failed to load Agentchat bootstrap:", error);
-                setBootstrapIssue(
-                    toAgentchatServerIssue({
-                        scope: "bootstrap",
-                        error,
-                    }),
-                );
-                setBootstrap({
-                    auth: {
-                        defaultProviderId: "google-main",
-                        requiresLogin: true,
-                        activeProvider: {
+            setSelectedAgentIdState(nextSelectedAgentId);
+            if (nextSelectedAgentId) {
+                storage.setSelectedAgentId(nextSelectedAgentId);
+            } else {
+                storage.clearSelectedAgentId();
+            }
+        } catch (error) {
+            console.error("Failed to load Agentchat bootstrap:", error);
+            setBootstrapIssue(
+                toAgentchatServerIssue({
+                    scope: "bootstrap",
+                    error,
+                }),
+            );
+            setBootstrap({
+                auth: {
+                    defaultProviderId: "google-main",
+                    requiresLogin: true,
+                    activeProvider: {
+                        id: "google-main",
+                        kind: "google",
+                        enabled: true,
+                        allowlistMode: "email",
+                        allowSignup: null,
+                    },
+                    providers: [
+                        {
                             id: "google-main",
                             kind: "google",
                             enabled: true,
                             allowlistMode: "email",
                             allowSignup: null,
                         },
-                        providers: [
-                            {
-                                id: "google-main",
-                                kind: "google",
-                                enabled: true,
-                                allowlistMode: "email",
-                                allowSignup: null,
-                            },
-                        ],
-                    },
-                    agents: [],
-                    providers: [],
-                });
-                setSelectedAgentIdState(null);
-                storage.clearSelectedAgentId();
-            } finally {
-                setLoadingAgents(false);
-            }
-        },
-        [],
-    );
+                    ],
+                },
+                agents: [],
+                providers: [],
+            });
+            setSelectedAgentIdState(null);
+            storage.clearSelectedAgentId();
+        } finally {
+            setLoadingAgents(false);
+        }
+    }, []);
 
     // Initial unauthenticated bootstrap (for auth config / login page)
     useEffect(() => {

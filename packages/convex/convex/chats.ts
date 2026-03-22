@@ -5,8 +5,10 @@ import {
     internalQuery,
     mutation,
     query,
+    type MutationCtx,
+    type QueryCtx,
 } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { isOwner, requireUserMatches } from "./lib/authz";
 import { requireWorkspaceUser } from "./lib/subscription";
 import { assertMaxLen, LIMITS } from "./lib/limits";
@@ -22,6 +24,52 @@ import {
  *
  * CRUD operations for chat sessions (conversations) in the workspace.
  */
+
+function pickMostRecentChat(chats: Doc<"chats">[]): Doc<"chats"> | null {
+    return (
+        chats.slice().sort((left, right) => {
+            const updatedAtDelta = right.updatedAt - left.updatedAt;
+            if (updatedAtDelta !== 0) {
+                return updatedAtDelta;
+            }
+
+            const createdAtDelta = right.createdAt - left.createdAt;
+            if (createdAtDelta !== 0) {
+                return createdAtDelta;
+            }
+
+            return String(right._id).localeCompare(String(left._id));
+        })[0] ?? null
+    );
+}
+
+function getStrictUniqueChat(chats: Doc<"chats">[]): Doc<"chats"> | null {
+    if (chats.length !== 1) {
+        return null;
+    }
+
+    return chats[0] ?? null;
+}
+
+async function getChatByAgentLocalId(
+    ctx: Pick<QueryCtx | MutationCtx, "db">,
+    args: {
+        userId: Id<"users">;
+        agentId: string;
+        localId: string;
+    },
+): Promise<Doc<"chats"> | null> {
+    const chats = await ctx.db
+        .query("chats")
+        .withIndex("by_userId_and_agentId_and_localId", (q) =>
+            q
+                .eq("userId", args.userId)
+                .eq("agentId", args.agentId)
+                .eq("localId", args.localId),
+        )
+        .collect();
+    return getStrictUniqueChat(chats);
+}
 
 // Get all chats for a user, sorted by updatedAt descending
 export const listByUser = query({
@@ -107,36 +155,34 @@ export const get = query({
 export const getByLocalId = query({
     args: {
         userId: v.id("users"),
+        agentId: v.string(),
         localId: v.string(),
     },
     handler: async (ctx, args) => {
         const authenticatedUserId = await requireWorkspaceUser(ctx);
         requireUserMatches(authenticatedUserId, args.userId);
         assertMaxLen(args.localId, LIMITS.maxLocalIdChars, "localId");
+        assertMaxLen(args.agentId, LIMITS.maxLocalIdChars, "agentId");
 
-        return await ctx.db
-            .query("chats")
-            .withIndex("by_local_id", (q) =>
-                q.eq("userId", authenticatedUserId).eq("localId", args.localId),
-            )
-            .unique();
+        return await getChatByAgentLocalId(ctx, {
+            userId: authenticatedUserId,
+            agentId: args.agentId,
+            localId: args.localId,
+        });
     },
 });
 
 export const getByLocalIdInternal = internalQuery({
     args: {
         userId: v.id("users"),
+        agentId: v.string(),
         localId: v.string(),
     },
     handler: async (ctx, args) => {
         assertMaxLen(args.localId, LIMITS.maxLocalIdChars, "localId");
+        assertMaxLen(args.agentId, LIMITS.maxLocalIdChars, "agentId");
 
-        return await ctx.db
-            .query("chats")
-            .withIndex("by_local_id", (q) =>
-                q.eq("userId", args.userId).eq("localId", args.localId),
-            )
-            .unique();
+        return await getChatByAgentLocalId(ctx, args);
     },
 });
 
@@ -159,6 +205,23 @@ export const create = mutation({
         assertMaxLen(args.localId, LIMITS.maxLocalIdChars, "localId");
         assertMaxLen(args.agentId, LIMITS.maxLocalIdChars, "agentId");
         assertMaxLen(args.title, LIMITS.maxChatTitleChars, "title");
+
+        if (args.localId) {
+            const existing = await ctx.db
+                .query("chats")
+                .withIndex("by_userId_and_agentId_and_localId", (q) =>
+                    q
+                        .eq("userId", authenticatedUserId)
+                        .eq("agentId", args.agentId)
+                        .eq("localId", args.localId),
+                )
+                .collect();
+            if (existing.length > 0) {
+                throw new Error(
+                    "Conversation localId already exists for this agent.",
+                );
+            }
+        }
 
         const usage = await ensureWorkspaceUsageCounters(
             ctx,
@@ -259,16 +322,12 @@ export const markViewed = mutation({
 export const lockSettingsIfNeeded = internalMutation({
     args: {
         userId: v.id("users"),
+        agentId: v.string(),
         localId: v.string(),
         lockedAt: v.number(),
     },
     handler: async (ctx, args) => {
-        const chat = await ctx.db
-            .query("chats")
-            .withIndex("by_local_id", (q) =>
-                q.eq("userId", args.userId).eq("localId", args.localId),
-            )
-            .unique();
+        const chat = await getChatByAgentLocalId(ctx, args);
         if (!chat) {
             throw new Error("Conversation not found");
         }

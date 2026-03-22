@@ -21,6 +21,7 @@ function createRuntimeManager() {
         unsubscribe: mock(() => undefined),
         interrupt: mock(async () => undefined),
         sendMessage: mock(async () => undefined),
+        deleteConversationWorkspace: mock(async () => undefined),
     };
 }
 
@@ -43,6 +44,7 @@ describe("websocketSession", () => {
                 type: "conversation.subscribe",
                 payload: {
                     conversationId: "chat-1",
+                    agentId: "agent-1",
                 },
             }),
             sendJson,
@@ -53,11 +55,38 @@ describe("websocketSession", () => {
             expect.objectContaining({
                 userId: "user-1",
                 conversationId: "chat-1",
+                agentId: "agent-1",
                 subscriberId: "socket-1",
                 sendEvent: expect.any(Function),
             }),
         );
         expect(sendJson).not.toHaveBeenCalled();
+    });
+
+    test("rejects subscribe commands without agentId", async () => {
+        const runtimeManager = createRuntimeManager();
+        const sendJson = mock(() => undefined);
+
+        await handleConnectedSocketMessage({
+            runtimeManager,
+            session,
+            connectionId: "socket-1",
+            rawMessage: JSON.stringify({
+                id: "cmd-missing-agent-sub",
+                type: "conversation.subscribe",
+                payload: {
+                    conversationId: "chat-1",
+                },
+            }),
+            sendJson,
+        });
+
+        expect(runtimeManager.subscribe).not.toHaveBeenCalled();
+        expect(sendJson).toHaveBeenCalledWith(
+            expect.stringContaining(
+                "Invalid conversation subscription payload",
+            ),
+        );
     });
 
     test("serializes subscribed runtime events back to the socket client", async () => {
@@ -73,6 +102,7 @@ describe("websocketSession", () => {
                 type: "conversation.subscribe",
                 payload: {
                     conversationId: "chat-1",
+                    agentId: "agent-1",
                 },
             }),
             sendJson,
@@ -120,6 +150,7 @@ describe("websocketSession", () => {
                 type: "conversation.interrupt",
                 payload: {
                     conversationId: "chat-1",
+                    agentId: "agent-1",
                 },
             }),
             sendJson: () => undefined,
@@ -129,6 +160,7 @@ describe("websocketSession", () => {
         expect(runtimeManager.interrupt).toHaveBeenCalledWith({
             userId: "user-1",
             conversationId: "chat-1",
+            agentId: "agent-1",
         });
     });
 
@@ -144,6 +176,7 @@ describe("websocketSession", () => {
                 type: "conversation.unsubscribe",
                 payload: {
                     conversationId: "chat-1",
+                    agentId: "agent-1",
                 },
             }),
             sendJson: () => undefined,
@@ -153,6 +186,7 @@ describe("websocketSession", () => {
         expect(runtimeManager.unsubscribe).toHaveBeenCalledWith({
             subscriberId: "socket-1",
             conversationId: "chat-1",
+            agentId: "agent-1",
         });
     });
 
@@ -187,6 +221,35 @@ describe("websocketSession", () => {
                 subscriberId: "socket-1",
                 sendEvent: expect.any(Function),
             }),
+        );
+    });
+
+    test("rejects send commands without agentId", async () => {
+        const runtimeManager = createRuntimeManager();
+        const sendJson = mock(() => undefined);
+
+        await handleConnectedSocketMessage({
+            runtimeManager,
+            session,
+            connectionId: "socket-1",
+            rawMessage: JSON.stringify({
+                id: "cmd-missing-agent-send",
+                type: "conversation.send",
+                payload: {
+                    conversationId: "chat-1",
+                    modelId: "gpt-5.3-codex",
+                    content: "Hello",
+                    userMessageId: "user-1",
+                    assistantMessageId: "assistant-1",
+                    history: [],
+                },
+            }),
+            sendJson,
+        });
+
+        expect(runtimeManager.sendMessage).not.toHaveBeenCalled();
+        expect(sendJson).toHaveBeenCalledWith(
+            expect.stringContaining("Invalid send payload"),
         );
     });
 
@@ -278,6 +341,36 @@ describe("websocketSession", () => {
         expect(sendJson).toHaveBeenCalledTimes(1);
         expect(sendJson).toHaveBeenCalledWith(
             expect.stringContaining("runtime failed"),
+        );
+    });
+
+    test("routes delete commands to runtimeManager.deleteConversationWorkspace", async () => {
+        const runtimeManager = createRuntimeManager();
+
+        await handleConnectedSocketMessage({
+            runtimeManager,
+            session,
+            connectionId: "socket-1",
+            rawMessage: JSON.stringify({
+                id: "cmd-del",
+                type: "conversation.delete",
+                payload: {
+                    conversationId: "chat-1",
+                    agentId: "agent-1",
+                },
+            }),
+            sendJson: () => undefined,
+        });
+
+        expect(
+            runtimeManager.deleteConversationWorkspace,
+        ).toHaveBeenCalledTimes(1);
+        expect(runtimeManager.deleteConversationWorkspace).toHaveBeenCalledWith(
+            {
+                userId: "user-1",
+                conversationId: "chat-1",
+                agentId: "agent-1",
+            },
         );
     });
 

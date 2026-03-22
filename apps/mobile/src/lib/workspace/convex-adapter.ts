@@ -59,9 +59,10 @@ function createServices(client: ConvexClientInterface): ConvexAdapterServices {
                 (await client.query(convexApi.chats.get, {
                     id: id as ConvexId<"chats">,
                 })) as any,
-            getByLocalId: async ({ userId, localId }) =>
+            getByLocalId: async ({ userId, agentId, localId }) =>
                 (await client.query(convexApi.chats.getByLocalId, {
                     userId: userId as ConvexId<"users">,
+                    agentId,
                     localId,
                 })) as any,
             listByUser: async ({ userId }) =>

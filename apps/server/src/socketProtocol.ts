@@ -23,6 +23,7 @@ export interface ConversationInterruptCommand {
     type: "conversation.interrupt";
     payload: {
         conversationId: string;
+        agentId: string;
     };
 }
 
@@ -31,13 +32,25 @@ export interface ConversationSubscribeCommand {
     type: "conversation.subscribe" | "conversation.unsubscribe";
     payload: {
         conversationId: string;
+        agentId: string;
+    };
+}
+
+export interface ConversationDeleteCommand {
+    id: string;
+    type: "conversation.delete";
+    payload: {
+        conversationId: string;
+        agentId: string;
+        chatId?: string;
     };
 }
 
 export type ClientCommand =
     | ConversationSendCommand
     | ConversationInterruptCommand
-    | ConversationSubscribeCommand;
+    | ConversationSubscribeCommand
+    | ConversationDeleteCommand;
 
 export interface ServerEvent {
     type:
@@ -90,7 +103,11 @@ export function parseClientCommand(raw: string): ClientCommand {
         const payload = command.payload as
             | ConversationSubscribeCommand["payload"]
             | undefined;
-        if (!payload || typeof payload.conversationId !== "string") {
+        if (
+            !payload ||
+            typeof payload.conversationId !== "string" ||
+            typeof payload.agentId !== "string"
+        ) {
             throw new Error("Invalid conversation subscription payload");
         }
 
@@ -105,13 +122,37 @@ export function parseClientCommand(raw: string): ClientCommand {
         const payload = command.payload as
             | ConversationInterruptCommand["payload"]
             | undefined;
-        if (!payload || typeof payload.conversationId !== "string") {
+        if (
+            !payload ||
+            typeof payload.conversationId !== "string" ||
+            typeof payload.agentId !== "string"
+        ) {
             throw new Error("Invalid interrupt payload");
         }
 
         return {
             id: command.id,
             type: "conversation.interrupt",
+            payload,
+        };
+    }
+
+    if (command.type === "conversation.delete") {
+        const payload = command.payload as
+            | ConversationDeleteCommand["payload"]
+            | undefined;
+        if (
+            !payload ||
+            typeof payload.conversationId !== "string" ||
+            typeof payload.agentId !== "string" ||
+            (payload.chatId !== undefined && typeof payload.chatId !== "string")
+        ) {
+            throw new Error("Invalid delete payload");
+        }
+
+        return {
+            id: command.id,
+            type: "conversation.delete",
             payload,
         };
     }

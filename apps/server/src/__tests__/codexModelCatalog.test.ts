@@ -6,6 +6,8 @@ import type { AgentchatConfig } from "../config.ts";
 function createConfig(): AgentchatConfig {
     return {
         version: 1,
+        instanceKey: "instance-test",
+        sandboxRoot: "/tmp/agentchat-sandboxes",
         auth: {
             defaultProviderId: "google-main",
             providers: [
@@ -73,7 +75,7 @@ describe("CodexModelCatalog", () => {
             ],
             nextCursor: null,
         }));
-        const stop = mock(() => undefined);
+        const stop = mock(async () => undefined);
 
         const catalog = new CodexModelCatalog({
             getConfig: () => createConfig(),
@@ -137,7 +139,7 @@ describe("CodexModelCatalog", () => {
                 request,
                 onNotification: () => undefined,
                 onExit: () => undefined,
-                stop: () => undefined,
+                stop: async () => undefined,
             }),
         });
 
@@ -168,7 +170,7 @@ describe("CodexModelCatalog", () => {
                     },
                     onNotification: () => undefined,
                     onExit: () => undefined,
-                    stop: () => undefined,
+                    stop: async () => undefined,
                 }),
             });
 
@@ -214,7 +216,7 @@ describe("CodexModelCatalog", () => {
                     }),
                     onNotification: () => undefined,
                     onExit: () => undefined,
-                    stop: () => undefined,
+                    stop: async () => undefined,
                 }),
             });
 
@@ -287,7 +289,7 @@ describe("CodexModelCatalog", () => {
                 request,
                 onNotification: () => undefined,
                 onExit: () => undefined,
-                stop: () => undefined,
+                stop: async () => undefined,
             }),
         });
 
@@ -340,7 +342,7 @@ describe("CodexModelCatalog", () => {
                 }),
                 onNotification: () => undefined,
                 onExit: () => undefined,
-                stop: () => undefined,
+                stop: async () => undefined,
             }),
         });
 
@@ -364,7 +366,7 @@ describe("CodexModelCatalog", () => {
                 },
                 onNotification: () => undefined,
                 onExit: () => undefined,
-                stop: () => undefined,
+                stop: async () => undefined,
             }),
         });
 
@@ -389,7 +391,7 @@ describe("CodexModelCatalog", () => {
                 }),
                 onNotification: () => undefined,
                 onExit: () => undefined,
-                stop: () => undefined,
+                stop: async () => undefined,
             }),
         });
 

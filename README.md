@@ -163,6 +163,7 @@ Set these in `apps/server/.env.local` for local development. A template lives at
 - `BACKEND_TOKEN_SECRET` - Must exactly match the Convex value so `apps/server` can verify backend session tokens.
 - `AGENTCHAT_CONVEX_SITE_URL` - Convex site URL used by `apps/server` runtime persistence ingress. Example: `https://<deployment>.convex.site`.
 - `RUNTIME_INGRESS_SECRET` - Must exactly match the Convex value so `apps/server` can persist runs, run events, and runtime bindings.
+- `XDG_STATE_HOME` - Optional state-directory override for server-managed sidecar files such as sandbox-root registries. When unset, Agentchat falls back to `~/.local/state/agentchat`.
 
 **Optional Convex limits (anti-abuse knobs)**
 

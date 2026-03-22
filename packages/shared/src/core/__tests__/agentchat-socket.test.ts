@@ -105,6 +105,7 @@ describe("agentchat socket helpers", () => {
         firstSocket.emitEvent({
             type: "run.started",
             payload: {
+                agentId: "agent-1",
                 conversationId: "chat-1",
                 runId: "run-1",
                 messageId: "assistant-1",
@@ -207,8 +208,14 @@ describe("agentchat socket helpers", () => {
         });
         await connectPromise;
 
-        const unsubscribeA = client.subscribeToConversation("chat-1");
-        const unsubscribeB = client.subscribeToConversation("chat-1");
+        const unsubscribeA = client.subscribeToConversation(
+            "chat-1",
+            "agent-1",
+        );
+        const unsubscribeB = client.subscribeToConversation(
+            "chat-1",
+            "agent-1",
+        );
 
         expect(
             socket.sentMessages.filter((message) =>
@@ -231,6 +238,54 @@ describe("agentchat socket helpers", () => {
         ).toHaveLength(1);
     });
 
+    test("keeps distinct subscriptions when agent and conversation ids contain colons", async () => {
+        globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
+
+        const client = new AgentchatSocketClient({
+            getWebSocketUrl: () => "ws://localhost:3030/ws",
+            createId: () => "id-1",
+            notConfiguredMessage: "missing",
+        });
+
+        const connectPromise = client.ensureConnected(async () => "token-1");
+        await Promise.resolve();
+        const socket = FakeWebSocket.instances[0];
+        if (!socket) {
+            throw new Error("Expected a websocket connection");
+        }
+        socket.emitOpen();
+        socket.emitEvent({
+            type: "connection.ready",
+            payload: {
+                user: {
+                    sub: "sub-1",
+                    userId: "user-1",
+                    email: "user@example.com",
+                },
+                transport: "websocket",
+            },
+        });
+        await connectPromise;
+
+        const unsubscribeA = client.subscribeToConversation("foo:bar", "prod");
+        const unsubscribeB = client.subscribeToConversation("bar", "prod:foo");
+
+        expect(
+            socket.sentMessages.filter((message) =>
+                message.includes('"type":"conversation.subscribe"'),
+            ),
+        ).toHaveLength(2);
+
+        unsubscribeA();
+        unsubscribeB();
+
+        expect(
+            socket.sentMessages.filter((message) =>
+                message.includes('"type":"conversation.unsubscribe"'),
+            ),
+        ).toHaveLength(2);
+    });
+
     test("replays subscriptions that were requested before the first socket became ready", async () => {
         globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
 
@@ -247,7 +302,7 @@ describe("agentchat socket helpers", () => {
             throw new Error("Expected the first websocket connection");
         }
 
-        client.subscribeToConversation("chat-1");
+        client.subscribeToConversation("chat-1", "agent-1");
         expect(
             firstSocket.sentMessages.filter((message) =>
                 message.includes('"type":"conversation.subscribe"'),
@@ -275,6 +330,9 @@ describe("agentchat socket helpers", () => {
         ).toHaveLength(1);
         expect(firstSocket.sentMessages.join("\n")).toContain(
             '"conversationId":"chat-1"',
+        );
+        expect(firstSocket.sentMessages.join("\n")).toContain(
+            '"agentId":"agent-1"',
         );
     });
 
@@ -307,8 +365,8 @@ describe("agentchat socket helpers", () => {
         });
         await connectPromise;
 
-        client.subscribeToConversation("chat-1");
-        client.subscribeToConversation("chat-2");
+        client.subscribeToConversation("chat-1", "agent-1");
+        client.subscribeToConversation("chat-2", "agent-2");
 
         expect(
             firstSocket.sentMessages.filter((message) =>
@@ -346,9 +404,112 @@ describe("agentchat socket helpers", () => {
         expect(resubscribeMessages.join("\n")).toContain(
             '"conversationId":"chat-1"',
         );
+        expect(resubscribeMessages.join("\n")).toContain('"agentId":"agent-1"');
         expect(resubscribeMessages.join("\n")).toContain(
             '"conversationId":"chat-2"',
         );
+        expect(resubscribeMessages.join("\n")).toContain('"agentId":"agent-2"');
+    });
+
+    test("sends conversation.delete notification when connected", async () => {
+        globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
+
+        const client = new AgentchatSocketClient({
+            getWebSocketUrl: () => "ws://localhost:3030/ws",
+            createId: () => "id-1",
+            notConfiguredMessage: "missing",
+        });
+
+        const connectPromise = client.ensureConnected(async () => "token-1");
+        await Promise.resolve();
+        const socket = FakeWebSocket.instances[0];
+        if (!socket) {
+            throw new Error("Expected a websocket connection");
+        }
+        socket.emitOpen();
+        socket.emitEvent({
+            type: "connection.ready",
+            payload: {
+                user: {
+                    sub: "sub-1",
+                    userId: "user-1",
+                    email: "user@example.com",
+                },
+                transport: "websocket",
+            },
+        });
+        await connectPromise;
+
+        await client.notifyConversationDeleted("chat-1", "agent-1");
+
+        const deleteMessages = socket.sentMessages.filter((message) =>
+            message.includes('"type":"conversation.delete"'),
+        );
+        expect(deleteMessages).toHaveLength(1);
+
+        const parsed = JSON.parse(deleteMessages[0]!) as {
+            type: string;
+            payload: { conversationId: string; agentId: string };
+        };
+        expect(parsed.payload.conversationId).toBe("chat-1");
+        expect(parsed.payload.agentId).toBe("agent-1");
+    });
+
+    test("silently ignores conversation.delete when not connected and no token issuer", async () => {
+        globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
+
+        const client = new AgentchatSocketClient({
+            getWebSocketUrl: () => "ws://localhost:3030/ws",
+            createId: () => "id-1",
+            notConfiguredMessage: "missing",
+        });
+
+        // Should not throw even when no socket exists and no tokenIssuer
+        await client.notifyConversationDeleted("chat-1", "agent-1");
+
+        expect(FakeWebSocket.instances).toHaveLength(0);
+    });
+
+    test("connects conversation.delete with a caller-provided token issuer", async () => {
+        globalThis.WebSocket = FakeWebSocket as unknown as typeof WebSocket;
+
+        const client = new AgentchatSocketClient({
+            getWebSocketUrl: () => "ws://localhost:3030/ws",
+            createId: () => "id-1",
+            notConfiguredMessage: "missing",
+        });
+
+        const deletePromise = client.notifyConversationDeleted(
+            "chat-1",
+            "agent-1",
+            async () => "token-1",
+        );
+        await Promise.resolve();
+
+        const socket = FakeWebSocket.instances[0];
+        if (!socket) {
+            throw new Error("Expected a websocket connection");
+        }
+
+        socket.emitOpen();
+        socket.emitEvent({
+            type: "connection.ready",
+            payload: {
+                user: {
+                    sub: "sub-1",
+                    userId: "user-1",
+                    email: "user@example.com",
+                },
+                transport: "websocket",
+            },
+        });
+        await deletePromise;
+
+        expect(
+            socket.sentMessages.some((message) =>
+                message.includes('"type":"conversation.delete"'),
+            ),
+        ).toBe(true);
     });
 
     test("does not replay subscriptions that were removed during a reconnect gap", async () => {
@@ -380,7 +541,7 @@ describe("agentchat socket helpers", () => {
         });
         await connectPromise;
 
-        const unsubscribe = client.subscribeToConversation("chat-1");
+        const unsubscribe = client.subscribeToConversation("chat-1", "agent-1");
         expect(
             firstSocket.sentMessages.filter((message) =>
                 message.includes('"type":"conversation.subscribe"'),

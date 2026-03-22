@@ -12,7 +12,7 @@ export class UnavailablePersistenceAdapter implements PersistenceAdapter {
         this.fail();
     }
 
-    async getChat(): Promise<undefined> {
+    async getChat(_id: string, _agentId: string): Promise<undefined> {
         return undefined;
     }
 
@@ -24,15 +24,19 @@ export class UnavailablePersistenceAdapter implements PersistenceAdapter {
         this.fail();
     }
 
-    async markChatViewed(): Promise<void> {
+    async markChatViewed(
+        _chatId: string,
+        _timestamp: number,
+        _agentId: string,
+    ): Promise<void> {
         this.fail();
     }
 
-    async deleteChat(): Promise<void> {
+    async deleteChat(_id: string, _agentId: string): Promise<string | null> {
         this.fail();
     }
 
-    async createMessage(): Promise<string> {
+    async createMessage(_message: unknown, _agentId: string): Promise<string> {
         this.fail();
     }
 
@@ -40,11 +44,14 @@ export class UnavailablePersistenceAdapter implements PersistenceAdapter {
         this.fail();
     }
 
-    async getMessagesByChat(): Promise<[]> {
+    async getMessagesByChat(_chatId: string, _agentId: string): Promise<[]> {
         return [];
     }
 
-    async deleteMessagesByChat(): Promise<void> {
+    async deleteMessagesByChat(
+        _chatId: string,
+        _agentId: string,
+    ): Promise<void> {
         this.fail();
     }
 
