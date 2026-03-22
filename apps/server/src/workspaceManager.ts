@@ -465,11 +465,14 @@ export class WorkspaceManager {
         agentId: string,
         userId: string,
         conversationId: string,
+        options?: {
+            force?: boolean;
+        },
     ): Promise<void> {
         const configuredAgent = this.getConfig().agents.find(
             (agent) => agent.id === agentId,
         );
-        if (configuredAgent?.workspaceMode === "shared") {
+        if (!options?.force && configuredAgent?.workspaceMode === "shared") {
             return;
         }
 

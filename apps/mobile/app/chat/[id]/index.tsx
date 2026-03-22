@@ -213,11 +213,14 @@ export default function ChatScreen(): ReactElement {
     ]);
 
     useEffect(() => {
-        if (!chatId) {
+        if (!chatId || !routeSelection?.agentId) {
             return;
         }
 
-        const pendingShare = consumePendingSharePayload(chatId);
+        const pendingShare = consumePendingSharePayload(
+            chatId,
+            routeSelection.agentId,
+        );
         if (!pendingShare?.text) {
             return;
         }
@@ -229,7 +232,7 @@ export default function ChatScreen(): ReactElement {
         return () => {
             clearTimeout(timeoutId);
         };
-    }, [chatId]);
+    }, [chatId, routeSelection?.agentId]);
 
     useEffect(() => {
         if (chats.length > 0) return;

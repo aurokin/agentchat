@@ -56,7 +56,9 @@ export function ShareIntentBridge(): ReactElement | null {
 
         void (async () => {
             const chat = await createChat();
-            setPendingSharePayload(chat.id, { text: payload.text });
+            setPendingSharePayload(chat.id, chat.agentId, {
+                text: payload.text,
+            });
             router.replace(
                 `/chat/${buildChatRouteId({
                     chatId: chat.id,

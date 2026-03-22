@@ -39,7 +39,9 @@ type ActiveTurn = {
     lastPersistedContent: string;
     pendingDeltaFlush: ReturnType<typeof setTimeout> | null;
     inFlightDeltaFlush: Promise<void> | null;
+    pendingRunStartPersistence: Promise<void> | null;
     pendingMessageStartPersistence: Promise<void> | null;
+    queuedNotifications: JsonRpcNotification[];
     reject: (error: Error) => void;
     resolve: () => void;
 };
@@ -328,24 +330,6 @@ export class CodexRuntimeManager {
         }
 
         const runId = crypto.randomUUID();
-        this.emitToSubscribers(
-            runtime,
-            createRuntimeServerEvent(runtime, "run.started", {
-                runId,
-                messageId: params.command.payload.assistantMessageId,
-            }),
-        );
-        this.emitToSubscribers(
-            runtime,
-            createRuntimeServerEvent(runtime, "message.started", {
-                runId,
-                messageId: params.command.payload.assistantMessageId,
-                messageIndex: 0,
-                kind: "assistant_message",
-                content: "",
-            }),
-        );
-
         await new Promise<void>((resolve, reject) => {
             runtime.activeTurn = {
                 runId,
@@ -360,7 +344,9 @@ export class CodexRuntimeManager {
                 lastPersistedContent: "",
                 pendingDeltaFlush: null,
                 inFlightDeltaFlush: null,
+                pendingRunStartPersistence: null,
                 pendingMessageStartPersistence: null,
+                queuedNotifications: [],
                 reject,
                 resolve,
             };
@@ -378,25 +364,6 @@ export class CodexRuntimeManager {
                     }
 
                     const startedAt = Date.now();
-                    await this.persistence.runtimeBinding({
-                        chatId: runtime.chatId,
-                        userId: params.userId,
-                        agentId: runtime.agentId,
-                        conversationLocalId:
-                            params.command.payload.conversationId,
-                        provider: runtime.provider.id,
-                        status: "active",
-                        providerThreadId: runtime.threadId,
-                        providerResumeToken: null,
-                        activeRunId: null,
-                        lastError: null,
-                        lastEventAt: startedAt,
-                        expiresAt: null,
-                        workspaceMode: runtime.agent.workspaceMode,
-                        workspaceRootPath: runtime.agent.rootPath,
-                        workspaceCwd: runtime.cwd,
-                        updatedAt: startedAt,
-                    });
 
                     const inputText = isNew
                         ? buildInitialTurnText(
@@ -424,22 +391,67 @@ export class CodexRuntimeManager {
                     activeTurn.turnId = extractTurnId(turnResult);
                     runtime.modelId = params.command.payload.modelId;
 
-                    await this.persistence.runStarted({
-                        chatId: runtime.chatId,
-                        userId: params.userId,
-                        agentId: runtime.agentId,
-                        conversationLocalId:
-                            params.command.payload.conversationId,
-                        triggerMessageLocalId:
-                            params.command.payload.userMessageId,
-                        assistantMessageLocalId:
-                            params.command.payload.assistantMessageId,
-                        externalRunId: runId,
-                        provider: runtime.provider.id,
-                        providerThreadId: runtime.threadId,
-                        providerTurnId: activeTurn.turnId,
-                        startedAt,
-                    });
+                    const pendingRunStartPersistence = this.persistence
+                        .runStarted({
+                            chatId: runtime.chatId,
+                            userId: params.userId,
+                            agentId: runtime.agentId,
+                            conversationLocalId:
+                                params.command.payload.conversationId,
+                            triggerMessageLocalId:
+                                params.command.payload.userMessageId,
+                            assistantMessageLocalId:
+                                params.command.payload.assistantMessageId,
+                            externalRunId: runId,
+                            provider: runtime.provider.id,
+                            providerThreadId: runtime.threadId,
+                            providerTurnId: activeTurn.turnId,
+                            startedAt,
+                        })
+                        .finally(() => {
+                            if (
+                                activeTurn.pendingRunStartPersistence ===
+                                pendingRunStartPersistence
+                            ) {
+                                activeTurn.pendingRunStartPersistence = null;
+                            }
+                        });
+                    activeTurn.pendingRunStartPersistence =
+                        pendingRunStartPersistence;
+                    await pendingRunStartPersistence;
+
+                    if (
+                        this.runtimes.get(runtime.key) !== runtime ||
+                        runtime.activeTurn !== activeTurn
+                    ) {
+                        return;
+                    }
+
+                    this.emitToSubscribers(
+                        runtime,
+                        createRuntimeServerEvent(runtime, "run.started", {
+                            runId,
+                            messageId:
+                                params.command.payload.assistantMessageId,
+                        }),
+                    );
+                    this.emitToSubscribers(
+                        runtime,
+                        createRuntimeServerEvent(runtime, "message.started", {
+                            runId,
+                            messageId:
+                                params.command.payload.assistantMessageId,
+                            messageIndex: 0,
+                            kind: "assistant_message",
+                            content: "",
+                        }),
+                    );
+
+                    const queuedNotifications =
+                        activeTurn.queuedNotifications.splice(0);
+                    for (const queuedNotification of queuedNotifications) {
+                        this.handleNotification(runtime, queuedNotification);
+                    }
                 } catch (error) {
                     const errorMessage =
                         error instanceof Error
@@ -464,6 +476,7 @@ export class CodexRuntimeManager {
                     const failedTurn = runtime.activeTurn;
                     runtime.activeTurn = null;
                     if (failedTurn) {
+                        failedTurn.queuedNotifications.length = 0;
                         try {
                             await this.persistence.runFailed({
                                 chatId: runtime.chatId,
@@ -649,6 +662,13 @@ export class CodexRuntimeManager {
                 params.agentId,
                 params.userId,
                 params.conversationId,
+                {
+                    force:
+                        runtime?.agent?.workspaceMode ===
+                            "copy-on-conversation" &&
+                        configuredAgent?.workspaceMode !==
+                            "copy-on-conversation",
+                },
             );
         }
     }
@@ -1462,6 +1482,10 @@ export class CodexRuntimeManager {
     ): void {
         const activeTurn = runtime.activeTurn;
         if (!activeTurn || typeof notification.method !== "string") {
+            return;
+        }
+        if (activeTurn.pendingRunStartPersistence) {
+            activeTurn.queuedNotifications.push(notification);
             return;
         }
 

@@ -226,6 +226,7 @@ function createPersistence(
         runtimeBindingCalls: [] as Array<Record<string, unknown>>,
         runStartedCalls: [] as Array<Record<string, unknown>>,
         messageStartedCalls: [] as Array<Record<string, unknown>>,
+        messageDeltaCalls: [] as Array<Record<string, unknown>>,
         runCompletedCalls: [] as Array<Record<string, unknown>>,
         runFailedCalls: [] as Array<Record<string, unknown>>,
         runInterruptedCalls: [] as Array<Record<string, unknown>>,
@@ -269,8 +270,8 @@ function createPersistence(
         async messageStarted(payload: Record<string, unknown>) {
             this.messageStartedCalls.push(payload);
         },
-        async messageDelta() {
-            return undefined;
+        async messageDelta(payload: Record<string, unknown>) {
+            this.messageDeltaCalls.push(payload);
         },
         async runCompleted(payload: Record<string, unknown>) {
             this.runCompletedCalls.push(payload);
@@ -649,6 +650,72 @@ describe("CodexRuntimeManager", () => {
                 },
             },
         ]);
+
+        fakeClient.emit({
+            method: "turn/completed",
+            params: {
+                turn: {
+                    status: "completed",
+                },
+            },
+        });
+        await sendPromise;
+    });
+
+    test("buffers provider notifications until run-start persistence completes", async () => {
+        const config = createConfig();
+        const persistence = createPersistence(null);
+        const runStartedDeferred = createDeferred<void>();
+        persistence.runStarted = async (payload: Record<string, unknown>) => {
+            persistence.runStartedCalls.push(payload);
+            await runStartedDeferred.promise;
+        };
+        const fakeClient = new FakeCodexClient({
+            startedThreadId: "thread-fresh",
+            autoComplete: false,
+        });
+        const events: Array<{
+            type: string;
+            payload: Record<string, unknown>;
+        }> = [];
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: () => fakeClient,
+        });
+
+        const sendPromise = manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: (event) => {
+                events.push(event);
+            },
+        });
+
+        await Bun.sleep(0);
+        fakeClient.emit({
+            method: "item/agentMessage/delta",
+            params: {
+                delta: "Working on it",
+            },
+        });
+        await Bun.sleep(0);
+
+        expect(persistence.runStartedCalls).toHaveLength(1);
+        expect(persistence.messageDeltaCalls).toHaveLength(0);
+        expect(events).toEqual([]);
+
+        runStartedDeferred.resolve();
+        await Bun.sleep(0);
+
+        expect(events.map((event) => event.type)).toEqual([
+            "run.started",
+            "message.started",
+            "message.delta",
+        ]);
+        expect(persistence.messageDeltaCalls).toHaveLength(0);
+        expect(persistence.runtimeBindingCalls).toHaveLength(0);
 
         fakeClient.emit({
             method: "turn/completed",
@@ -1376,11 +1443,7 @@ describe("CodexRuntimeManager", () => {
             },
         });
 
-        expect(events.map((event) => event.type)).toEqual([
-            "run.started",
-            "message.started",
-            "run.failed",
-        ]);
+        expect(events.map((event) => event.type)).toEqual(["run.failed"]);
         expect(persistence.runFailedCalls).toHaveLength(1);
         expect(persistence.runFailedCalls[0]).toMatchObject({
             conversationLocalId: "chat-1",
@@ -2474,6 +2537,72 @@ describe("CodexRuntimeManager", () => {
                 localId: "chat-1",
             },
         ]);
+    });
+
+    test("conversation delete removes copied workspaces after the agent flips to shared mode", async () => {
+        const sandboxRoot = makeTempDir("sandbox");
+        const agentRoot = makeTempDir("agent-root");
+        writeFileSync(path.join(agentRoot, "version.txt"), "first");
+
+        const config = createConfig();
+        config.sandboxRoot = sandboxRoot;
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath: agentRoot,
+            workspaceMode: "copy-on-conversation",
+        };
+
+        const workspaceManager = createWorkspaceManager(() => config);
+        const persistence = createPersistence(null);
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            workspaceManager,
+        });
+        const workspacePath = await workspaceManager.ensureWorkspace(
+            config.agents[0]!,
+            "user-1",
+            "chat-1",
+        );
+
+        (
+            manager as unknown as {
+                runtimes: Map<string, Record<string, unknown>>;
+            }
+        ).runtimes.set(JSON.stringify(["user-1", "agent-1", "chat-1"]), {
+            key: JSON.stringify(["user-1", "agent-1", "chat-1"]),
+            userId: "user-1",
+            conversationId: "chat-1",
+            agentId: "agent-1",
+            modelId: "gpt-5.3-codex",
+            provider: config.providers[0],
+            agent: {
+                ...config.agents[0]!,
+                workspaceMode: "copy-on-conversation",
+            },
+            cwd: workspacePath,
+            chatId: "chats:chat-1",
+            threadId: "thread-1",
+            activeTurn: null,
+            idleTimer: null,
+            subscribers: new Map(),
+            client: new FakeCodexClient(),
+        });
+
+        config.agents[0] = {
+            ...config.agents[0]!,
+            workspaceMode: "shared",
+        };
+
+        expect(existsSync(workspacePath)).toBe(true);
+
+        await manager.deleteConversationWorkspace({
+            userId: "user-1",
+            conversationId: "chat-1",
+            agentId: "agent-1",
+        });
+
+        expect(existsSync(workspacePath)).toBe(false);
     });
 
     test("cancels pending runtime initialization when the conversation is deleted", async () => {

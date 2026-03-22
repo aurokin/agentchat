@@ -1435,6 +1435,42 @@ new WorkspaceManager({
             ).resolves.toBeUndefined();
         });
 
+        test("force deletes a copied workspace after the agent flips to shared mode", async () => {
+            const sandboxRoot = makeTempDir("sandbox");
+            const rootPath = makeTempDir("agent-root");
+            writeFileSync(path.join(rootPath, "file.txt"), "source");
+
+            const config = makeConfig({
+                sandboxRoot,
+                agents: [
+                    makeAgent({
+                        id: "agent-a",
+                        rootPath,
+                        workspaceMode: "copy-on-conversation",
+                    }),
+                ],
+            });
+            const manager = createWorkspaceManager(() => config);
+
+            const workspacePath = await manager.ensureWorkspace(
+                config.agents[0]!,
+                "user-1",
+                "conv-1",
+            );
+            expect(existsSync(workspacePath)).toBe(true);
+
+            config.agents[0] = {
+                ...config.agents[0]!,
+                workspaceMode: "shared",
+            };
+
+            await manager.deleteWorkspace("agent-a", "user-1", "conv-1", {
+                force: true,
+            });
+
+            expect(existsSync(workspacePath)).toBe(false);
+        });
+
         test("refuses to delete workspaces through symlinked ancestors", async () => {
             const sandboxRoot = makeTempDir("sandbox");
             const outsideDir = makeTempDir("outside");

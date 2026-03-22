@@ -21,14 +21,19 @@ type ConversationActivity =
 
 export function resolvePersistedConversationActivity(params: {
     status: "idle" | "active" | "expired" | "errored";
+    activeRunId: string | null;
     lastEventAt: number | null;
     lastViewedAt: number | null;
 }): ConversationActivity {
     if (params.status === "active") {
-        return {
-            label: "Working",
-            tone: "working",
-        };
+        if (params.activeRunId !== null) {
+            return {
+                label: "Working",
+                tone: "working",
+            };
+        }
+
+        return null;
     }
 
     if (params.status === "errored") {
@@ -155,6 +160,7 @@ export const listByUser = query({
                     updatedAt: binding.updatedAt,
                     activity: resolvePersistedConversationActivity({
                         status: binding.status,
+                        activeRunId: binding.activeRunId,
                         lastEventAt: binding.lastEventAt,
                         lastViewedAt: chat.lastViewedAt ?? null,
                     }),
@@ -192,6 +198,7 @@ export const listAgentActivityCounts = query({
             };
             const activity = resolvePersistedConversationActivity({
                 status: binding.status,
+                activeRunId: binding.activeRunId,
                 lastEventAt: binding.lastEventAt,
                 lastViewedAt: chat.lastViewedAt ?? null,
             });
