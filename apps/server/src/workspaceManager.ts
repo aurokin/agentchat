@@ -5,9 +5,19 @@ import {
     realpathSync,
     readFileSync,
     readdirSync,
+    renameSync,
+    rmSync,
     writeFileSync,
 } from "node:fs";
-import { cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import {
+    cp,
+    mkdir,
+    readFile,
+    readdir,
+    rename,
+    rm,
+    writeFile,
+} from "node:fs/promises";
 import path from "node:path";
 
 import type { AgentchatConfig, AgentConfig } from "./config.ts";
@@ -34,6 +44,9 @@ const MANAGED_WORKSPACES_REGISTRY_NAME = "managed-workspaces.json";
 const SANDBOX_ROOT_REGISTRY_HEARTBEAT_MS = 60_000;
 const SANDBOX_ROOT_REGISTRY_INSTANCE_TTL_MS = 5 * 60_000;
 const RECENT_WORKSPACE_TOUCH_TTL_MS = 5 * 60_000;
+const FILE_LOCK_STALE_MS = 5_000;
+const FILE_LOCK_WAIT_MS = 5_000;
+const FILE_LOCK_POLL_MS = 10;
 
 type WorkspaceMetadata = {
     sourceRootPath: string;
@@ -57,6 +70,43 @@ function areSortedStringArraysEqual(left: string[], right: string[]): boolean {
         left.length === right.length &&
         left.every((value, index) => value === right[index])
     );
+}
+
+const syncSleepBuffer = new Int32Array(new SharedArrayBuffer(4));
+
+function sleepSync(ms: number): void {
+    try {
+        Atomics.wait(syncSleepBuffer, 0, 0, ms);
+    } catch {
+        const deadline = Date.now() + ms;
+        while (Date.now() < deadline) {
+            // Busy-wait fallback for runtimes without Atomics.wait.
+        }
+    }
+}
+
+function isAlreadyExistsError(error: unknown): boolean {
+    return (
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        (error as { code?: unknown }).code === "EEXIST"
+    );
+}
+
+function writeFileSyncAtomic(filePath: string, contents: string): void {
+    const tempPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+    writeFileSync(tempPath, contents, "utf8");
+    renameSync(tempPath, filePath);
+}
+
+async function writeFileAtomic(
+    filePath: string,
+    contents: string,
+): Promise<void> {
+    const tempPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+    await writeFile(tempPath, contents, "utf8");
+    await rename(tempPath, filePath);
 }
 
 export function getSandboxStateRootPath(sandboxRoot: string): string {
@@ -154,6 +204,103 @@ export class WorkspaceManager {
                         ),
                 ));
         this.syncSandboxRootsRegistry({ forceHeartbeat: true });
+    }
+
+    private getSandboxRootsRegistryLockPath(): string {
+        return `${this.getRootsRegistryPath()}.lock`;
+    }
+
+    private getManagedWorkspaceRegistryLockPath(sandboxRoot: string): string {
+        return `${getManagedWorkspacesRegistryPath(sandboxRoot)}.lock`;
+    }
+
+    private withFileLockSync<T>(lockPath: string, run: () => T): T {
+        mkdirSync(path.dirname(lockPath), { recursive: true });
+        const deadline = Date.now() + FILE_LOCK_WAIT_MS;
+
+        for (;;) {
+            try {
+                mkdirSync(lockPath);
+                break;
+            } catch (error) {
+                if (!isAlreadyExistsError(error)) {
+                    throw error;
+                }
+
+                try {
+                    if (
+                        Date.now() - lstatSync(lockPath).mtimeMs >=
+                        FILE_LOCK_STALE_MS
+                    ) {
+                        rmSync(lockPath, { force: true, recursive: true });
+                        continue;
+                    }
+                } catch {
+                    continue;
+                }
+
+                if (Date.now() >= deadline) {
+                    throw new Error(
+                        `Timed out acquiring file lock for ${lockPath}`,
+                    );
+                }
+
+                sleepSync(FILE_LOCK_POLL_MS);
+            }
+        }
+
+        try {
+            return run();
+        } finally {
+            rmSync(lockPath, { force: true, recursive: true });
+        }
+    }
+
+    private async withFileLock<T>(
+        lockPath: string,
+        run: () => Promise<T>,
+    ): Promise<T> {
+        await mkdir(path.dirname(lockPath), { recursive: true });
+        const deadline = Date.now() + FILE_LOCK_WAIT_MS;
+
+        for (;;) {
+            try {
+                await mkdir(lockPath);
+                break;
+            } catch (error) {
+                if (!isAlreadyExistsError(error)) {
+                    throw error;
+                }
+
+                try {
+                    if (
+                        Date.now() - lstatSync(lockPath).mtimeMs >=
+                        FILE_LOCK_STALE_MS
+                    ) {
+                        await rm(lockPath, { force: true, recursive: true });
+                        continue;
+                    }
+                } catch {
+                    continue;
+                }
+
+                if (Date.now() >= deadline) {
+                    throw new Error(
+                        `Timed out acquiring file lock for ${lockPath}`,
+                    );
+                }
+
+                await new Promise((resolve) =>
+                    setTimeout(resolve, FILE_LOCK_POLL_MS),
+                );
+            }
+        }
+
+        try {
+            return await run();
+        } finally {
+            await rm(lockPath, { force: true, recursive: true });
+        }
     }
 
     async ensureWorkspaceState(
@@ -709,10 +856,9 @@ export class WorkspaceManager {
     ): Promise<void> {
         const metadataPath = this.getWorkspaceMetadataPath(sandboxPath);
         await mkdir(path.dirname(metadataPath), { recursive: true });
-        await writeFile(
+        await writeFileAtomic(
             metadataPath,
             `${JSON.stringify(metadata, null, 2)}\n`,
-            "utf8",
         );
     }
 
@@ -844,14 +990,13 @@ export class WorkspaceManager {
             return;
         }
 
-        await writeFile(
+        await writeFileAtomic(
             registryPath,
             `${JSON.stringify(
                 [...registry].sort((left, right) => left.localeCompare(right)),
                 null,
                 2,
             )}\n`,
-            "utf8",
         );
     }
 
@@ -879,12 +1024,21 @@ export class WorkspaceManager {
 
         try {
             await previous.catch(() => undefined);
-            const registry =
-                await this.readManagedWorkspaceRegistry(workspacePathInfo);
-            mutate(registry);
-            await this.writeManagedWorkspaceRegistry(
-                workspacePathInfo,
-                registry,
+            await this.withFileLock(
+                this.getManagedWorkspaceRegistryLockPath(
+                    workspacePathInfo.sandboxRoot,
+                ),
+                async () => {
+                    const registry =
+                        await this.readManagedWorkspaceRegistry(
+                            workspacePathInfo,
+                        );
+                    mutate(registry);
+                    await this.writeManagedWorkspaceRegistry(
+                        workspacePathInfo,
+                        registry,
+                    );
+                },
             );
         } finally {
             releaseCurrentMutation();
@@ -917,82 +1071,114 @@ export class WorkspaceManager {
         return registry.roots;
     }
 
-    private syncSandboxRootsRegistry(params?: {
-        forceHeartbeat?: boolean;
-    }): SandboxRootsRegistry {
-        const now = Date.now();
-        const registry = this.readSandboxRootsRegistry();
-        let didMutateRegistry = false;
-        for (const [instanceKey, entry] of Object.entries(
-            registry.activeInstances,
-        )) {
-            if (entry.updatedAt < now - SANDBOX_ROOT_REGISTRY_INSTANCE_TTL_MS) {
-                delete registry.activeInstances[instanceKey];
-                didMutateRegistry = true;
-            }
-        }
-
-        const sandboxRoot = canonicalizePathForComparison(
-            this.getConfig().sandboxRoot,
-        );
-        const copyOnConversationAgentIds = this.getConfig()
-            .agents.filter(
-                (agent) => agent.workspaceMode === "copy-on-conversation",
-            )
-            .map((agent) => agent.id)
-            .sort((left, right) => left.localeCompare(right));
-        if (!registry.roots.includes(sandboxRoot)) {
-            registry.roots.push(sandboxRoot);
-            didMutateRegistry = true;
-        }
-
-        const instanceKey = this.getConfig().instanceKey;
-        if (
-            this.lastPublishedInstanceKey &&
-            this.lastPublishedInstanceKey !== instanceKey &&
-            registry.activeInstances[this.lastPublishedInstanceKey]
-        ) {
-            delete registry.activeInstances[this.lastPublishedInstanceKey];
-            didMutateRegistry = true;
-        }
-
-        const previousEntry = registry.activeInstances[instanceKey];
-        const shouldHeartbeat =
-            params?.forceHeartbeat === true ||
-            now - this.lastSandboxRootsRegistryHeartbeatAt >=
-                SANDBOX_ROOT_REGISTRY_HEARTBEAT_MS;
-        if (
-            !previousEntry ||
-            previousEntry.rootPath !== sandboxRoot ||
-            !areSortedStringArraysEqual(
-                previousEntry.copyOnConversationAgentIds,
-                copyOnConversationAgentIds,
-            ) ||
-            shouldHeartbeat
-        ) {
-            registry.activeInstances[instanceKey] = {
-                rootPath: sandboxRoot,
-                updatedAt: now,
-                copyOnConversationAgentIds,
-            };
-            didMutateRegistry = true;
-            this.lastSandboxRootsRegistryHeartbeatAt = now;
-        }
-
-        const normalizedRoots = [...new Set(registry.roots)]
+    private publishKnownSandboxRoots(roots: string[]): string[] {
+        const normalizedRoots = [...new Set(roots)]
             .map((rootPath) => canonicalizePathForComparison(rootPath))
             .sort((left, right) => left.localeCompare(right));
-        registry.roots = normalizedRoots;
         this.knownSandboxRoots.clear();
         for (const rootPath of normalizedRoots) {
             this.knownSandboxRoots.add(rootPath);
         }
+        return normalizedRoots;
+    }
 
-        if (didMutateRegistry) {
-            this.writeSandboxRootsRegistry(registry);
+    private syncSandboxRootsRegistry(params?: {
+        forceHeartbeat?: boolean;
+    }): SandboxRootsRegistry {
+        try {
+            return this.withFileLockSync(
+                this.getSandboxRootsRegistryLockPath(),
+                () => {
+                    const now = Date.now();
+                    const registry = this.readSandboxRootsRegistry();
+                    let didMutateRegistry = false;
+                    for (const [instanceKey, entry] of Object.entries(
+                        registry.activeInstances,
+                    )) {
+                        if (
+                            entry.updatedAt <
+                            now - SANDBOX_ROOT_REGISTRY_INSTANCE_TTL_MS
+                        ) {
+                            delete registry.activeInstances[instanceKey];
+                            didMutateRegistry = true;
+                        }
+                    }
+
+                    const sandboxRoot = canonicalizePathForComparison(
+                        this.getConfig().sandboxRoot,
+                    );
+                    const copyOnConversationAgentIds = this.getConfig()
+                        .agents.filter(
+                            (agent) =>
+                                agent.workspaceMode === "copy-on-conversation",
+                        )
+                        .map((agent) => agent.id)
+                        .sort((left, right) => left.localeCompare(right));
+                    if (!registry.roots.includes(sandboxRoot)) {
+                        registry.roots.push(sandboxRoot);
+                        didMutateRegistry = true;
+                    }
+
+                    const instanceKey = this.getConfig().instanceKey;
+                    if (
+                        this.lastPublishedInstanceKey &&
+                        this.lastPublishedInstanceKey !== instanceKey &&
+                        registry.activeInstances[this.lastPublishedInstanceKey]
+                    ) {
+                        delete registry.activeInstances[
+                            this.lastPublishedInstanceKey
+                        ];
+                        didMutateRegistry = true;
+                    }
+
+                    const previousEntry = registry.activeInstances[instanceKey];
+                    const shouldHeartbeat =
+                        params?.forceHeartbeat === true ||
+                        now - this.lastSandboxRootsRegistryHeartbeatAt >=
+                            SANDBOX_ROOT_REGISTRY_HEARTBEAT_MS;
+                    if (
+                        !previousEntry ||
+                        previousEntry.rootPath !== sandboxRoot ||
+                        !areSortedStringArraysEqual(
+                            previousEntry.copyOnConversationAgentIds,
+                            copyOnConversationAgentIds,
+                        ) ||
+                        shouldHeartbeat
+                    ) {
+                        registry.activeInstances[instanceKey] = {
+                            rootPath: sandboxRoot,
+                            updatedAt: now,
+                            copyOnConversationAgentIds,
+                        };
+                        didMutateRegistry = true;
+                        this.lastSandboxRootsRegistryHeartbeatAt = now;
+                    }
+
+                    registry.roots = this.publishKnownSandboxRoots(
+                        registry.roots,
+                    );
+                    if (didMutateRegistry) {
+                        this.writeSandboxRootsRegistry(registry);
+                    }
+                    this.lastPublishedInstanceKey = instanceKey;
+                    return registry;
+                },
+            );
+        } catch (error) {
+            console.error(
+                `[agentchat-server] failed to synchronize sandbox root registry:`,
+                error,
+            );
+            const sandboxRoot = canonicalizePathForComparison(
+                this.getConfig().sandboxRoot,
+            );
+            const registry = this.readSandboxRootsRegistry();
+            registry.roots = this.publishKnownSandboxRoots([
+                ...registry.roots,
+                sandboxRoot,
+            ]);
+            return registry;
         }
-        this.lastPublishedInstanceKey = instanceKey;
-        return registry;
     }
 
     private readSandboxRootsRegistry(): SandboxRootsRegistry {
@@ -1102,10 +1288,9 @@ export class WorkspaceManager {
             mkdirSync(path.dirname(rootsRegistryPath), {
                 recursive: true,
             });
-            writeFileSync(
+            writeFileSyncAtomic(
                 rootsRegistryPath,
                 `${JSON.stringify(registry, null, 2)}\n`,
-                "utf8",
             );
         } catch (error) {
             console.error(

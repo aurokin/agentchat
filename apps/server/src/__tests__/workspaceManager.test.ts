@@ -9,6 +9,7 @@ import {
     writeFileSync,
     readFileSync,
 } from "node:fs";
+import { spawn } from "node:child_process";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -209,6 +210,131 @@ describe("WorkspaceManager", () => {
         expect(releaseAManager.listCurrentSandboxRoots()).toEqual(
             expectedRoots,
         );
+    });
+
+    test("waits for the sandbox root registry lock before publishing instance state", async () => {
+        const rootsRegistryPath = path.join(
+            makeTempDir("sandbox-roots-registry"),
+            "sandbox-roots.json",
+        );
+        const lockPath = `${rootsRegistryPath}.lock`;
+        const releaseARoot = makeTempDir("sandbox-a");
+        const releaseBRoot = makeTempDir("sandbox-b");
+        const workspaceManagerModuleUrl = new URL(
+            "../workspaceManager.ts",
+            import.meta.url,
+        ).href;
+
+        mkdirSync(lockPath, { recursive: true });
+
+        const child = spawn(
+            "bun",
+            [
+                "-e",
+                `
+const { WorkspaceManager } = await import(${JSON.stringify(workspaceManagerModuleUrl)});
+const config = {
+    version: 1,
+    stateId: "shared-install",
+    instanceKey: "instance-b",
+    sandboxRoot: ${JSON.stringify(releaseBRoot)},
+    auth: {
+        defaultProviderId: "local-main",
+        providers: [{ id: "local-main", kind: "local", enabled: true, allowSignup: false }],
+    },
+    providers: [],
+    agents: [{
+        id: "copy-agent",
+        name: "Copy Agent",
+        enabled: true,
+        defaultVisible: true,
+        visibilityOverrides: [],
+        rootPath: "/tmp/placeholder",
+        providerIds: ["codex-main"],
+        defaultProviderId: "codex-main",
+        modelAllowlist: [],
+        variantAllowlist: [],
+        tags: [],
+        sortOrder: 0,
+        workspaceMode: "copy-on-conversation",
+    }],
+};
+new WorkspaceManager({
+    getConfig: () => config,
+    rootsRegistryPath: ${JSON.stringify(rootsRegistryPath)},
+});
+`,
+            ],
+            {
+                stdio: ["ignore", "pipe", "pipe"],
+            },
+        );
+
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        expect(child.exitCode).toBeNull();
+
+        writeFileSync(
+            rootsRegistryPath,
+            `${JSON.stringify(
+                {
+                    roots: [releaseARoot],
+                    activeInstances: {
+                        "instance-a": {
+                            rootPath: releaseARoot,
+                            updatedAt: Date.now(),
+                            copyOnConversationAgentIds: ["copy-agent"],
+                        },
+                    },
+                },
+                null,
+                2,
+            )}\n`,
+            "utf8",
+        );
+        rmSync(lockPath, { recursive: true, force: true });
+
+        const exitCode = await new Promise<number>((resolve, reject) => {
+            let stderr = "";
+            child.stderr?.on("data", (chunk) => {
+                stderr += chunk.toString();
+            });
+            child.on("error", reject);
+            child.on("exit", (code) => {
+                if (code === 0) {
+                    resolve(code);
+                    return;
+                }
+                reject(
+                    new Error(
+                        `child exited with code ${String(code)}${stderr ? `: ${stderr}` : ""}`,
+                    ),
+                );
+            });
+        });
+        expect(exitCode).toBe(0);
+
+        const registry = JSON.parse(
+            readFileSync(rootsRegistryPath, "utf8"),
+        ) as {
+            roots: string[];
+            activeInstances: Record<
+                string,
+                {
+                    rootPath: string;
+                }
+            >;
+        };
+        expect(
+            registry.roots.sort((left, right) => left.localeCompare(right)),
+        ).toEqual(
+            [releaseARoot, releaseBRoot].sort((left, right) =>
+                left.localeCompare(right),
+            ),
+        );
+        expect(Object.keys(registry.activeInstances).sort()).toEqual([
+            "instance-a",
+            "instance-b",
+        ]);
     });
 
     test("refreshes the sandbox root heartbeat for idle instances", async () => {
@@ -641,6 +767,74 @@ describe("WorkspaceManager", () => {
 
             const registry =
                 await managerInternals.readManagedWorkspaceRegistry({
+                    sandboxRoot,
+                });
+            expect(
+                [...registry].sort((left, right) => left.localeCompare(right)),
+            ).toEqual(
+                [workspacePathA, workspacePathB].sort((left, right) =>
+                    left.localeCompare(right),
+                ),
+            );
+        });
+
+        test("serializes managed workspace registry updates across manager instances", async () => {
+            const sandboxRoot = makeTempDir("sandbox");
+            const config = makeConfig({ sandboxRoot });
+            const managerA = createWorkspaceManager(() => config);
+            const managerB = createWorkspaceManager(() => config);
+            const workspacePathA = managerA.getWorkspacePath(
+                "test-agent",
+                "user-1",
+                "conv-1",
+            );
+            const workspacePathB = managerB.getWorkspacePath(
+                "test-agent",
+                "user-1",
+                "conv-2",
+            );
+            const gate = createDeferred<void>();
+            let firstWriteStarted = false;
+
+            const managerAInternals = managerA as unknown as {
+                recordManagedWorkspace: (sandboxPath: string) => Promise<void>;
+                readManagedWorkspaceRegistry: (workspacePathInfo: {
+                    sandboxRoot: string;
+                }) => Promise<Set<string>>;
+                writeManagedWorkspaceRegistry: (
+                    workspacePathInfo: {
+                        sandboxRoot: string;
+                    },
+                    registry: Set<string>,
+                ) => Promise<void>;
+            };
+            const managerBInternals = managerB as unknown as {
+                recordManagedWorkspace: (sandboxPath: string) => Promise<void>;
+            };
+
+            const originalWriteRegistry =
+                managerAInternals.writeManagedWorkspaceRegistry.bind(managerA);
+            managerAInternals.writeManagedWorkspaceRegistry = async (
+                workspacePathInfo,
+                registry,
+            ) => {
+                if (!firstWriteStarted) {
+                    firstWriteStarted = true;
+                    await gate.promise;
+                }
+                await originalWriteRegistry(workspacePathInfo, registry);
+            };
+
+            const firstRecord =
+                managerAInternals.recordManagedWorkspace(workspacePathA);
+            await waitFor(() => firstWriteStarted);
+            const secondRecord =
+                managerBInternals.recordManagedWorkspace(workspacePathB);
+            gate.resolve();
+            await Promise.all([firstRecord, secondRecord]);
+
+            const registry =
+                await managerAInternals.readManagedWorkspaceRegistry({
                     sandboxRoot,
                 });
             expect(

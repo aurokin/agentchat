@@ -238,6 +238,23 @@ export abstract class ConvexAdapterBase implements PersistenceAdapter {
             : this.messageIdMap.get(message.id);
 
         if (!convexId) {
+            const existingByLocalId = await this.services.messages.getByLocalId(
+                {
+                    userId: this.userId,
+                    localId: message.id,
+                },
+            );
+            if (existingByLocalId) {
+                convexId = existingByLocalId._id;
+                this.cacheMessageId(
+                    message.id,
+                    convexId,
+                    existingByLocalId.chatId,
+                );
+            }
+        }
+
+        if (!convexId) {
             if (!cachedChatId) {
                 throw new Error(
                     `Message not found or ambiguous: ${message.id}`,
@@ -294,7 +311,12 @@ export abstract class ConvexAdapterBase implements PersistenceAdapter {
         let convexId = this.messageIdMap.get(id);
 
         if (!convexId) {
-            return;
+            const existing = await this.services.messages.getByLocalId({
+                userId: this.userId,
+                localId: id,
+            });
+            if (!existing) return;
+            convexId = existing._id;
         }
 
         await this.services.messages.remove({ id: convexId });

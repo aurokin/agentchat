@@ -107,7 +107,32 @@ function createAdapter(params: {
         },
         messages: {
             create: async () => "unused",
-            getByLocalId: async () => null,
+            getByLocalId: async ({ localId }) => {
+                const matches = Object.entries(params.messagesByChatId)
+                    .flatMap(([chatId, messages]) =>
+                        messages.map((message) => ({ chatId, message })),
+                    )
+                    .filter(
+                        ({ message }) =>
+                            (message.id ?? message.convexId) === localId,
+                    );
+                if (matches.length !== 1) {
+                    return null;
+                }
+                const match = matches[0]!;
+                return {
+                    _id:
+                        match.message.convexId ??
+                        `${match.chatId}:${match.message.id}`,
+                    localId: match.message.id,
+                    chatId: match.chatId,
+                    role: match.message.role,
+                    kind: match.message.kind,
+                    content: match.message.content,
+                    contextContent: match.message.contextContent,
+                    createdAt: match.message.createdAt,
+                };
+            },
             listByChat: async ({ chatId }) =>
                 (params.messagesByChatId[chatId] ?? []).map((message) => ({
                     _id: message.convexId ?? `${chatId}:${message.id}`,
@@ -235,6 +260,33 @@ describe("ConvexAdapterBase", () => {
         expect(remove).not.toHaveBeenCalled();
     });
 
+    test("deleteMessage looks up the backing message id on a cold start", async () => {
+        const { adapter, remove } = createAdapter({
+            chats: [
+                createChat({
+                    id: "chat-1",
+                    convexId: "chats:agent-a",
+                    agentId: "agent-a",
+                }),
+            ],
+            messagesByChatId: {
+                "chats:agent-a": [
+                    createMessage({
+                        id: "message-1",
+                        sessionId: "chat-1",
+                        content: "A",
+                    }),
+                ],
+            },
+        });
+
+        await adapter.deleteMessage("message-1");
+
+        expect(remove).toHaveBeenCalledWith({
+            id: "chats:agent-a:message-1",
+        });
+    });
+
     test("updateMessage does not suffix-match cached chat ids containing colons", async () => {
         const { adapter, update } = createAdapter({
             chats: [
@@ -283,6 +335,44 @@ describe("ConvexAdapterBase", () => {
 
         expect(update).toHaveBeenCalledWith({
             id: "chats:plain:message-1",
+            message: createMessage({
+                id: "message-1",
+                sessionId: "chat-1",
+                content: "updated",
+            }),
+        });
+    });
+
+    test("updateMessage looks up the backing message id on a cold start", async () => {
+        const { adapter, update } = createAdapter({
+            chats: [
+                createChat({
+                    id: "chat-1",
+                    convexId: "chats:agent-a",
+                    agentId: "agent-a",
+                }),
+            ],
+            messagesByChatId: {
+                "chats:agent-a": [
+                    createMessage({
+                        id: "message-1",
+                        sessionId: "chat-1",
+                        content: "A",
+                    }),
+                ],
+            },
+        });
+
+        await adapter.updateMessage(
+            createMessage({
+                id: "message-1",
+                sessionId: "chat-1",
+                content: "updated",
+            }),
+        );
+
+        expect(update).toHaveBeenCalledWith({
+            id: "chats:agent-a:message-1",
             message: createMessage({
                 id: "message-1",
                 sessionId: "chat-1",
