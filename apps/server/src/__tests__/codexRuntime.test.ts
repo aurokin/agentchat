@@ -2439,6 +2439,43 @@ describe("CodexRuntimeManager", () => {
         ]);
     });
 
+    test("conversation delete skips sandbox cleanup for shared-mode agents with unsafe ids", async () => {
+        const sandboxRoot = makeTempDir("sandbox");
+        const agentRoot = makeTempDir("agent-root");
+        const config = createConfig();
+        config.sandboxRoot = sandboxRoot;
+        config.agents[0] = {
+            ...config.agents[0]!,
+            id: "team/frontend",
+            rootPath: agentRoot,
+            workspaceMode: "shared",
+        };
+
+        const workspaceManager = createWorkspaceManager(() => config);
+        const persistence = createPersistence(null);
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            workspaceManager,
+        });
+
+        await expect(
+            manager.deleteConversationWorkspace({
+                userId: "user-1",
+                conversationId: "chat-1",
+                agentId: "team/frontend",
+            }),
+        ).resolves.toBeUndefined();
+
+        expect(persistence.chatExistsCalls).toEqual([
+            {
+                userId: "user-1",
+                agentId: "team/frontend",
+                localId: "chat-1",
+            },
+        ]);
+    });
+
     test("cancels pending runtime initialization when the conversation is deleted", async () => {
         const sandboxRoot = makeTempDir("sandbox");
         const agentRoot = makeTempDir("agent-root");

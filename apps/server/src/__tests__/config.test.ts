@@ -170,6 +170,31 @@ describe("server config", () => {
         );
     });
 
+    test("separates default state ids for installs with different Convex deployments", () => {
+        const originalSiteUrl = process.env.AGENTCHAT_CONVEX_SITE_URL;
+        const baseConfig = JSON.parse(
+            readFileSync(exampleConfigPath, "utf8"),
+        ) as Record<string, unknown>;
+
+        try {
+            process.env.AGENTCHAT_CONVEX_SITE_URL =
+                "https://staging-agentchat.convex.site/";
+            const stagingStateId = parseConfig(baseConfig).stateId;
+
+            process.env.AGENTCHAT_CONVEX_SITE_URL =
+                "https://prod-agentchat.convex.site";
+            const productionStateId = parseConfig(baseConfig).stateId;
+
+            expect(stagingStateId).not.toBe(productionStateId);
+        } finally {
+            if (originalSiteUrl === undefined) {
+                delete process.env.AGENTCHAT_CONVEX_SITE_URL;
+            } else {
+                process.env.AGENTCHAT_CONVEX_SITE_URL = originalSiteUrl;
+            }
+        }
+    });
+
     test("rejects unsupported auth.mode configs", () => {
         expect(() =>
             parseConfig({

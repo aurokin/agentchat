@@ -1171,6 +1171,22 @@ describe("WorkspaceManager", () => {
             expect(existsSync(outsideDir)).toBe(true);
         });
 
+        test("is a no-op for configured shared-mode agents with unsafe ids", async () => {
+            const sandboxRoot = makeTempDir("sandbox");
+            const agent = makeAgent({
+                id: "team/frontend",
+                rootPath: makeTempDir("agent-root"),
+                workspaceMode: "shared",
+            });
+            const manager = createWorkspaceManager(() =>
+                makeConfig({ sandboxRoot, agents: [agent] }),
+            );
+
+            await expect(
+                manager.deleteWorkspace("team/frontend", "user-1", "conv-1"),
+            ).resolves.toBeUndefined();
+        });
+
         test("refuses to delete agent rootPath", async () => {
             const sandboxRoot = makeTempDir("sandbox");
 
@@ -1220,6 +1236,25 @@ describe("WorkspaceManager", () => {
             await manager.deleteWorkspace(agentId, userId, convId);
 
             expect(existsSync(nestedRoot)).toBe(true);
+        });
+
+        test("is a no-op for shared-mode agents with unsafe ids", async () => {
+            const sandboxRoot = makeTempDir("sandbox");
+            const manager = createWorkspaceManager(() =>
+                makeConfig({
+                    sandboxRoot,
+                    agents: [
+                        makeAgent({
+                            id: "team/frontend",
+                            workspaceMode: "shared",
+                        }),
+                    ],
+                }),
+            );
+
+            await expect(
+                manager.deleteWorkspace("team/frontend", "user-1", "conv-1"),
+            ).resolves.toBeUndefined();
         });
 
         test("refuses to delete workspaces through symlinked ancestors", async () => {

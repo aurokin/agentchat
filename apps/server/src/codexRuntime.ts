@@ -21,6 +21,7 @@ import type {
 import {
     getSandboxConversationPathSegment,
     getSandboxUserPathSegment,
+    isSafePathSegment,
 } from "./sandboxPaths.ts";
 import type { WorkspaceManager } from "./workspaceManager.ts";
 import { getWorkspaceActiveKeyFromSegments } from "./workspaceManager.ts";
@@ -633,8 +634,17 @@ export class CodexRuntimeManager {
             }
         }
 
+        const configuredAgent = this.getConfig().agents.find(
+            (agent) => agent.id === params.agentId,
+        );
+        const shouldDeleteCopiedWorkspace =
+            runtime?.agent?.workspaceMode === "copy-on-conversation" ||
+            configuredAgent?.workspaceMode === "copy-on-conversation" ||
+            (configuredAgent === undefined &&
+                isSafePathSegment(params.agentId));
+
         // Delete the sandbox workspace if workspace manager is configured
-        if (this.workspaceManager) {
+        if (this.workspaceManager && shouldDeleteCopiedWorkspace) {
             await this.workspaceManager.deleteWorkspace(
                 params.agentId,
                 params.userId,

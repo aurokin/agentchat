@@ -254,12 +254,21 @@ export function resolveDefaultConfigPath(): string {
 
 const DEFAULT_SANDBOX_ROOT = path.join(os.homedir(), ".agentchat", "sandboxes");
 
+function getDefaultStateRuntimeBackendIdentity(): string | null {
+    const siteUrl = process.env.AGENTCHAT_CONVEX_SITE_URL?.trim();
+    if (!siteUrl) {
+        return null;
+    }
+    return siteUrl.replace(/\/+$/, "");
+}
+
 function buildDefaultStateIdSeed(
     parsed: z.infer<typeof AgentchatConfigInputSchema>,
     auth: AuthConfig,
 ): string {
     return JSON.stringify({
         version: parsed.version,
+        runtimeBackendIdentity: getDefaultStateRuntimeBackendIdentity(),
         auth,
         providers: parsed.providers.map((provider) => ({
             id: provider.id,

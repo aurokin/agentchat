@@ -319,6 +319,13 @@ export class WorkspaceManager {
         userId: string,
         conversationId: string,
     ): Promise<void> {
+        const configuredAgent = this.getConfig().agents.find(
+            (agent) => agent.id === agentId,
+        );
+        if (configuredAgent?.workspaceMode === "shared") {
+            return;
+        }
+
         this.syncSandboxRootsRegistry();
         for (const sandboxRoot of this.getKnownSandboxRoots()) {
             const target = this.sandboxPathForRoot(
