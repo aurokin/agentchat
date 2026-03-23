@@ -1932,9 +1932,8 @@ new WorkspaceManager({
                 "user-1",
                 "conv-1",
             );
-            const workspaceMetadataDir = getWorkspaceMetadataRootPath(
-                sandboxRoot,
-            );
+            const workspaceMetadataDir =
+                getWorkspaceMetadataRootPath(sandboxRoot);
             const metadataFile =
                 readdirSync(workspaceMetadataDir).find((entry) =>
                     entry.endsWith(".json"),

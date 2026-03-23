@@ -1318,52 +1318,55 @@ export class CodexRuntimeManager {
             return;
         }
 
-        await this.persistence.recoverStaleRun({
-            chatId: persistedState.chatId,
-            userId: params.userId,
-            agentId: params.agentId,
-            conversationLocalId: params.conversationId,
-            externalRunId: persistedBinding.activeRunId,
-            completedAt: Date.now(),
-            errorMessage:
-                "This run was orphaned after the runtime disconnected before completion.",
-            workspaceMode: persistedBinding.workspaceMode,
-            workspaceRootPath: persistedBinding.workspaceRootPath,
-            workspaceCwd: persistedBinding.workspaceCwd,
-        }).catch(async (error) => {
-            console.error(
-                "[agentchat-server] failed to recover orphaned active run; clearing stale binding",
-                error,
-            );
-            try {
-                await this.persistence.runtimeBinding({
-                    chatId: persistedState.chatId,
-                    userId: params.userId,
-                    agentId: params.agentId,
-                    conversationLocalId: params.conversationId,
-                    provider: persistedBinding.provider,
-                    status: "errored",
-                    providerThreadId: persistedBinding.providerThreadId,
-                    providerResumeToken: persistedBinding.providerResumeToken,
-                    activeRunId: null,
-                    lastError:
-                        error instanceof Error
-                            ? error.message
-                            : "Failed to recover orphaned active run.",
-                    lastEventAt: Date.now(),
-                    expiresAt: null,
-                    workspaceMode: persistedBinding.workspaceMode,
-                    workspaceRootPath: persistedBinding.workspaceRootPath,
-                    workspaceCwd: persistedBinding.workspaceCwd,
-                    updatedAt: Date.now(),
-                });
-            } catch (bindingError) {
+        await this.persistence
+            .recoverStaleRun({
+                chatId: persistedState.chatId,
+                userId: params.userId,
+                agentId: params.agentId,
+                conversationLocalId: params.conversationId,
+                externalRunId: persistedBinding.activeRunId,
+                completedAt: Date.now(),
+                errorMessage:
+                    "This run was orphaned after the runtime disconnected before completion.",
+                workspaceMode: persistedBinding.workspaceMode,
+                workspaceRootPath: persistedBinding.workspaceRootPath,
+                workspaceCwd: persistedBinding.workspaceCwd,
+            })
+            .catch(async (error) => {
                 console.error(
-                    "[agentchat-server] failed to clear stale orphaned binding",
-                    bindingError,
+                    "[agentchat-server] failed to recover orphaned active run; clearing stale binding",
+                    error,
                 );
-            }
-        });
+                try {
+                    await this.persistence.runtimeBinding({
+                        chatId: persistedState.chatId,
+                        userId: params.userId,
+                        agentId: params.agentId,
+                        conversationLocalId: params.conversationId,
+                        provider: persistedBinding.provider,
+                        status: "errored",
+                        providerThreadId: persistedBinding.providerThreadId,
+                        providerResumeToken:
+                            persistedBinding.providerResumeToken,
+                        activeRunId: null,
+                        lastError:
+                            error instanceof Error
+                                ? error.message
+                                : "Failed to recover orphaned active run.",
+                        lastEventAt: Date.now(),
+                        expiresAt: null,
+                        workspaceMode: persistedBinding.workspaceMode,
+                        workspaceRootPath: persistedBinding.workspaceRootPath,
+                        workspaceCwd: persistedBinding.workspaceCwd,
+                        updatedAt: Date.now(),
+                    });
+                } catch (bindingError) {
+                    console.error(
+                        "[agentchat-server] failed to clear stale orphaned binding",
+                        bindingError,
+                    );
+                }
+            });
     }
 
     private emitToSubscribers(

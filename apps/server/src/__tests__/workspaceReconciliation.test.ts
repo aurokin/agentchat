@@ -203,6 +203,30 @@ describe("workspace reconciliation", () => {
         );
     });
 
+    test("does not preserve copied sandboxes after an agent flips to shared", () => {
+        expect(
+            getPersistedWorkspaceActiveKeys(
+                [
+                    {
+                        agentId: "copy-agent",
+                        userId: "user-1",
+                        localId: "chat-1",
+                    },
+                ],
+                {
+                    copyOnConversationAgentIds: new Set(),
+                    currentCopyOnConversationSandboxRootsByAgent: {},
+                    configuredAgentIds: new Set(["copy-agent"]),
+                    currentSandboxRoots: ["/tmp/current-sandbox"],
+                    knownSandboxRoots: [
+                        "/tmp/current-sandbox",
+                        "/tmp/old-sandbox",
+                    ],
+                },
+            ),
+        ).toEqual(new Set());
+    });
+
     test("preserves current copied sandboxes for missing agents that remain active on another release", () => {
         expect(
             getPersistedWorkspaceActiveKeys(

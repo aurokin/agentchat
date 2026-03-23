@@ -634,9 +634,8 @@ export class WorkspaceManager {
                             continue;
                         }
 
-                        const metadata = await this.readWorkspaceMetadata(
-                            target,
-                        );
+                        const metadata =
+                            await this.readWorkspaceMetadata(target);
                         if (metadata?.state === "creating") {
                             continue;
                         }

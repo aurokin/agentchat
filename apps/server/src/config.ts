@@ -207,10 +207,7 @@ const AgentchatConfigInputSchema = z
             }
 
             const resolvedRootPath = path.resolve(agent.rootPath);
-            if (
-                agent.workspaceMode === "copy-on-conversation" &&
-                pathsOverlap(resolvedSandboxRoot, resolvedRootPath)
-            ) {
+            if (pathsOverlap(resolvedSandboxRoot, resolvedRootPath)) {
                 const effectiveSandboxRoot =
                     config.sandboxRoot ?? DEFAULT_SANDBOX_ROOT;
                 ctx.addIssue({

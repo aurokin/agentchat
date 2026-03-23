@@ -889,7 +889,9 @@ describe("CodexRuntimeManager", () => {
             workspaceRootPath: config.agents[0]!.rootPath,
             workspaceCwd: config.agents[0]!.rootPath,
         });
-        persistence.recoverStaleRun = async (payload: Record<string, unknown>) => {
+        persistence.recoverStaleRun = async (
+            payload: Record<string, unknown>,
+        ) => {
             persistence.recoverStaleRunCalls.push(payload);
             throw new Error("Run not found");
         };
