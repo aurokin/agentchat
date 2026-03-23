@@ -86,7 +86,7 @@ describe("workspace reconciliation", () => {
         ]);
     });
 
-    test("preserves missing-agent workspaces only across older known sandbox roots", () => {
+    test("preserves missing-agent workspaces across known roots when agent-specific liveness is unavailable", () => {
         expect(
             getPersistedWorkspaceActiveKeys(
                 [
@@ -121,6 +121,12 @@ describe("workspace reconciliation", () => {
                     agentId: "copy-agent",
                     userId: "user-1",
                     conversationId: "chat-1",
+                }),
+                getWorkspaceActiveKey({
+                    sandboxRoot: "/tmp/current-sandbox",
+                    agentId: "missing-agent",
+                    userId: "user-1",
+                    conversationId: "chat-2",
                 }),
                 getWorkspaceActiveKey({
                     sandboxRoot: "/tmp/old-sandbox",

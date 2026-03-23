@@ -39,7 +39,6 @@ export function getPersistedWorkspaceActiveKeys(
     },
 ): Set<string> {
     const activeKeys = new Set<string>();
-    const currentSandboxRoots = new Set(params.currentSandboxRoots);
     for (const entry of entries) {
         const activeCopyOnConversationSandboxRoots =
             params.currentCopyOnConversationSandboxRootsByAgent[
@@ -52,10 +51,7 @@ export function getPersistedWorkspaceActiveKeys(
                   ? params.knownSandboxRoots
                   : params.configuredAgentIds.has(entry.agentId)
                     ? []
-                    : params.knownSandboxRoots.filter(
-                          (sandboxRoot) =>
-                              !currentSandboxRoots.has(sandboxRoot),
-                      );
+                    : params.knownSandboxRoots;
         for (const sandboxRoot of sandboxRoots) {
             activeKeys.add(
                 getWorkspaceActiveKey({

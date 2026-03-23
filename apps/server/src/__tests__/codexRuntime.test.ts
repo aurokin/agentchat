@@ -2706,6 +2706,57 @@ describe("CodexRuntimeManager", () => {
         expect(existsSync(workspacePath)).toBe(false);
     });
 
+    test("conversation delete removes copied workspaces from inactive old sandbox roots after sandboxRoot migration", async () => {
+        const firstSandboxRoot = makeTempDir("sandbox-a");
+        const secondSandboxRoot = makeTempDir("sandbox-b");
+        const rootsRegistryPath = path.join(
+            makeTempDir("sandbox-roots-registry"),
+            "sandbox-roots.json",
+        );
+        const agentRoot = makeTempDir("agent-root");
+        writeFileSync(path.join(agentRoot, "version.txt"), "first");
+
+        const config = createConfig();
+        config.sandboxRoot = firstSandboxRoot;
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath: agentRoot,
+            workspaceMode: "copy-on-conversation",
+        };
+
+        const firstWorkspaceManager = new WorkspaceManager({
+            getConfig: () => config,
+            rootsRegistryPath,
+        });
+        const persistence = createPersistence(null);
+        const workspacePath = await firstWorkspaceManager.ensureWorkspace(
+            config.agents[0]!,
+            "user-1",
+            "chat-1",
+        );
+
+        config.sandboxRoot = secondSandboxRoot;
+        const migratedWorkspaceManager = new WorkspaceManager({
+            getConfig: () => config,
+            rootsRegistryPath,
+        });
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            workspaceManager: migratedWorkspaceManager,
+        });
+
+        expect(existsSync(workspacePath)).toBe(true);
+
+        await manager.deleteConversationWorkspace({
+            userId: "user-1",
+            conversationId: "chat-1",
+            agentId: "agent-1",
+        });
+
+        expect(existsSync(workspacePath)).toBe(false);
+    });
+
     test("cancels pending runtime initialization when the conversation is deleted", async () => {
         const sandboxRoot = makeTempDir("sandbox");
         const agentRoot = makeTempDir("agent-root");

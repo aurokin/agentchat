@@ -664,11 +664,21 @@ export class CodexRuntimeManager {
 
         // Delete the sandbox workspace if workspace manager is configured
         if (this.workspaceManager && shouldDeleteCopiedWorkspace) {
+            const currentSandboxRoots = new Set(
+                this.workspaceManager.listCurrentSandboxRoots(),
+            );
+            const inactiveKnownSandboxRoots = this.workspaceManager
+                .listKnownSandboxRoots()
+                .filter((sandboxRoot) => !currentSandboxRoots.has(sandboxRoot));
             await this.workspaceManager.deleteWorkspace(
                 params.agentId,
                 params.userId,
                 params.conversationId,
                 {
+                    sandboxRoots: [
+                        this.getConfig().sandboxRoot,
+                        ...inactiveKnownSandboxRoots,
+                    ],
                     force:
                         runtime?.agent?.workspaceMode ===
                             "copy-on-conversation" &&
