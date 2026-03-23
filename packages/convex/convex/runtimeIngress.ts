@@ -250,7 +250,7 @@ async function upsertRuntimeBinding(
     };
 
     if (existing) {
-        if (existing.updatedAt > args.updatedAt) {
+        if (existing.updatedAt >= args.updatedAt) {
             return;
         }
         await ctx.db.patch(existing._id, payload);
@@ -283,7 +283,7 @@ async function updateAssistantMessage(
     if (!message) {
         throw new Error("Assistant message not found");
     }
-    if (message.updatedAt > args.updatedAt) {
+    if (message.updatedAt >= args.updatedAt) {
         return message;
     }
 
@@ -332,7 +332,7 @@ async function createAssistantMessage(
         localId: args.localId,
     });
     if (existing) {
-        if (existing.updatedAt > args.createdAt) {
+        if (existing.updatedAt >= args.createdAt) {
             return existing;
         }
         await ctx.db.patch(existing._id, {
@@ -408,7 +408,7 @@ async function upsertStreamingAssistantMessage(
         localId: args.localId,
     });
     if (existing) {
-        if (existing.updatedAt > args.updatedAt) {
+        if (existing.updatedAt >= args.updatedAt) {
             return existing;
         }
         const kind = args.kind ?? existing.kind ?? args.defaultKind;
@@ -666,7 +666,7 @@ export const messageStarted = internalMutation({
         if (!previousAssistantMessage) {
             throw new Error("Assistant message not found");
         }
-        if (previousAssistantMessage.updatedAt > args.createdAt) {
+        if (previousAssistantMessage.updatedAt >= args.createdAt) {
             return;
         }
 
@@ -944,7 +944,7 @@ async function finalizeRun(
     if (!currentAssistantMessage) {
         throw new Error("Assistant message not found");
     }
-    if (currentAssistantMessage.updatedAt > args.completedAt) {
+    if (currentAssistantMessage.updatedAt >= args.completedAt) {
         return;
     }
 

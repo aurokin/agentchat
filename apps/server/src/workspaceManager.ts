@@ -44,6 +44,7 @@ const MANAGED_WORKSPACES_REGISTRY_NAME = "managed-workspaces.json";
 const SANDBOX_ROOT_REGISTRY_HEARTBEAT_MS = 60_000;
 const SANDBOX_ROOT_REGISTRY_INSTANCE_TTL_MS = 5 * 60_000;
 const RECENT_WORKSPACE_TOUCH_TTL_MS = 5 * 60_000;
+const STALE_CREATING_WORKSPACE_TTL_MS = 30 * 60_000;
 const FILE_LOCK_STALE_MS = 5_000;
 const FILE_LOCK_WAIT_MS = 5_000;
 const FILE_LOCK_POLL_MS = 10;
@@ -637,7 +638,14 @@ export class WorkspaceManager {
                         const metadata =
                             await this.readWorkspaceMetadata(target);
                         if (metadata?.state === "creating") {
-                            continue;
+                            if (
+                                !this.isWorkspaceCreationStale(
+                                    target,
+                                    reconcileStartedAt,
+                                )
+                            ) {
+                                continue;
+                            }
                         }
 
                         await this.deleteWorkspacePathBySegments({
@@ -672,6 +680,39 @@ export class WorkspaceManager {
                 this.recentWorkspaceTouches.delete(key);
             }
         }
+    }
+
+    private isWorkspaceCreationStale(
+        sandboxPath: string,
+        reconcileStartedAt: number,
+    ): boolean {
+        const staleThreshold =
+            reconcileStartedAt - STALE_CREATING_WORKSPACE_TTL_MS;
+        return (
+            this.getWorkspaceCreationLastTouchedAt(sandboxPath) < staleThreshold
+        );
+    }
+
+    private getWorkspaceCreationLastTouchedAt(sandboxPath: string): number {
+        let latestTouchedAt = 0;
+        const candidatePaths = [
+            sandboxPath,
+            this.getWorkspaceMetadataPath(sandboxPath),
+        ];
+
+        for (const candidatePath of candidatePaths) {
+            try {
+                latestTouchedAt = Math.max(
+                    latestTouchedAt,
+                    lstatSync(candidatePath).mtimeMs,
+                );
+            } catch {
+                // Ignore missing paths and fall back to the latest available
+                // on-disk timestamp.
+            }
+        }
+
+        return latestTouchedAt;
     }
 
     hasManagedWorkspaces(): boolean {

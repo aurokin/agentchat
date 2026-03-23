@@ -19,7 +19,7 @@ import {
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { resolveConversationActivityState } from "@shared/core/conversation-activity";
-import { useChatContext } from "@/contexts/ChatContext";
+import { useChatContext, type ScopedChatTarget } from "@/contexts/ChatContext";
 import { useAppContext } from "@/contexts/AppContext";
 import { useTheme, type ThemeColors } from "@/contexts/ThemeContext";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -181,19 +181,22 @@ export default function HomeScreen(): React.ReactElement {
                 getScopedChatStateKey(chat.id, chat.agentId),
             ),
         );
-        const chatIds = selectedChats.map((chat) => chat.id);
-        const hasMessages = await hasMessagesInChats(chatIds);
+        const chatTargets: ScopedChatTarget[] = selectedChats.map((chat) => ({
+            chatId: chat.id,
+            agentId: chat.agentId,
+        }));
+        const hasMessages = await hasMessagesInChats(chatTargets);
 
         const performDelete = async () => {
-            await deleteChats(chatIds);
+            await deleteChats(chatTargets);
             clearSelection();
         };
 
         if (hasMessages) {
             Alert.alert(
                 "Delete Chats",
-                `Delete ${chatIds.length} ${
-                    chatIds.length === 1 ? "chat" : "chats"
+                `Delete ${chatTargets.length} ${
+                    chatTargets.length === 1 ? "chat" : "chats"
                 }?`,
                 [
                     { text: "Cancel", style: "cancel" },

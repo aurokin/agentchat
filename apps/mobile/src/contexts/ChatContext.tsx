@@ -45,6 +45,11 @@ import {
     getScopedChatStateKey,
 } from "@/contexts/chat-state";
 
+export type ScopedChatTarget = {
+    chatId: string;
+    agentId: string;
+};
+
 interface ChatContextValue {
     chats: ChatSession[];
     currentChat: ChatSession | null;
@@ -63,11 +68,11 @@ interface ChatContextValue {
     loadChats: () => Promise<void>;
     createChat: (title?: string, modelId?: string) => Promise<ChatSession>;
     selectChat: (chatId: string) => Promise<void>;
-    deleteChat: (chatId: string) => Promise<void>;
-    deleteChats: (chatIds: string[]) => Promise<void>;
+    deleteChat: (chatId: string, agentId?: string) => Promise<void>;
+    deleteChats: (targets: ScopedChatTarget[]) => Promise<void>;
     updateChat: (chat: ChatSession) => Promise<void>;
     loadMessages: (chatId: string, agentId: string) => Promise<void>;
-    hasMessagesInChats: (chatIds: string[]) => Promise<boolean>;
+    hasMessagesInChats: (targets: ScopedChatTarget[]) => Promise<boolean>;
     addMessage: (
         message: Omit<Message, "createdAt" | "id"> & { id?: string },
     ) => Promise<Message>;
@@ -578,13 +583,20 @@ export function ChatProvider({
     );
 
     const deleteChat = useCallback(
-        async (chatId: string) => {
+        async (chatId: string, agentId?: string) => {
             const deletedChat =
                 chats.find(
-                    (c) => c.id === chatId && c.agentId === selectedAgentId,
+                    (c) =>
+                        c.id === chatId &&
+                        c.agentId ===
+                            (agentId ??
+                                selectedAgentId ??
+                                currentChat?.agentId ??
+                                null),
                 ) ?? null;
             const deletedChatAgentId =
                 deletedChat?.agentId ??
+                agentId ??
                 selectedAgentId ??
                 currentChat?.agentId ??
                 null;
@@ -642,42 +654,39 @@ export function ChatProvider({
     );
 
     const deleteChats = useCallback(
-        async (chatIds: string[]) => {
-            if (chatIds.length === 0) return;
+        async (targets: ScopedChatTarget[]) => {
+            if (targets.length === 0) return;
 
             const socketClient = getSharedAgentchatSocketClient();
-            for (const chatId of chatIds) {
-                const chat = chats.find((c) => c.id === chatId) ?? null;
-                const chatAgentId = chat?.agentId ?? selectedAgentId ?? null;
-                if (!chatAgentId) {
-                    continue;
-                }
+            for (const target of targets) {
+                const chat =
+                    chats.find(
+                        (candidate) =>
+                            getScopedChatStateKey(
+                                candidate.id,
+                                candidate.agentId,
+                            ) ===
+                            getScopedChatStateKey(
+                                target.chatId,
+                                target.agentId,
+                            ),
+                    ) ?? null;
                 const deletedChatId = await adapter.deleteChat(
-                    chatId,
-                    chatAgentId,
+                    target.chatId,
+                    target.agentId,
                 );
-                if (chat) {
-                    void socketClient.notifyConversationDeleted(
-                        chatId,
-                        chat.agentId,
-                        getBackendSessionToken,
-                        deletedChatId ?? undefined,
-                    );
-                }
+                void socketClient.notifyConversationDeleted(
+                    target.chatId,
+                    chat?.agentId ?? target.agentId,
+                    getBackendSessionToken,
+                    deletedChatId ?? undefined,
+                );
             }
 
             const chatScopeKeys = new Set(
-                chatIds
-                    .map(
-                        (chatId) =>
-                            chats.find(
-                                (candidate) => candidate.id === chatId,
-                            ) ?? null,
-                    )
-                    .filter((chat): chat is ChatSession => chat !== null)
-                    .map((chat) =>
-                        getScopedChatStateKey(chat.id, chat.agentId),
-                    ),
+                targets.map((target) =>
+                    getScopedChatStateKey(target.chatId, target.agentId),
+                ),
             );
             setChats((prev) =>
                 prev.filter(
@@ -689,49 +698,33 @@ export function ChatProvider({
             );
             setCurrentChat((prev) =>
                 prev &&
-                chatIds.some((id) => {
-                    const chat =
-                        chats.find((candidate) => candidate.id === id) ?? null;
-                    return (
-                        !!chat?.agentId &&
+                targets.some(
+                    (target) =>
                         getScopedChatStateKey(prev.id, prev.agentId) ===
-                            getScopedChatStateKey(id, chat.agentId)
-                    );
-                })
+                        getScopedChatStateKey(target.chatId, target.agentId),
+                )
                     ? null
                     : prev,
             );
             setMessages((prev) => {
                 const next = { ...prev };
-                for (const chatId of chatIds) {
-                    const chat = chats.find(
-                        (candidate) => candidate.id === chatId,
-                    );
-                    if (!chat?.agentId) {
-                        continue;
-                    }
-                    delete next[getScopedChatStateKey(chatId, chat.agentId)];
+                for (const target of targets) {
+                    delete next[
+                        getScopedChatStateKey(target.chatId, target.agentId)
+                    ];
                 }
                 return next;
             });
-            if (
-                selectedAgentId &&
-                currentChatScopeRef.current &&
-                chatIds.some((chatId) => {
-                    const chat =
-                        chats.find((candidate) => candidate.id === chatId) ??
-                        null;
-                    return (
-                        !!chat?.agentId &&
-                        currentChatScopeRef.current ===
-                            getScopedChatStateKey(chatId, chat.agentId)
-                    );
-                })
-            ) {
-                await clearSelectedChatId(selectedAgentId);
+            for (const target of targets) {
+                const storedSelectedChatId = await getSelectedChatId(
+                    target.agentId,
+                );
+                if (storedSelectedChatId === target.chatId) {
+                    await clearSelectedChatId(target.agentId);
+                }
             }
         },
-        [adapter, chats, selectedAgentId, getBackendSessionToken],
+        [adapter, chats, getBackendSessionToken],
     );
 
     const updateChat = useCallback(
@@ -791,14 +784,11 @@ export function ChatProvider({
     );
 
     const hasMessagesInChats = useCallback(
-        async (chatIds: string[]): Promise<boolean> => {
-            if (!selectedAgentId) {
-                return false;
-            }
-            for (const chatId of chatIds) {
+        async (targets: ScopedChatTarget[]): Promise<boolean> => {
+            for (const target of targets) {
                 const cachedMessages =
                     messages[
-                        getScopedChatStateKey(chatId, selectedAgentId ?? null)
+                        getScopedChatStateKey(target.chatId, target.agentId)
                     ];
                 if (cachedMessages && cachedMessages.length > 0) {
                     return true;
@@ -809,8 +799,8 @@ export function ChatProvider({
                 }
 
                 const storedMessages = await adapter.getMessagesByChat(
-                    chatId,
-                    selectedAgentId,
+                    target.chatId,
+                    target.agentId,
                 );
                 if (storedMessages.length > 0) {
                     return true;
@@ -819,7 +809,7 @@ export function ChatProvider({
 
             return false;
         },
-        [adapter, messages, selectedAgentId],
+        [adapter, messages],
     );
 
     const updateMessage = useCallback(

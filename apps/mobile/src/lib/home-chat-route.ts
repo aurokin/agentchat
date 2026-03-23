@@ -105,3 +105,24 @@ export function resolveRouteChatSelection(params: {
 
     return routeChat;
 }
+
+export function resolveActiveRouteChat(params: {
+    routeChatId: string | null;
+    routeAgentId: string | null;
+    chats: ChatSession[];
+    currentChat: ChatSession | null;
+}): ChatSession | null {
+    if (!params.routeChatId || !params.routeAgentId) {
+        return params.currentChat;
+    }
+    const routeChatId = params.routeChatId;
+    const routeAgentId = params.routeAgentId;
+
+    return (
+        params.chats.find(
+            (chat) =>
+                getScopedChatKey(chat.id, chat.agentId) ===
+                getScopedChatKey(routeChatId, routeAgentId),
+        ) ?? null
+    );
+}

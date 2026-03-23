@@ -86,7 +86,7 @@ describe("workspace reconciliation", () => {
         ]);
     });
 
-    test("preserves missing-agent workspaces across known roots when agent-specific liveness is unavailable", () => {
+    test("preserves missing-agent workspaces across known roots during current-root grace", () => {
         expect(
             getPersistedWorkspaceActiveKeys(
                 [
@@ -112,6 +112,9 @@ describe("workspace reconciliation", () => {
                         "/tmp/current-sandbox",
                         "/tmp/old-sandbox",
                     ],
+                    missingAgentIdsWithCurrentRootGrace: new Set([
+                        "missing-agent",
+                    ]),
                 },
             ),
         ).toEqual(
@@ -128,6 +131,40 @@ describe("workspace reconciliation", () => {
                     userId: "user-1",
                     conversationId: "chat-2",
                 }),
+                getWorkspaceActiveKey({
+                    sandboxRoot: "/tmp/old-sandbox",
+                    agentId: "missing-agent",
+                    userId: "user-1",
+                    conversationId: "chat-2",
+                }),
+            ]),
+        );
+    });
+
+    test("preserves missing-agent workspaces only across older roots after current-root grace expires", () => {
+        expect(
+            getPersistedWorkspaceActiveKeys(
+                [
+                    {
+                        agentId: "missing-agent",
+                        userId: "user-1",
+                        localId: "chat-2",
+                    },
+                ],
+                {
+                    copyOnConversationAgentIds: new Set(["copy-agent"]),
+                    currentCopyOnConversationSandboxRootsByAgent: {},
+                    configuredAgentIds: new Set(["copy-agent", "shared-agent"]),
+                    currentSandboxRoots: ["/tmp/current-sandbox"],
+                    knownSandboxRoots: [
+                        "/tmp/current-sandbox",
+                        "/tmp/old-sandbox",
+                    ],
+                    missingAgentIdsWithCurrentRootGrace: new Set(),
+                },
+            ),
+        ).toEqual(
+            new Set([
                 getWorkspaceActiveKey({
                     sandboxRoot: "/tmp/old-sandbox",
                     agentId: "missing-agent",

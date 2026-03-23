@@ -6,6 +6,7 @@ import {
     readdirSync,
     rmSync,
     symlinkSync,
+    utimesSync,
     writeFileSync,
     readFileSync,
 } from "node:fs";
@@ -1957,6 +1958,57 @@ new WorkspaceManager({
             await manager.reconcile(new Set());
 
             expect(existsSync(workspace)).toBe(true);
+        });
+
+        test("removes stale workspaces with on-disk creating metadata during reconciliation", async () => {
+            const sandboxRoot = makeTempDir("sandbox");
+            const rootPath = makeTempDir("agent-root");
+            writeFileSync(path.join(rootPath, "file.txt"), "data");
+
+            const agent = makeAgent({
+                id: "agent-a",
+                rootPath,
+                workspaceMode: "copy-on-conversation",
+            });
+            const manager = createWorkspaceManager(() =>
+                makeConfig({ sandboxRoot, agents: [agent] }),
+            );
+
+            const workspace = await manager.ensureWorkspace(
+                agent,
+                "user-1",
+                "conv-1",
+            );
+            const workspaceMetadataDir =
+                getWorkspaceMetadataRootPath(sandboxRoot);
+            const metadataFile =
+                readdirSync(workspaceMetadataDir).find((entry) =>
+                    entry.endsWith(".json"),
+                ) ?? null;
+            if (!metadataFile) {
+                throw new Error("Expected workspace metadata file to exist.");
+            }
+
+            const metadataPath = path.join(workspaceMetadataDir, metadataFile);
+            writeFileSync(
+                metadataPath,
+                `${JSON.stringify(
+                    {
+                        sourceRootPath: path.resolve(rootPath),
+                        state: "creating",
+                    },
+                    null,
+                    2,
+                )}\n`,
+            );
+            const staleDate = new Date(Date.now() - 31 * 60_000);
+            utimesSync(workspace, staleDate, staleDate);
+            utimesSync(metadataPath, staleDate, staleDate);
+
+            await manager.reconcile(new Set());
+
+            expect(existsSync(workspace)).toBe(false);
+            expect(existsSync(metadataPath)).toBe(false);
         });
 
         test("keeps workspaces that were touched after reconciliation started", async () => {

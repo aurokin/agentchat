@@ -708,6 +708,15 @@ describe("CodexRuntimeManager", () => {
         await Bun.sleep(0);
 
         expect(persistence.runStartedCalls).toHaveLength(1);
+        expect(persistence.runtimeBindingCalls[0]).toMatchObject({
+            conversationLocalId: "chat-1",
+            status: "idle",
+            providerThreadId: "thread-fresh",
+            activeRunId: null,
+            workspaceMode: "shared",
+            workspaceRootPath: config.agents[0]!.rootPath,
+            workspaceCwd: config.agents[0]!.rootPath,
+        });
         expect(persistence.runStartedCalls[0]).toMatchObject({
             workspaceMode: "shared",
             workspaceRootPath: config.agents[0]!.rootPath,
@@ -725,7 +734,7 @@ describe("CodexRuntimeManager", () => {
             "message.delta",
         ]);
         expect(persistence.messageDeltaCalls).toHaveLength(0);
-        expect(persistence.runtimeBindingCalls).toHaveLength(0);
+        expect(persistence.runtimeBindingCalls).toHaveLength(1);
 
         fakeClient.emit({
             method: "turn/completed",
@@ -880,25 +889,80 @@ describe("CodexRuntimeManager", () => {
 
     test("fails closed when orphaned run recovery cannot finalize the stale run", async () => {
         const config = createConfig();
-        const persistence = createPersistence({
+        const bindingState: {
+            provider: string;
+            providerThreadId: string | null;
+            providerResumeToken: null;
+            status: "idle" | "active" | "expired" | "errored";
+            activeRunId: string | null;
+            lastError: null;
+            lastEventAt: null;
+            expiresAt: null;
+            workspaceMode: "shared" | "copy-on-conversation";
+            workspaceRootPath: string;
+            workspaceCwd: string;
+            updatedAt: number;
+        } = {
             provider: "codex-default",
             providerThreadId: "thread-orphaned",
+            providerResumeToken: null,
             status: "active",
             activeRunId: "run-orphaned",
+            lastError: null,
+            lastEventAt: null,
+            expiresAt: null,
             workspaceMode: "shared",
             workspaceRootPath: config.agents[0]!.rootPath,
             workspaceCwd: config.agents[0]!.rootPath,
-        });
+            updatedAt: Date.now(),
+        };
+        const persistence = createPersistence(bindingState);
+        persistence.readRuntimeBinding = async (payload) => {
+            persistence.readRuntimeBindingCalls.push(payload);
+            return {
+                chatId: "chats:chat-1",
+                binding: { ...bindingState },
+            };
+        };
         persistence.recoverStaleRun = async (
             payload: Record<string, unknown>,
         ) => {
             persistence.recoverStaleRunCalls.push(payload);
             throw new Error("Run not found");
         };
+        persistence.runtimeBinding = async (
+            payload: Record<string, unknown>,
+        ) => {
+            persistence.runtimeBindingCalls.push(payload);
+            bindingState.provider = payload.provider as string;
+            bindingState.providerThreadId =
+                (payload.providerThreadId as string | null | undefined) ?? null;
+            bindingState.providerResumeToken = null;
+            bindingState.status = payload.status as
+                | "idle"
+                | "active"
+                | "expired"
+                | "errored";
+            bindingState.activeRunId =
+                (payload.activeRunId as string | null | undefined) ?? null;
+            bindingState.lastError = null;
+            bindingState.lastEventAt = null;
+            bindingState.expiresAt = null;
+            bindingState.workspaceMode = payload.workspaceMode as
+                | "shared"
+                | "copy-on-conversation";
+            bindingState.workspaceRootPath =
+                payload.workspaceRootPath as string;
+            bindingState.workspaceCwd = payload.workspaceCwd as string;
+            bindingState.updatedAt = payload.updatedAt as number;
+        };
+        const fakeClient = new FakeCodexClient({
+            startedThreadId: "thread-fresh",
+        });
         const manager = new CodexRuntimeManager({
             getConfig: () => config,
             persistence: persistence as unknown as RuntimePersistenceClient,
-            createClient: () => new FakeCodexClient(),
+            createClient: () => fakeClient,
         });
 
         await expect(
@@ -920,6 +984,20 @@ describe("CodexRuntimeManager", () => {
             workspaceRootPath: config.agents[0]!.rootPath,
             workspaceCwd: config.agents[0]!.rootPath,
         });
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-2",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        expect(fakeClient.requests.map((request) => request.method)).toContain(
+            "thread/start",
+        );
+        expect(
+            fakeClient.requests.map((request) => request.method),
+        ).not.toContain("thread/resume");
     });
 
     test("keeps an active runtime across reconnects for the same user", async () => {

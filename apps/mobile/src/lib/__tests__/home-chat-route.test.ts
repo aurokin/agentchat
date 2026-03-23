@@ -3,6 +3,7 @@ import {
     buildChatRouteId,
     getPreferredHomeChatRouteId,
     parseChatRouteId,
+    resolveActiveRouteChat,
     resolveRouteChatSelection,
 } from "../home-chat-route";
 
@@ -163,5 +164,34 @@ describe("home chat route helpers", () => {
                 currentChat: null,
             }),
         ).toBeNull();
+    });
+
+    it("resolves the route-scoped active chat even before currentChat catches up", () => {
+        const activeChat = resolveActiveRouteChat({
+            routeChatId: "shared-chat",
+            routeAgentId: "agent-2",
+            chats: [
+                {
+                    ...chats[0],
+                    id: "shared-chat",
+                    agentId: "agent-1",
+                },
+                {
+                    ...chats[1],
+                    id: "shared-chat",
+                    agentId: "agent-2",
+                },
+            ],
+            currentChat: {
+                ...chats[0],
+                id: "shared-chat",
+                agentId: "agent-1",
+            },
+        });
+
+        expect(activeChat).toMatchObject({
+            id: "shared-chat",
+            agentId: "agent-2",
+        });
     });
 });

@@ -287,6 +287,7 @@ export class CodexRuntimeManager {
     private readonly createClient: CreateCodexClient;
     private readonly workspaceManager: WorkspaceManager | null;
     private readonly pendingRuntimeDeleteWaitMs: number;
+    private lastPersistenceTimestamp = 0;
 
     constructor(params: {
         getConfig: () => AgentchatConfig;
@@ -303,6 +304,13 @@ export class CodexRuntimeManager {
         this.workspaceManager = params.workspaceManager ?? null;
         this.pendingRuntimeDeleteWaitMs =
             params.pendingRuntimeDeleteWaitMs ?? PENDING_RUNTIME_DELETE_WAIT_MS;
+    }
+
+    private nextPersistenceTimestamp(): number {
+        const now = Date.now();
+        const nextTimestamp = Math.max(now, this.lastPersistenceTimestamp + 1);
+        this.lastPersistenceTimestamp = nextTimestamp;
+        return nextTimestamp;
     }
 
     async sendMessage(params: {
@@ -363,7 +371,7 @@ export class CodexRuntimeManager {
                         return;
                     }
 
-                    const startedAt = Date.now();
+                    const startedAt = this.nextPersistenceTimestamp();
 
                     const inputText = isNew
                         ? buildInitialTurnText(
@@ -495,7 +503,7 @@ export class CodexRuntimeManager {
                                 workspaceMode: runtime.agent.workspaceMode,
                                 workspaceRootPath: runtime.agent.rootPath,
                                 workspaceCwd: runtime.cwd,
-                                completedAt: Date.now(),
+                                completedAt: this.nextPersistenceTimestamp(),
                                 errorMessage,
                             });
                         } catch (persistError) {
@@ -505,6 +513,8 @@ export class CodexRuntimeManager {
                             );
                         }
                     }
+                    const erroredBindingUpdatedAt =
+                        this.nextPersistenceTimestamp();
                     void this.persistence
                         .runtimeBinding({
                             chatId: runtime.chatId,
@@ -518,12 +528,12 @@ export class CodexRuntimeManager {
                             providerResumeToken: null,
                             activeRunId: null,
                             lastError: errorMessage,
-                            lastEventAt: Date.now(),
+                            lastEventAt: erroredBindingUpdatedAt,
                             expiresAt: null,
                             workspaceMode: runtime.agent.workspaceMode,
                             workspaceRootPath: runtime.agent.rootPath,
                             workspaceCwd: runtime.cwd,
-                            updatedAt: Date.now(),
+                            updatedAt: erroredBindingUpdatedAt,
                         })
                         .catch((persistError) => {
                             if (
@@ -1055,6 +1065,25 @@ export class CodexRuntimeManager {
                 cwd,
                 cleanupWorkspace: cleanupWorkspaceOnFailure,
             });
+            const bindingUpdatedAt = this.nextPersistenceTimestamp();
+            await this.persistence.runtimeBinding({
+                chatId: persistedState.chatId,
+                userId: params.userId,
+                agentId: resources.agent.id,
+                conversationLocalId: params.command.payload.conversationId,
+                provider: resources.provider.id,
+                status: "idle",
+                providerThreadId: threadId,
+                providerResumeToken: null,
+                activeRunId: null,
+                lastError: null,
+                lastEventAt: bindingUpdatedAt,
+                expiresAt: null,
+                workspaceMode: resources.agent.workspaceMode,
+                workspaceRootPath: resources.agent.rootPath,
+                workspaceCwd: cwd,
+                updatedAt: bindingUpdatedAt,
+            });
 
             const runtime: ConversationRuntime = {
                 key,
@@ -1335,7 +1364,7 @@ export class CodexRuntimeManager {
                 agentId: params.agentId,
                 conversationLocalId: params.conversationId,
                 externalRunId: persistedBinding.activeRunId,
-                completedAt: Date.now(),
+                completedAt: this.nextPersistenceTimestamp(),
                 errorMessage:
                     "This run was orphaned after the runtime disconnected before completion.",
                 workspaceMode: persistedBinding.workspaceMode,
@@ -1348,6 +1377,8 @@ export class CodexRuntimeManager {
                     error,
                 );
                 try {
+                    const staleBindingUpdatedAt =
+                        this.nextPersistenceTimestamp();
                     await this.persistence.runtimeBinding({
                         chatId: persistedState.chatId,
                         userId: params.userId,
@@ -1355,20 +1386,19 @@ export class CodexRuntimeManager {
                         conversationLocalId: params.conversationId,
                         provider: persistedBinding.provider,
                         status: "errored",
-                        providerThreadId: persistedBinding.providerThreadId,
-                        providerResumeToken:
-                            persistedBinding.providerResumeToken,
+                        providerThreadId: null,
+                        providerResumeToken: null,
                         activeRunId: null,
                         lastError:
                             error instanceof Error
                                 ? error.message
                                 : "Failed to recover orphaned active run.",
-                        lastEventAt: Date.now(),
+                        lastEventAt: staleBindingUpdatedAt,
                         expiresAt: null,
                         workspaceMode: persistedBinding.workspaceMode,
                         workspaceRootPath: persistedBinding.workspaceRootPath,
                         workspaceCwd: persistedBinding.workspaceCwd,
-                        updatedAt: Date.now(),
+                        updatedAt: staleBindingUpdatedAt,
                     });
                 } catch (bindingError) {
                     console.error(
@@ -1484,7 +1514,7 @@ export class CodexRuntimeManager {
                     workspaceMode: runtime.agent.workspaceMode,
                     workspaceRootPath: runtime.agent.rootPath,
                     workspaceCwd: runtime.cwd,
-                    completedAt: Date.now(),
+                    completedAt: this.nextPersistenceTimestamp(),
                     errorMessage: error.message,
                 })
                 .catch((persistError) => {
@@ -1507,6 +1537,7 @@ export class CodexRuntimeManager {
             activeTurn.reject(error);
         }
 
+        const runtimeErroredAt = this.nextPersistenceTimestamp();
         void this.persistence
             .runtimeBinding({
                 chatId: runtime.chatId,
@@ -1519,12 +1550,12 @@ export class CodexRuntimeManager {
                 providerResumeToken: null,
                 activeRunId: null,
                 lastError: error.message,
-                lastEventAt: Date.now(),
+                lastEventAt: runtimeErroredAt,
                 expiresAt: null,
                 workspaceMode: runtime.agent.workspaceMode,
                 workspaceRootPath: runtime.agent.rootPath,
                 workspaceCwd: runtime.cwd,
-                updatedAt: Date.now(),
+                updatedAt: runtimeErroredAt,
             })
             .catch((persistError) => {
                 if (isRecoverablePersistenceMissingResource(persistError)) {
@@ -1618,7 +1649,7 @@ export class CodexRuntimeManager {
                     delta,
                     kind: activeTurn.currentMessageKind,
                     runMessageIndex: activeTurn.currentMessageIndex,
-                    createdAt: Date.now(),
+                    createdAt: this.nextPersistenceTimestamp(),
                 })
                 .catch((error) => {
                     console.error(
@@ -1710,7 +1741,7 @@ export class CodexRuntimeManager {
         const nextMessageId = crypto.randomUUID();
         const previousCompletedSequence = activeTurn.nextSequence++;
         const messageStartedSequence = activeTurn.nextSequence++;
-        const createdAt = Date.now();
+        const createdAt = this.nextPersistenceTimestamp();
 
         this.emitToSubscribers(
             runtime,
@@ -1807,7 +1838,7 @@ export class CodexRuntimeManager {
 
         const sequence = activeTurn.nextSequence;
         activeTurn.nextSequence += 2;
-        const completedAt = Date.now();
+        const completedAt = this.nextPersistenceTimestamp();
 
         if (params.finalStatus === "completed") {
             void this.persistence
@@ -1937,6 +1968,7 @@ export class CodexRuntimeManager {
             }
             runtime.idleTimer = null;
 
+            const expiredAt = this.nextPersistenceTimestamp();
             void this.persistence
                 .runtimeBinding({
                     chatId: runtime.chatId,
@@ -1949,12 +1981,12 @@ export class CodexRuntimeManager {
                     providerResumeToken: null,
                     activeRunId: null,
                     lastError: null,
-                    lastEventAt: Date.now(),
-                    expiresAt: Date.now(),
+                    lastEventAt: expiredAt,
+                    expiresAt: expiredAt,
                     workspaceMode: runtime.agent.workspaceMode,
                     workspaceRootPath: runtime.agent.rootPath,
                     workspaceCwd: runtime.cwd,
-                    updatedAt: Date.now(),
+                    updatedAt: expiredAt,
                 })
                 .catch((error) => {
                     if (isRecoverablePersistenceMissingResource(error)) {
@@ -2029,7 +2061,7 @@ export class CodexRuntimeManager {
             sequence: activeTurn.nextSequence++,
             content: activeTurn.text,
             delta,
-            createdAt: Date.now(),
+            createdAt: this.nextPersistenceTimestamp(),
         });
     }
 
