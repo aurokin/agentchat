@@ -578,12 +578,35 @@ export class WorkspaceManager {
      * active set. Call on startup and periodically as a safety net.
      */
     async reconcile(activeKeys: Set<string>): Promise<void> {
-        this.syncSandboxRootsRegistry();
+        const registry = this.syncSandboxRootsRegistry();
         const reconcileStartedAt = Date.now();
         this.pruneRecentWorkspaceTouches(reconcileStartedAt);
+        const currentSandboxRoot = canonicalizePathForComparison(
+            this.getConfig().sandboxRoot,
+        );
+        const activeInstanceCountsByRoot = new Map<string, number>();
+        for (const entry of Object.values(registry.activeInstances)) {
+            const rootPath = canonicalizePathForComparison(entry.rootPath);
+            activeInstanceCountsByRoot.set(
+                rootPath,
+                (activeInstanceCountsByRoot.get(rootPath) ?? 0) + 1,
+            );
+        }
 
         for (const sandboxRoot of this.getKnownSandboxRoots()) {
             if (!existsSync(sandboxRoot)) {
+                continue;
+            }
+            const canonicalSandboxRoot =
+                canonicalizePathForComparison(sandboxRoot);
+            const activeInstanceCount =
+                activeInstanceCountsByRoot.get(canonicalSandboxRoot) ?? 0;
+            if (
+                (canonicalSandboxRoot !== currentSandboxRoot &&
+                    activeInstanceCount > 0) ||
+                (canonicalSandboxRoot === currentSandboxRoot &&
+                    activeInstanceCount > 1)
+            ) {
                 continue;
             }
 
@@ -700,12 +723,20 @@ export class WorkspaceManager {
             this.getWorkspaceMetadataPath(sandboxPath),
         ];
 
-        for (const candidatePath of candidatePaths) {
+        while (candidatePaths.length > 0) {
+            const candidatePath = candidatePaths.pop();
+            if (!candidatePath) {
+                continue;
+            }
+
             try {
-                latestTouchedAt = Math.max(
-                    latestTouchedAt,
-                    lstatSync(candidatePath).mtimeMs,
-                );
+                const stats = lstatSync(candidatePath);
+                latestTouchedAt = Math.max(latestTouchedAt, stats.mtimeMs);
+                if (stats.isDirectory()) {
+                    for (const entry of readdirSync(candidatePath)) {
+                        candidatePaths.push(path.join(candidatePath, entry));
+                    }
+                }
             } catch {
                 // Ignore missing paths and fall back to the latest available
                 // on-disk timestamp.

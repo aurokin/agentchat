@@ -372,6 +372,33 @@ export class CodexRuntimeManager {
                     }
 
                     const startedAt = this.nextPersistenceTimestamp();
+                    let releaseRunStartNotificationGate: () => void = () =>
+                        undefined;
+                    activeTurn.pendingRunStartPersistence = new Promise<void>(
+                        (resolve) => {
+                            releaseRunStartNotificationGate = resolve;
+                        },
+                    );
+
+                    await this.persistence.runStarted({
+                        chatId: runtime.chatId,
+                        userId: params.userId,
+                        agentId: runtime.agentId,
+                        conversationLocalId:
+                            params.command.payload.conversationId,
+                        triggerMessageLocalId:
+                            params.command.payload.userMessageId,
+                        assistantMessageLocalId:
+                            params.command.payload.assistantMessageId,
+                        externalRunId: runId,
+                        provider: runtime.provider.id,
+                        providerThreadId: runtime.threadId,
+                        providerTurnId: null,
+                        workspaceMode: runtime.agent.workspaceMode,
+                        workspaceRootPath: runtime.agent.rootPath,
+                        workspaceCwd: runtime.cwd,
+                        startedAt,
+                    });
 
                     const inputText = isNew
                         ? buildInitialTurnText(
@@ -399,44 +426,15 @@ export class CodexRuntimeManager {
                     activeTurn.turnId = extractTurnId(turnResult);
                     runtime.modelId = params.command.payload.modelId;
 
-                    const pendingRunStartPersistence = this.persistence
-                        .runStarted({
-                            chatId: runtime.chatId,
-                            userId: params.userId,
-                            agentId: runtime.agentId,
-                            conversationLocalId:
-                                params.command.payload.conversationId,
-                            triggerMessageLocalId:
-                                params.command.payload.userMessageId,
-                            assistantMessageLocalId:
-                                params.command.payload.assistantMessageId,
-                            externalRunId: runId,
-                            provider: runtime.provider.id,
-                            providerThreadId: runtime.threadId,
-                            providerTurnId: activeTurn.turnId,
-                            workspaceMode: runtime.agent.workspaceMode,
-                            workspaceRootPath: runtime.agent.rootPath,
-                            workspaceCwd: runtime.cwd,
-                            startedAt,
-                        })
-                        .finally(() => {
-                            if (
-                                activeTurn.pendingRunStartPersistence ===
-                                pendingRunStartPersistence
-                            ) {
-                                activeTurn.pendingRunStartPersistence = null;
-                            }
-                        });
-                    activeTurn.pendingRunStartPersistence =
-                        pendingRunStartPersistence;
-                    await pendingRunStartPersistence;
-
                     if (
                         this.runtimes.get(runtime.key) !== runtime ||
                         runtime.activeTurn !== activeTurn
                     ) {
                         return;
                     }
+
+                    activeTurn.pendingRunStartPersistence = null;
+                    releaseRunStartNotificationGate();
 
                     this.emitToSubscribers(
                         runtime,

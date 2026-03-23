@@ -1813,6 +1813,95 @@ new WorkspaceManager({
             expect(existsSync(newWorkspace)).toBe(true);
         });
 
+        test("does not reconcile a copied workspace from another active sandbox root", async () => {
+            const firstSandboxRoot = makeTempDir("sandbox-a");
+            const secondSandboxRoot = makeTempDir("sandbox-b");
+            const rootsRegistryPath = path.join(
+                makeTempDir("sandbox-roots-registry"),
+                "sandbox-roots.json",
+            );
+            const rootPath = makeTempDir("agent-root");
+            writeFileSync(path.join(rootPath, "file.txt"), "data");
+
+            const agent = makeAgent({
+                id: "agent-a",
+                rootPath,
+                workspaceMode: "copy-on-conversation",
+            });
+            const firstConfig = makeConfig({
+                sandboxRoot: firstSandboxRoot,
+                agents: [agent],
+                instanceKey: "instance-a",
+            });
+            const secondConfig = makeConfig({
+                sandboxRoot: secondSandboxRoot,
+                agents: [agent],
+                instanceKey: "instance-b",
+            });
+            const firstManager = new WorkspaceManager({
+                getConfig: () => firstConfig,
+                rootsRegistryPath,
+            });
+            const secondManager = new WorkspaceManager({
+                getConfig: () => secondConfig,
+                rootsRegistryPath,
+            });
+
+            const workspace = await secondManager.ensureWorkspace(
+                agent,
+                "user-1",
+                "conv-1",
+            );
+
+            await firstManager.reconcile(new Set());
+
+            expect(existsSync(workspace)).toBe(true);
+        });
+
+        test("does not reconcile the current sandbox root while another instance shares it", async () => {
+            const sandboxRoot = makeTempDir("sandbox");
+            const rootsRegistryPath = path.join(
+                makeTempDir("sandbox-roots-registry"),
+                "sandbox-roots.json",
+            );
+            const rootPath = makeTempDir("agent-root");
+            writeFileSync(path.join(rootPath, "file.txt"), "data");
+
+            const agent = makeAgent({
+                id: "agent-a",
+                rootPath,
+                workspaceMode: "copy-on-conversation",
+            });
+            const firstConfig = makeConfig({
+                sandboxRoot,
+                agents: [agent],
+                instanceKey: "instance-a",
+            });
+            const secondConfig = makeConfig({
+                sandboxRoot,
+                agents: [agent],
+                instanceKey: "instance-b",
+            });
+            const firstManager = new WorkspaceManager({
+                getConfig: () => firstConfig,
+                rootsRegistryPath,
+            });
+            const secondManager = new WorkspaceManager({
+                getConfig: () => secondConfig,
+                rootsRegistryPath,
+            });
+
+            const workspace = await secondManager.ensureWorkspace(
+                agent,
+                "user-1",
+                "conv-2",
+            );
+
+            await firstManager.reconcile(new Set());
+
+            expect(existsSync(workspace)).toBe(true);
+        });
+
         test("refuses to remove orphaned workspaces that overlap an agent rootPath", async () => {
             const sandboxRoot = makeTempDir("sandbox");
             const rootPath = makeTempDir("agent-root");
@@ -2002,6 +2091,9 @@ new WorkspaceManager({
                 )}\n`,
             );
             const staleDate = new Date(Date.now() - 31 * 60_000);
+            for (const entry of readdirSync(workspace)) {
+                utimesSync(path.join(workspace, entry), staleDate, staleDate);
+            }
             utimesSync(workspace, staleDate, staleDate);
             utimesSync(metadataPath, staleDate, staleDate);
 
@@ -2009,6 +2101,63 @@ new WorkspaceManager({
 
             expect(existsSync(workspace)).toBe(false);
             expect(existsSync(metadataPath)).toBe(false);
+        });
+
+        test("keeps creating workspaces when nested files were touched recently", async () => {
+            const sandboxRoot = makeTempDir("sandbox");
+            const rootPath = makeTempDir("agent-root");
+            writeFileSync(path.join(rootPath, "file.txt"), "data");
+
+            const agent = makeAgent({
+                id: "agent-a",
+                rootPath,
+                workspaceMode: "copy-on-conversation",
+            });
+            const manager = createWorkspaceManager(() =>
+                makeConfig({ sandboxRoot, agents: [agent] }),
+            );
+
+            const workspace = await manager.ensureWorkspace(
+                agent,
+                "user-1",
+                "conv-1",
+            );
+            const workspaceMetadataDir =
+                getWorkspaceMetadataRootPath(sandboxRoot);
+            const metadataFile =
+                readdirSync(workspaceMetadataDir).find((entry) =>
+                    entry.endsWith(".json"),
+                ) ?? null;
+            if (!metadataFile) {
+                throw new Error("Expected workspace metadata file to exist.");
+            }
+
+            const metadataPath = path.join(workspaceMetadataDir, metadataFile);
+            writeFileSync(
+                metadataPath,
+                `${JSON.stringify(
+                    {
+                        sourceRootPath: path.resolve(rootPath),
+                        state: "creating",
+                    },
+                    null,
+                    2,
+                )}\n`,
+            );
+            const staleDate = new Date(Date.now() - 31 * 60_000);
+            utimesSync(workspace, staleDate, staleDate);
+            utimesSync(metadataPath, staleDate, staleDate);
+            const nestedDir = path.join(workspace, "nested");
+            mkdirSync(nestedDir, { recursive: true });
+            const nestedFile = path.join(nestedDir, "active.txt");
+            writeFileSync(nestedFile, "still copying");
+            const freshDate = new Date();
+            utimesSync(nestedFile, freshDate, freshDate);
+
+            await manager.reconcile(new Set());
+
+            expect(existsSync(workspace)).toBe(true);
+            expect(existsSync(metadataPath)).toBe(true);
         });
 
         test("keeps workspaces that were touched after reconciliation started", async () => {

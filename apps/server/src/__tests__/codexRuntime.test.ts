@@ -107,6 +107,7 @@ type FakeClientOptions = {
     turnId?: string;
     autoComplete?: boolean;
     turnStartError?: Error;
+    turnStartPromise?: Promise<void>;
     initializePromise?: Promise<void>;
 };
 
@@ -152,6 +153,7 @@ class FakeCodexClient {
             if (this.options.turnStartError) {
                 throw this.options.turnStartError;
             }
+            await this.options.turnStartPromise;
             if (this.options.autoComplete !== false) {
                 setTimeout(() => {
                     this.notificationHandler?.({
@@ -667,10 +669,11 @@ describe("CodexRuntimeManager", () => {
         await sendPromise;
     });
 
-    test("buffers provider notifications until run-start persistence completes", async () => {
+    test("persists run start before turn start and buffers notifications until turn start returns", async () => {
         const config = createConfig();
         const persistence = createPersistence(null);
         const runStartedDeferred = createDeferred<void>();
+        const turnStartDeferred = createDeferred<void>();
         persistence.runStarted = async (payload: Record<string, unknown>) => {
             persistence.runStartedCalls.push(payload);
             await runStartedDeferred.promise;
@@ -678,6 +681,7 @@ describe("CodexRuntimeManager", () => {
         const fakeClient = new FakeCodexClient({
             startedThreadId: "thread-fresh",
             autoComplete: false,
+            turnStartPromise: turnStartDeferred.promise,
         });
         const events: Array<{
             type: string;
@@ -699,13 +703,6 @@ describe("CodexRuntimeManager", () => {
         });
 
         await Bun.sleep(0);
-        fakeClient.emit({
-            method: "item/agentMessage/delta",
-            params: {
-                delta: "Working on it",
-            },
-        });
-        await Bun.sleep(0);
 
         expect(persistence.runStartedCalls).toHaveLength(1);
         expect(persistence.runtimeBindingCalls[0]).toMatchObject({
@@ -721,11 +718,33 @@ describe("CodexRuntimeManager", () => {
             workspaceMode: "shared",
             workspaceRootPath: config.agents[0]!.rootPath,
             workspaceCwd: config.agents[0]!.rootPath,
+            providerTurnId: null,
         });
+        expect(fakeClient.requests.map((request) => request.method)).toEqual([
+            "thread/start",
+        ]);
         expect(persistence.messageDeltaCalls).toHaveLength(0);
         expect(events).toEqual([]);
 
         runStartedDeferred.resolve();
+        await Bun.sleep(0);
+
+        expect(fakeClient.requests.map((request) => request.method)).toEqual([
+            "thread/start",
+            "turn/start",
+        ]);
+        fakeClient.emit({
+            method: "item/agentMessage/delta",
+            params: {
+                delta: "Working on it",
+            },
+        });
+        await Bun.sleep(0);
+
+        expect(events).toEqual([]);
+        expect(persistence.messageDeltaCalls).toHaveLength(0);
+
+        turnStartDeferred.resolve();
         await Bun.sleep(0);
 
         expect(events.map((event) => event.type)).toEqual([

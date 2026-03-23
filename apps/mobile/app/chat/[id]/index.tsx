@@ -143,6 +143,7 @@ export default function ChatScreen(): ReactElement {
     const suppressInputRef = useRef(false);
     const currentChatRef = useRef<ChatSession | null>(currentChat);
     const previousConversationScopeRef = useRef<string | null>(null);
+    const previousRouteScopeRef = useRef<string | null>(null);
     const chatMessagesRef = useRef<Message[]>(EMPTY_MESSAGES);
     const activeRunRef = useRef<ActiveRunState | null>(null);
     const pendingReconnectNoticeRef = useRef(false);
@@ -340,6 +341,30 @@ export default function ChatScreen(): ReactElement {
     useEffect(() => {
         currentChatRef.current = activeChat;
     }, [activeChat]);
+
+    useEffect(() => {
+        const currentRouteScope = routeSelection
+            ? getScopedChatStateKey(
+                  routeSelection.chatId,
+                  routeSelection.agentId,
+              )
+            : null;
+        if (
+            previousRouteScopeRef.current !== null &&
+            previousRouteScopeRef.current !== currentRouteScope
+        ) {
+            pendingInterruptRef.current = false;
+            pendingReconnectNoticeRef.current = false;
+            startTransition(() => {
+                setActiveRun(null);
+                setStreamingMessage(null);
+                setRecoveredRunNotice(false);
+                setIsLoading(false);
+            });
+        }
+
+        previousRouteScopeRef.current = currentRouteScope;
+    }, [routeSelection]);
 
     useEffect(() => {
         const currentConversationScope =
@@ -673,6 +698,7 @@ export default function ChatScreen(): ReactElement {
 
     useEffect(() => {
         if (!activeChat) {
+            pendingInterruptRef.current = false;
             startTransition(() => {
                 setActiveRun(null);
                 setStreamingMessage(null);
@@ -908,10 +934,26 @@ export default function ChatScreen(): ReactElement {
         );
     };
 
-    const handleSelectChatFromSidebar = (nextChatId: string) => {
-        if (nextChatId === chatId) return;
+    const handleSelectChatFromSidebar = (
+        nextChatId: string,
+        nextAgentId: string,
+    ) => {
+        if (
+            routeSelection &&
+            getScopedChatStateKey(nextChatId, nextAgentId) ===
+                getScopedChatStateKey(
+                    routeSelection.chatId,
+                    routeSelection.agentId,
+                )
+        ) {
+            return;
+        }
         const nextChat =
-            chats.find((candidate) => candidate.id === nextChatId) ?? null;
+            chats.find(
+                (candidate) =>
+                    getScopedChatStateKey(candidate.id, candidate.agentId) ===
+                    getScopedChatStateKey(nextChatId, nextAgentId),
+            ) ?? null;
         if (!nextChat) {
             return;
         }
@@ -919,7 +961,7 @@ export default function ChatScreen(): ReactElement {
         router.replace(
             `/chat/${buildChatRouteId({
                 chatId: nextChatId,
-                agentId: nextChat.agentId,
+                agentId: nextAgentId,
             })}`,
         );
     };
@@ -998,10 +1040,18 @@ export default function ChatScreen(): ReactElement {
                 ) : (
                     <FlatList
                         data={chats}
-                        keyExtractor={(item) => item.id}
+                        keyExtractor={(item) =>
+                            getScopedChatStateKey(item.id, item.agentId)
+                        }
                         contentContainerStyle={styles.tabletSidebarListContent}
                         renderItem={({ item }) => {
-                            const isActive = item.id === chatId;
+                            const isActive =
+                                routeSelection !== null &&
+                                getScopedChatStateKey(item.id, item.agentId) ===
+                                    getScopedChatStateKey(
+                                        routeSelection.chatId,
+                                        routeSelection.agentId,
+                                    );
                             return (
                                 <TouchableOpacity
                                     style={[
@@ -1010,7 +1060,10 @@ export default function ChatScreen(): ReactElement {
                                             styles.tabletSidebarChatItemActive,
                                     ]}
                                     onPress={() =>
-                                        handleSelectChatFromSidebar(item.id)
+                                        handleSelectChatFromSidebar(
+                                            item.id,
+                                            item.agentId,
+                                        )
                                     }
                                 >
                                     <Text
