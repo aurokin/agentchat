@@ -700,21 +700,18 @@ describe("runtime ingress", () => {
     });
 
     test("checks chat existence against both agentId and localId", async () => {
-        const collect = mock(async () => [
-            {
-                _id: "chats:1",
-                agentId: "agent-a",
-                userId: "users:test",
-                localId: "chat-1",
-            },
-            {
-                _id: "chats:2",
-                agentId: "agent-b",
-                userId: "users:test",
-                localId: "chat-1",
-            },
-        ]);
-        const withIndex = mock(() => ({ collect }));
+        let callCount = 0;
+        const unique = mock(async () =>
+            callCount++ === 0
+                ? {
+                      _id: "chats:2",
+                      agentId: "agent-b",
+                      userId: "users:test",
+                      localId: "chat-1",
+                  }
+                : null,
+        );
+        const withIndex = mock(() => ({ unique }));
         const query = mock(() => ({ withIndex }));
         const ctx = {
             db: {
@@ -737,6 +734,36 @@ describe("runtime ingress", () => {
                 localId: "chat-1",
             }),
         ).resolves.toBe(false);
+    });
+
+    test("falls back to agent-local lookup when the supplied chatId is stale", async () => {
+        const unique = mock(async () => ({
+            _id: "chats:live",
+            agentId: "agent-a",
+            userId: "users:test",
+            localId: "chat-1",
+        }));
+        const withIndex = mock(() => ({ unique }));
+        const query = mock(() => ({ withIndex }));
+        const get = mock(async () => null);
+        const ctx = {
+            db: {
+                get,
+                query,
+            },
+        };
+
+        await expect(
+            runHandler(chatExistsByLocalId as unknown as HandlerExport, ctx, {
+                userId: "users:test",
+                agentId: "agent-a",
+                localId: "chat-1",
+                chatId: "chats:stale",
+            }),
+        ).resolves.toBe(true);
+
+        expect(get).toHaveBeenCalledWith("chats:stale");
+        expect(query).toHaveBeenCalledWith("chats");
     });
 
     test("readRuntimeBinding resolves the matching agent when chats share a localId", async () => {

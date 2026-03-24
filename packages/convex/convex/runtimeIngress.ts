@@ -1179,24 +1179,26 @@ export const chatExistsByLocalId = internalQuery({
     handler: async (ctx, args): Promise<boolean> => {
         if (args.chatId) {
             const chat = await ctx.db.get(args.chatId);
-            if (!chat) {
-                return false;
-            }
-
-            return (
+            if (
+                chat &&
                 chat.userId === args.userId &&
                 chat.agentId === args.agentId &&
                 chat.localId === args.localId
-            );
+            ) {
+                return true;
+            }
         }
 
-        const chats = await ctx.db
+        const chat = await ctx.db
             .query("chats")
-            .withIndex("by_local_id", (q) =>
-                q.eq("userId", args.userId).eq("localId", args.localId),
+            .withIndex("by_userId_and_agentId_and_localId", (q) =>
+                q
+                    .eq("userId", args.userId)
+                    .eq("agentId", args.agentId)
+                    .eq("localId", args.localId),
             )
-            .collect();
-        return chats.some((chat) => chat.agentId === args.agentId);
+            .unique();
+        return chat !== null;
     },
 });
 
