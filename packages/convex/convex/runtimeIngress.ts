@@ -182,6 +182,13 @@ async function getRuntimeBindingByChatIdForQuery(
         .unique();
 }
 
+function matchesConversationLocalId(
+    chat: Pick<Doc<"chats">, "_id" | "localId">,
+    localId: string,
+): boolean {
+    return (chat.localId ?? chat._id) === localId;
+}
+
 async function appendRunEvent(
     ctx: RuntimeMutationCtx,
     args: {
@@ -1183,7 +1190,7 @@ export const chatExistsByLocalId = internalQuery({
                 chat &&
                 chat.userId === args.userId &&
                 chat.agentId === args.agentId &&
-                chat.localId === args.localId
+                matchesConversationLocalId(chat, args.localId)
             ) {
                 return true;
             }
@@ -1198,7 +1205,19 @@ export const chatExistsByLocalId = internalQuery({
                     .eq("localId", args.localId),
             )
             .unique();
-        return chat !== null;
+        if (chat !== null) {
+            return true;
+        }
+
+        const legacyChatMatches = await ctx.db
+            .query("chats")
+            .withIndex("by_userId_and_agentId_and_updatedAt", (q) =>
+                q.eq("userId", args.userId).eq("agentId", args.agentId),
+            )
+            .collect();
+        return legacyChatMatches.some((candidate) =>
+            matchesConversationLocalId(candidate, args.localId),
+        );
     },
 });
 

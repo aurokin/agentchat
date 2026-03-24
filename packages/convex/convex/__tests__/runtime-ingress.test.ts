@@ -711,7 +711,12 @@ describe("runtime ingress", () => {
                   }
                 : null,
         );
-        const withIndex = mock(() => ({ unique }));
+        const collect = mock(async () => []);
+        const withIndex = mock((indexName: string) =>
+            indexName === "by_userId_and_agentId_and_localId"
+                ? { unique }
+                : { collect },
+        );
         const query = mock(() => ({ withIndex }));
         const ctx = {
             db: {
@@ -743,7 +748,12 @@ describe("runtime ingress", () => {
             userId: "users:test",
             localId: "chat-1",
         }));
-        const withIndex = mock(() => ({ unique }));
+        const collect = mock(async () => []);
+        const withIndex = mock((indexName: string) =>
+            indexName === "by_userId_and_agentId_and_localId"
+                ? { unique }
+                : { collect },
+        );
         const query = mock(() => ({ withIndex }));
         const get = mock(async () => null);
         const ctx = {
@@ -764,6 +774,37 @@ describe("runtime ingress", () => {
 
         expect(get).toHaveBeenCalledWith("chats:stale");
         expect(query).toHaveBeenCalledWith("chats");
+    });
+
+    test("falls back to legacy chat ids when a chat has no localId", async () => {
+        const unique = mock(async () => null);
+        const collect = mock(async () => [
+            {
+                _id: "chats:legacy",
+                agentId: "agent-a",
+                userId: "users:test",
+                localId: null,
+            },
+        ]);
+        const withIndex = mock((indexName: string) =>
+            indexName === "by_userId_and_agentId_and_localId"
+                ? { unique }
+                : { collect },
+        );
+        const query = mock(() => ({ withIndex }));
+        const ctx = {
+            db: {
+                query,
+            },
+        };
+
+        await expect(
+            runHandler(chatExistsByLocalId as unknown as HandlerExport, ctx, {
+                userId: "users:test",
+                agentId: "agent-a",
+                localId: "chats:legacy",
+            }),
+        ).resolves.toBe(true);
     });
 
     test("readRuntimeBinding resolves the matching agent when chats share a localId", async () => {
