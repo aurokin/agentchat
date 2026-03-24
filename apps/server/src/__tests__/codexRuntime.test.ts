@@ -585,6 +585,81 @@ describe("CodexRuntimeManager", () => {
         expect(fakeClient.stopped).toBe(true);
     });
 
+    test("preserves resume failures and cleans copied workspaces when stop fails during init cleanup", async () => {
+        const sandboxRoot = makeTempDir("sandbox");
+        const agentRoot = makeTempDir("agent-root");
+        writeFileSync(path.join(agentRoot, "version.txt"), "first");
+
+        const config = createConfig();
+        config.sandboxRoot = sandboxRoot;
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath: agentRoot,
+            workspaceMode: "copy-on-conversation",
+        };
+
+        const workspaceManager = createWorkspaceManager(() => config);
+        const workspacePath = workspaceManager.getWorkspacePath(
+            "agent-1",
+            "user-1",
+            "chat-1",
+        );
+        const persistence = createPersistence({
+            provider: "codex-default",
+            providerThreadId: "thread-stale",
+            workspaceMode: "copy-on-conversation",
+            workspaceRootPath: agentRoot,
+            workspaceCwd: workspacePath,
+        });
+        const stopError = new Error("stop timeout");
+        const fakeClient = new FakeCodexClient({
+            resumeError: new Error(
+                "thread/resume failed: timed out waiting for server",
+            ),
+            stopError,
+        });
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: () => fakeClient,
+            workspaceManager,
+        });
+        const originalConsoleError = console.error;
+        const consoleErrorCalls: unknown[][] = [];
+        console.error = ((...args: unknown[]) => {
+            consoleErrorCalls.push(args);
+        }) as typeof console.error;
+
+        try {
+            await expect(
+                manager.sendMessage({
+                    userId: "user-1",
+                    subscriberId: "socket-1",
+                    command: createCommand(),
+                    sendEvent: () => undefined,
+                }),
+            ).rejects.toThrow(
+                "thread/resume failed: timed out waiting for server",
+            );
+
+            expect(
+                fakeClient.requests.map((request) => request.method),
+            ).toEqual(["thread/resume"]);
+            expect(fakeClient.stopped).toBe(true);
+            expect(existsSync(workspacePath)).toBe(false);
+            expect(consoleErrorCalls).toContainEqual([
+                "[agentchat-server] failed to stop Codex client during non-recoverable thread resume cleanup",
+                stopError,
+            ]);
+            expect(consoleErrorCalls).toContainEqual([
+                "[agentchat-server] failed to stop Codex client during failed runtime initialization cleanup",
+                stopError,
+            ]);
+        } finally {
+            console.error = originalConsoleError;
+        }
+    });
+
     test("replays the active run snapshot to newly subscribed clients", async () => {
         const config = createConfig();
         const persistence = createPersistence(null);
@@ -1751,6 +1826,63 @@ describe("CodexRuntimeManager", () => {
             activeRunId: null,
         });
         expect(fakeClient.stopped).toBe(true);
+    });
+
+    test("clears stale runtimes when stop fails during send-start teardown", async () => {
+        const config = createConfig();
+        const persistence = createPersistence(null);
+        const stopError = new Error("stop timeout");
+        const firstClient = new FakeCodexClient({
+            turnStartError: new Error("turn/start failed: codex unavailable"),
+            stopError,
+        });
+        const secondClient = new FakeCodexClient({
+            startedThreadId: "thread-retry",
+        });
+        const clients = [firstClient, secondClient];
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: () => {
+                const client = clients.shift();
+                if (!client) {
+                    throw new Error("No fake client available");
+                }
+                return client;
+            },
+        });
+        const originalConsoleError = console.error;
+        const consoleErrorCalls: unknown[][] = [];
+        console.error = ((...args: unknown[]) => {
+            consoleErrorCalls.push(args);
+        }) as typeof console.error;
+
+        try {
+            await manager.sendMessage({
+                userId: "user-1",
+                subscriberId: "socket-1",
+                command: createCommand(),
+                sendEvent: () => undefined,
+            });
+
+            await manager.sendMessage({
+                userId: "user-1",
+                subscriberId: "socket-2",
+                command: createCommand(),
+                sendEvent: () => undefined,
+            });
+
+            expect(firstClient.stopped).toBe(true);
+            expect(
+                secondClient.requests.map((request) => request.method),
+            ).toEqual(["thread/start", "turn/start"]);
+            expect(consoleErrorCalls).toContainEqual([
+                "[agentchat-server] failed to stop Codex client during runtime disposal",
+                stopError,
+            ]);
+        } finally {
+            console.error = originalConsoleError;
+        }
     });
 
     test("persists crashed runs when the runtime exits mid-stream", async () => {

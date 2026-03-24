@@ -1159,7 +1159,10 @@ export class CodexRuntimeManager {
         }
 
         if (params.client) {
-            await params.client.stop();
+            await this.stopClientSafely(
+                params.client,
+                "canceled runtime initialization",
+            );
         }
         if (
             params.cleanupWorkspace &&
@@ -1231,7 +1234,10 @@ export class CodexRuntimeManager {
         cleanupWorkspace: boolean;
     }): Promise<void> {
         if (params.client) {
-            await params.client.stop();
+            await this.stopClientSafely(
+                params.client,
+                "failed runtime initialization cleanup",
+            );
         }
         if (
             params.cleanupWorkspace &&
@@ -1472,7 +1478,10 @@ export class CodexRuntimeManager {
                 };
             } catch (error) {
                 if (!isRecoverableThreadResumeError(error)) {
-                    await params.client.stop();
+                    await this.stopClientSafely(
+                        params.client,
+                        "non-recoverable thread resume cleanup",
+                    );
                     throw error;
                 }
             }
@@ -2105,13 +2114,13 @@ export class CodexRuntimeManager {
             runtime.activeTurn = null;
         }
 
-        await runtime.client.stop();
         if (
             params.removeFromMap &&
             this.runtimes.get(runtime.key) === runtime
         ) {
             this.runtimes.delete(runtime.key);
         }
+        await this.stopClientSafely(runtime.client, "runtime disposal");
     }
 }
 
