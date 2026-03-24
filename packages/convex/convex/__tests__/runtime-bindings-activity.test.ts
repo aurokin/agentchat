@@ -10,6 +10,7 @@ describe("runtime binding activity", () => {
         expect(
             resolvePersistedConversationActivity({
                 status: "active",
+                activeRunId: "run-1",
                 lastEventAt: 20,
                 lastViewedAt: 10,
             }),
@@ -23,6 +24,7 @@ describe("runtime binding activity", () => {
         expect(
             resolvePersistedConversationActivity({
                 status: "errored",
+                activeRunId: null,
                 lastEventAt: 20,
                 lastViewedAt: 10,
             }),
@@ -36,6 +38,7 @@ describe("runtime binding activity", () => {
         expect(
             resolvePersistedConversationActivity({
                 status: "idle",
+                activeRunId: null,
                 lastEventAt: 20,
                 lastViewedAt: 10,
             }),
@@ -49,8 +52,20 @@ describe("runtime binding activity", () => {
         expect(
             resolvePersistedConversationActivity({
                 status: "idle",
+                activeRunId: null,
                 lastEventAt: 20,
                 lastViewedAt: 20,
+            }),
+        ).toBeNull();
+    });
+
+    test("does not mark active bindings without a run id as working", () => {
+        expect(
+            resolvePersistedConversationActivity({
+                status: "active",
+                activeRunId: null,
+                lastEventAt: 20,
+                lastViewedAt: 10,
             }),
         ).toBeNull();
     });

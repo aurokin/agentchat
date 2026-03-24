@@ -8,17 +8,25 @@ import {
 } from "../conversation-runtime-events";
 
 describe("mobile conversation runtime events", () => {
+    const activeRun = {
+        conversationId: "chat-1",
+        agentId: "agent-1",
+        assistantMessageId: "assistant-1",
+        userContent: "hello",
+        content: "",
+        runId: "run-1",
+    } as const;
+
     test("plans a recovered run.started with reconnect notice state", () => {
         expect(
             planMobileRunLifecycleResolution({
                 resolution: {
                     type: "run.started",
                     activeRun: {
-                        conversationId: "chat-1",
+                        ...activeRun,
                         assistantMessageId: "assistant-1",
                         userContent: "hello",
                         content: "Recovered output",
-                        runId: "run-1",
                     },
                     recovered: true,
                     streamingMessage: {
@@ -31,11 +39,10 @@ describe("mobile conversation runtime events", () => {
         ).toEqual({
             type: "run.started",
             activeRun: {
-                conversationId: "chat-1",
+                ...activeRun,
                 assistantMessageId: "assistant-1",
                 userContent: "hello",
                 content: "Recovered output",
-                runId: "run-1",
             },
             shouldSetLoading: true,
             error: null,
@@ -53,13 +60,7 @@ describe("mobile conversation runtime events", () => {
             planMobileRunLifecycleResolution({
                 resolution: {
                     type: "run.started",
-                    activeRun: {
-                        conversationId: "chat-1",
-                        assistantMessageId: "assistant-1",
-                        userContent: "hello",
-                        content: "",
-                        runId: "run-1",
-                    },
+                    activeRun,
                     recovered: false,
                     streamingMessage: null,
                 },
@@ -71,13 +72,7 @@ describe("mobile conversation runtime events", () => {
             }),
         ).toEqual({
             type: "run.started",
-            activeRun: {
-                conversationId: "chat-1",
-                assistantMessageId: "assistant-1",
-                userContent: "hello",
-                content: "",
-                runId: "run-1",
-            },
+            activeRun,
             shouldSetLoading: true,
             error: {
                 message: "interrupt failed",
@@ -110,11 +105,10 @@ describe("mobile conversation runtime events", () => {
         expect(
             planMobileConnectionError({
                 activeRun: {
-                    conversationId: "chat-1",
+                    ...activeRun,
                     assistantMessageId: "assistant-1",
                     userContent: "hello",
                     content: "Partial output",
-                    runId: "run-1",
                 },
                 event,
             }),
@@ -137,6 +131,7 @@ describe("mobile conversation runtime events", () => {
             type: "message.completed",
             activeRun: {
                 conversationId: "chat-1",
+                agentId: "agent-1",
                 assistantMessageId: "assistant-2",
                 userContent: "hello",
                 content: "second message",

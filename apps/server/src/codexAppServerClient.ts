@@ -23,7 +23,7 @@ export type CodexClient = {
         handler: (notification: JsonRpcNotification) => void,
     ) => void;
     onExit: (handler: (error: Error) => void) => void;
-    stop: () => void;
+    stop: () => Promise<void>;
 };
 
 export type CreateCodexClient = (params: {
@@ -36,6 +36,8 @@ function toJsonLine(value: unknown): string {
 }
 
 export class CodexAppServerClient implements CodexClient {
+    private static readonly DEFAULT_STOP_TIMEOUT_MS = 5_000;
+
     private readonly child: ChildProcessWithoutNullStreams;
     private readonly pending = new Map<
         number,
@@ -51,9 +53,25 @@ export class CodexAppServerClient implements CodexClient {
     private exitHandler: ((error: Error) => void) | null = null;
     private isStopping = false;
     private hasExited = false;
+    private readonly exitPromise: Promise<void>;
+    private readonly resolveExitPromise: () => void;
+    private readonly stopTimeoutMs: number;
+    private stopPromise: Promise<void> | null = null;
 
-    constructor(params: { provider: ProviderConfig; agent: AgentConfig }) {
+    constructor(params: {
+        provider: ProviderConfig;
+        agent: AgentConfig;
+        stopTimeoutMs?: number;
+    }) {
         const { provider } = params;
+        this.stopTimeoutMs =
+            params.stopTimeoutMs ??
+            CodexAppServerClient.DEFAULT_STOP_TIMEOUT_MS;
+        let resolveExitPromise!: () => void;
+        this.exitPromise = new Promise<void>((resolve) => {
+            resolveExitPromise = resolve;
+        });
+        this.resolveExitPromise = resolveExitPromise;
         this.child = spawn(provider.codex.command, provider.codex.args, {
             cwd: provider.codex.cwd ?? params.agent.rootPath,
             env: {
@@ -115,6 +133,7 @@ export class CodexAppServerClient implements CodexClient {
                 return;
             }
             this.hasExited = true;
+            this.resolveExitPromise();
             for (const [, pending] of this.pending) {
                 pending.reject(error);
             }
@@ -129,6 +148,7 @@ export class CodexAppServerClient implements CodexClient {
                 return;
             }
             this.hasExited = true;
+            this.resolveExitPromise();
             const error = new Error(
                 `Codex app-server exited (${code ?? "null"} / ${signal ?? "null"})`,
             );
@@ -188,8 +208,70 @@ export class CodexAppServerClient implements CodexClient {
         );
     }
 
-    stop(): void {
+    async stop(): Promise<void> {
+        if (this.stopPromise) {
+            return await this.stopPromise;
+        }
+
         this.isStopping = true;
-        this.child.kill("SIGTERM");
+        if (this.hasExited) {
+            return;
+        }
+
+        this.stopPromise = (async () => {
+            this.tryKill("SIGTERM");
+            if (await this.waitForExit(this.stopTimeoutMs)) {
+                return;
+            }
+
+            this.tryKill("SIGKILL");
+            if (await this.waitForExit(this.stopTimeoutMs)) {
+                return;
+            }
+
+            throw new Error(
+                `Codex app-server did not exit within ${this.stopTimeoutMs}ms after SIGTERM/SIGKILL`,
+            );
+        })();
+
+        try {
+            await this.stopPromise;
+        } finally {
+            this.stopPromise = null;
+        }
+    }
+
+    private tryKill(signal: NodeJS.Signals): void {
+        if (this.hasExited) {
+            return;
+        }
+
+        try {
+            this.child.kill(signal);
+        } catch (error) {
+            if (!this.hasExited) {
+                throw error;
+            }
+        }
+    }
+
+    private async waitForExit(timeoutMs: number): Promise<boolean> {
+        let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+        try {
+            return await Promise.race([
+                this.exitPromise.then(() => true),
+                new Promise<boolean>((resolve) => {
+                    timeoutId = setTimeout(() => {
+                        timeoutId = null;
+                        resolve(false);
+                    }, timeoutMs);
+                }),
+            ]);
+        } finally {
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+            }
+        }
     }
 }

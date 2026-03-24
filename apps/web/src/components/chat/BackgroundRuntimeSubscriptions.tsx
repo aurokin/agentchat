@@ -46,18 +46,16 @@ export function BackgroundRuntimeSubscriptions() {
     }, []);
 
     useEffect(() => {
-        if (!isWorkspaceReady || !activeConversations) {
+        if (!isWorkspaceReady) {
             clearBackgroundConversationSubscriptions(subscriptionsRef.current);
             return;
         }
 
         const activeCount = reconcileBackgroundConversationSubscriptions({
             subscriptions: subscriptionsRef.current,
-            desiredConversationIds: activeConversations.map(
-                (entry) => entry.conversationId,
-            ),
-            subscribeToConversation: (conversationId) =>
-                socketClient.subscribeToConversation(conversationId),
+            desiredConversations: activeConversations,
+            subscribeToConversation: ({ conversationId, agentId }) =>
+                socketClient.subscribeToConversation(conversationId, agentId),
         });
 
         if (activeCount === 0) {

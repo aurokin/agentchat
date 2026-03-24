@@ -20,8 +20,10 @@ export function createMemoryAdapter(
             chats.push(chat);
             return chat.id;
         },
-        async getChat(id) {
-            return chats.find((chat) => chat.id === id);
+        async getChat(id, agentId) {
+            return chats.find(
+                (chat) => chat.id === id && chat.agentId === agentId,
+            );
         },
         async getAllChats() {
             return [...chats];
@@ -32,8 +34,10 @@ export function createMemoryAdapter(
                 chats[index] = chat;
             }
         },
-        async markChatViewed(chatId, timestamp) {
-            const index = findIndexById(chats, chatId);
+        async markChatViewed(chatId, timestamp, agentId) {
+            const index = chats.findIndex(
+                (chat) => chat.id === chatId && chat.agentId === agentId,
+            );
             if (index >= 0) {
                 const existingChat = chats[index];
                 if (!existingChat) {
@@ -45,14 +49,25 @@ export function createMemoryAdapter(
                 };
             }
         },
-        async deleteChat(id) {
-            const index = findIndexById(chats, id);
+        async deleteChat(id, agentId) {
+            const index = chats.findIndex(
+                (chat) => chat.id === id && chat.agentId === agentId,
+            );
             if (index >= 0) {
                 chats.splice(index, 1);
             }
+            return id;
         },
 
-        async createMessage(message) {
+        async createMessage(message, agentId) {
+            const chat = chats.find(
+                (candidate) =>
+                    candidate.id === message.sessionId &&
+                    candidate.agentId === agentId,
+            );
+            if (!chat) {
+                throw new Error(`Chat not found: ${message.sessionId}`);
+            }
             messages.push(message);
             return message.id;
         },
@@ -62,10 +77,24 @@ export function createMemoryAdapter(
                 messages[index] = message;
             }
         },
-        async getMessagesByChat(chatId) {
+        async getMessagesByChat(chatId, agentId) {
+            const chat = chats.find(
+                (candidate) =>
+                    candidate.id === chatId && candidate.agentId === agentId,
+            );
+            if (!chat) {
+                return [];
+            }
             return messages.filter((message) => message.sessionId === chatId);
         },
-        async deleteMessagesByChat(chatId) {
+        async deleteMessagesByChat(chatId, agentId) {
+            const chat = chats.find(
+                (candidate) =>
+                    candidate.id === chatId && candidate.agentId === agentId,
+            );
+            if (!chat) {
+                return;
+            }
             for (let i = messages.length - 1; i >= 0; i -= 1) {
                 const message = messages[i];
                 if (message?.sessionId === chatId) {

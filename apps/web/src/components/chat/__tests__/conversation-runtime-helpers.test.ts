@@ -67,12 +67,14 @@ describe("conversation runtime helpers", () => {
         expect(
             createRecoveredActiveRunFromSocket({
                 conversationId: "chat-1",
+                agentId: "agent-1",
                 messageId: "assistant-1",
                 runId: "run-1",
                 messages: createMessages(),
             }),
         ).toEqual({
             conversationId: "chat-1",
+            agentId: "agent-1",
             assistantMessageId: "assistant-1",
             userContent: "First prompt",
             content: "Partial answer",
@@ -89,6 +91,7 @@ describe("conversation runtime helpers", () => {
             }),
         ).toEqual({
             conversationId: "chat-1",
+            agentId: "agent-1",
             assistantMessageId: "assistant-1",
             userContent: "First prompt",
             content: "Partial answer",
@@ -105,6 +108,7 @@ describe("conversation runtime helpers", () => {
             }),
         ).toEqual({
             conversationId: "chat-1",
+            agentId: "agent-1",
             assistantMessageId: "assistant-1",
             userContent: "First prompt",
             content: "Partial answer",

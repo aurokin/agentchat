@@ -3,16 +3,19 @@ import type { SocketEventResolution } from "../conversation-runtime-controller";
 import { planConversationMessageLifecycleResolution } from "../conversation-runtime-messages";
 
 describe("conversation runtime messages", () => {
+    const activeRun = {
+        conversationId: "chat-1",
+        agentId: "agent-1",
+        assistantMessageId: "assistant-2",
+        userContent: "hello",
+        content: "second message",
+        runId: "run-1",
+    } as const;
+
     test("plans message.started inserts with previous message patching", () => {
         const resolution: SocketEventResolution = {
             type: "message.started",
-            activeRun: {
-                conversationId: "chat-1",
-                assistantMessageId: "assistant-2",
-                userContent: "hello",
-                content: "second message",
-                runId: "run-1",
-            },
+            activeRun,
             message: {
                 id: "assistant-2",
                 sessionId: "chat-1",
@@ -35,13 +38,7 @@ describe("conversation runtime messages", () => {
 
         expect(planConversationMessageLifecycleResolution(resolution)).toEqual({
             type: "message.started",
-            activeRun: {
-                conversationId: "chat-1",
-                assistantMessageId: "assistant-2",
-                userContent: "hello",
-                content: "second message",
-                runId: "run-1",
-            },
+            activeRun,
             insertedMessage: resolution.message,
             previousMessagePatch: {
                 id: "assistant-1",
@@ -57,13 +54,7 @@ describe("conversation runtime messages", () => {
     test("plans message.completed streaming updates only for the active assistant message", () => {
         const activeAssistantResolution: SocketEventResolution = {
             type: "message.completed",
-            activeRun: {
-                conversationId: "chat-1",
-                assistantMessageId: "assistant-2",
-                userContent: "hello",
-                content: "second message",
-                runId: "run-1",
-            },
+            activeRun,
             messageId: "assistant-2",
             finalContent: "second message",
         };

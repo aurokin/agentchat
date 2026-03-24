@@ -29,6 +29,15 @@ function createSyncResolution(
     };
 }
 
+const recoveredRun = {
+    conversationId: "chat-1",
+    agentId: "agent-1",
+    assistantMessageId: "assistant-1",
+    userContent: "hello",
+    content: "Recovered output",
+    runId: "run-1",
+} as const;
+
 describe("conversation runtime sync", () => {
     test("keeps the pending reconnect notice for one grace pass after a local reset", () => {
         expect(
@@ -48,13 +57,7 @@ describe("conversation runtime sync", () => {
         expect(
             shouldClearPendingReconnectNoticeAfterSync({
                 syncResolution: createSyncResolution({
-                    recoveredRun: {
-                        conversationId: "chat-1",
-                        assistantMessageId: "assistant-1",
-                        userContent: "hello",
-                        content: "Recovered output",
-                        runId: "run-1",
-                    },
+                    recoveredRun,
                 }),
                 runtimeState: createRuntimeState({
                     phase: "recovering",

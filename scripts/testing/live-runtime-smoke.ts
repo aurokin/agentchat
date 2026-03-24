@@ -1716,10 +1716,15 @@ type PersistedRunState = {
         provider: string;
         status: string;
         providerThreadId: string | null;
+        providerResumeToken: string | null;
         activeRunId: string | null;
         lastError: string | null;
         lastEventAt: number | null;
         expiresAt: number | null;
+        workspaceMode?: "shared" | "copy-on-conversation";
+        workspaceRootPath?: string;
+        workspaceCwd?: string;
+        updatedAt: number;
     } | null;
     persistedMessages: Array<{
         localId?: string | null;
@@ -1735,6 +1740,7 @@ async function readPersistedRunState(params: {
     repoRoot: string;
     identity: Identity;
     userId: string;
+    agentId: string;
     chatId: string;
     assistantMessageLocalId: string;
     conversationLocalId: string;
@@ -1824,18 +1830,27 @@ async function readPersistedRunState(params: {
     });
 
     const binding = await postRuntimeIngress<{
-        provider: string;
-        status: string;
-        providerThreadId: string | null;
-        activeRunId: string | null;
-        lastError: string | null;
-        lastEventAt: number | null;
-        expiresAt: number | null;
+        chatId: string;
+        binding: {
+            provider: string;
+            status: string;
+            providerThreadId: string | null;
+            providerResumeToken: string | null;
+            activeRunId: string | null;
+            lastError: string | null;
+            lastEventAt: number | null;
+            expiresAt: number | null;
+            workspaceMode?: "shared" | "copy-on-conversation";
+            workspaceRootPath?: string;
+            workspaceCwd?: string;
+            updatedAt: number;
+        } | null;
     } | null>({
         repoRoot: params.repoRoot,
         path: "/runtime/runtime-binding/read",
         payload: {
             userId: params.userId,
+            agentId: params.agentId,
             conversationLocalId: params.conversationLocalId,
         },
     });
@@ -1846,7 +1861,7 @@ async function readPersistedRunState(params: {
         persistedMessages,
         run,
         runEvents,
-        binding,
+        binding: binding?.binding ?? null,
     };
 }
 
@@ -1854,6 +1869,7 @@ async function waitForPersistedTerminalState(params: {
     repoRoot: string;
     identity: Identity;
     userId: string;
+    agentId: string;
     chatId: string;
     assistantMessageLocalId: string;
     conversationLocalId: string;
@@ -1887,6 +1903,7 @@ async function waitForPersistedTerminalState(params: {
 async function tryCollectFailureSnapshot(params: {
     repoRoot: string;
     userId: string;
+    agentId: string;
     identity: Identity | null;
     conversationLocalId: string;
     assistantMessageLocalId: string;
@@ -1897,6 +1914,7 @@ async function tryCollectFailureSnapshot(params: {
             functionName: "chats:getByLocalId",
             args: {
                 userId: params.userId,
+                agentId: params.agentId,
                 localId: params.conversationLocalId,
             },
             identity: params.identity ?? undefined,
@@ -1945,6 +1963,7 @@ async function tryCollectFailureSnapshot(params: {
             path: "/runtime/runtime-binding/read",
             payload: {
                 userId: params.userId,
+                agentId: params.agentId,
                 conversationLocalId: params.conversationLocalId,
             },
         });
@@ -2010,10 +2029,15 @@ function assertTerminalBinding(params: {
         provider: string;
         status: string;
         providerThreadId: string | null;
+        providerResumeToken: string | null;
         activeRunId: string | null;
         lastError: string | null;
         lastEventAt: number | null;
         expiresAt: number | null;
+        workspaceMode?: "shared" | "copy-on-conversation";
+        workspaceRootPath?: string;
+        workspaceCwd?: string;
+        updatedAt: number;
     } | null;
     expectedProvider: string;
     expectedThreadId?: string | null;
@@ -2049,6 +2073,35 @@ function assertTerminalBinding(params: {
             params.binding.providerThreadId.length > 0,
         "Expected runtime binding providerThreadId to be persisted.",
     );
+    invariant(
+        params.binding.providerResumeToken === null,
+        "Expected runtime binding providerResumeToken to remain null for Codex runs.",
+    );
+    invariant(
+        typeof params.binding.updatedAt === "number",
+        "Expected runtime binding updatedAt to be persisted.",
+    );
+    invariant(
+        params.binding.workspaceMode === "shared" ||
+            params.binding.workspaceMode === "copy-on-conversation",
+        `Expected runtime binding workspaceMode to be persisted, got ${params.binding.workspaceMode}.`,
+    );
+    invariant(
+        typeof params.binding.workspaceRootPath === "string" &&
+            params.binding.workspaceRootPath.length > 0,
+        "Expected runtime binding workspaceRootPath to be persisted.",
+    );
+    invariant(
+        typeof params.binding.workspaceCwd === "string" &&
+            params.binding.workspaceCwd.length > 0,
+        "Expected runtime binding workspaceCwd to be persisted.",
+    );
+    if (params.binding.workspaceMode === "shared") {
+        invariant(
+            params.binding.workspaceCwd === params.binding.workspaceRootPath,
+            "Expected shared workspace bindings to reuse the root path as cwd.",
+        );
+    }
     if (params.expectedThreadId) {
         invariant(
             params.binding.providerThreadId === params.expectedThreadId,
@@ -2498,6 +2551,7 @@ async function runLiveRuntimeSmoke(
         const snapshot = await tryCollectFailureSnapshot({
             repoRoot,
             userId,
+            agentId,
             identity,
             conversationLocalId: ids.conversationId,
             assistantMessageLocalId: ids.assistantMessageId,
@@ -2580,6 +2634,7 @@ async function runLiveRuntimeSmoke(
                 repoRoot,
                 identity: entry.identity,
                 userId: entry.userId,
+                agentId: entry.agentId,
                 chatId: entry.chatId,
                 assistantMessageLocalId: entry.ids.assistantMessageId,
                 conversationLocalId: entry.ids.conversationId,
@@ -2654,6 +2709,7 @@ async function runLiveRuntimeSmoke(
             repoRoot,
             identity,
             userId,
+            agentId,
             chatId,
             assistantMessageLocalId: ids.assistantMessageId,
             conversationLocalId: ids.conversationId,

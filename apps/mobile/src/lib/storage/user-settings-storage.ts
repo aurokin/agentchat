@@ -1,11 +1,11 @@
-import * as SecureStore from "expo-secure-store";
+import { getItemAsync, setItemAsync, deleteItemAsync } from "./secure-store";
 
 const SELECTED_AGENT_KEY = "agentchat-selected-agent";
 const SELECTED_CHAT_BY_AGENT_KEY = "agentchat-selected-chat-by-agent";
 
 async function getStringMap(key: string): Promise<Record<string, string>> {
     try {
-        const stored = await SecureStore.getItemAsync(key);
+        const stored = await getItemAsync(key);
         if (!stored) return {};
         const parsed = JSON.parse(stored) as unknown;
         if (!parsed || typeof parsed !== "object") {
@@ -31,7 +31,7 @@ async function setStringMap(
     value: Record<string, string>,
 ): Promise<void> {
     try {
-        await SecureStore.setItemAsync(key, JSON.stringify(value));
+        await setItemAsync(key, JSON.stringify(value));
     } catch (error) {
         console.error(`Failed to save ${key}:`, error);
     }
@@ -39,7 +39,7 @@ async function setStringMap(
 
 export async function getSelectedAgentId(): Promise<string | null> {
     try {
-        return await SecureStore.getItemAsync(SELECTED_AGENT_KEY);
+        return await getItemAsync(SELECTED_AGENT_KEY);
     } catch {
         return null;
     }
@@ -47,7 +47,7 @@ export async function getSelectedAgentId(): Promise<string | null> {
 
 export async function setSelectedAgentId(agentId: string): Promise<void> {
     try {
-        await SecureStore.setItemAsync(SELECTED_AGENT_KEY, agentId);
+        await setItemAsync(SELECTED_AGENT_KEY, agentId);
     } catch (error) {
         console.error("Failed to save selected agent:", error);
     }
@@ -55,7 +55,7 @@ export async function setSelectedAgentId(agentId: string): Promise<void> {
 
 export async function clearSelectedAgentId(): Promise<void> {
     try {
-        await SecureStore.deleteItemAsync(SELECTED_AGENT_KEY);
+        await deleteItemAsync(SELECTED_AGENT_KEY);
     } catch (error) {
         console.error("Failed to clear selected agent:", error);
     }

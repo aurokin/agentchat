@@ -1,3 +1,5 @@
+import { getConversationScopeKey } from "./conversation-scope-key";
+
 export interface ConversationHistoryEntry {
     role: "user" | "assistant" | "system";
     content: string;
@@ -23,6 +25,7 @@ export interface ConversationInterruptCommand {
     type: "conversation.interrupt";
     payload: {
         conversationId: string;
+        agentId: string;
     };
 }
 
@@ -31,13 +34,25 @@ export interface ConversationSubscriptionCommand {
     type: "conversation.subscribe" | "conversation.unsubscribe";
     payload: {
         conversationId: string;
+        agentId: string;
+    };
+}
+
+export interface ConversationDeleteCommand {
+    id: string;
+    type: "conversation.delete";
+    payload: {
+        conversationId: string;
+        agentId: string;
+        chatId?: string;
     };
 }
 
 export type AgentchatSocketCommand =
     | ConversationSendCommand
     | ConversationInterruptCommand
-    | ConversationSubscriptionCommand;
+    | ConversationSubscriptionCommand
+    | ConversationDeleteCommand;
 
 export type AgentchatSocketEvent =
     | {
@@ -66,6 +81,7 @@ export type AgentchatSocketEvent =
     | {
           type: "run.started";
           payload: {
+              agentId: string;
               conversationId: string;
               runId: string;
               messageId: string;
@@ -74,6 +90,7 @@ export type AgentchatSocketEvent =
     | {
           type: "message.started";
           payload: {
+              agentId: string;
               conversationId: string;
               runId: string;
               messageId: string;
@@ -87,6 +104,7 @@ export type AgentchatSocketEvent =
     | {
           type: "run.completed" | "run.interrupted";
           payload: {
+              agentId: string;
               conversationId: string;
               runId: string;
           };
@@ -94,6 +112,7 @@ export type AgentchatSocketEvent =
     | {
           type: "run.failed";
           payload: {
+              agentId: string;
               conversationId: string;
               runId: string;
               error: {
@@ -104,6 +123,7 @@ export type AgentchatSocketEvent =
     | {
           type: "message.delta";
           payload: {
+              agentId: string;
               conversationId: string;
               messageId: string;
               delta: string;
@@ -113,6 +133,7 @@ export type AgentchatSocketEvent =
     | {
           type: "message.completed";
           payload: {
+              agentId: string;
               conversationId: string;
               messageId: string;
               content: string;
@@ -150,7 +171,14 @@ export class AgentchatSocketClient {
     private socket: WebSocket | null = null;
     private connectPromise: Promise<void> | null = null;
     private readonly listeners = new Set<AgentchatSocketListener>();
-    private readonly conversationSubscriptions = new Map<string, number>();
+    private readonly conversationSubscriptions = new Map<
+        string,
+        {
+            conversationId: string;
+            agentId: string;
+            subscriptionCount: number;
+        }
+    >();
     private ready = false;
     private tokenIssuer: TokenIssuer | null = null;
     private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -186,33 +214,47 @@ export class AgentchatSocketClient {
         };
     }
 
-    subscribeToConversation(conversationId: string): () => void {
-        const nextCount =
-            (this.conversationSubscriptions.get(conversationId) ?? 0) + 1;
-        this.conversationSubscriptions.set(conversationId, nextCount);
+    subscribeToConversation(
+        conversationId: string,
+        agentId: string,
+    ): () => void {
+        const key = this.getConversationSubscriptionKey(
+            conversationId,
+            agentId,
+        );
+        const existing = this.conversationSubscriptions.get(key);
+        const nextCount = (existing?.subscriptionCount ?? 0) + 1;
+        this.conversationSubscriptions.set(key, {
+            conversationId,
+            agentId,
+            subscriptionCount: nextCount,
+        });
         if (nextCount === 1) {
             this.sendConversationSubscription(
                 "conversation.subscribe",
                 conversationId,
+                agentId,
             );
         }
 
         return () => {
             const currentCount =
-                this.conversationSubscriptions.get(conversationId) ?? 0;
+                this.conversationSubscriptions.get(key)?.subscriptionCount ?? 0;
             if (currentCount <= 1) {
-                this.conversationSubscriptions.delete(conversationId);
+                this.conversationSubscriptions.delete(key);
                 this.sendConversationSubscription(
                     "conversation.unsubscribe",
                     conversationId,
+                    agentId,
                 );
                 return;
             }
 
-            this.conversationSubscriptions.set(
+            this.conversationSubscriptions.set(key, {
                 conversationId,
-                currentCount - 1,
-            );
+                agentId,
+                subscriptionCount: currentCount - 1,
+            });
         };
     }
 
@@ -222,6 +264,42 @@ export class AgentchatSocketClient {
         }
 
         this.socket.send(JSON.stringify(command));
+    }
+
+    /**
+     * Best-effort notification to the server that a conversation was deleted,
+     * so it can clean up any sandbox workspace. Connects first if needed
+     * and a token issuer is available; otherwise silently ignored.
+     */
+    async notifyConversationDeleted(
+        conversationId: string,
+        agentId: string,
+        tokenIssuer?: (() => Promise<string>) | null,
+        chatId?: string,
+    ): Promise<void> {
+        const effectiveTokenIssuer = tokenIssuer ?? this.tokenIssuer;
+        if (
+            (!this.socket || this.socket.readyState !== WebSocket.OPEN) &&
+            effectiveTokenIssuer
+        ) {
+            try {
+                await this.ensureConnected(effectiveTokenIssuer);
+            } catch {
+                return;
+            }
+        }
+
+        if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+            return;
+        }
+
+        this.socket.send(
+            JSON.stringify({
+                id: this.options.createId(),
+                type: "conversation.delete",
+                payload: { conversationId, agentId, chatId },
+            } satisfies ConversationDeleteCommand),
+        );
     }
 
     close(): void {
@@ -335,17 +413,26 @@ export class AgentchatSocketClient {
     }
 
     private replayConversationSubscriptions(): void {
-        for (const conversationId of this.conversationSubscriptions.keys()) {
+        for (const subscription of this.conversationSubscriptions.values()) {
             this.sendConversationSubscription(
                 "conversation.subscribe",
-                conversationId,
+                subscription.conversationId,
+                subscription.agentId,
             );
         }
+    }
+
+    private getConversationSubscriptionKey(
+        conversationId: string,
+        agentId: string,
+    ): string {
+        return getConversationScopeKey(conversationId, agentId);
     }
 
     private sendConversationSubscription(
         type: "conversation.subscribe" | "conversation.unsubscribe",
         conversationId: string,
+        agentId: string,
     ): void {
         if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
             return;
@@ -357,6 +444,7 @@ export class AgentchatSocketClient {
                 type,
                 payload: {
                     conversationId,
+                    agentId,
                 },
             } satisfies ConversationSubscriptionCommand),
         );

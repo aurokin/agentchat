@@ -64,7 +64,10 @@ export type ConversationSendRuntimeDependencies = {
 };
 
 export type ConversationSocketSessionDependencies = {
-    subscribeToConversation: (conversationId: string) => () => void;
+    subscribeToConversation: (
+        conversationId: string,
+        agentId: string,
+    ) => () => void;
     ensureConnected: () => Promise<void>;
     onConnectionError?: (error: unknown) => void;
 };
@@ -82,15 +85,16 @@ export type ConversationSendRuntimeResult =
       };
 
 export function connectConversationSocket(params: {
-    currentChatId: string | null;
+    currentChat: Pick<ChatSession, "id" | "agentId"> | null;
     dependencies: ConversationSocketSessionDependencies;
 }): (() => void) | null {
-    if (!params.currentChatId) {
+    if (!params.currentChat) {
         return null;
     }
 
     const unsubscribe = params.dependencies.subscribeToConversation(
-        params.currentChatId,
+        params.currentChat.id,
+        params.currentChat.agentId,
     );
     void params.dependencies.ensureConnected().catch((error) => {
         params.dependencies.onConnectionError?.(error);
@@ -176,7 +180,10 @@ export function interruptConversationRun(params: {
 
     try {
         params.sendCommand(
-            buildInterruptCommand(params.activeRun.conversationId),
+            buildInterruptCommand(
+                params.activeRun.conversationId,
+                params.activeRun.agentId,
+            ),
         );
         return null;
     } catch (cancelError) {
@@ -197,6 +204,7 @@ export type RequestConversationInterruptResult = {
 
 export function requestConversationInterrupt(params: {
     activeRun: ActiveRunState | null;
+    agentId: string | null;
     isSending: boolean;
     queuePendingInterrupt: () => void;
     sendCommand: (command: ConversationInterruptCommand) => void;
@@ -231,6 +239,7 @@ export function requestConversationInterrupt(params: {
 export function flushPendingConversationInterrupt(params: {
     pendingInterrupt: boolean;
     activeRun: ActiveRunState | null;
+    agentId: string | null;
     sendCommand: (command: ConversationInterruptCommand) => void;
 }): RuntimeErrorState | null {
     if (!params.pendingInterrupt || !params.activeRun) {
@@ -264,6 +273,7 @@ export function resolveConversationRuntimeSync(params: {
 
     const shouldReset = shouldResetActiveRunForRuntimeSnapshot({
         currentConversationId: params.currentChat.id,
+        currentAgentId: params.currentChat.agentId,
         runtimeState: params.runtimeState,
         activeRun: params.activeRun,
     });
@@ -273,6 +283,7 @@ export function resolveConversationRuntimeSync(params: {
             shouldReset: false,
             recoveredRun: synchronizeActiveRunWithRuntimeSnapshot({
                 currentConversationId: params.currentChat.id,
+                currentAgentId: params.currentChat.agentId,
                 runtimeState: params.runtimeState,
                 activeRun: params.activeRun,
             }),

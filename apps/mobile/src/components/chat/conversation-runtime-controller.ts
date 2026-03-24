@@ -166,6 +166,7 @@ export function resolveMobileConversationRuntimeSync(params: {
 
     const shouldReset = shouldResetActiveRunForRuntimeSnapshot({
         currentConversationId: params.currentChat.id,
+        currentAgentId: params.currentChat.agentId,
         runtimeState: params.runtimeState,
         activeRun: params.activeRun,
     });
@@ -175,6 +176,7 @@ export function resolveMobileConversationRuntimeSync(params: {
             shouldReset: false,
             recoveredRun: synchronizeActiveRunWithRuntimeSnapshot({
                 currentConversationId: params.currentChat.id,
+                currentAgentId: params.currentChat.agentId,
                 runtimeState: params.runtimeState,
                 activeRun: params.activeRun,
             }),
@@ -185,6 +187,7 @@ export function resolveMobileConversationRuntimeSync(params: {
         shouldReset,
         recoveredRun: createRecoveredActiveRunFromRuntimeState({
             conversationId: params.currentChat.id,
+            agentId: params.currentChat.agentId,
             messages: params.messages,
             runtimeState: params.runtimeState,
         }),
@@ -201,7 +204,11 @@ export function interruptMobileConversationRun(params: {
 
     try {
         params.sendCommand(
-            buildInterruptCommand(params.activeRun.conversationId, uuidv4),
+            buildInterruptCommand(
+                params.activeRun.conversationId,
+                params.activeRun.agentId,
+                uuidv4,
+            ),
         );
         return null;
     } catch (cancelError) {
@@ -222,6 +229,7 @@ export type RequestMobileConversationInterruptResult = {
 
 export function requestMobileConversationInterrupt(params: {
     activeRun: ActiveRunState | null;
+    agentId: string | null;
     isLoading: boolean;
     queuePendingInterrupt: () => void;
     sendCommand: (command: ReturnType<typeof buildInterruptCommand>) => void;
@@ -256,6 +264,7 @@ export function requestMobileConversationInterrupt(params: {
 export function flushPendingMobileConversationInterrupt(params: {
     pendingInterrupt: boolean;
     activeRun: ActiveRunState | null;
+    agentId: string | null;
     sendCommand: (command: ReturnType<typeof buildInterruptCommand>) => void;
 }): RuntimeErrorState | null {
     if (!params.pendingInterrupt || !params.activeRun) {

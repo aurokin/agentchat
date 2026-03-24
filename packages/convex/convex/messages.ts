@@ -1,6 +1,12 @@
 import { v } from "convex/values";
 import { paginationOptsValidator } from "convex/server";
-import { internalQuery, mutation, query } from "./_generated/server";
+import {
+    internalQuery,
+    mutation,
+    query,
+    type MutationCtx,
+    type QueryCtx,
+} from "./_generated/server";
 import { isOwner, requireUserMatches } from "./lib/authz";
 import { requireWorkspaceUser } from "./lib/subscription";
 import { drainBatches } from "./lib/batch";
@@ -10,6 +16,7 @@ import {
     applyWorkspaceUsageDelta,
     ensureWorkspaceUsageCounters,
 } from "./lib/workspace_usage";
+import type { Doc, Id } from "./_generated/dataModel";
 
 /**
  * Message Operations
@@ -78,6 +85,36 @@ export const get = query({
 });
 
 // Get message by the client-visible message id.
+function getStrictUniqueMessage(
+    messages: Doc<"messages">[],
+): Doc<"messages"> | null {
+    if (messages.length !== 1) {
+        return null;
+    }
+
+    return messages[0] ?? null;
+}
+
+async function getMessageByUserLocalId(
+    ctx: {
+        db: {
+            query: QueryCtx["db"]["query"] | MutationCtx["db"]["query"];
+        };
+    },
+    args: {
+        userId: Id<"users">;
+        localId: string;
+    },
+): Promise<Doc<"messages"> | null> {
+    const messages = await ctx.db
+        .query("messages")
+        .withIndex("by_local_id", (q) =>
+            q.eq("userId", args.userId).eq("localId", args.localId),
+        )
+        .collect();
+    return getStrictUniqueMessage(messages);
+}
+
 export const getByLocalId = query({
     args: {
         userId: v.id("users"),
@@ -88,12 +125,10 @@ export const getByLocalId = query({
         requireUserMatches(authenticatedUserId, args.userId);
         assertMaxLen(args.localId, LIMITS.maxLocalIdChars, "localId");
 
-        return await ctx.db
-            .query("messages")
-            .withIndex("by_local_id", (q) =>
-                q.eq("userId", authenticatedUserId).eq("localId", args.localId),
-            )
-            .unique();
+        return await getMessageByUserLocalId(ctx, {
+            userId: authenticatedUserId,
+            localId: args.localId,
+        });
     },
 });
 
@@ -105,12 +140,7 @@ export const getByLocalIdInternal = internalQuery({
     handler: async (ctx, args) => {
         assertMaxLen(args.localId, LIMITS.maxLocalIdChars, "localId");
 
-        return await ctx.db
-            .query("messages")
-            .withIndex("by_local_id", (q) =>
-                q.eq("userId", args.userId).eq("localId", args.localId),
-            )
-            .unique();
+        return await getMessageByUserLocalId(ctx, args);
     },
 });
 

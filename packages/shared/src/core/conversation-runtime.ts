@@ -28,6 +28,7 @@ export interface StreamingMessageState {
 
 export interface ActiveRunState {
     conversationId: string;
+    agentId: string;
     assistantMessageId: string;
     userContent: string;
     content: string;
@@ -179,6 +180,7 @@ export function prepareConversationSend(params: {
         effectiveReasoningEffort,
         activeRun: {
             conversationId: params.chat.id,
+            agentId: params.chat.agentId,
             assistantMessageId,
             userContent: params.content,
             content: "",
@@ -197,6 +199,7 @@ export function isConversationRuntimeSnapshotLive(
 
 export function shouldResetActiveRunForRuntimeSnapshot(params: {
     currentConversationId: string;
+    currentAgentId: string;
     runtimeState: ConversationRuntimeSnapshot;
     activeRun: ActiveRunState | null;
 }): boolean {
@@ -205,6 +208,10 @@ export function shouldResetActiveRunForRuntimeSnapshot(params: {
     }
 
     if (params.activeRun.conversationId !== params.currentConversationId) {
+        return true;
+    }
+
+    if (params.activeRun.agentId !== params.currentAgentId) {
         return true;
     }
 
@@ -233,6 +240,7 @@ export function shouldResetActiveRunForRuntimeSnapshot(params: {
 
 export function synchronizeActiveRunWithRuntimeSnapshot(params: {
     currentConversationId: string;
+    currentAgentId: string;
     runtimeState: ConversationRuntimeSnapshot;
     activeRun: ActiveRunState | null;
 }): ActiveRunState | null {
@@ -241,6 +249,10 @@ export function synchronizeActiveRunWithRuntimeSnapshot(params: {
     }
 
     if (params.activeRun.conversationId !== params.currentConversationId) {
+        return null;
+    }
+
+    if (params.activeRun.agentId !== params.currentAgentId) {
         return null;
     }
 
@@ -283,25 +295,40 @@ export function shouldClearPendingReconnectNoticeAfterRuntimeSync(params: {
 
 export function shouldApplyConversationScopedUpdate(params: {
     currentConversationId: string | null;
+    currentAgentId: string | null;
     targetConversationId: string;
+    targetAgentId: string;
 }): boolean {
-    return params.currentConversationId === params.targetConversationId;
+    return (
+        params.currentConversationId === params.targetConversationId &&
+        params.currentAgentId === params.targetAgentId
+    );
 }
 
 export function shouldResetPendingConversationSendOnConversationChange(params: {
     currentConversationId: string | null;
+    currentAgentId: string | null;
     pendingSendConversationId: string | null;
+    pendingSendAgentId: string | null;
     activeRun: ActiveRunState | null;
 }): boolean {
-    if (!params.pendingSendConversationId || params.activeRun) {
+    if (
+        !params.pendingSendConversationId ||
+        !params.pendingSendAgentId ||
+        params.activeRun
+    ) {
         return false;
     }
 
-    return params.currentConversationId !== params.pendingSendConversationId;
+    return (
+        params.currentConversationId !== params.pendingSendConversationId ||
+        params.currentAgentId !== params.pendingSendAgentId
+    );
 }
 
 export function buildInterruptCommand(
     conversationId: string,
+    agentId: string,
     createId: RuntimeIdFactory = generateId,
 ): ConversationInterruptCommand {
     return {
@@ -309,12 +336,14 @@ export function buildInterruptCommand(
         type: "conversation.interrupt",
         payload: {
             conversationId,
+            agentId,
         },
     };
 }
 
 export function createRecoveredActiveRunFromSocket(params: {
     conversationId: string;
+    agentId: string;
     messageId: string;
     runId: string;
     messages: Message[];
@@ -328,6 +357,7 @@ export function createRecoveredActiveRunFromSocket(params: {
 
     return {
         conversationId: params.conversationId,
+        agentId: params.agentId,
         assistantMessageId: params.messageId,
         userContent: findLatestUserContentBeforeMessage(
             params.messages,
@@ -340,6 +370,7 @@ export function createRecoveredActiveRunFromSocket(params: {
 
 export function createRecoveredActiveRunFromRuntimeState(params: {
     conversationId: string;
+    agentId: string;
     messages: Message[];
     runtimeState: ConversationRuntimeSnapshot;
 }): ActiveRunState | null {
@@ -360,6 +391,7 @@ export function createRecoveredActiveRunFromRuntimeState(params: {
 
     return {
         conversationId: params.conversationId,
+        agentId: params.agentId,
         assistantMessageId: assistantMessage.id,
         userContent: findLatestUserContentBeforeMessage(
             params.messages,
@@ -436,14 +468,17 @@ export type SocketEventResolution =
 
 export function resolveConversationSocketEvent(params: {
     currentChatId: string | null;
+    currentAgentId: string | null;
     event: AgentchatSocketEvent;
     activeRun: ActiveRunState | null;
     messages: Message[];
 }): SocketEventResolution {
     if (
         !params.currentChatId ||
+        !params.currentAgentId ||
         !("conversationId" in params.event.payload) ||
-        params.event.payload.conversationId !== params.currentChatId
+        params.event.payload.conversationId !== params.currentChatId ||
+        params.event.payload.agentId !== params.currentAgentId
     ) {
         return { type: "ignore" };
     }
@@ -452,6 +487,7 @@ export function resolveConversationSocketEvent(params: {
         if (!params.activeRun) {
             const recoveredRun = createRecoveredActiveRunFromSocket({
                 conversationId: params.event.payload.conversationId,
+                agentId: params.event.payload.agentId,
                 messageId: params.event.payload.messageId,
                 runId: params.event.payload.runId,
                 messages: params.messages,
@@ -517,6 +553,7 @@ export function resolveConversationSocketEvent(params: {
               };
         const nextActiveRun: ActiveRunState = {
             conversationId: event.payload.conversationId,
+            agentId: event.payload.agentId,
             assistantMessageId: event.payload.messageId,
             userContent:
                 params.activeRun?.userContent ??

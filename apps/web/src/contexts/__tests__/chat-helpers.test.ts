@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import {
     filterChatsForAgent,
     resolveCurrentChatForAgent,
-} from "@/contexts/chat-helpers";
+} from "../chat-helpers";
 import type { ChatSession } from "@/lib/types";
 
 const chats: ChatSession[] = [
@@ -41,6 +41,7 @@ describe("chat helpers", () => {
             resolveCurrentChatForAgent({
                 chats: filterChatsForAgent(chats, "agent-a"),
                 currentChat: chats[1] ?? null,
+                selectedAgentId: "agent-a",
             }),
         ).toBeNull();
     });
@@ -50,8 +51,30 @@ describe("chat helpers", () => {
             resolveCurrentChatForAgent({
                 chats: filterChatsForAgent(chats, "agent-a"),
                 currentChat: chats[0] ?? null,
+                selectedAgentId: "agent-a",
             })?.id,
         ).toBe("chat-a");
+    });
+
+    test("does not preserve a different agent's chat when local ids collide", () => {
+        const sameLocalIdChats: ChatSession[] = [
+            {
+                ...chats[0]!,
+                id: "shared-chat",
+            },
+            {
+                ...chats[1]!,
+                id: "shared-chat",
+            },
+        ];
+
+        expect(
+            resolveCurrentChatForAgent({
+                chats: filterChatsForAgent(sameLocalIdChats, "agent-a"),
+                currentChat: sameLocalIdChats[1] ?? null,
+                selectedAgentId: "agent-a",
+            }),
+        ).toBeNull();
     });
 
     test("falls back to the stored chat when no current chat is loaded", () => {
@@ -59,8 +82,20 @@ describe("chat helpers", () => {
             resolveCurrentChatForAgent({
                 chats: filterChatsForAgent(chats, "agent-a"),
                 currentChat: null,
+                selectedAgentId: "agent-a",
                 storedChatId: "chat-a",
             })?.id,
         ).toBe("chat-a");
+    });
+
+    test("does not preserve a current chat from another agent", () => {
+        expect(
+            resolveCurrentChatForAgent({
+                chats: filterChatsForAgent(chats, "agent-a"),
+                currentChat: chats[1] ?? null,
+                selectedAgentId: "agent-a",
+                storedChatId: "chat-b",
+            }),
+        ).toBeNull();
     });
 });

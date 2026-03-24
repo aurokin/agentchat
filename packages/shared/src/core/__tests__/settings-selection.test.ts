@@ -86,8 +86,8 @@ describe("settings selection", () => {
             selectScopedDefaultModel({
                 models: [
                     {
-                        id: "legacy",
-                        name: "Legacy",
+                        id: "baseline",
+                        name: "Baseline",
                         providerId: "codex",
                         provider: "Codex",
                     },

@@ -1,6 +1,11 @@
 import { describe, expect, mock, test } from "bun:test";
 
-import { markViewed, update as updateChat } from "../chats";
+import {
+    create,
+    getByLocalId,
+    markViewed,
+    update as updateChat,
+} from "../chats";
 
 const AUTH_USER_ID = "users:auth";
 const CHAT_ID = "chats:1";
@@ -14,6 +19,55 @@ function runHandler(handler: HandlerExport, ctx: unknown, args: unknown) {
 }
 
 describe("chat settings lock", () => {
+    test("rejects duplicate local ids within the same agent", async () => {
+        const insert = mock(async () => CHAT_ID);
+        const query = mock(() => ({
+            withIndex: mock(() => ({
+                collect: mock(async () => [
+                    {
+                        _id: CHAT_ID,
+                        userId: AUTH_USER_ID,
+                        localId: "chat-local-1",
+                        agentId: "agent-a",
+                    },
+                ]),
+            })),
+        }));
+        const ctx = {
+            auth: {
+                getUserIdentity: async () => ({
+                    subject: `${AUTH_USER_ID}|session:auth`,
+                }),
+            },
+            db: {
+                get: async (id: string) => {
+                    if (id === AUTH_USER_ID) {
+                        return { _id: AUTH_USER_ID };
+                    }
+
+                    return null;
+                },
+                query,
+                insert,
+            },
+        };
+
+        await expect(
+            runHandler(create as unknown as HandlerExport, ctx, {
+                userId: AUTH_USER_ID,
+                localId: "chat-local-1",
+                agentId: "agent-a",
+                title: "Duplicate",
+                modelId: "gpt-5.4",
+                variantId: null,
+            }),
+        ).rejects.toThrow(
+            "Conversation localId already exists for this agent.",
+        );
+
+        expect(insert).not.toHaveBeenCalled();
+    });
+
     test("rejects changing model settings after the first message", async () => {
         const patch = mock(async () => undefined);
         const ctx = {
@@ -135,5 +189,54 @@ describe("chat settings lock", () => {
         expect(patch).toHaveBeenCalledWith(CHAT_ID, {
             lastViewedAt: 75,
         });
+    });
+
+    test("fails safely when duplicate agent local ids already exist", async () => {
+        const ctx = {
+            auth: {
+                getUserIdentity: async () => ({
+                    subject: `${AUTH_USER_ID}|session:auth`,
+                }),
+            },
+            db: {
+                get: async (id: string) => {
+                    if (id === AUTH_USER_ID) {
+                        return { _id: AUTH_USER_ID };
+                    }
+
+                    return null;
+                },
+                query: mock(() => ({
+                    withIndex: mock(() => ({
+                        collect: mock(async () => [
+                            {
+                                _id: "chats:duplicate-1",
+                                userId: AUTH_USER_ID,
+                                localId: "chat-local-1",
+                                agentId: "agent-a",
+                                updatedAt: 200,
+                                createdAt: 100,
+                            },
+                            {
+                                _id: "chats:duplicate-2",
+                                userId: AUTH_USER_ID,
+                                localId: "chat-local-1",
+                                agentId: "agent-a",
+                                updatedAt: 100,
+                                createdAt: 50,
+                            },
+                        ]),
+                    })),
+                })),
+            },
+        };
+
+        await expect(
+            runHandler(getByLocalId as unknown as HandlerExport, ctx, {
+                userId: AUTH_USER_ID,
+                agentId: "agent-a",
+                localId: "chat-local-1",
+            }),
+        ).resolves.toBeNull();
     });
 });

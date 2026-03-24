@@ -11,17 +11,25 @@ const reconnectError: RuntimeErrorState = {
 };
 
 describe("conversation runtime events", () => {
+    const activeRun = {
+        conversationId: "chat-1",
+        agentId: "agent-1",
+        assistantMessageId: "assistant-1",
+        userContent: "hello",
+        content: "",
+        runId: "run-1",
+    } as const;
+
     test("recovers a started run with reconnect notice state", () => {
         expect(
             planConversationRunLifecycleResolution({
                 resolution: {
                     type: "run.started",
                     activeRun: {
-                        conversationId: "chat-1",
+                        ...activeRun,
                         assistantMessageId: "assistant-1",
                         userContent: "hello",
                         content: "Recovered output",
-                        runId: "run-1",
                     },
                     recovered: true,
                     streamingMessage: {
@@ -34,11 +42,10 @@ describe("conversation runtime events", () => {
         ).toEqual({
             type: "run.started",
             activeRun: {
-                conversationId: "chat-1",
+                ...activeRun,
                 assistantMessageId: "assistant-1",
                 userContent: "hello",
                 content: "Recovered output",
-                runId: "run-1",
             },
             clearPendingInterrupt: true,
             error: null,
@@ -57,13 +64,7 @@ describe("conversation runtime events", () => {
             planConversationRunLifecycleResolution({
                 resolution: {
                     type: "run.started",
-                    activeRun: {
-                        conversationId: "chat-1",
-                        assistantMessageId: "assistant-1",
-                        userContent: "hello",
-                        content: "",
-                        runId: "run-1",
-                    },
+                    activeRun,
                     recovered: false,
                     streamingMessage: null,
                 },
@@ -72,13 +73,7 @@ describe("conversation runtime events", () => {
             }),
         ).toEqual({
             type: "run.started",
-            activeRun: {
-                conversationId: "chat-1",
-                assistantMessageId: "assistant-1",
-                userContent: "hello",
-                content: "",
-                runId: "run-1",
-            },
+            activeRun,
             clearPendingInterrupt: true,
             error: reconnectError,
             shouldSetSending: false,
@@ -92,11 +87,10 @@ describe("conversation runtime events", () => {
         const resolution: SocketEventResolution = {
             type: "run.failed",
             activeRun: {
-                conversationId: "chat-1",
+                ...activeRun,
                 assistantMessageId: "assistant-1",
                 userContent: "hello",
                 content: "Partial output",
-                runId: "run-1",
             },
             finalContent: "Partial output",
             error: {
@@ -117,11 +111,10 @@ describe("conversation runtime events", () => {
         ).toEqual({
             type: "terminal",
             activeRun: {
-                conversationId: "chat-1",
+                ...activeRun,
                 assistantMessageId: "assistant-1",
                 userContent: "hello",
                 content: "Partial output",
-                runId: "run-1",
             },
             clearPendingInterrupt: true,
             persistFinalContent: "Partial output",

@@ -71,6 +71,27 @@ function createModels(): ProviderModel[] {
     ];
 }
 
+function createActiveRun(
+    overrides: Partial<{
+        conversationId: string;
+        agentId: string;
+        assistantMessageId: string;
+        userContent: string;
+        content: string;
+        runId: string | null;
+    }> = {},
+) {
+    return {
+        conversationId: "chat-1",
+        agentId: "agent-1",
+        assistantMessageId: "assistant-1",
+        userContent: "Hello",
+        content: "",
+        runId: "run-1",
+        ...overrides,
+    };
+}
+
 describe("conversation runtime controller", () => {
     test("prepares a send plan with chat history and title update", () => {
         const ids = ["user-1", "assistant-1", "command-1"];
@@ -118,6 +139,7 @@ describe("conversation runtime controller", () => {
         });
         expect(sendPlan.activeRun).toEqual({
             conversationId: "chat-1",
+            agentId: "agent-1",
             assistantMessageId: "assistant-1",
             userContent: "New prompt",
             content: "",
@@ -162,11 +184,14 @@ describe("conversation runtime controller", () => {
     });
 
     test("builds an interrupt command for the active conversation", () => {
-        expect(buildInterruptCommand("chat-1", () => "interrupt-1")).toEqual({
+        expect(
+            buildInterruptCommand("chat-1", "agent-1", () => "interrupt-1"),
+        ).toEqual({
             id: "interrupt-1",
             type: "conversation.interrupt",
             payload: {
                 conversationId: "chat-1",
+                agentId: "agent-1",
             },
         });
     });
@@ -174,12 +199,12 @@ describe("conversation runtime controller", () => {
     test("connects and subscribes the current conversation socket session", async () => {
         const calls: string[] = [];
         const cleanup = connectConversationSocket({
-            currentChatId: "chat-1",
+            currentChat: { id: "chat-1", agentId: "agent-1" },
             dependencies: {
-                subscribeToConversation: (conversationId) => {
-                    calls.push(`subscribe:${conversationId}`);
+                subscribeToConversation: (conversationId, agentId) => {
+                    calls.push(`subscribe:${agentId}:${conversationId}`);
                     return () => {
-                        calls.push(`unsubscribe:${conversationId}`);
+                        calls.push(`unsubscribe:${agentId}:${conversationId}`);
                     };
                 },
                 ensureConnected: async () => {
@@ -189,19 +214,19 @@ describe("conversation runtime controller", () => {
         });
 
         await Promise.resolve();
-        expect(calls).toEqual(["subscribe:chat-1", "ensureConnected"]);
+        expect(calls).toEqual(["subscribe:agent-1:chat-1", "ensureConnected"]);
         cleanup?.();
         expect(calls).toEqual([
-            "subscribe:chat-1",
+            "subscribe:agent-1:chat-1",
             "ensureConnected",
-            "unsubscribe:chat-1",
+            "unsubscribe:agent-1:chat-1",
         ]);
     });
 
     test("reports socket bootstrap failures through the provided error handler", async () => {
         const errors: string[] = [];
         connectConversationSocket({
-            currentChatId: "chat-1",
+            currentChat: { id: "chat-1", agentId: "agent-1" },
             dependencies: {
                 subscribeToConversation: () => () => {},
                 ensureConnected: async () => {
@@ -222,7 +247,7 @@ describe("conversation runtime controller", () => {
 
     test("skips socket setup when no conversation is selected", () => {
         const cleanup = connectConversationSocket({
-            currentChatId: null,
+            currentChat: null,
             dependencies: {
                 subscribeToConversation: () => {
                     throw new Error("should not subscribe");
@@ -360,13 +385,7 @@ describe("conversation runtime controller", () => {
     test("returns an interrupt error when the socket command throws", () => {
         expect(
             interruptConversationRun({
-                activeRun: {
-                    conversationId: "chat-1",
-                    assistantMessageId: "assistant-1",
-                    userContent: "Hello",
-                    content: "",
-                    runId: "run-1",
-                },
+                activeRun: createActiveRun(),
                 sendCommand: () => {
                     throw new Error("cannot interrupt");
                 },
@@ -383,6 +402,7 @@ describe("conversation runtime controller", () => {
         expect(
             requestConversationInterrupt({
                 activeRun: null,
+                agentId: "agent-1",
                 isSending: true,
                 queuePendingInterrupt: () => {
                     calls.push("queued");
@@ -405,13 +425,8 @@ describe("conversation runtime controller", () => {
         expect(
             flushPendingConversationInterrupt({
                 pendingInterrupt: true,
-                activeRun: {
-                    conversationId: "chat-1",
-                    assistantMessageId: "assistant-1",
-                    userContent: "Hello",
-                    content: "",
-                    runId: "run-1",
-                },
+                activeRun: createActiveRun(),
+                agentId: "agent-1",
                 sendCommand: (command) => {
                     commands.push(command.type);
                 },
@@ -444,6 +459,7 @@ describe("conversation runtime controller", () => {
         const event: AgentchatSocketEvent = {
             type: "run.started",
             payload: {
+                agentId: "agent-1",
                 conversationId: "chat-1",
                 runId: "run-1",
                 messageId: "assistant-1",
@@ -453,6 +469,7 @@ describe("conversation runtime controller", () => {
         expect(
             resolveConversationSocketEvent({
                 currentChatId: "chat-1",
+                currentAgentId: "agent-1",
                 event,
                 activeRun: null,
                 messages,
@@ -461,6 +478,7 @@ describe("conversation runtime controller", () => {
             type: "run.started",
             activeRun: {
                 conversationId: "chat-1",
+                agentId: "agent-1",
                 assistantMessageId: "assistant-1",
                 userContent: "Recover this",
                 content: "Partial response",
@@ -478,6 +496,7 @@ describe("conversation runtime controller", () => {
         const event: AgentchatSocketEvent = {
             type: "message.started",
             payload: {
+                agentId: "agent-1",
                 conversationId: "chat-1",
                 runId: "run-1",
                 messageId: "assistant-2",
@@ -492,9 +511,11 @@ describe("conversation runtime controller", () => {
         expect(
             resolveConversationSocketEvent({
                 currentChatId: "chat-1",
+                currentAgentId: "agent-1",
                 event,
                 activeRun: {
                     conversationId: "chat-1",
+                    agentId: "agent-1",
                     assistantMessageId: "assistant-1",
                     userContent: "Recover this",
                     content: "Status update",
@@ -506,6 +527,7 @@ describe("conversation runtime controller", () => {
             type: "message.started",
             activeRun: {
                 conversationId: "chat-1",
+                agentId: "agent-1",
                 assistantMessageId: "assistant-2",
                 userContent: "Recover this",
                 content: "Report\n- Done",
@@ -538,6 +560,7 @@ describe("conversation runtime controller", () => {
         const event: AgentchatSocketEvent = {
             type: "run.failed",
             payload: {
+                agentId: "agent-1",
                 conversationId: "chat-1",
                 runId: "run-1",
                 error: {
@@ -549,25 +572,20 @@ describe("conversation runtime controller", () => {
         expect(
             resolveConversationSocketEvent({
                 currentChatId: "chat-1",
+                currentAgentId: "agent-1",
                 event,
-                activeRun: {
-                    conversationId: "chat-1",
-                    assistantMessageId: "assistant-1",
+                activeRun: createActiveRun({
                     userContent: "Retry me",
                     content: "Partial output",
-                    runId: "run-1",
-                },
+                }),
                 messages: createMessages(),
             }),
         ).toEqual({
             type: "run.failed",
-            activeRun: {
-                conversationId: "chat-1",
-                assistantMessageId: "assistant-1",
+            activeRun: createActiveRun({
                 userContent: "Retry me",
                 content: "Partial output",
-                runId: "run-1",
-            },
+            }),
             finalContent: "Partial output",
             error: {
                 message: "Codex failed",
@@ -584,7 +602,8 @@ describe("conversation runtime controller", () => {
         const event: AgentchatSocketEvent = {
             type: "message.delta",
             payload: {
-                conversationId: "chat-2",
+                agentId: "agent-2",
+                conversationId: "chat-1",
                 messageId: "assistant-1",
                 delta: "x",
                 content: "x",
@@ -594,14 +613,9 @@ describe("conversation runtime controller", () => {
         expect(
             resolveConversationSocketEvent({
                 currentChatId: "chat-1",
+                currentAgentId: "agent-1",
                 event,
-                activeRun: {
-                    conversationId: "chat-1",
-                    assistantMessageId: "assistant-1",
-                    userContent: "Hello",
-                    content: "",
-                    runId: "run-1",
-                },
+                activeRun: createActiveRun(),
                 messages: createMessages(),
             }),
         ).toEqual({ type: "ignore" });
@@ -629,13 +643,10 @@ describe("conversation runtime controller", () => {
                     completedAt: null,
                     lastEventAt: null,
                 },
-                activeRun: {
-                    conversationId: "chat-1",
-                    assistantMessageId: "assistant-1",
+                activeRun: createActiveRun({
                     userContent: "Old run",
                     content: "Old content",
-                    runId: "run-1",
-                },
+                }),
             }),
         ).toEqual({
             shouldReset: true,
@@ -685,6 +696,7 @@ describe("conversation runtime controller", () => {
             shouldReset: false,
             recoveredRun: {
                 conversationId: "chat-1",
+                agentId: "agent-1",
                 assistantMessageId: "assistant-1",
                 userContent: "Recover me",
                 content: "Partial persisted output",
@@ -735,6 +747,7 @@ describe("conversation runtime controller", () => {
             shouldReset: false,
             recoveredRun: {
                 conversationId: "chat-1",
+                agentId: "agent-1",
                 assistantMessageId: "assistant-1",
                 userContent: "Recover me",
                 content: "Recovering output",
@@ -761,6 +774,7 @@ describe("conversation runtime controller", () => {
                 },
                 activeRun: {
                     conversationId: "chat-1",
+                    agentId: "agent-1",
                     assistantMessageId: "assistant-1",
                     userContent: "Old prompt",
                     content: "Old output",
@@ -771,6 +785,7 @@ describe("conversation runtime controller", () => {
             shouldReset: false,
             recoveredRun: {
                 conversationId: "chat-1",
+                agentId: "agent-1",
                 assistantMessageId: "assistant-1",
                 userContent: "Old prompt",
                 content: "Old output",
@@ -797,6 +812,7 @@ describe("conversation runtime controller", () => {
                 },
                 activeRun: {
                     conversationId: "chat-1",
+                    agentId: "agent-1",
                     assistantMessageId: "assistant-1",
                     userContent: "Old prompt",
                     content: "Old output",
@@ -845,18 +861,17 @@ describe("conversation runtime controller", () => {
                     completedAt: null,
                     lastEventAt: 2,
                 },
-                activeRun: {
-                    conversationId: "chat-1",
+                activeRun: createActiveRun({
                     assistantMessageId: "assistant-1",
                     userContent: "Old prompt",
                     content: "Old output",
-                    runId: "run-1",
-                },
+                }),
             }),
         ).toEqual({
             shouldReset: true,
             recoveredRun: {
                 conversationId: "chat-1",
+                agentId: "agent-1",
                 assistantMessageId: "assistant-2",
                 userContent: "New prompt",
                 content: "New persisted output",
@@ -903,6 +918,7 @@ describe("conversation runtime controller", () => {
                 },
                 activeRun: {
                     conversationId: "chat-1",
+                    agentId: "agent-1",
                     assistantMessageId: "assistant-1",
                     userContent: "Old prompt",
                     content: "Old output",
@@ -913,6 +929,7 @@ describe("conversation runtime controller", () => {
             shouldReset: true,
             recoveredRun: {
                 conversationId: "chat-2",
+                agentId: "agent-2",
                 assistantMessageId: "assistant-2",
                 userContent: "New conversation prompt",
                 content: "Recovered output",

@@ -4,39 +4,98 @@ import {
     clearBackgroundConversationSubscriptions,
     reconcileBackgroundConversationSubscriptions,
 } from "../background-runtime-subscriptions";
+import { getConversationScopeKey } from "../conversation-scope-key";
 
 describe("background runtime subscriptions", () => {
     test("reconciles subscriptions by adding missing ids and removing stale ones", () => {
         const calls: string[] = [];
         const subscriptions = new Map<string, () => void>([
             [
-                "chat-1",
+                getConversationScopeKey("chat-1", "agent-a"),
                 () => {
-                    calls.push("unsubscribe:chat-1");
+                    calls.push("unsubscribe:agent-a:chat-1");
                 },
             ],
             [
-                "chat-2",
+                getConversationScopeKey("chat-2", "agent-a"),
                 () => {
-                    calls.push("unsubscribe:chat-2");
+                    calls.push("unsubscribe:agent-a:chat-2");
                 },
             ],
         ]);
 
         const activeCount = reconcileBackgroundConversationSubscriptions({
             subscriptions,
-            desiredConversationIds: ["chat-2", "chat-3", "chat-3"],
-            subscribeToConversation: (conversationId) => {
-                calls.push(`subscribe:${conversationId}`);
+            desiredConversations: [
+                { conversationId: "chat-2", agentId: "agent-a" },
+                { conversationId: "chat-3", agentId: "agent-b" },
+                { conversationId: "chat-3", agentId: "agent-b" },
+            ],
+            subscribeToConversation: ({ conversationId, agentId }) => {
+                calls.push(`subscribe:${agentId}:${conversationId}`);
                 return () => {
-                    calls.push(`unsubscribe:${conversationId}`);
+                    calls.push(`unsubscribe:${agentId}:${conversationId}`);
                 };
             },
         });
 
         expect(activeCount).toBe(2);
-        expect(calls).toEqual(["unsubscribe:chat-1", "subscribe:chat-3"]);
-        expect([...subscriptions.keys()]).toEqual(["chat-2", "chat-3"]);
+        expect(calls).toEqual([
+            "unsubscribe:agent-a:chat-1",
+            "subscribe:agent-b:chat-3",
+        ]);
+        expect([...subscriptions.keys()]).toEqual([
+            getConversationScopeKey("chat-2", "agent-a"),
+            getConversationScopeKey("chat-3", "agent-b"),
+        ]);
+    });
+
+    test("does not collapse distinct targets whose ids contain colons", () => {
+        const subscriptions = new Map<string, () => void>();
+
+        const activeCount = reconcileBackgroundConversationSubscriptions({
+            subscriptions,
+            desiredConversations: [
+                { conversationId: "foo:bar", agentId: "prod" },
+                { conversationId: "bar", agentId: "prod:foo" },
+            ],
+            subscribeToConversation: () => () => undefined,
+        });
+
+        expect(activeCount).toBe(2);
+        expect([...subscriptions.keys()]).toEqual([
+            getConversationScopeKey("foo:bar", "prod"),
+            getConversationScopeKey("bar", "prod:foo"),
+        ]);
+    });
+
+    test("retains background subscriptions while the active conversation query is temporarily unavailable", () => {
+        const calls: string[] = [];
+        const subscriptions = new Map<string, () => void>([
+            [
+                getConversationScopeKey("chat-1", "agent-a"),
+                () => {
+                    calls.push("unsubscribe:agent-a:chat-1");
+                },
+            ],
+        ]);
+
+        const activeCount = reconcileBackgroundConversationSubscriptions({
+            subscriptions,
+            desiredConversations: undefined,
+            subscribeToConversation: ({ conversationId, agentId }) => {
+                calls.push(`subscribe:${agentId}:${conversationId}`);
+                return () => {
+                    calls.push(`unsubscribe:${agentId}:${conversationId}`);
+                };
+            },
+        });
+
+        expect(activeCount).toBe(1);
+        expect(calls).toEqual([]);
+        expect([...subscriptions.keys()]).toEqual([
+            getConversationScopeKey("chat-1", "agent-a"),
+        ]);
     });
 
     test("clears all background subscriptions", () => {

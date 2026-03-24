@@ -11,15 +11,19 @@ export {
 
 export interface PersistenceAdapter {
     createChat(chat: ChatSession): Promise<string>;
-    getChat(id: string): Promise<ChatSession | undefined>;
+    getChat(id: string, agentId: string): Promise<ChatSession | undefined>;
     getAllChats(): Promise<ChatSession[]>;
     updateChat(chat: ChatSession): Promise<void>;
-    markChatViewed(chatId: string, timestamp: number): Promise<void>;
-    deleteChat(id: string): Promise<void>;
-    createMessage(message: Message): Promise<string>;
+    markChatViewed(
+        chatId: string,
+        timestamp: number,
+        agentId: string,
+    ): Promise<void>;
+    deleteChat(id: string, agentId: string): Promise<string | null>;
+    createMessage(message: Message, agentId: string): Promise<string>;
     updateMessage(message: Message): Promise<void>;
-    getMessagesByChat(chatId: string): Promise<Message[]>;
-    deleteMessagesByChat(chatId: string): Promise<void>;
+    getMessagesByChat(chatId: string, agentId: string): Promise<Message[]>;
+    deleteMessagesByChat(chatId: string, agentId: string): Promise<void>;
     deleteMessage(id: string): Promise<void>;
 }
 

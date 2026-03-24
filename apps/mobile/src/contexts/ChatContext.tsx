@@ -38,6 +38,20 @@ import {
 import { useModelContext } from "@/contexts/ModelContext";
 import { deriveConversationRuntimeState } from "@/contexts/runtime-helpers";
 import { useAgent } from "@/contexts/AgentContext";
+import { getSharedAgentchatSocketClient } from "@/lib/agentchat-socket";
+import { useAuthContext } from "@/lib/convex/AuthContext";
+import {
+    buildConversationRuntimeBindingMap,
+    getScopedChatStateKey,
+    insertScopedMessage,
+    patchScopedMessage,
+    replaceScopedMessage,
+} from "@/contexts/chat-state";
+
+export type ScopedChatTarget = {
+    chatId: string;
+    agentId: string;
+};
 
 interface ChatContextValue {
     chats: ChatSession[];
@@ -57,16 +71,22 @@ interface ChatContextValue {
     loadChats: () => Promise<void>;
     createChat: (title?: string, modelId?: string) => Promise<ChatSession>;
     selectChat: (chatId: string) => Promise<void>;
-    deleteChat: (chatId: string) => Promise<void>;
-    deleteChats: (chatIds: string[]) => Promise<void>;
+    deleteChat: (chatId: string, agentId?: string) => Promise<void>;
+    deleteChats: (targets: ScopedChatTarget[]) => Promise<void>;
     updateChat: (chat: ChatSession) => Promise<void>;
-    loadMessages: (chatId: string) => Promise<void>;
-    hasMessagesInChats: (chatIds: string[]) => Promise<boolean>;
+    loadMessages: (chatId: string, agentId: string) => Promise<void>;
+    hasMessagesInChats: (targets: ScopedChatTarget[]) => Promise<boolean>;
     addMessage: (
         message: Omit<Message, "createdAt" | "id"> & { id?: string },
     ) => Promise<Message>;
-    insertMessage: (message: Message) => void;
-    updateMessage: (message: Message) => Promise<void>;
+    insertMessage: (
+        message: Message,
+        agentId?: string | null,
+    ) => void;
+    updateMessage: (
+        message: Message,
+        agentId?: string | null,
+    ) => Promise<void>;
     patchMessage: (
         id: string,
         chatId: string,
@@ -76,6 +96,7 @@ interface ChatContextValue {
                 "content" | "contextContent" | "reasoning" | "status" | "kind"
             >
         >,
+        agentId?: string | null,
     ) => void;
 }
 
@@ -113,6 +134,7 @@ export function ChatProvider({
     const [isLoading, setIsLoading] = useState(false);
     const [isMessagesLoading, setIsMessagesLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const { getBackendSessionToken } = useAuthContext();
     const { defaultAgentId, selectedModel, selectedVariantId, models } =
         useModelContext();
     const { selectedAgentId } = useAgent();
@@ -133,12 +155,14 @@ export function ChatProvider({
         useWorkspace();
     const pendingChatIdsRef = React.useRef<Set<string>>(new Set());
     const pendingMessageIdsRef = React.useRef<Set<string>>(new Set());
-    const currentChatIdRef = useRef<string | null>(null);
+    const currentChatRef = useRef<ChatSession | null>(null);
+    const currentChatScopeRef = useRef<string | null>(null);
     const latestViewedAtRef = useRef<Record<string, number>>({});
     const markViewedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
         null,
     );
     const pendingViewedChatRef = useRef<{
+        agentId: string;
         chatId: string;
         timestamp: number;
     } | null>(null);
@@ -153,8 +177,15 @@ export function ChatProvider({
     );
     const workspaceCurrentChat = useQuery(
         api.chats.getByLocalId,
-        isWorkspaceActive && workspaceUserId && currentChatId
-            ? { userId: workspaceUserId, localId: currentChatId }
+        isWorkspaceActive &&
+            workspaceUserId &&
+            currentChatId &&
+            currentChat?.agentId
+            ? {
+                  userId: workspaceUserId,
+                  agentId: currentChat.agentId,
+                  localId: currentChatId,
+              }
             : "skip",
     );
     const workspaceMessages = useQuery(
@@ -192,12 +223,16 @@ export function ChatProvider({
         [workspaceRuntimeBinding],
     );
     const currentMessages = useMemo(() => {
-        if (!currentChatId) {
+        if (!currentChatId || !currentChat?.agentId) {
             return [];
         }
 
-        return messages[currentChatId] ?? [];
-    }, [currentChatId, messages]);
+        return (
+            messages[
+                getScopedChatStateKey(currentChatId, currentChat.agentId)
+            ] ?? []
+        );
+    }, [currentChat?.agentId, currentChatId, messages]);
     const runtimeState = useMemo(
         () =>
             deriveConversationRuntimeState({
@@ -209,12 +244,9 @@ export function ChatProvider({
     );
     const conversationRuntimeBindings = useMemo(
         () =>
-            Object.fromEntries(
-                (workspaceConversationRuntimeBindings ?? []).map((binding) => [
-                    binding.conversationId,
-                    binding,
-                ]),
-            ) as Record<string, ConversationRuntimeBindingSummary>,
+            buildConversationRuntimeBindingMap(
+                workspaceConversationRuntimeBindings,
+            ),
         [workspaceConversationRuntimeBindings],
     );
     const agentRuntimeActivitySummaries = useMemo(
@@ -223,14 +255,22 @@ export function ChatProvider({
     );
 
     useEffect(() => {
-        currentChatIdRef.current = currentChat?.id ?? null;
-    }, [currentChat?.id]);
+        currentChatScopeRef.current = currentChat
+            ? getScopedChatStateKey(currentChat.id, currentChat.agentId)
+            : null;
+    }, [currentChat]);
+
+    useEffect(() => {
+        currentChatRef.current = currentChat;
+    }, [currentChat]);
 
     const applyChatLastViewedAt = useCallback(
-        (chatId: string, timestamp: number) => {
+        (chatId: string, agentId: string, timestamp: number) => {
+            const scopedChatKey = getScopedChatStateKey(chatId, agentId);
             setChats((prev) =>
                 prev.map((chat) =>
-                    chat.id === chatId
+                    getScopedChatStateKey(chat.id, chat.agentId) ===
+                    scopedChatKey
                         ? {
                               ...chat,
                               lastViewedAt: Math.max(
@@ -242,7 +282,8 @@ export function ChatProvider({
                 ),
             );
             setCurrentChat((prev) =>
-                prev?.id === chatId
+                prev &&
+                getScopedChatStateKey(prev.id, prev.agentId) === scopedChatKey
                     ? {
                           ...prev,
                           lastViewedAt: Math.max(
@@ -313,6 +354,10 @@ export function ChatProvider({
 
         const chatLocalId =
             workspaceCurrentChat.localId ?? workspaceCurrentChat._id;
+        const scopedChatKey = getScopedChatStateKey(
+            chatLocalId,
+            workspaceCurrentChat.agentId,
+        );
         const mapped = workspaceMessages.map((msg) =>
             mapConvexMessageToMessage(msg, chatLocalId),
         );
@@ -323,9 +368,9 @@ export function ChatProvider({
 
         setMessages((prev) => ({
             ...prev,
-            [chatLocalId]: mergeByIdWithPending(
+            [scopedChatKey]: mergeByIdWithPending(
                 mapped,
-                prev[chatLocalId] ?? [],
+                prev[scopedChatKey] ?? [],
                 pending,
                 (a, b) => a.createdAt - b.createdAt,
             ),
@@ -349,9 +394,13 @@ export function ChatProvider({
             return;
         }
 
-        const lastMessageAt = messages[currentChat.id]?.at(-1)?.createdAt ?? 0;
+        const currentChatKey = getScopedChatStateKey(
+            currentChat.id,
+            currentChat.agentId,
+        );
+        const lastMessageAt = messages[currentChatKey]?.at(-1)?.createdAt ?? 0;
         const lastRuntimeEventAt =
-            conversationRuntimeBindings[currentChat.id]?.lastEventAt ?? 0;
+            conversationRuntimeBindings[currentChatKey]?.lastEventAt ?? 0;
         const visibleAt = Math.max(
             lastMessageAt,
             lastRuntimeEventAt,
@@ -360,26 +409,30 @@ export function ChatProvider({
         );
         const alreadyViewedAt = Math.max(
             currentChat.lastViewedAt ?? 0,
-            latestViewedAtRef.current[currentChat.id] ?? 0,
+            latestViewedAtRef.current[currentChatKey] ?? 0,
         );
 
         if (visibleAt <= alreadyViewedAt) {
             return;
         }
 
-        latestViewedAtRef.current[currentChat.id] = visibleAt;
-        applyChatLastViewedAt(currentChat.id, visibleAt);
+        latestViewedAtRef.current[currentChatKey] = visibleAt;
+        applyChatLastViewedAt(currentChat.id, currentChat.agentId, visibleAt);
 
         const pendingViewed = pendingViewedChatRef.current;
         if (
             pendingViewed &&
-            pendingViewed.chatId !== currentChat.id &&
+            getScopedChatStateKey(
+                pendingViewed.chatId,
+                pendingViewed.agentId,
+            ) !== currentChatKey &&
             markViewedTimeoutRef.current
         ) {
             clearTimeout(markViewedTimeoutRef.current);
             void adapter.markChatViewed(
                 pendingViewed.chatId,
                 pendingViewed.timestamp,
+                pendingViewed.agentId,
             );
             markViewedTimeoutRef.current = null;
             pendingViewedChatRef.current = null;
@@ -388,6 +441,7 @@ export function ChatProvider({
         }
 
         pendingViewedChatRef.current = {
+            agentId: currentChat.agentId,
             chatId: currentChat.id,
             timestamp: visibleAt,
         };
@@ -397,7 +451,7 @@ export function ChatProvider({
                 return;
             }
             const { chatId, timestamp } = pending;
-            void adapter.markChatViewed(chatId, timestamp);
+            void adapter.markChatViewed(chatId, timestamp, pending.agentId);
             pendingViewedChatRef.current = null;
             markViewedTimeoutRef.current = null;
         }, 300);
@@ -433,7 +487,10 @@ export function ChatProvider({
 
             setChats((prev) => [chat, ...prev]);
             setCurrentChat(chat);
-            setMessages((prev) => ({ ...prev, [chatId]: [] }));
+            setMessages((prev) => ({
+                ...prev,
+                [getScopedChatStateKey(chatId, chat.agentId)]: [],
+            }));
             if (chat.agentId) {
                 await setSelectedChatId(chat.agentId, chat.id);
             }
@@ -451,11 +508,17 @@ export function ChatProvider({
     );
 
     const loadMessages = useCallback(
-        async (chatId: string) => {
+        async (chatId: string, agentId: string) => {
             setIsMessagesLoading(true);
             try {
-                const loadedMessages = await adapter.getMessagesByChat(chatId);
-                setMessages((prev) => ({ ...prev, [chatId]: loadedMessages }));
+                const loadedMessages = await adapter.getMessagesByChat(
+                    chatId,
+                    agentId,
+                );
+                setMessages((prev) => ({
+                    ...prev,
+                    [getScopedChatStateKey(chatId, agentId)]: loadedMessages,
+                }));
             } catch {
                 console.error("Failed to load messages");
             } finally {
@@ -475,8 +538,13 @@ export function ChatProvider({
         }
 
         const currentChatStillInScope =
-            currentChatIdRef.current &&
-            chats.some((chat) => chat.id === currentChatIdRef.current);
+            currentChatRef.current?.agentId === selectedAgentId &&
+            currentChatScopeRef.current &&
+            chats.some(
+                (chat) =>
+                    getScopedChatStateKey(chat.id, chat.agentId) ===
+                    currentChatScopeRef.current,
+            );
         if (currentChatStillInScope) {
             return;
         }
@@ -484,7 +552,11 @@ export function ChatProvider({
         void (async () => {
             const storedChatId = await getSelectedChatId(selectedAgentId);
             const nextChat =
-                chats.find((chat) => chat.id === storedChatId) ??
+                chats.find(
+                    (chat) =>
+                        chat.id === storedChatId &&
+                        chat.agentId === selectedAgentId,
+                ) ??
                 chats[0] ??
                 null;
             if (cancelled) {
@@ -493,7 +565,7 @@ export function ChatProvider({
 
             setCurrentChat(nextChat);
             if (nextChat) {
-                await loadMessages(nextChat.id);
+                await loadMessages(nextChat.id, nextChat.agentId);
             } else {
                 setIsMessagesLoading(false);
             }
@@ -506,72 +578,183 @@ export function ChatProvider({
 
     const selectChat = useCallback(
         async (chatId: string) => {
-            const chat = chats.find((c) => c.id === chatId);
+            const chat = chats.find(
+                (c) => c.id === chatId && c.agentId === selectedAgentId,
+            );
             if (chat) {
                 setCurrentChat(chat);
                 if (selectedAgentId) {
                     await setSelectedChatId(selectedAgentId, chat.id);
                 }
-                await loadMessages(chatId);
+                await loadMessages(chatId, chat.agentId);
             }
         },
         [chats, loadMessages, selectedAgentId],
     );
 
     const deleteChat = useCallback(
-        async (chatId: string) => {
-            await adapter.deleteChat(chatId);
-
-            setChats((prev) => prev.filter((c) => c.id !== chatId));
-            setCurrentChat((prev) => (prev?.id === chatId ? null : prev));
-            setMessages((prev) => {
-                const next = { ...prev };
-                delete next[chatId];
-                return next;
-            });
-            if (selectedAgentId && currentChatIdRef.current === chatId) {
-                await clearSelectedChatId(selectedAgentId);
-            }
-        },
-        [adapter, selectedAgentId],
-    );
-
-    const deleteChats = useCallback(
-        async (chatIds: string[]) => {
-            if (chatIds.length === 0) return;
-
-            for (const chatId of chatIds) {
-                await adapter.deleteChat(chatId);
+        async (chatId: string, agentId?: string) => {
+            const deletedChat =
+                chats.find(
+                    (c) =>
+                        c.id === chatId &&
+                        c.agentId ===
+                            (agentId ??
+                                selectedAgentId ??
+                                currentChat?.agentId ??
+                                null),
+                ) ?? null;
+            const deletedChatAgentId =
+                deletedChat?.agentId ??
+                agentId ??
+                selectedAgentId ??
+                currentChat?.agentId ??
+                null;
+            if (!deletedChatAgentId) {
+                return;
             }
 
-            const chatIdSet = new Set(chatIds);
-            setChats((prev) => prev.filter((c) => !chatIdSet.has(c.id)));
+            const deletedChatId = await adapter.deleteChat(
+                chatId,
+                deletedChatAgentId,
+            );
+
+            if (deletedChat) {
+                void getSharedAgentchatSocketClient().notifyConversationDeleted(
+                    chatId,
+                    deletedChat.agentId,
+                    getBackendSessionToken,
+                    deletedChatId ?? undefined,
+                );
+            }
+
+            setChats((prev) =>
+                prev.filter(
+                    (c) =>
+                        getScopedChatStateKey(c.id, c.agentId) !==
+                        getScopedChatStateKey(chatId, deletedChatAgentId),
+                ),
+            );
             setCurrentChat((prev) =>
-                prev && chatIdSet.has(prev.id) ? null : prev,
+                prev &&
+                getScopedChatStateKey(prev.id, prev.agentId) ===
+                    getScopedChatStateKey(chatId, deletedChatAgentId)
+                    ? null
+                    : prev,
             );
             setMessages((prev) => {
                 const next = { ...prev };
-                for (const chatId of chatIds) {
-                    delete next[chatId];
+                if (deletedChat?.agentId) {
+                    delete next[
+                        getScopedChatStateKey(chatId, deletedChat.agentId)
+                    ];
                 }
                 return next;
             });
             if (
                 selectedAgentId &&
-                currentChatIdRef.current &&
-                chatIdSet.has(currentChatIdRef.current)
+                deletedChatAgentId &&
+                currentChatScopeRef.current ===
+                    getScopedChatStateKey(chatId, deletedChatAgentId)
             ) {
                 await clearSelectedChatId(selectedAgentId);
             }
         },
-        [adapter, selectedAgentId],
+        [adapter, chats, currentChat, selectedAgentId, getBackendSessionToken],
+    );
+
+    const deleteChats = useCallback(
+        async (targets: ScopedChatTarget[]) => {
+            if (targets.length === 0) return;
+
+            const socketClient = getSharedAgentchatSocketClient();
+            for (const target of targets) {
+                const chat =
+                    chats.find(
+                        (candidate) =>
+                            getScopedChatStateKey(
+                                candidate.id,
+                                candidate.agentId,
+                            ) ===
+                            getScopedChatStateKey(
+                                target.chatId,
+                                target.agentId,
+                            ),
+                    ) ?? null;
+                const deletedChatId = await adapter.deleteChat(
+                    target.chatId,
+                    target.agentId,
+                );
+                void socketClient.notifyConversationDeleted(
+                    target.chatId,
+                    chat?.agentId ?? target.agentId,
+                    getBackendSessionToken,
+                    deletedChatId ?? undefined,
+                );
+            }
+
+            const chatScopeKeys = new Set(
+                targets.map((target) =>
+                    getScopedChatStateKey(target.chatId, target.agentId),
+                ),
+            );
+            setChats((prev) =>
+                prev.filter(
+                    (c) =>
+                        !chatScopeKeys.has(
+                            getScopedChatStateKey(c.id, c.agentId),
+                        ),
+                ),
+            );
+            setCurrentChat((prev) =>
+                prev &&
+                targets.some(
+                    (target) =>
+                        getScopedChatStateKey(prev.id, prev.agentId) ===
+                        getScopedChatStateKey(target.chatId, target.agentId),
+                )
+                    ? null
+                    : prev,
+            );
+            setMessages((prev) => {
+                const next = { ...prev };
+                for (const target of targets) {
+                    delete next[
+                        getScopedChatStateKey(target.chatId, target.agentId)
+                    ];
+                }
+                return next;
+            });
+            for (const target of targets) {
+                const storedSelectedChatId = await getSelectedChatId(
+                    target.agentId,
+                );
+                if (storedSelectedChatId === target.chatId) {
+                    await clearSelectedChatId(target.agentId);
+                }
+            }
+        },
+        [adapter, chats, getBackendSessionToken],
     );
 
     const updateChat = useCallback(
         async (chat: ChatSession) => {
             await adapter.updateChat(chat);
-            setChats((prev) => prev.map((c) => (c.id === chat.id ? chat : c)));
-            setCurrentChat((prev) => (prev?.id === chat.id ? chat : prev));
+            setChats((prev) =>
+                prev.map((c) =>
+                    getScopedChatStateKey(c.id, c.agentId) ===
+                    getScopedChatStateKey(chat.id, chat.agentId)
+                        ? chat
+                        : c,
+                ),
+            );
+            setCurrentChat((prev) =>
+                prev &&
+                getScopedChatStateKey(prev.id, prev.agentId) ===
+                    getScopedChatStateKey(chat.id, chat.agentId)
+                    ? chat
+                    : prev,
+            );
         },
         [adapter],
     );
@@ -588,16 +771,20 @@ export function ChatProvider({
                 createdAt: Date.now(),
             };
 
-            await adapter.createMessage(message);
+            await adapter.createMessage(message, currentChat.agentId);
             if (isWorkspaceActive) {
                 pendingMessageIdsRef.current.add(message.id);
             }
 
             setMessages((prev) => {
-                const chatMessages = prev[currentChat.id] || [];
+                const currentChatKey = getScopedChatStateKey(
+                    currentChat.id,
+                    currentChat.agentId,
+                );
+                const chatMessages = prev[currentChatKey] || [];
                 return {
                     ...prev,
-                    [currentChat.id]: [...chatMessages, message],
+                    [currentChatKey]: [...chatMessages, message],
                 };
             });
 
@@ -607,9 +794,12 @@ export function ChatProvider({
     );
 
     const hasMessagesInChats = useCallback(
-        async (chatIds: string[]): Promise<boolean> => {
-            for (const chatId of chatIds) {
-                const cachedMessages = messages[chatId];
+        async (targets: ScopedChatTarget[]): Promise<boolean> => {
+            for (const target of targets) {
+                const cachedMessages =
+                    messages[
+                        getScopedChatStateKey(target.chatId, target.agentId)
+                    ];
                 if (cachedMessages && cachedMessages.length > 0) {
                     return true;
                 }
@@ -618,7 +808,10 @@ export function ChatProvider({
                     continue;
                 }
 
-                const storedMessages = await adapter.getMessagesByChat(chatId);
+                const storedMessages = await adapter.getMessagesByChat(
+                    target.chatId,
+                    target.agentId,
+                );
                 if (storedMessages.length > 0) {
                     return true;
                 }
@@ -630,33 +823,33 @@ export function ChatProvider({
     );
 
     const updateMessage = useCallback(
-        async (message: Message) => {
+        async (message: Message, agentId?: string | null) => {
             await adapter.updateMessage(message);
 
-            if (currentChat) {
-                setMessages((prev) => ({
-                    ...prev,
-                    [currentChat.id]: (prev[currentChat.id] || []).map((m) =>
-                        m.id === message.id ? message : m,
-                    ),
-                }));
+            const targetAgentId = agentId ?? currentChat?.agentId ?? null;
+            if (targetAgentId === null) {
+                return;
             }
+
+            setMessages((prev) =>
+                replaceScopedMessage(prev, message, targetAgentId),
+            );
         },
         [adapter, currentChat],
     );
 
-    const insertMessage = useCallback((message: Message) => {
-        setMessages((prev) => {
-            const chatMessages = prev[message.sessionId] || [];
-            if (chatMessages.some((existing) => existing.id === message.id)) {
-                return prev;
-            }
-            return {
-                ...prev,
-                [message.sessionId]: [...chatMessages, message],
-            };
-        });
-    }, []);
+    const insertMessage = useCallback(
+        (message: Message, agentId?: string | null) => {
+            setMessages((prev) =>
+                insertScopedMessage(
+                    prev,
+                    message,
+                    agentId ?? currentChat?.agentId ?? null,
+                ),
+            );
+        },
+        [currentChat?.agentId],
+    );
 
     const patchMessage = useCallback(
         (
@@ -665,23 +858,21 @@ export function ChatProvider({
             updates: Partial<
                 Pick<
                     Message,
-                    "content" | "contextContent" | "reasoning" | "status"
+                    "content" | "contextContent" | "reasoning" | "status" | "kind"
                 >
             >,
+            agentId?: string | null,
         ) => {
-            setMessages((prev) => {
-                const chatMessages = prev[chatId] || [];
-                return {
-                    ...prev,
-                    [chatId]: chatMessages.map((message) =>
-                        message.id === id
-                            ? { ...message, ...updates }
-                            : message,
-                    ),
-                };
-            });
+            setMessages((prev) =>
+                patchScopedMessage(prev, {
+                    id,
+                    chatId,
+                    agentId: agentId ?? currentChat?.agentId ?? null,
+                    updates,
+                }),
+            );
         },
-        [],
+        [currentChat?.agentId],
     );
 
     useEffect(() => {

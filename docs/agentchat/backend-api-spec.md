@@ -198,6 +198,24 @@ Payload:
 - `conversationId`
 - `runId`
 
+### `conversation.delete`
+
+Purpose:
+
+- notify the backend that a conversation has been deleted so it can clean up sandbox workspace copies
+
+Payload:
+
+- `conversationId`
+- `agentId`
+
+Notes:
+
+- this is a best-effort notification sent by the client after deleting the conversation from Convex
+- the server tears down any active runtime for the conversation, then deletes the sandbox directory if one exists
+- the server also runs periodic reconciliation (startup + every 10 minutes) to clean up any sandboxes missed by this command
+- no-op for agents using `workspaceMode: "shared"`
+
 ### `provider.models.refresh`
 
 Purpose:

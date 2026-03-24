@@ -2,20 +2,27 @@ export interface PendingSharePayload {
     text: string;
 }
 
-const payloadByChatId = new Map<string, PendingSharePayload>();
+const payloadByConversationKey = new Map<string, PendingSharePayload>();
+
+function getPendingShareKey(chatId: string, agentId: string): string {
+    return JSON.stringify([agentId, chatId]);
+}
 
 export function setPendingSharePayload(
     chatId: string,
+    agentId: string,
     payload: PendingSharePayload,
 ): void {
-    payloadByChatId.set(chatId, payload);
+    payloadByConversationKey.set(getPendingShareKey(chatId, agentId), payload);
 }
 
 export function consumePendingSharePayload(
     chatId: string,
+    agentId: string,
 ): PendingSharePayload | null {
-    const payload = payloadByChatId.get(chatId);
+    const key = getPendingShareKey(chatId, agentId);
+    const payload = payloadByConversationKey.get(key);
     if (!payload) return null;
-    payloadByChatId.delete(chatId);
+    payloadByConversationKey.delete(key);
     return payload;
 }

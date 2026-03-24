@@ -39,6 +39,23 @@ For each agent, decide:
 - default provider
 - default model
 - default variant
+- workspace mode
+
+### Workspace Modes
+
+Each agent has a `workspaceMode` setting:
+
+- `"shared"` (default) — the provider operates directly against `rootPath`. All conversations for this agent share the same directory. This is the original behavior.
+- `"copy-on-conversation"` — on first message, the server copies `rootPath` into a per-conversation sandbox under `sandboxRoot`. Each conversation gets its own isolated directory. The copy is deleted when the conversation is deleted.
+
+Use `"shared"` when all users should see the same workspace state. Use `"copy-on-conversation"` when each conversation needs an isolated copy of the codebase.
+
+The top-level `sandboxRoot` config field controls where copies are stored. It defaults to `~/.agentchat/sandboxes`. The directory structure is `<sandboxRoot>/<agentId>/<conversationId>/`.
+
+Sandbox cleanup happens in two ways:
+
+1. Clients send a `conversation.delete` notification over the WebSocket after deleting a conversation from Convex.
+2. The server runs periodic reconciliation (on startup and every 10 minutes) to remove sandbox directories for conversations that no longer exist.
 
 Keep these workspaces stable. If you move a workspace, update `agentchat.config.json` and re-run the doctor command before using the app again.
 

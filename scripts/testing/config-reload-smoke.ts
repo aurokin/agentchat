@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -98,6 +99,40 @@ async function writeConfigAndPause(
     await new Promise((resolve) => setTimeout(resolve, 300));
 }
 
+function runLiveRuntimeProbe(params: {
+    repoRoot: string;
+    serverUrl: string;
+    mode: "smoke" | "interrupt";
+}): void {
+    const scriptPath = path.join(
+        params.repoRoot,
+        "scripts",
+        "testing",
+        "live-runtime-smoke.ts",
+    );
+    const result = spawnSync(
+        process.execPath,
+        [
+            scriptPath,
+            "--mode",
+            params.mode,
+            "--server-url",
+            params.serverUrl,
+        ],
+        {
+            cwd: params.repoRoot,
+            encoding: "utf8",
+        },
+    );
+
+    if (result.status !== 0) {
+        const detail = `${result.stdout ?? ""}\n${result.stderr ?? ""}`.trim();
+        throw new Error(
+            `Live runtime ${params.mode} probe failed during config reload smoke: ${detail}`,
+        );
+    }
+}
+
 async function main() {
     const serverUrl = trimTrailingSlash(
         process.argv[2]?.trim() || DEFAULT_SERVER_URL,
@@ -189,6 +224,11 @@ async function main() {
                 return JSON.stringify(options);
             },
         );
+        runLiveRuntimeProbe({
+            repoRoot,
+            serverUrl,
+            mode: "smoke",
+        });
 
         const disableProviderConfig = withOperatorProviderEnabled({
             config: originalConfig,
@@ -244,6 +284,12 @@ async function main() {
         );
     }
 
+    runLiveRuntimeProbe({
+        repoRoot,
+        serverUrl,
+        mode: "interrupt",
+    });
+
     console.log(
         JSON.stringify(
             {
@@ -252,8 +298,10 @@ async function main() {
                 checks: [
                     "agent disable reload",
                     "default fallback reload",
+                    "post-fallback live runtime probe",
                     "provider disable reload",
                     "config restore",
+                    "post-restore workspace runtime probe",
                 ],
             },
             null,

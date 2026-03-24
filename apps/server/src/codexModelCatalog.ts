@@ -119,6 +119,7 @@ function toBootstrapAgent(provider: ProviderConfig): AgentConfig {
         variantAllowlist: [],
         tags: [],
         sortOrder: 0,
+        workspaceMode: "shared",
     };
 }
 
@@ -300,7 +301,7 @@ export class CodexModelCatalog {
 
             return items;
         } finally {
-            client.stop();
+            await client.stop();
         }
     }
 }

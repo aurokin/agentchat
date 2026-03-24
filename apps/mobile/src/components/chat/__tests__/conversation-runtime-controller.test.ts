@@ -130,6 +130,7 @@ describe("mobile conversation runtime controller", () => {
         const error = interruptMobileConversationRun({
             activeRun: {
                 conversationId: "chat-1",
+                agentId: "agent-1",
                 assistantMessageId: "assistant-1",
                 userContent: "hello",
                 content: "",
@@ -152,6 +153,7 @@ describe("mobile conversation runtime controller", () => {
         expect(
             requestMobileConversationInterrupt({
                 activeRun: null,
+                agentId: "agent-1",
                 isLoading: true,
                 queuePendingInterrupt: () => {
                     calls.push("queued");
@@ -176,11 +178,13 @@ describe("mobile conversation runtime controller", () => {
                 pendingInterrupt: true,
                 activeRun: {
                     conversationId: "chat-1",
+                    agentId: "agent-1",
                     assistantMessageId: "assistant-1",
                     userContent: "hello",
                     content: "",
                     runId: "run-1",
                 },
+                agentId: "agent-1",
                 sendCommand: (command) => {
                     commands.push(command.type);
                 },
@@ -200,6 +204,7 @@ describe("mobile conversation runtime controller", () => {
             }),
             activeRun: {
                 conversationId: "chat-1",
+                agentId: "agent-1",
                 assistantMessageId: "assistant-1",
                 userContent: "hello",
                 content: "",
@@ -247,6 +252,7 @@ describe("mobile conversation runtime controller", () => {
             shouldReset: false,
             recoveredRun: {
                 conversationId: "chat-1",
+                agentId: "agent-1",
                 assistantMessageId: "assistant-1",
                 userContent: "hello",
                 content: "Recovering output",
@@ -270,6 +276,7 @@ describe("mobile conversation runtime controller", () => {
             }),
             activeRun: {
                 conversationId: "chat-1",
+                agentId: "agent-1",
                 assistantMessageId: "assistant-1",
                 userContent: "hello",
                 content: "Old output",
@@ -281,6 +288,7 @@ describe("mobile conversation runtime controller", () => {
             shouldReset: false,
             recoveredRun: {
                 conversationId: "chat-1",
+                agentId: "agent-1",
                 assistantMessageId: "assistant-1",
                 userContent: "hello",
                 content: "Old output",
@@ -318,6 +326,7 @@ describe("mobile conversation runtime controller", () => {
             }),
             activeRun: {
                 conversationId: "chat-1",
+                agentId: "agent-1",
                 assistantMessageId: "assistant-1",
                 userContent: "hello",
                 content: "Old output",
@@ -329,6 +338,7 @@ describe("mobile conversation runtime controller", () => {
             shouldReset: true,
             recoveredRun: {
                 conversationId: "chat-1",
+                agentId: "agent-1",
                 assistantMessageId: "assistant-2",
                 userContent: "next prompt",
                 content: "Next output",

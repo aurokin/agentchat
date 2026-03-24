@@ -7,6 +7,7 @@ import {
     toAgentchatWebSocketUrl,
     type AgentchatSocketCommand,
     type AgentchatSocketEvent,
+    type ConversationDeleteCommand,
     type ConversationHistoryEntry,
     type ConversationInterruptCommand,
     type ConversationSendCommand,
@@ -16,6 +17,7 @@ import {
 export type {
     AgentchatSocketCommand,
     AgentchatSocketEvent,
+    ConversationDeleteCommand,
     ConversationHistoryEntry,
     ConversationInterruptCommand,
     ConversationSendCommand,

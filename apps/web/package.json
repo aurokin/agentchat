@@ -16,6 +16,7 @@
         "health": "bun run format:check && bun run typecheck && bun run lint && bun test"
     },
     "dependencies": {
+        "@agentchat/shared": "workspace:*",
         "@convex-dev/auth": "^0.0.90",
         "clsx": "^2.1.1",
         "convex": "^1.31.7",
