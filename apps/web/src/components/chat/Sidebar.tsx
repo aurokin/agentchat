@@ -40,6 +40,17 @@ interface SidebarProps {
     onClose?: () => void;
 }
 
+type ScopedChatTarget = {
+    id: string;
+    agentId: string;
+};
+
+export function getScopedChatTargetKey(
+    chat: ScopedChatTarget | null,
+): string | null {
+    return chat ? getScopedChatStateKey(chat.id, chat.agentId) : null;
+}
+
 export function resolveSidebarConversationState({
     isActiveConversation,
     activity,
@@ -90,15 +101,25 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
     const persistenceAdapter = usePersistenceAdapter();
 
     const [isMac, setIsMac] = useState(false);
-    const [pendingDeleteChatId, setPendingDeleteChatId] = useState<
-        string | null
-    >(null);
+    const [pendingDeleteChat, setPendingDeleteChat] =
+        useState<ScopedChatTarget | null>(null);
     const scrollContainerRef = useRef<HTMLDivElement | null>(null);
     const loadMoreRef = useRef<HTMLLIElement | null>(null);
+    const currentChatKey = useMemo(
+        () => getScopedChatTargetKey(currentChat),
+        [currentChat],
+    );
 
     const pendingChat = useMemo(
-        () => chats.find((chat) => chat.id === pendingDeleteChatId) ?? null,
-        [chats, pendingDeleteChatId],
+        () =>
+            pendingDeleteChat
+                ? (chats.find(
+                      (chat) =>
+                          getScopedChatStateKey(chat.id, chat.agentId) ===
+                          getScopedChatTargetKey(pendingDeleteChat),
+                  ) ?? null)
+                : null,
+        [chats, pendingDeleteChat],
     );
     const activeRunCountsByAgent = useMemo(
         () =>
@@ -162,14 +183,19 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
     }, [chats, currentChat?.id, isMobile, onClose, router, selectChat]);
 
     const deleteChatAndSelectNext = useCallback(
-        async (chatId: string) => {
-            const chatIndex = chats.findIndex((chat) => chat.id === chatId);
+        async (chat: ScopedChatTarget) => {
+            const targetChatKey = getScopedChatStateKey(chat.id, chat.agentId);
+            const chatIndex = chats.findIndex(
+                (candidate) =>
+                    getScopedChatStateKey(candidate.id, candidate.agentId) ===
+                    targetChatKey,
+            );
             const nextChatId =
-                currentChat?.id === chatId
+                currentChatKey === targetChatKey
                     ? (chats[chatIndex + 1]?.id ?? null)
                     : null;
 
-            await deleteChat(chatId);
+            await deleteChat(chat.id);
 
             if (nextChatId) {
                 await selectChat(nextChatId);
@@ -181,7 +207,7 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
         },
         [
             chats,
-            currentChat?.id,
+            currentChatKey,
             deleteChat,
             isMobile,
             onClose,
@@ -191,31 +217,39 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
     );
 
     const requestDeleteChat = useCallback(
-        async (chatId: string) => {
-            const targetChat = chats.find((chat) => chat.id === chatId) ?? null;
-            if (!targetChat && currentChat?.id !== chatId) {
+        async (chat: ScopedChatTarget) => {
+            const targetChatKey = getScopedChatStateKey(chat.id, chat.agentId);
+            const targetChat =
+                chats.find(
+                    (candidate) =>
+                        getScopedChatStateKey(
+                            candidate.id,
+                            candidate.agentId,
+                        ) === targetChatKey,
+                ) ?? null;
+            if (!targetChat && currentChatKey !== targetChatKey) {
                 return;
             }
             const hasMessages =
-                currentChat?.id === chatId
+                currentChatKey === targetChatKey
                     ? messages.length > 0
                     : (
                           await persistenceAdapter.getMessagesByChat(
-                              chatId,
-                              targetChat!.agentId,
+                              chat.id,
+                              chat.agentId,
                           )
                       ).length > 0;
 
             if (!hasMessages) {
-                await deleteChatAndSelectNext(chatId);
+                await deleteChatAndSelectNext(chat);
                 return;
             }
 
-            setPendingDeleteChatId(chatId);
+            setPendingDeleteChat(chat);
         },
         [
             chats,
-            currentChat?.id,
+            currentChatKey,
             deleteChatAndSelectNext,
             messages.length,
             persistenceAdapter,
@@ -223,9 +257,9 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
     );
 
     const handleConfirmDelete = async () => {
-        if (!pendingDeleteChatId) return;
-        await deleteChatAndSelectNext(pendingDeleteChatId);
-        setPendingDeleteChatId(null);
+        if (!pendingDeleteChat) return;
+        await deleteChatAndSelectNext(pendingDeleteChat);
+        setPendingDeleteChat(null);
     };
 
     useEffect(() => {
@@ -255,7 +289,7 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                 if (!currentChat) return;
                 event.preventDefault();
                 event.stopPropagation();
-                void requestDeleteChat(currentChat.id);
+                void requestDeleteChat(currentChat);
                 return;
             }
 
@@ -411,7 +445,12 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                     ) : (
                         <ul className="p-3 space-y-1 list-none">
                             {chats.map((chat) => {
-                                const isActive = currentChat?.id === chat.id;
+                                const isActive =
+                                    currentChatKey ===
+                                    getScopedChatStateKey(
+                                        chat.id,
+                                        chat.agentId,
+                                    );
                                 const runtimeBinding =
                                     conversationRuntimeBindings[
                                         getScopedChatStateKey(
@@ -504,7 +543,7 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                                                     onClick={(event) => {
                                                         event.stopPropagation();
                                                         void requestDeleteChat(
-                                                            chat.id,
+                                                            chat,
                                                         );
                                                     }}
                                                     className={cn(
@@ -593,7 +632,7 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                 </div>
             </aside>
             <ConfirmDialog
-                open={pendingDeleteChatId !== null}
+                open={pendingDeleteChat !== null}
                 title="Delete conversation?"
                 description={
                     pendingChat
@@ -603,7 +642,7 @@ export function Sidebar({ isOpen: propsIsOpen = true, onClose }: SidebarProps) {
                 confirmLabel="Delete"
                 cancelLabel="Cancel"
                 onConfirm={handleConfirmDelete}
-                onCancel={() => setPendingDeleteChatId(null)}
+                onCancel={() => setPendingDeleteChat(null)}
             />
         </>
     );

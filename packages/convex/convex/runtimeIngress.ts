@@ -1196,7 +1196,7 @@ export const chatExistsByLocalId = internalQuery({
             }
         }
 
-        const chat = await ctx.db
+        const chats = await ctx.db
             .query("chats")
             .withIndex("by_userId_and_agentId_and_localId", (q) =>
                 q
@@ -1204,8 +1204,8 @@ export const chatExistsByLocalId = internalQuery({
                     .eq("agentId", args.agentId)
                     .eq("localId", args.localId),
             )
-            .unique();
-        if (chat !== null) {
+            .collect();
+        if (chats.length > 0) {
             return true;
         }
 

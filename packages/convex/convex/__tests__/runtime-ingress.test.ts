@@ -701,21 +701,22 @@ describe("runtime ingress", () => {
 
     test("checks chat existence against both agentId and localId", async () => {
         let callCount = 0;
-        const unique = mock(async () =>
+        const collect = mock(async () =>
             callCount++ === 0
-                ? {
-                      _id: "chats:2",
-                      agentId: "agent-b",
-                      userId: "users:test",
-                      localId: "chat-1",
-                  }
-                : null,
-        );
-        const collect = mock(async () => []);
+                ? [
+                      {
+                          _id: "chats:2",
+                          agentId: "agent-b",
+                          userId: "users:test",
+                          localId: "chat-1",
+                      },
+                  ]
+                : []);
+        const legacyCollect = mock(async () => []);
         const withIndex = mock((indexName: string) =>
             indexName === "by_userId_and_agentId_and_localId"
-                ? { unique }
-                : { collect },
+                ? { collect }
+                : { collect: legacyCollect },
         );
         const query = mock(() => ({ withIndex }));
         const ctx = {
@@ -742,17 +743,19 @@ describe("runtime ingress", () => {
     });
 
     test("falls back to agent-local lookup when the supplied chatId is stale", async () => {
-        const unique = mock(async () => ({
-            _id: "chats:live",
-            agentId: "agent-a",
-            userId: "users:test",
-            localId: "chat-1",
-        }));
-        const collect = mock(async () => []);
+        const collect = mock(async () => [
+            {
+                _id: "chats:live",
+                agentId: "agent-a",
+                userId: "users:test",
+                localId: "chat-1",
+            },
+        ]);
+        const legacyCollect = mock(async () => []);
         const withIndex = mock((indexName: string) =>
             indexName === "by_userId_and_agentId_and_localId"
-                ? { unique }
-                : { collect },
+                ? { collect }
+                : { collect: legacyCollect },
         );
         const query = mock(() => ({ withIndex }));
         const get = mock(async () => null);
@@ -777,8 +780,8 @@ describe("runtime ingress", () => {
     });
 
     test("falls back to legacy chat ids when a chat has no localId", async () => {
-        const unique = mock(async () => null);
-        const collect = mock(async () => [
+        const collect = mock(async () => []);
+        const legacyCollect = mock(async () => [
             {
                 _id: "chats:legacy",
                 agentId: "agent-a",
@@ -788,8 +791,8 @@ describe("runtime ingress", () => {
         ]);
         const withIndex = mock((indexName: string) =>
             indexName === "by_userId_and_agentId_and_localId"
-                ? { unique }
-                : { collect },
+                ? { collect }
+                : { collect: legacyCollect },
         );
         const query = mock(() => ({ withIndex }));
         const ctx = {
@@ -803,6 +806,42 @@ describe("runtime ingress", () => {
                 userId: "users:test",
                 agentId: "agent-a",
                 localId: "chats:legacy",
+            }),
+        ).resolves.toBe(true);
+    });
+
+    test("treats duplicate agent-local matches as existing", async () => {
+        const collect = mock(async () => [
+            {
+                _id: "chats:1",
+                agentId: "agent-a",
+                userId: "users:test",
+                localId: "chat-1",
+            },
+            {
+                _id: "chats:2",
+                agentId: "agent-a",
+                userId: "users:test",
+                localId: "chat-1",
+            },
+        ]);
+        const withIndex = mock((indexName: string) =>
+            indexName === "by_userId_and_agentId_and_localId"
+                ? { collect }
+                : { collect: mock(async () => []) },
+        );
+        const query = mock(() => ({ withIndex }));
+        const ctx = {
+            db: {
+                query,
+            },
+        };
+
+        await expect(
+            runHandler(chatExistsByLocalId as unknown as HandlerExport, ctx, {
+                userId: "users:test",
+                agentId: "agent-a",
+                localId: "chat-1",
             }),
         ).resolves.toBe(true);
     });

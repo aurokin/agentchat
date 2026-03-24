@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { resolveConversationActivityState } from "@shared/core/conversation-activity";
+import { getScopedChatTargetKey } from "../Sidebar";
 
 describe("resolveConversationActivityState", () => {
     test("marks active runs as working", () => {
@@ -43,5 +44,19 @@ describe("resolveConversationActivityState", () => {
                 },
             }),
         ).toBeNull();
+    });
+});
+
+describe("getScopedChatTargetKey", () => {
+    test("distinguishes chats with the same id under different agents", () => {
+        expect(
+            getScopedChatTargetKey({ id: "chat-1", agentId: "agent-a" }),
+        ).not.toBe(
+            getScopedChatTargetKey({ id: "chat-1", agentId: "agent-b" }),
+        );
+    });
+
+    test("returns null for an absent chat target", () => {
+        expect(getScopedChatTargetKey(null)).toBeNull();
     });
 });
