@@ -141,7 +141,7 @@ describe("workspace reconciliation", () => {
         );
     });
 
-    test("preserves missing-agent workspaces only across older roots after current-root grace expires", () => {
+    test("preserves missing-agent workspaces across known roots when liveness is unavailable", () => {
         expect(
             getPersistedWorkspaceActiveKeys(
                 [
@@ -165,6 +165,12 @@ describe("workspace reconciliation", () => {
             ),
         ).toEqual(
             new Set([
+                getWorkspaceActiveKey({
+                    sandboxRoot: "/tmp/current-sandbox",
+                    agentId: "missing-agent",
+                    userId: "user-1",
+                    conversationId: "chat-2",
+                }),
                 getWorkspaceActiveKey({
                     sandboxRoot: "/tmp/old-sandbox",
                     agentId: "missing-agent",

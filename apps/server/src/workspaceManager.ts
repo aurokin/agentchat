@@ -185,6 +185,7 @@ export class WorkspaceManager {
     private readonly knownSandboxRoots = new Set<string>();
     private lastPublishedInstanceKey: string | null = null;
     private lastSandboxRootsRegistryHeartbeatAt = 0;
+    private sandboxRootsRegistryHealthy = true;
 
     constructor(params: {
         getConfig: () => AgentchatConfig;
@@ -579,6 +580,12 @@ export class WorkspaceManager {
      */
     async reconcile(activeKeys: Set<string>): Promise<void> {
         const registry = this.syncSandboxRootsRegistry();
+        if (!this.sandboxRootsRegistryHealthy) {
+            console.warn(
+                "[agentchat-server] reconcile: skipping sandbox cleanup because sandbox root registry sync is unhealthy",
+            );
+            return;
+        }
         const reconcileStartedAt = Date.now();
         this.pruneRecentWorkspaceTouches(reconcileStartedAt);
         const currentSandboxRoot = canonicalizePathForComparison(
@@ -1245,6 +1252,7 @@ export class WorkspaceManager {
                         this.writeSandboxRootsRegistry(registry);
                     }
                     this.lastPublishedInstanceKey = instanceKey;
+                    this.sandboxRootsRegistryHealthy = true;
                     return registry;
                 },
             );
@@ -1253,6 +1261,7 @@ export class WorkspaceManager {
                 `[agentchat-server] failed to synchronize sandbox root registry:`,
                 error,
             );
+            this.sandboxRootsRegistryHealthy = false;
             const sandboxRoot = canonicalizePathForComparison(
                 this.getConfig().sandboxRoot,
             );

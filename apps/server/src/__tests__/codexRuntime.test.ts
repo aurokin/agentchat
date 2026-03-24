@@ -109,6 +109,7 @@ type FakeClientOptions = {
     turnStartError?: Error;
     turnStartPromise?: Promise<void>;
     initializePromise?: Promise<void>;
+    stopPromise?: Promise<void>;
     stopError?: Error;
 };
 
@@ -191,6 +192,7 @@ class FakeCodexClient {
 
     async stop(): Promise<void> {
         this.stopped = true;
+        await this.options.stopPromise;
         if (this.options.stopError) {
             throw this.options.stopError;
         }
@@ -2185,6 +2187,76 @@ describe("CodexRuntimeManager", () => {
                     event.payload.conversationId === "chat-1",
             ),
         ).toBe(true);
+    });
+
+    test("does not resurrect unsubscribed subscribers during async runtime recycle", async () => {
+        const config = createConfig();
+        const clients: FakeCodexClient[] = [];
+        let releaseStop!: () => void;
+        const stopGate = new Promise<void>((resolve) => {
+            releaseStop = resolve;
+        });
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: createPersistence(
+                null,
+            ) as unknown as RuntimePersistenceClient,
+            createClient: () => {
+                const client = new FakeCodexClient({
+                    stopPromise:
+                        clients.length === 0 ? stopGate : Promise.resolve(),
+                });
+                clients.push(client);
+                return client;
+            },
+        });
+
+        const subscriberEvents: ServerEvent[] = [];
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+        await manager.subscribe({
+            userId: "user-1",
+            conversationId: "chat-1",
+            agentId: "agent-1",
+            subscriberId: "socket-2",
+            sendEvent: (event) => {
+                subscriberEvents.push(event);
+            },
+        });
+
+        const currentAgent = config.agents[0];
+        if (!currentAgent) {
+            throw new Error("Expected agent config");
+        }
+
+        config.agents[0] = {
+            ...currentAgent,
+            rootPath: "/tmp/agent-1-next",
+        };
+
+        const recycleSend = manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        await Bun.sleep(0);
+        manager.unsubscribe({
+            subscriberId: "socket-2",
+            conversationId: "chat-1",
+            agentId: "agent-1",
+        });
+        releaseStop();
+        await recycleSend;
+
+        expect(clients).toHaveLength(2);
+        expect(subscriberEvents).toEqual([]);
     });
 
     test("does not recycle an active runtime during config reload", async () => {

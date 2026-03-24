@@ -135,8 +135,6 @@ console.log(`[agentchat-server] using config ${configStore.path}`);
 // and every 10 minutes. Best-effort; failures are logged and ignored.
 const RECONCILE_INTERVAL_MS = 10 * 60 * 1000;
 const SANDBOX_ROOT_HEARTBEAT_INTERVAL_MS = 60_000;
-const MISSING_AGENT_CURRENT_ROOT_GRACE_RECONCILES = 2;
-const missingAgentCurrentRootMissCounts = new Map<string, number>();
 
 async function runReconciliation(): Promise<void> {
     try {
@@ -162,40 +160,21 @@ async function runReconciliation(): Promise<void> {
             workspaceManager.listCurrentCopyOnConversationSandboxRootsByAgent();
         const currentSandboxRoots = workspaceManager.listCurrentSandboxRoots();
         const knownSandboxRoots = workspaceManager.listKnownSandboxRoots();
-        const missingAgentIdsWithCurrentRootGrace = new Set<string>();
         const persistedAgentIds = new Set(
             entries.map((entry) => entry.agentId),
         );
         for (const agentId of persistedAgentIds) {
-            if (configuredAgentIds.has(agentId)) {
-                missingAgentCurrentRootMissCounts.delete(agentId);
-                continue;
-            }
-
             if (
+                !configuredAgentIds.has(agentId) &&
                 (currentCopyOnConversationSandboxRootsByAgent[agentId] ?? [])
-                    .length > 0 ||
-                currentSandboxRoots.length === 0
+                    .length === 0 &&
+                currentSandboxRoots.length > 0
             ) {
-                missingAgentCurrentRootMissCounts.delete(agentId);
-                continue;
-            }
-
-            const nextMissCount =
-                (missingAgentCurrentRootMissCounts.get(agentId) ?? 0) + 1;
-            missingAgentCurrentRootMissCounts.set(agentId, nextMissCount);
-            if (nextMissCount <= MISSING_AGENT_CURRENT_ROOT_GRACE_RECONCILES) {
-                missingAgentIdsWithCurrentRootGrace.add(agentId);
-            }
-        }
-        for (const agentId of Array.from(
-            missingAgentCurrentRootMissCounts.keys(),
-        )) {
-            if (
-                !persistedAgentIds.has(agentId) ||
-                configuredAgentIds.has(agentId)
-            ) {
-                missingAgentCurrentRootMissCounts.delete(agentId);
+                // Fail closed for missing agents: preserve current-root copied
+                // workspaces until a later release can prove they are dead.
+                currentCopyOnConversationSandboxRootsByAgent[agentId] = [
+                    ...currentSandboxRoots,
+                ];
             }
         }
         // Build composite keys so reconciliation can distinguish sandboxes
@@ -206,7 +185,6 @@ async function runReconciliation(): Promise<void> {
             currentCopyOnConversationSandboxRootsByAgent,
             currentSandboxRoots,
             knownSandboxRoots,
-            missingAgentIdsWithCurrentRootGrace,
         });
         // Include live runtimes to avoid deleting sandboxes for in-progress
         // sessions not yet persisted to Convex.

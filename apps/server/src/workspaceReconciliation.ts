@@ -53,14 +53,7 @@ export function getPersistedWorkspaceActiveKeys(
                   ? params.knownSandboxRoots
                   : params.configuredAgentIds.has(entry.agentId)
                     ? []
-                    : params.missingAgentIdsWithCurrentRootGrace?.has(
-                            entry.agentId,
-                        )
-                      ? params.knownSandboxRoots
-                      : params.knownSandboxRoots.filter(
-                            (sandboxRoot) =>
-                                !currentSandboxRoots.has(sandboxRoot),
-                        );
+                    : params.knownSandboxRoots;
         for (const sandboxRoot of sandboxRoots) {
             activeKeys.add(
                 getWorkspaceActiveKey({

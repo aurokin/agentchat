@@ -1902,6 +1902,51 @@ new WorkspaceManager({
             expect(existsSync(workspace)).toBe(true);
         });
 
+        test("skips reconciliation when sandbox root registry sync is unhealthy", async () => {
+            const sandboxRoot = makeTempDir("sandbox");
+            const rootPath = makeTempDir("agent-root");
+            writeFileSync(path.join(rootPath, "file.txt"), "data");
+
+            const agent = makeAgent({
+                id: "agent-a",
+                rootPath,
+                workspaceMode: "copy-on-conversation",
+            });
+            const manager = createWorkspaceManager(() =>
+                makeConfig({ sandboxRoot, agents: [agent] }),
+            );
+
+            const workspace = await manager.ensureWorkspace(
+                agent,
+                "user-1",
+                "conv-1",
+            );
+
+            (
+                manager as unknown as {
+                    sandboxRootsRegistryHealthy: boolean;
+                    syncSandboxRootsRegistry: () => {
+                        roots: string[];
+                        activeInstances: Record<string, unknown>;
+                    };
+                }
+            ).syncSandboxRootsRegistry = () => {
+                (
+                    manager as unknown as {
+                        sandboxRootsRegistryHealthy: boolean;
+                    }
+                ).sandboxRootsRegistryHealthy = false;
+                return {
+                    roots: [sandboxRoot],
+                    activeInstances: {},
+                };
+            };
+
+            await manager.reconcile(new Set());
+
+            expect(existsSync(workspace)).toBe(true);
+        });
+
         test("refuses to remove orphaned workspaces that overlap an agent rootPath", async () => {
             const sandboxRoot = makeTempDir("sandbox");
             const rootPath = makeTempDir("agent-root");

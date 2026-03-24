@@ -931,13 +931,19 @@ export class CodexRuntimeManager {
         });
         const existing = this.runtimes.get(key);
         let shouldResetConversationState = false;
-        let recycledSubscribers: Map<string, RuntimeSubscriber> | null = null;
         if (existing) {
             if (shouldRecycleRuntime(existing, resources, desiredCwd)) {
                 if (existing.activeTurn) {
                     return { runtime: existing, isNew: false };
                 }
-                recycledSubscribers = new Map(existing.subscribers);
+                const recycledSubscribers = mergeRuntimeSubscribers(
+                    this.pendingSubscriptions.get(key) ?? new Map(),
+                    existing.subscribers,
+                );
+                if (recycledSubscribers.size > 0) {
+                    this.pendingSubscriptions.set(key, recycledSubscribers);
+                }
+                existing.subscribers = new Map();
                 shouldResetConversationState = shouldResetRuntimeState(
                     existing,
                     resources,
@@ -1103,9 +1109,7 @@ export class CodexRuntimeManager {
                 threadId,
                 activeTurn: null,
                 idleTimer: null,
-                subscribers: recycledSubscribers
-                    ? new Map(recycledSubscribers)
-                    : new Map(),
+                subscribers: new Map(),
             };
 
             const pendingSubscribers = this.pendingSubscriptions.get(key);
