@@ -109,6 +109,7 @@ type FakeClientOptions = {
     turnStartError?: Error;
     turnStartPromise?: Promise<void>;
     initializePromise?: Promise<void>;
+    stopError?: Error;
 };
 
 class FakeCodexClient {
@@ -190,6 +191,9 @@ class FakeCodexClient {
 
     async stop(): Promise<void> {
         this.stopped = true;
+        if (this.options.stopError) {
+            throw this.options.stopError;
+        }
     }
 
     emit(notification: unknown): void {
@@ -1351,6 +1355,98 @@ describe("CodexRuntimeManager", () => {
                 ).runtimes.get(runtime.key as string),
             ).toBe(runtime);
         } finally {
+            globalThis.setTimeout = originalSetTimeout;
+            globalThis.clearTimeout = originalClearTimeout;
+        }
+    });
+
+    test("logs and swallows stop failures during idle expiration", async () => {
+        const originalSetTimeout = globalThis.setTimeout;
+        const originalClearTimeout = globalThis.clearTimeout;
+        const scheduledCallbacks: Array<() => void> = [];
+        const originalConsoleError = console.error;
+        const consoleErrorCalls: unknown[][] = [];
+        const consoleError = (...args: unknown[]) => {
+            consoleErrorCalls.push(args);
+        };
+
+        globalThis.setTimeout = ((handler: TimerHandler) => {
+            if (typeof handler === "function") {
+                scheduledCallbacks.push(handler as () => void);
+            }
+            return Symbol("timeout") as unknown as ReturnType<
+                typeof setTimeout
+            >;
+        }) as unknown as typeof setTimeout;
+        globalThis.clearTimeout = (() => undefined) as typeof clearTimeout;
+        console.error = consoleError as typeof console.error;
+
+        try {
+            const config = createConfig();
+            const persistence = createPersistence(null);
+            const stopError = new Error("stop timeout");
+            const fakeClient = new FakeCodexClient({
+                startedThreadId: "thread-fresh",
+                autoComplete: false,
+                stopError,
+            });
+            const manager = new CodexRuntimeManager({
+                getConfig: () => config,
+                persistence: persistence as unknown as RuntimePersistenceClient,
+                createClient: () => fakeClient,
+            });
+            const runtime: Record<string, unknown> = {
+                key: JSON.stringify(["user-1", "agent-1", "chat-1"]),
+                userId: "user-1",
+                conversationId: "chat-1",
+                agentId: "agent-1",
+                modelId: "gpt-5.3-codex",
+                provider: config.providers[0]!,
+                agent: config.agents[0]!,
+                cwd: config.agents[0]!.rootPath,
+                client: fakeClient,
+                threadId: "thread-fresh",
+                activeTurn: null,
+                idleTimer: null,
+                subscribers: new Map(),
+            };
+
+            (
+                manager as unknown as {
+                    runtimes: Map<string, Record<string, unknown>>;
+                    scheduleIdleExpiration: (
+                        runtime: Record<string, unknown>,
+                    ) => void;
+                }
+            ).runtimes.set(runtime.key as string, runtime);
+            (
+                manager as unknown as {
+                    scheduleIdleExpiration: (
+                        runtime: Record<string, unknown>,
+                    ) => void;
+                }
+            ).scheduleIdleExpiration(runtime);
+
+            const queuedIdleCallback = scheduledCallbacks[0];
+            expect(queuedIdleCallback).toBeDefined();
+
+            queuedIdleCallback?.();
+            await Bun.sleep(0);
+
+            expect(fakeClient.stopped).toBe(true);
+            expect(
+                (
+                    manager as unknown as {
+                        runtimes: Map<string, unknown>;
+                    }
+                ).runtimes.get(runtime.key as string),
+            ).toBeUndefined();
+            expect(consoleErrorCalls).toContainEqual([
+                "[agentchat-server] failed to stop Codex client during idle runtime expiration",
+                stopError,
+            ]);
+        } finally {
+            console.error = originalConsoleError;
             globalThis.setTimeout = originalSetTimeout;
             globalThis.clearTimeout = originalClearTimeout;
         }
@@ -3044,6 +3140,56 @@ describe("CodexRuntimeManager", () => {
                 ),
             ),
         ).toBe(false);
+    });
+
+    test("logs and swallows stop failures when canceling pending initialization", async () => {
+        const config = createConfig();
+        const persistence = createPersistence(null);
+        const stopError = new Error("stop timeout");
+        const client = new FakeCodexClient({ stopError });
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: () => client,
+        });
+        const originalConsoleError = console.error;
+        const consoleErrorCalls: unknown[][] = [];
+        const consoleError = (...args: unknown[]) => {
+            consoleErrorCalls.push(args);
+        };
+        console.error = consoleError as typeof console.error;
+
+        try {
+            const key = JSON.stringify(["user-1", "agent-1", "chat-1"]);
+            (
+                manager as unknown as {
+                    pendingRuntimeInitializations: Map<string, unknown>;
+                }
+            ).pendingRuntimeInitializations.set(key, {
+                cancelReason: null,
+                client,
+                promise: new Promise(() => undefined),
+            });
+
+            (
+                manager as unknown as {
+                    cancelPendingRuntimeInitialization: (
+                        key: string,
+                        reason: Error,
+                    ) => unknown;
+                }
+            ).cancelPendingRuntimeInitialization(key, new Error("cancelled"));
+
+            await Bun.sleep(0);
+
+            expect(client.stopped).toBe(true);
+            expect(consoleErrorCalls).toContainEqual([
+                "[agentchat-server] failed to stop Codex client during pending runtime initialization cancellation",
+                stopError,
+            ]);
+        } finally {
+            console.error = originalConsoleError;
+        }
     });
 
     test("conversation delete does not wait forever on a hung runtime initialization", async () => {

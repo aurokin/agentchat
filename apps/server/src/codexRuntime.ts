@@ -1186,8 +1186,27 @@ export class CodexRuntimeManager {
         }
 
         pendingInitialization.cancelReason ??= reason;
-        void pendingInitialization.client?.stop();
+        if (pendingInitialization.client) {
+            void this.stopClientSafely(
+                pendingInitialization.client,
+                "pending runtime initialization cancellation",
+            );
+        }
         return pendingInitialization;
+    }
+
+    private async stopClientSafely(
+        client: CodexClient,
+        reason: string,
+    ): Promise<void> {
+        try {
+            await client.stop();
+        } catch (error) {
+            console.error(
+                `[agentchat-server] failed to stop Codex client during ${reason}`,
+                error,
+            );
+        }
     }
 
     private async waitForPendingRuntimeInitialization(
@@ -1957,46 +1976,51 @@ export class CodexRuntimeManager {
         }
 
         const idleTimer = setTimeout(() => {
-            if (
-                this.runtimes.get(runtime.key) !== runtime ||
-                runtime.idleTimer !== idleTimer ||
-                runtime.activeTurn
-            ) {
-                return;
-            }
-            runtime.idleTimer = null;
+            void (async () => {
+                if (
+                    this.runtimes.get(runtime.key) !== runtime ||
+                    runtime.idleTimer !== idleTimer ||
+                    runtime.activeTurn
+                ) {
+                    return;
+                }
+                runtime.idleTimer = null;
 
-            const expiredAt = this.nextPersistenceTimestamp();
-            void this.persistence
-                .runtimeBinding({
-                    chatId: runtime.chatId,
-                    userId: runtime.userId,
-                    agentId: runtime.agentId,
-                    conversationLocalId: runtime.conversationId,
-                    provider: runtime.provider.id,
-                    status: "expired",
-                    providerThreadId: runtime.threadId,
-                    providerResumeToken: null,
-                    activeRunId: null,
-                    lastError: null,
-                    lastEventAt: expiredAt,
-                    expiresAt: expiredAt,
-                    workspaceMode: runtime.agent.workspaceMode,
-                    workspaceRootPath: runtime.agent.rootPath,
-                    workspaceCwd: runtime.cwd,
-                    updatedAt: expiredAt,
-                })
-                .catch((error) => {
-                    if (isRecoverablePersistenceMissingResource(error)) {
-                        return;
-                    }
-                    console.error(
-                        "[agentchat-server] failed to persist expired runtime binding",
-                        error,
-                    );
-                });
-            void runtime.client.stop();
-            this.runtimes.delete(runtime.key);
+                const expiredAt = this.nextPersistenceTimestamp();
+                void this.persistence
+                    .runtimeBinding({
+                        chatId: runtime.chatId,
+                        userId: runtime.userId,
+                        agentId: runtime.agentId,
+                        conversationLocalId: runtime.conversationId,
+                        provider: runtime.provider.id,
+                        status: "expired",
+                        providerThreadId: runtime.threadId,
+                        providerResumeToken: null,
+                        activeRunId: null,
+                        lastError: null,
+                        lastEventAt: expiredAt,
+                        expiresAt: expiredAt,
+                        workspaceMode: runtime.agent.workspaceMode,
+                        workspaceRootPath: runtime.agent.rootPath,
+                        workspaceCwd: runtime.cwd,
+                        updatedAt: expiredAt,
+                    })
+                    .catch((error) => {
+                        if (isRecoverablePersistenceMissingResource(error)) {
+                            return;
+                        }
+                        console.error(
+                            "[agentchat-server] failed to persist expired runtime binding",
+                            error,
+                        );
+                    });
+                this.runtimes.delete(runtime.key);
+                await this.stopClientSafely(
+                    runtime.client,
+                    "idle runtime expiration",
+                );
+            })();
         }, runtime.provider.idleTtlSeconds * 1000);
         runtime.idleTimer = idleTimer;
     }
