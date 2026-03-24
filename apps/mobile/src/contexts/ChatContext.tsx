@@ -43,6 +43,9 @@ import { useAuthContext } from "@/lib/convex/AuthContext";
 import {
     buildConversationRuntimeBindingMap,
     getScopedChatStateKey,
+    insertScopedMessage,
+    patchScopedMessage,
+    replaceScopedMessage,
 } from "@/contexts/chat-state";
 
 export type ScopedChatTarget = {
@@ -76,8 +79,14 @@ interface ChatContextValue {
     addMessage: (
         message: Omit<Message, "createdAt" | "id"> & { id?: string },
     ) => Promise<Message>;
-    insertMessage: (message: Message) => void;
-    updateMessage: (message: Message) => Promise<void>;
+    insertMessage: (
+        message: Message,
+        agentId?: string | null,
+    ) => void;
+    updateMessage: (
+        message: Message,
+        agentId?: string | null,
+    ) => Promise<void>;
     patchMessage: (
         id: string,
         chatId: string,
@@ -87,6 +96,7 @@ interface ChatContextValue {
                 "content" | "contextContent" | "reasoning" | "status" | "kind"
             >
         >,
+        agentId?: string | null,
     ) => void;
 }
 
@@ -813,48 +823,30 @@ export function ChatProvider({
     );
 
     const updateMessage = useCallback(
-        async (message: Message) => {
+        async (message: Message, agentId?: string | null) => {
             await adapter.updateMessage(message);
 
-            if (currentChat) {
-                const currentChatKey = getScopedChatStateKey(
-                    currentChat.id,
-                    currentChat.agentId,
-                );
-                setMessages((prev) => ({
-                    ...prev,
-                    [currentChatKey]: (prev[currentChatKey] || []).map((m) =>
-                        m.id === message.id ? message : m,
-                    ),
-                }));
+            const targetAgentId = agentId ?? currentChat?.agentId ?? null;
+            if (targetAgentId === null) {
+                return;
             }
+
+            setMessages((prev) =>
+                replaceScopedMessage(prev, message, targetAgentId),
+            );
         },
         [adapter, currentChat],
     );
 
     const insertMessage = useCallback(
-        (message: Message) => {
-            setMessages((prev) => {
-                const chatMessages =
-                    prev[
-                        getScopedChatStateKey(
-                            message.sessionId,
-                            currentChat?.agentId ?? null,
-                        )
-                    ] || [];
-                if (
-                    chatMessages.some((existing) => existing.id === message.id)
-                ) {
-                    return prev;
-                }
-                return {
-                    ...prev,
-                    [getScopedChatStateKey(
-                        message.sessionId,
-                        currentChat?.agentId ?? null,
-                    )]: [...chatMessages, message],
-                };
-            });
+        (message: Message, agentId?: string | null) => {
+            setMessages((prev) =>
+                insertScopedMessage(
+                    prev,
+                    message,
+                    agentId ?? currentChat?.agentId ?? null,
+                ),
+            );
         },
         [currentChat?.agentId],
     );
@@ -866,25 +858,19 @@ export function ChatProvider({
             updates: Partial<
                 Pick<
                     Message,
-                    "content" | "contextContent" | "reasoning" | "status"
+                    "content" | "contextContent" | "reasoning" | "status" | "kind"
                 >
             >,
+            agentId?: string | null,
         ) => {
-            const scopedChatKey = getScopedChatStateKey(
-                chatId,
-                currentChat?.agentId ?? null,
+            setMessages((prev) =>
+                patchScopedMessage(prev, {
+                    id,
+                    chatId,
+                    agentId: agentId ?? currentChat?.agentId ?? null,
+                    updates,
+                }),
             );
-            setMessages((prev) => {
-                const chatMessages = prev[scopedChatKey] || [];
-                return {
-                    ...prev,
-                    [scopedChatKey]: chatMessages.map((message) =>
-                        message.id === id
-                            ? { ...message, ...updates }
-                            : message,
-                    ),
-                };
-            });
         },
         [currentChat?.agentId],
     );

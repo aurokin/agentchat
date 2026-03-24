@@ -493,9 +493,9 @@ export default function ChatScreen(): ReactElement {
                 runId: params.runId,
                 updatedAt: Date.now(),
                 completedAt: params.status === "streaming" ? null : Date.now(),
-            });
+            }, currentChatAgentId);
         },
-        [updateMessage],
+        [currentChatAgentId, updateMessage],
     );
 
     useEffect(() => {
@@ -600,9 +600,13 @@ export default function ChatScreen(): ReactElement {
                             kind: messageLifecyclePlan.previousMessagePatch
                                 .kind,
                         },
+                        messageLifecyclePlan.activeRun.agentId,
                     );
                 }
-                insertMessage(messageLifecyclePlan.insertedMessage);
+                insertMessage(
+                    messageLifecyclePlan.insertedMessage,
+                    messageLifecyclePlan.activeRun.agentId,
+                );
                 setActiveRun(messageLifecyclePlan.activeRun);
                 setStreamingMessage(messageLifecyclePlan.streamingMessage);
                 return;
@@ -620,6 +624,7 @@ export default function ChatScreen(): ReactElement {
                     currentChatRef.current?.id ??
                         messageLifecyclePlan.activeRun.conversationId,
                     messageLifecyclePlan.messagePatch,
+                    messageLifecyclePlan.activeRun.agentId,
                 );
                 setActiveRun(messageLifecyclePlan.activeRun);
                 if (messageLifecyclePlan.streamingMessage) {

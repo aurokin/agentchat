@@ -36,6 +36,8 @@ function toJsonLine(value: unknown): string {
 }
 
 export class CodexAppServerClient implements CodexClient {
+    private static readonly DEFAULT_STOP_TIMEOUT_MS = 5_000;
+
     private readonly child: ChildProcessWithoutNullStreams;
     private readonly pending = new Map<
         number,
@@ -53,9 +55,18 @@ export class CodexAppServerClient implements CodexClient {
     private hasExited = false;
     private readonly exitPromise: Promise<void>;
     private readonly resolveExitPromise: () => void;
+    private readonly stopTimeoutMs: number;
+    private stopPromise: Promise<void> | null = null;
 
-    constructor(params: { provider: ProviderConfig; agent: AgentConfig }) {
+    constructor(params: {
+        provider: ProviderConfig;
+        agent: AgentConfig;
+        stopTimeoutMs?: number;
+    }) {
         const { provider } = params;
+        this.stopTimeoutMs =
+            params.stopTimeoutMs ??
+            CodexAppServerClient.DEFAULT_STOP_TIMEOUT_MS;
         let resolveExitPromise!: () => void;
         this.exitPromise = new Promise<void>((resolve) => {
             resolveExitPromise = resolve;
@@ -198,11 +209,69 @@ export class CodexAppServerClient implements CodexClient {
     }
 
     async stop(): Promise<void> {
+        if (this.stopPromise) {
+            return await this.stopPromise;
+        }
+
         this.isStopping = true;
         if (this.hasExited) {
             return;
         }
-        this.child.kill("SIGTERM");
-        await this.exitPromise;
+
+        this.stopPromise = (async () => {
+            this.tryKill("SIGTERM");
+            if (await this.waitForExit(this.stopTimeoutMs)) {
+                return;
+            }
+
+            this.tryKill("SIGKILL");
+            if (await this.waitForExit(this.stopTimeoutMs)) {
+                return;
+            }
+
+            throw new Error(
+                `Codex app-server did not exit within ${this.stopTimeoutMs}ms after SIGTERM/SIGKILL`,
+            );
+        })();
+
+        try {
+            await this.stopPromise;
+        } finally {
+            this.stopPromise = null;
+        }
+    }
+
+    private tryKill(signal: NodeJS.Signals): void {
+        if (this.hasExited) {
+            return;
+        }
+
+        try {
+            this.child.kill(signal);
+        } catch (error) {
+            if (!this.hasExited) {
+                throw error;
+            }
+        }
+    }
+
+    private async waitForExit(timeoutMs: number): Promise<boolean> {
+        let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+        try {
+            return await Promise.race([
+                this.exitPromise.then(() => true),
+                new Promise<boolean>((resolve) => {
+                    timeoutId = setTimeout(() => {
+                        timeoutId = null;
+                        resolve(false);
+                    }, timeoutMs);
+                }),
+            ]);
+        } finally {
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+            }
+        }
     }
 }
