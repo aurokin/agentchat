@@ -12,6 +12,7 @@ import path from "node:path";
 
 import { ConfigStore, loadConfigFile, parseConfig } from "../config.ts";
 import { createFetchHandler } from "../http.ts";
+import { resolveDefaultInstanceKey } from "../serverState.ts";
 
 const exampleConfigPath = path.resolve(
     import.meta.dir,
@@ -287,6 +288,17 @@ describe("server config", () => {
         } finally {
             rmSync(releaseRoot, { recursive: true, force: true });
         }
+    });
+
+    test("derives unique default instance keys for distinct running servers", () => {
+        const seed = "shared-config-seed";
+
+        expect(resolveDefaultInstanceKey(seed, "runtime-a")).not.toBe(
+            resolveDefaultInstanceKey(seed, "runtime-b"),
+        );
+        expect(resolveDefaultInstanceKey(seed, "runtime-a")).toBe(
+            resolveDefaultInstanceKey(seed, "runtime-a"),
+        );
     });
 
     test("preserves an explicit state id from config", () => {

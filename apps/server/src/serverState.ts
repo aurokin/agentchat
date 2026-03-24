@@ -1,8 +1,9 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 
 const AGENTCHAT_STATE_DIRECTORY_NAME = ".agentchat-state";
+const DEFAULT_INSTANCE_RUNTIME_KEY = `${process.pid}:${randomUUID()}`;
 
 export function getDefaultAgentchatStateBasePath(): string {
     const xdgStateHome = process.env.XDG_STATE_HOME?.trim();
@@ -35,8 +36,11 @@ export function resolveDefaultStateId(
     return `${basename}-${getStableStateKey(seed)}`;
 }
 
-export function resolveDefaultInstanceKey(seed: string): string {
-    return `instance-${getStableStateKey(seed)}`;
+export function resolveDefaultInstanceKey(
+    seed: string,
+    runtimeKey = DEFAULT_INSTANCE_RUNTIME_KEY,
+): string {
+    return `instance-${getStableStateKey(`${seed}:${runtimeKey}`)}`;
 }
 
 export function getServerStateScopeKey(stateId: string): string {
