@@ -278,6 +278,7 @@ export class CodexRuntimeManager {
         Map<string, RuntimeSubscriber>
     >();
     private readonly closedSubscribers = new Set<string>();
+    private readonly pendingSubscriberResolutions = new Map<string, number>();
     private readonly pendingRuntimeInitializations = new Map<
         string,
         PendingRuntimeInitialization
@@ -704,8 +705,11 @@ export class CodexRuntimeManager {
         subscriberId: string;
         sendEvent: (event: ServerEvent) => void;
     }): Promise<void> | void {
+        this.beginSubscriberResolution(params.subscriberId);
         this.closedSubscribers.delete(params.subscriberId);
-        return this.subscribeResolved(params);
+        return this.subscribeResolved(params).finally(() => {
+            this.finishSubscriberResolution(params.subscriberId);
+        });
     }
 
     private async subscribeResolved(params: {
@@ -868,6 +872,8 @@ export class CodexRuntimeManager {
                 this.pendingSubscriptions.delete(key);
             }
         }
+
+        this.maybeClearClosedSubscriber(params.subscriberId);
     }
 
     private async ensureRuntime(params: {
@@ -1336,6 +1342,51 @@ export class CodexRuntimeManager {
         ) {
             subscribers.delete(subscriberId);
         }
+    }
+
+    private beginSubscriberResolution(subscriberId: string): void {
+        this.pendingSubscriberResolutions.set(
+            subscriberId,
+            (this.pendingSubscriberResolutions.get(subscriberId) ?? 0) + 1,
+        );
+    }
+
+    private finishSubscriberResolution(subscriberId: string): void {
+        const remaining =
+            (this.pendingSubscriberResolutions.get(subscriberId) ?? 1) - 1;
+        if (remaining > 0) {
+            this.pendingSubscriberResolutions.set(subscriberId, remaining);
+        } else {
+            this.pendingSubscriberResolutions.delete(subscriberId);
+        }
+        this.maybeClearClosedSubscriber(subscriberId);
+    }
+
+    private maybeClearClosedSubscriber(subscriberId: string): void {
+        if (!this.closedSubscribers.has(subscriberId)) {
+            return;
+        }
+        if (this.pendingSubscriberResolutions.has(subscriberId)) {
+            return;
+        }
+        if (this.hasTrackedSubscriber(subscriberId)) {
+            return;
+        }
+        this.closedSubscribers.delete(subscriberId);
+    }
+
+    private hasTrackedSubscriber(subscriberId: string): boolean {
+        for (const runtime of this.runtimes.values()) {
+            if (runtime.subscribers.has(subscriberId)) {
+                return true;
+            }
+        }
+        for (const subscribers of this.pendingSubscriptions.values()) {
+            if (subscribers.has(subscriberId)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private async readConversationPersistenceState(params: {

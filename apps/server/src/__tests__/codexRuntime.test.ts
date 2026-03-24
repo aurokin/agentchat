@@ -1281,6 +1281,59 @@ describe("CodexRuntimeManager", () => {
                 }
             ).pendingSubscriptions.size,
         ).toBe(0);
+        expect(
+            (
+                manager as unknown as {
+                    closedSubscribers: Set<string>;
+                }
+            ).closedSubscribers.size,
+        ).toBe(0);
+    });
+
+    test("evicts closed subscriber ids after connection-wide unsubscribe", async () => {
+        const config = createConfig();
+        const persistence = createPersistence(null);
+        const fakeClient = new FakeCodexClient({
+            startedThreadId: "thread-fresh",
+            autoComplete: false,
+        });
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: () => fakeClient,
+        });
+
+        const sendPromise = manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        await Bun.sleep(0);
+
+        manager.unsubscribe({
+            subscriberId: "socket-1",
+        });
+
+        expect(
+            (
+                manager as unknown as {
+                    closedSubscribers: Set<string>;
+                }
+            ).closedSubscribers.size,
+        ).toBe(0);
+
+        fakeClient.emit({
+            method: "turn/completed",
+            params: {
+                turn: {
+                    status: "completed",
+                },
+            },
+        });
+
+        await sendPromise;
     });
 
     test("serializes concurrent runtime initialization for the same agent conversation", async () => {
