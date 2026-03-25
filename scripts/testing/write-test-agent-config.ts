@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -22,6 +22,11 @@ function resolveGitUserEmail(repoRoot: string): string | null {
 }
 
 type AuthMode = "google" | "local";
+const LOCAL_SMOKE_USERNAMES = ["smoke_1", "smoke_2"];
+
+type GeneratedConfig = ReturnType<typeof buildConfig>;
+type GeneratedAgent = GeneratedConfig["agents"][number];
+type GeneratedProvider = GeneratedConfig["providers"][number];
 
 function resolveAuthMode(): AuthMode {
     const flag = process.argv.find((arg) => arg.startsWith("--auth-mode="));
@@ -96,7 +101,11 @@ function buildOptionalAgents(homeDir: string) {
     return optionalAgents;
 }
 
-function buildConfig(homeDir: string, authMode: AuthMode, allowedEmail: string) {
+export function buildConfig(
+    homeDir: string,
+    authMode: AuthMode,
+    allowedEmail: string,
+) {
     const fixturesRoot = path.join(homeDir, "agents", "agentchat_test");
 
     return {
@@ -169,6 +178,8 @@ function buildConfig(homeDir: string, authMode: AuthMode, allowedEmail: string) 
                 description: "Ultra-cheap liveness fixture.",
                 avatar: null,
                 enabled: true,
+                defaultVisible: false,
+                visibilityOverrides: LOCAL_SMOKE_USERNAMES,
                 rootPath: path.join(fixturesRoot, "smoke"),
                 providerIds: ["codex-main"],
                 defaultProviderId: "codex-main",
@@ -185,6 +196,8 @@ function buildConfig(homeDir: string, authMode: AuthMode, allowedEmail: string) 
                 description: "Deterministic read-only Codex confidence fixture.",
                 avatar: null,
                 enabled: true,
+                defaultVisible: false,
+                visibilityOverrides: LOCAL_SMOKE_USERNAMES,
                 rootPath: fixturesRoot,
                 providerIds: ["codex-main"],
                 defaultProviderId: "codex-main",
@@ -202,6 +215,8 @@ function buildConfig(homeDir: string, authMode: AuthMode, allowedEmail: string) 
                     "Small mutable workspace fixture for interruption and resume checks.",
                 avatar: null,
                 enabled: true,
+                defaultVisible: false,
+                visibilityOverrides: LOCAL_SMOKE_USERNAMES,
                 rootPath: path.join(fixturesRoot, "workspace"),
                 providerIds: ["codex-main"],
                 defaultProviderId: "codex-main",
@@ -217,45 +232,104 @@ function buildConfig(homeDir: string, authMode: AuthMode, allowedEmail: string) 
     };
 }
 
-const repoRoot = getRepoRoot();
-const configPath = path.join(repoRoot, "apps/server/agentchat.config.json");
-const dryRun = process.argv.includes("--dry-run");
-const force = process.argv.includes("--force");
-const fixturesRoot = path.join(os.homedir(), "agents", "agentchat_test");
+function readExistingConfig(configPath: string): GeneratedConfig | null {
+    if (!existsSync(configPath)) {
+        return null;
+    }
 
-for (const requiredPath of [
-    fixturesRoot,
-    path.join(fixturesRoot, "smoke"),
-    path.join(fixturesRoot, "workspace"),
-]) {
-    if (!existsSync(requiredPath)) {
-        throw new Error(`Missing test fixture path: ${requiredPath}`);
+    return JSON.parse(readFileSync(configPath, "utf8")) as GeneratedConfig;
+}
+
+function sortAgentsByOrder(agents: GeneratedAgent[]): GeneratedAgent[] {
+    return [...agents].sort((left, right) => left.sortOrder - right.sortOrder);
+}
+
+export function mergePreservedConfig(params: {
+    generatedConfig: GeneratedConfig;
+    existingConfig: GeneratedConfig | null;
+}): GeneratedConfig {
+    const { generatedConfig, existingConfig } = params;
+    if (!existingConfig) {
+        return generatedConfig;
+    }
+
+    const managedAgentIds = new Set(generatedConfig.agents.map((agent) => agent.id));
+    const preservedAgents = existingConfig.agents.filter(
+        (agent) => !managedAgentIds.has(agent.id),
+    );
+    const requiredProviderIds = new Set(
+        preservedAgents.flatMap((agent) => agent.providerIds),
+    );
+    const managedProviderIds = new Set(
+        generatedConfig.providers.map((provider) => provider.id),
+    );
+    const preservedProviders = existingConfig.providers.filter(
+        (provider) =>
+            requiredProviderIds.has(provider.id) &&
+            !managedProviderIds.has(provider.id),
+    );
+
+    return {
+        ...generatedConfig,
+        stateId: existingConfig.stateId ?? generatedConfig.stateId,
+        sandboxRoot: existingConfig.sandboxRoot ?? generatedConfig.sandboxRoot,
+        providers: [...generatedConfig.providers, ...preservedProviders],
+        agents: sortAgentsByOrder([
+            ...generatedConfig.agents,
+            ...preservedAgents,
+        ]),
+    };
+}
+
+function main() {
+    const repoRoot = getRepoRoot();
+    const configPath = path.join(repoRoot, "apps/server/agentchat.config.json");
+    const dryRun = process.argv.includes("--dry-run");
+    const force = process.argv.includes("--force");
+    const fixturesRoot = path.join(os.homedir(), "agents", "agentchat_test");
+
+    for (const requiredPath of [
+        fixturesRoot,
+        path.join(fixturesRoot, "smoke"),
+        path.join(fixturesRoot, "workspace"),
+    ]) {
+        if (!existsSync(requiredPath)) {
+            throw new Error(`Missing test fixture path: ${requiredPath}`);
+        }
+    }
+
+    if (existsSync(configPath) && !force) {
+        throw new Error(
+            `Refusing to overwrite ${configPath}. Re-run with --force if you want to replace it.`,
+        );
+    }
+
+    const allowedEmail =
+        process.env.AGENTCHAT_ALLOWED_EMAIL?.trim() ||
+        resolveGitUserEmail(repoRoot) ||
+        "operator@example.com";
+    const authMode = resolveAuthMode();
+
+    const existingConfig = force ? readExistingConfig(configPath) : null;
+    const config = mergePreservedConfig({
+        generatedConfig: buildConfig(os.homedir(), authMode, allowedEmail),
+        existingConfig,
+    });
+    const json = `${JSON.stringify(config, null, 4)}\n`;
+
+    if (dryRun) {
+        console.log(json);
+        return;
+    }
+
+    writeFileSync(configPath, json, "utf8");
+    console.log(`[agentchat] wrote ${configPath}`);
+    console.log(`[agentchat] auth provider kind: ${authMode}`);
+    if (authMode === "google") {
+        console.log(`[agentchat] allowlisted email: ${allowedEmail}`);
     }
 }
 
-if (existsSync(configPath) && !force) {
-    throw new Error(
-        `Refusing to overwrite ${configPath}. Re-run with --force if you want to replace it.`,
-    );
-}
-
-const allowedEmail =
-    process.env.AGENTCHAT_ALLOWED_EMAIL?.trim() ||
-    resolveGitUserEmail(repoRoot) ||
-    "operator@example.com";
-const authMode = resolveAuthMode();
-
-const config = buildConfig(os.homedir(), authMode, allowedEmail);
-const json = `${JSON.stringify(config, null, 4)}\n`;
-
-if (dryRun) {
-    console.log(json);
-    process.exit(0);
-}
-
-writeFileSync(configPath, json, "utf8");
-console.log(`[agentchat] wrote ${configPath}`);
-console.log(`[agentchat] auth provider kind: ${authMode}`);
-if (authMode === "google") {
-    console.log(`[agentchat] allowlisted email: ${allowedEmail}`);
+if (import.meta.main) {
+    main();
 }
