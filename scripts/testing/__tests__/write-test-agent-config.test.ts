@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import {
     buildConfig,
     mergePreservedConfig,
+    tryParseExistingConfig,
 } from "../write-test-agent-config";
 
 describe("write-test-agent-config", () => {
@@ -109,6 +110,44 @@ describe("write-test-agent-config", () => {
         });
     });
 
+    test("preserves standalone custom providers when regenerating", () => {
+        const generatedConfig = buildConfig(
+            "/home/tester",
+            "local",
+            "tester@example.com",
+        );
+        const existingConfig = {
+            ...generatedConfig,
+            providers: [
+                ...generatedConfig.providers,
+                {
+                    id: "codex-staged",
+                    kind: "codex" as const,
+                    label: "Codex Staged",
+                    enabled: true,
+                    idleTtlSeconds: 900,
+                    modelCacheTtlSeconds: 300,
+                    models: generatedConfig.providers[0]!.models,
+                    codex: {
+                        command: "codex",
+                        args: ["app-server"],
+                        baseEnv: {},
+                        cwd: "/home/tester/staged",
+                    },
+                },
+            ],
+        };
+
+        const merged = mergePreservedConfig({
+            generatedConfig,
+            existingConfig,
+        });
+
+        expect(merged.providers.map((provider) => provider.id)).toContain(
+            "codex-staged",
+        );
+    });
+
     test("replaces managed fixture agents with regenerated values", () => {
         const generatedConfig = buildConfig(
             "/home/tester",
@@ -139,5 +178,9 @@ describe("write-test-agent-config", () => {
             rootPath: "/home/tester/agents/agentchat_test",
             defaultVariant: "low",
         });
+    });
+
+    test("treats malformed existing config as missing", () => {
+        expect(tryParseExistingConfig("{ invalid json")).toBeNull();
     });
 });

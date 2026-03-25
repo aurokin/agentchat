@@ -232,16 +232,24 @@ export function buildConfig(
     };
 }
 
+function sortAgentsByOrder(agents: GeneratedAgent[]): GeneratedAgent[] {
+    return [...agents].sort((left, right) => left.sortOrder - right.sortOrder);
+}
+
+export function tryParseExistingConfig(rawConfig: string): GeneratedConfig | null {
+    try {
+        return JSON.parse(rawConfig) as GeneratedConfig;
+    } catch {
+        return null;
+    }
+}
+
 function readExistingConfig(configPath: string): GeneratedConfig | null {
     if (!existsSync(configPath)) {
         return null;
     }
 
-    return JSON.parse(readFileSync(configPath, "utf8")) as GeneratedConfig;
-}
-
-function sortAgentsByOrder(agents: GeneratedAgent[]): GeneratedAgent[] {
-    return [...agents].sort((left, right) => left.sortOrder - right.sortOrder);
+    return tryParseExistingConfig(readFileSync(configPath, "utf8"));
 }
 
 export function mergePreservedConfig(params: {
@@ -257,16 +265,11 @@ export function mergePreservedConfig(params: {
     const preservedAgents = existingConfig.agents.filter(
         (agent) => !managedAgentIds.has(agent.id),
     );
-    const requiredProviderIds = new Set(
-        preservedAgents.flatMap((agent) => agent.providerIds),
-    );
     const managedProviderIds = new Set(
         generatedConfig.providers.map((provider) => provider.id),
     );
     const preservedProviders = existingConfig.providers.filter(
-        (provider) =>
-            requiredProviderIds.has(provider.id) &&
-            !managedProviderIds.has(provider.id),
+        (provider) => !managedProviderIds.has(provider.id),
     );
 
     return {
