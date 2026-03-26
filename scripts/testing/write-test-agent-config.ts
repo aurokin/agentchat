@@ -101,12 +101,27 @@ function buildOptionalAgents(homeDir: string) {
     return optionalAgents;
 }
 
+function getFixtureVisibility(authMode: AuthMode) {
+    if (authMode === "local") {
+        return {
+            defaultVisible: false,
+            visibilityOverrides: LOCAL_SMOKE_USERNAMES,
+        };
+    }
+
+    return {
+        defaultVisible: true,
+        visibilityOverrides: [],
+    };
+}
+
 export function buildConfig(
     homeDir: string,
     authMode: AuthMode,
     allowedEmail: string,
 ) {
     const fixturesRoot = path.join(homeDir, "agents", "agentchat_test");
+    const fixtureVisibility = getFixtureVisibility(authMode);
 
     return {
         version: 1,
@@ -178,8 +193,7 @@ export function buildConfig(
                 description: "Ultra-cheap liveness fixture.",
                 avatar: null,
                 enabled: true,
-                defaultVisible: false,
-                visibilityOverrides: LOCAL_SMOKE_USERNAMES,
+                ...fixtureVisibility,
                 rootPath: path.join(fixturesRoot, "smoke"),
                 providerIds: ["codex-main"],
                 defaultProviderId: "codex-main",
@@ -196,8 +210,7 @@ export function buildConfig(
                 description: "Deterministic read-only Codex confidence fixture.",
                 avatar: null,
                 enabled: true,
-                defaultVisible: false,
-                visibilityOverrides: LOCAL_SMOKE_USERNAMES,
+                ...fixtureVisibility,
                 rootPath: fixturesRoot,
                 providerIds: ["codex-main"],
                 defaultProviderId: "codex-main",
@@ -215,8 +228,7 @@ export function buildConfig(
                     "Small mutable workspace fixture for interruption and resume checks.",
                 avatar: null,
                 enabled: true,
-                defaultVisible: false,
-                visibilityOverrides: LOCAL_SMOKE_USERNAMES,
+                ...fixtureVisibility,
                 rootPath: path.join(fixturesRoot, "workspace"),
                 providerIds: ["codex-main"],
                 defaultProviderId: "codex-main",
@@ -242,8 +254,19 @@ function isGeneratedConfigShape(value: unknown): value is GeneratedConfig {
     }
 
     const candidate = value as Partial<GeneratedConfig>;
+    const hasValidEntries = (
+        entries: unknown,
+    ): entries is Array<{ id: string }> =>
+        Array.isArray(entries) &&
+        entries.every(
+            (entry) =>
+                entry !== null &&
+                typeof entry === "object" &&
+                typeof (entry as { id?: unknown }).id === "string",
+        );
+
     return (
-        Array.isArray(candidate.providers) && Array.isArray(candidate.agents)
+        hasValidEntries(candidate.providers) && hasValidEntries(candidate.agents)
     );
 }
 

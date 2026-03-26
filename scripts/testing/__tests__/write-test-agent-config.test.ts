@@ -39,6 +39,38 @@ describe("write-test-agent-config", () => {
         );
     });
 
+    test("keeps generated fixture agents visible for google auth", () => {
+        const generatedConfig = buildConfig(
+            "/home/tester",
+            "google",
+            "tester@example.com",
+        );
+
+        expect(
+            generatedConfig.agents.filter((agent) =>
+                agent.id.startsWith("agentchat-"),
+            ),
+        ).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    id: "agentchat-smoke",
+                    defaultVisible: true,
+                    visibilityOverrides: [],
+                }),
+                expect.objectContaining({
+                    id: "agentchat-test",
+                    defaultVisible: true,
+                    visibilityOverrides: [],
+                }),
+                expect.objectContaining({
+                    id: "agentchat-workspace",
+                    defaultVisible: true,
+                    visibilityOverrides: [],
+                }),
+            ]),
+        );
+    });
+
     test("preserves custom agents and their providers when regenerating", () => {
         const generatedConfig = buildConfig(
             "/home/tester",
@@ -184,5 +216,15 @@ describe("write-test-agent-config", () => {
         expect(tryParseExistingConfig("{ invalid json")).toBeNull();
         expect(tryParseExistingConfig("{}")).toBeNull();
         expect(tryParseExistingConfig("[]")).toBeNull();
+        expect(
+            tryParseExistingConfig(
+                '{"providers":[null],"agents":[]}',
+            ),
+        ).toBeNull();
+        expect(
+            tryParseExistingConfig(
+                '{"providers":[],"agents":[{"name":"missing-id"}]}',
+            ),
+        ).toBeNull();
     });
 });
