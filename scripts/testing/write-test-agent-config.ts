@@ -236,9 +236,21 @@ function sortAgentsByOrder(agents: GeneratedAgent[]): GeneratedAgent[] {
     return [...agents].sort((left, right) => left.sortOrder - right.sortOrder);
 }
 
+function isGeneratedConfigShape(value: unknown): value is GeneratedConfig {
+    if (!value || typeof value !== "object") {
+        return false;
+    }
+
+    const candidate = value as Partial<GeneratedConfig>;
+    return (
+        Array.isArray(candidate.providers) && Array.isArray(candidate.agents)
+    );
+}
+
 export function tryParseExistingConfig(rawConfig: string): GeneratedConfig | null {
     try {
-        return JSON.parse(rawConfig) as GeneratedConfig;
+        const parsed = JSON.parse(rawConfig) as unknown;
+        return isGeneratedConfigShape(parsed) ? parsed : null;
     } catch {
         return null;
     }

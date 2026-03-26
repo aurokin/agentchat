@@ -182,5 +182,7 @@ describe("write-test-agent-config", () => {
 
     test("treats malformed existing config as missing", () => {
         expect(tryParseExistingConfig("{ invalid json")).toBeNull();
+        expect(tryParseExistingConfig("{}")).toBeNull();
+        expect(tryParseExistingConfig("[]")).toBeNull();
     });
 });
