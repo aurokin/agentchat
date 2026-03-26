@@ -3,6 +3,8 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { pathsOverlap } from "../../apps/server/src/pathComparison.ts";
+import { isSafePathSegment } from "../../apps/server/src/sandboxPaths.ts";
 
 function getRepoRoot(): string {
     const scriptDir = path.dirname(fileURLToPath(import.meta.url));
@@ -273,6 +275,10 @@ function sortAgentsByOrder(agents: GeneratedAgent[]): GeneratedAgent[] {
     return [...agents].sort((left, right) => left.sortOrder - right.sortOrder);
 }
 
+function isNonEmptyString(value: unknown): value is string {
+    return typeof value === "string" && value.length > 0;
+}
+
 function isStringRecord(value: unknown): value is Record<string, string> {
     if (!value || typeof value !== "object" || Array.isArray(value)) {
         return false;
@@ -292,8 +298,8 @@ function isValidProviderVariant(value: unknown): value is PreservedProviderVaria
         enabled?: unknown;
     };
     return (
-        typeof variant.id === "string" &&
-        typeof variant.label === "string" &&
+        isNonEmptyString(variant.id) &&
+        isNonEmptyString(variant.label) &&
         typeof variant.enabled === "boolean"
     );
 }
@@ -311,8 +317,8 @@ function isValidProviderModel(value: unknown): value is PreservedProviderModel {
         variants?: unknown;
     };
     return (
-        typeof model.id === "string" &&
-        typeof model.label === "string" &&
+        isNonEmptyString(model.id) &&
+        isNonEmptyString(model.label) &&
         typeof model.enabled === "boolean" &&
         typeof model.supportsReasoning === "boolean" &&
         (model.variants === undefined ||
@@ -346,9 +352,9 @@ function isValidPreservedProvider(value: unknown): value is PreservedProvider {
         | undefined;
 
     return (
-        typeof provider.id === "string" &&
+        isNonEmptyString(provider.id) &&
         provider.kind === "codex" &&
-        typeof provider.label === "string" &&
+        isNonEmptyString(provider.label) &&
         typeof provider.enabled === "boolean" &&
         typeof provider.idleTtlSeconds === "number" &&
         Number.isInteger(provider.idleTtlSeconds) &&
@@ -360,17 +366,19 @@ function isValidPreservedProvider(value: unknown): value is PreservedProvider {
             (Array.isArray(provider.models) &&
                 provider.models.every(isValidProviderModel))) &&
         !!codexConfig &&
-        typeof codexConfig.command === "string" &&
+        isNonEmptyString(codexConfig.command) &&
         (codexConfig.args === undefined ||
             (Array.isArray(codexConfig.args) &&
                 codexConfig.args.every((arg) => typeof arg === "string"))) &&
         isStringRecord(codexConfig.baseEnv) &&
-        (codexConfig.cwd === undefined || typeof codexConfig.cwd === "string")
+        (codexConfig.cwd === undefined ||
+            (isNonEmptyString(codexConfig.cwd) &&
+                path.isAbsolute(codexConfig.cwd)))
     );
 }
 
 function isStringArray(value: unknown): value is string[] {
-    return Array.isArray(value) && value.every((entry) => typeof entry === "string");
+    return Array.isArray(value) && value.every(isNonEmptyString);
 }
 
 function isValidPreservedAgent(value: unknown): value is PreservedAgent {
@@ -397,23 +405,27 @@ function isValidPreservedAgent(value: unknown): value is PreservedAgent {
         sortOrder?: unknown;
         workspaceMode?: unknown;
     };
+    const providerIds = agent.providerIds;
+    const defaultProviderId = agent.defaultProviderId;
+    const workspaceMode = agent.workspaceMode;
 
     return (
-        typeof agent.id === "string" &&
-        typeof agent.name === "string" &&
-        (agent.description === undefined || typeof agent.description === "string") &&
+        isNonEmptyString(agent.id) &&
+        isNonEmptyString(agent.name) &&
+        (agent.description === undefined || isNonEmptyString(agent.description)) &&
         (agent.avatar === undefined ||
             agent.avatar === null ||
-            typeof agent.avatar === "string") &&
+            isNonEmptyString(agent.avatar)) &&
         typeof agent.enabled === "boolean" &&
-        typeof agent.rootPath === "string" &&
-        isStringArray(agent.providerIds) &&
-        agent.providerIds.length > 0 &&
-        typeof agent.defaultProviderId === "string" &&
-        (agent.defaultModel === undefined ||
-            typeof agent.defaultModel === "string") &&
+        isNonEmptyString(agent.rootPath) &&
+        path.isAbsolute(agent.rootPath) &&
+        isStringArray(providerIds) &&
+        providerIds.length > 0 &&
+        isNonEmptyString(defaultProviderId) &&
+        providerIds.includes(defaultProviderId) &&
+        (agent.defaultModel === undefined || isNonEmptyString(agent.defaultModel)) &&
         (agent.defaultVariant === undefined ||
-            typeof agent.defaultVariant === "string") &&
+            isNonEmptyString(agent.defaultVariant)) &&
         (agent.defaultVisible === undefined ||
             typeof agent.defaultVisible === "boolean") &&
         (agent.visibilityOverrides === undefined ||
@@ -426,9 +438,11 @@ function isValidPreservedAgent(value: unknown): value is PreservedAgent {
         (agent.sortOrder === undefined ||
             (typeof agent.sortOrder === "number" &&
                 Number.isInteger(agent.sortOrder))) &&
-        (agent.workspaceMode === undefined ||
-            agent.workspaceMode === "shared" ||
-            agent.workspaceMode === "copy-on-conversation")
+        (workspaceMode === undefined ||
+            workspaceMode === "shared" ||
+            workspaceMode === "copy-on-conversation") &&
+        (workspaceMode !== "copy-on-conversation" ||
+            isSafePathSegment(agent.id))
     );
 }
 
@@ -438,18 +452,56 @@ function isPreservedConfigShape(value: unknown): value is PreservedConfig {
     }
 
     const candidate = value as Partial<PreservedConfig>;
+    const sandboxRoot = candidate.sandboxRoot;
+    const providers = candidate.providers;
+    const agents = candidate.agents;
+    if (
+        (candidate.stateId !== undefined && !isNonEmptyString(candidate.stateId)) ||
+        (sandboxRoot !== undefined &&
+            (!isNonEmptyString(sandboxRoot) || !path.isAbsolute(sandboxRoot))) ||
+        !Array.isArray(providers) ||
+        !providers.every(isValidPreservedProvider) ||
+        !Array.isArray(agents) ||
+        !agents.every(isValidPreservedAgent)
+    ) {
+        return false;
+    }
+
+    const providerIds = new Set<string>();
+    for (const provider of providers) {
+        if (providerIds.has(provider.id)) {
+            return false;
+        }
+        providerIds.add(provider.id);
+    }
+
+    const resolvedSandboxRoot = path.resolve(
+        sandboxRoot ?? path.join(os.homedir(), ".agentchat", "sandboxes"),
+    );
+    const agentIds = new Set<string>();
+    for (const agent of agents) {
+        if (agentIds.has(agent.id)) {
+            return false;
+        }
+        agentIds.add(agent.id);
+
+        if (!providerIds.has(agent.defaultProviderId)) {
+            return false;
+        }
+
+        for (const providerId of agent.providerIds) {
+            if (!providerIds.has(providerId)) {
+                return false;
+            }
+        }
+
+        if (pathsOverlap(resolvedSandboxRoot, path.resolve(agent.rootPath))) {
+            return false;
+        }
+    }
+
     return (
-        (candidate.stateId === undefined ||
-            (typeof candidate.stateId === "string" &&
-                candidate.stateId.length > 0)) &&
-        (candidate.sandboxRoot === undefined ||
-            (typeof candidate.sandboxRoot === "string" &&
-                candidate.sandboxRoot.length > 0 &&
-                path.isAbsolute(candidate.sandboxRoot))) &&
-        Array.isArray(candidate.providers) &&
-        candidate.providers.every(isValidPreservedProvider) &&
-        Array.isArray(candidate.agents) &&
-        candidate.agents.every(isValidPreservedAgent)
+        true
     );
 }
 

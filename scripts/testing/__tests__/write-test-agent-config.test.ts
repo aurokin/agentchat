@@ -222,6 +222,258 @@ describe("write-test-agent-config", () => {
         });
     });
 
+    test("rejects preserved providers and agents that violate server constraints", () => {
+        expect(
+            tryParseExistingConfig(
+                JSON.stringify({
+                    providers: [
+                        {
+                            id: "",
+                            kind: "codex",
+                            label: "Codex Notes",
+                            enabled: true,
+                            idleTtlSeconds: 900,
+                            modelCacheTtlSeconds: 300,
+                            codex: {
+                                command: "codex",
+                                baseEnv: {},
+                                cwd: "/home/tester/notes",
+                            },
+                        },
+                    ],
+                    agents: [],
+                }),
+            ),
+        ).toBeNull();
+
+        expect(
+            tryParseExistingConfig(
+                JSON.stringify({
+                    providers: [
+                        {
+                            id: "codex-notes",
+                            kind: "codex",
+                            label: "Codex Notes",
+                            enabled: true,
+                            idleTtlSeconds: 900,
+                            modelCacheTtlSeconds: 300,
+                            codex: {
+                                command: "codex",
+                                baseEnv: {},
+                                cwd: "relative/path",
+                            },
+                        },
+                    ],
+                    agents: [],
+                }),
+            ),
+        ).toBeNull();
+
+        expect(
+            tryParseExistingConfig(
+                JSON.stringify({
+                    providers: [
+                        {
+                            id: "codex-notes",
+                            kind: "codex",
+                            label: "Codex Notes",
+                            enabled: true,
+                            idleTtlSeconds: 900,
+                            modelCacheTtlSeconds: 300,
+                            models: [
+                                {
+                                    id: "",
+                                    label: "Broken",
+                                    enabled: true,
+                                    supportsReasoning: true,
+                                },
+                            ],
+                            codex: {
+                                command: "codex",
+                                baseEnv: {},
+                                cwd: "/home/tester/notes",
+                            },
+                        },
+                    ],
+                    agents: [],
+                }),
+            ),
+        ).toBeNull();
+
+        expect(
+            tryParseExistingConfig(
+                JSON.stringify({
+                    providers: [
+                        {
+                            id: "codex-notes",
+                            kind: "codex",
+                            label: "Codex Notes",
+                            enabled: true,
+                            idleTtlSeconds: 900,
+                            modelCacheTtlSeconds: 300,
+                            codex: {
+                                command: "codex",
+                                baseEnv: {},
+                                cwd: "/home/tester/notes",
+                            },
+                        },
+                    ],
+                    agents: [
+                        {
+                            id: "dilbert",
+                            name: "Dilbert",
+                            enabled: true,
+                            rootPath: "relative/path",
+                            providerIds: ["codex-notes"],
+                            defaultProviderId: "codex-notes",
+                        },
+                    ],
+                }),
+            ),
+        ).toBeNull();
+
+        expect(
+            tryParseExistingConfig(
+                JSON.stringify({
+                    providers: [
+                        {
+                            id: "codex-notes",
+                            kind: "codex",
+                            label: "Codex Notes",
+                            enabled: true,
+                            idleTtlSeconds: 900,
+                            modelCacheTtlSeconds: 300,
+                            codex: {
+                                command: "codex",
+                                baseEnv: {},
+                                cwd: "/home/tester/notes",
+                            },
+                        },
+                    ],
+                    agents: [
+                        {
+                            id: "frontend/api",
+                            name: "Bad Agent",
+                            enabled: true,
+                            rootPath: "/home/tester/notes",
+                            providerIds: ["codex-notes"],
+                            defaultProviderId: "codex-notes",
+                            workspaceMode: "copy-on-conversation",
+                        },
+                    ],
+                }),
+            ),
+        ).toBeNull();
+    });
+
+    test("rejects preserved configs that violate top-level server constraints", () => {
+        expect(
+            tryParseExistingConfig(
+                JSON.stringify({
+                    sandboxRoot: "/tmp/shared-sandbox",
+                    providers: [
+                        {
+                            id: "codex-notes",
+                            kind: "codex",
+                            label: "Codex Notes",
+                            enabled: true,
+                            idleTtlSeconds: 900,
+                            modelCacheTtlSeconds: 300,
+                            codex: {
+                                command: "codex",
+                                baseEnv: {},
+                                cwd: "/home/tester/notes",
+                            },
+                        },
+                    ],
+                    agents: [
+                        {
+                            id: "dilbert",
+                            name: "Dilbert",
+                            enabled: true,
+                            rootPath: "/home/tester/notes",
+                            providerIds: ["missing-provider"],
+                            defaultProviderId: "missing-provider",
+                        },
+                    ],
+                }),
+            ),
+        ).toBeNull();
+
+        expect(
+            tryParseExistingConfig(
+                JSON.stringify({
+                    providers: [
+                        {
+                            id: "codex-notes",
+                            kind: "codex",
+                            label: "Codex Notes",
+                            enabled: true,
+                            idleTtlSeconds: 900,
+                            modelCacheTtlSeconds: 300,
+                            codex: {
+                                command: "codex",
+                                baseEnv: {},
+                                cwd: "/home/tester/notes",
+                            },
+                        },
+                    ],
+                    agents: [
+                        {
+                            id: "dilbert",
+                            name: "Dilbert One",
+                            enabled: true,
+                            rootPath: "/home/tester/notes-a",
+                            providerIds: ["codex-notes"],
+                            defaultProviderId: "codex-notes",
+                        },
+                        {
+                            id: "dilbert",
+                            name: "Dilbert Two",
+                            enabled: true,
+                            rootPath: "/home/tester/notes-b",
+                            providerIds: ["codex-notes"],
+                            defaultProviderId: "codex-notes",
+                        },
+                    ],
+                }),
+            ),
+        ).toBeNull();
+
+        expect(
+            tryParseExistingConfig(
+                JSON.stringify({
+                    sandboxRoot: "/home/tester/notes",
+                    providers: [
+                        {
+                            id: "codex-notes",
+                            kind: "codex",
+                            label: "Codex Notes",
+                            enabled: true,
+                            idleTtlSeconds: 900,
+                            modelCacheTtlSeconds: 300,
+                            codex: {
+                                command: "codex",
+                                baseEnv: {},
+                                cwd: "/home/tester/notes",
+                            },
+                        },
+                    ],
+                    agents: [
+                        {
+                            id: "dilbert",
+                            name: "Dilbert",
+                            enabled: true,
+                            rootPath: "/home/tester/notes/project",
+                            providerIds: ["codex-notes"],
+                            defaultProviderId: "codex-notes",
+                        },
+                    ],
+                }),
+            ),
+        ).toBeNull();
+    });
+
     test("replaces managed fixture agents with regenerated values", () => {
         const generatedConfig = buildConfig(
             "/home/tester",
