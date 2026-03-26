@@ -248,25 +248,183 @@ function sortAgentsByOrder(agents: GeneratedAgent[]): GeneratedAgent[] {
     return [...agents].sort((left, right) => left.sortOrder - right.sortOrder);
 }
 
+function isStringRecord(value: unknown): value is Record<string, string> {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+        return false;
+    }
+
+    return Object.values(value).every((entry) => typeof entry === "string");
+}
+
+function isValidProviderVariant(value: unknown): value is {
+    id: string;
+    label: string;
+    enabled: boolean;
+} {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+        return false;
+    }
+
+    const variant = value as {
+        id?: unknown;
+        label?: unknown;
+        enabled?: unknown;
+    };
+    return (
+        typeof variant.id === "string" &&
+        typeof variant.label === "string" &&
+        typeof variant.enabled === "boolean"
+    );
+}
+
+function isValidProviderModel(value: unknown): value is {
+    id: string;
+    label: string;
+    enabled: boolean;
+    supportsReasoning: boolean;
+    variants: Array<{ id: string; label: string; enabled: boolean }>;
+} {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+        return false;
+    }
+
+    const model = value as {
+        id?: unknown;
+        label?: unknown;
+        enabled?: unknown;
+        supportsReasoning?: unknown;
+        variants?: unknown;
+    };
+    return (
+        typeof model.id === "string" &&
+        typeof model.label === "string" &&
+        typeof model.enabled === "boolean" &&
+        typeof model.supportsReasoning === "boolean" &&
+        Array.isArray(model.variants) &&
+        model.variants.every(isValidProviderVariant)
+    );
+}
+
+function isValidGeneratedProvider(value: unknown): value is GeneratedProvider {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+        return false;
+    }
+
+    const provider = value as {
+        id?: unknown;
+        kind?: unknown;
+        label?: unknown;
+        enabled?: unknown;
+        idleTtlSeconds?: unknown;
+        modelCacheTtlSeconds?: unknown;
+        models?: unknown;
+        codex?: unknown;
+    };
+    const codexConfig = provider.codex as
+        | {
+              command?: unknown;
+              args?: unknown;
+              baseEnv?: unknown;
+              cwd?: unknown;
+          }
+        | undefined;
+
+    return (
+        typeof provider.id === "string" &&
+        provider.kind === "codex" &&
+        typeof provider.label === "string" &&
+        typeof provider.enabled === "boolean" &&
+        typeof provider.idleTtlSeconds === "number" &&
+        Number.isInteger(provider.idleTtlSeconds) &&
+        provider.idleTtlSeconds > 0 &&
+        typeof provider.modelCacheTtlSeconds === "number" &&
+        Number.isInteger(provider.modelCacheTtlSeconds) &&
+        provider.modelCacheTtlSeconds > 0 &&
+        Array.isArray(provider.models) &&
+        provider.models.every(isValidProviderModel) &&
+        !!codexConfig &&
+        typeof codexConfig.command === "string" &&
+        Array.isArray(codexConfig.args) &&
+        codexConfig.args.every((arg) => typeof arg === "string") &&
+        isStringRecord(codexConfig.baseEnv) &&
+        (codexConfig.cwd === undefined || typeof codexConfig.cwd === "string")
+    );
+}
+
+function isStringArray(value: unknown): value is string[] {
+    return Array.isArray(value) && value.every((entry) => typeof entry === "string");
+}
+
+function isValidGeneratedAgent(value: unknown): value is GeneratedAgent {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+        return false;
+    }
+
+    const agent = value as {
+        id?: unknown;
+        name?: unknown;
+        description?: unknown;
+        avatar?: unknown;
+        enabled?: unknown;
+        rootPath?: unknown;
+        providerIds?: unknown;
+        defaultProviderId?: unknown;
+        defaultModel?: unknown;
+        defaultVariant?: unknown;
+        defaultVisible?: unknown;
+        visibilityOverrides?: unknown;
+        modelAllowlist?: unknown;
+        variantAllowlist?: unknown;
+        tags?: unknown;
+        sortOrder?: unknown;
+        workspaceMode?: unknown;
+    };
+
+    return (
+        typeof agent.id === "string" &&
+        typeof agent.name === "string" &&
+        (agent.description === undefined || typeof agent.description === "string") &&
+        (agent.avatar === undefined ||
+            agent.avatar === null ||
+            typeof agent.avatar === "string") &&
+        typeof agent.enabled === "boolean" &&
+        typeof agent.rootPath === "string" &&
+        isStringArray(agent.providerIds) &&
+        agent.providerIds.length > 0 &&
+        typeof agent.defaultProviderId === "string" &&
+        (agent.defaultModel === undefined ||
+            typeof agent.defaultModel === "string") &&
+        (agent.defaultVariant === undefined ||
+            typeof agent.defaultVariant === "string") &&
+        (agent.defaultVisible === undefined ||
+            typeof agent.defaultVisible === "boolean") &&
+        (agent.visibilityOverrides === undefined ||
+            isStringArray(agent.visibilityOverrides)) &&
+        (agent.modelAllowlist === undefined ||
+            isStringArray(agent.modelAllowlist)) &&
+        (agent.variantAllowlist === undefined ||
+            isStringArray(agent.variantAllowlist)) &&
+        (agent.tags === undefined || isStringArray(agent.tags)) &&
+        (agent.sortOrder === undefined ||
+            (typeof agent.sortOrder === "number" &&
+                Number.isInteger(agent.sortOrder))) &&
+        (agent.workspaceMode === undefined ||
+            agent.workspaceMode === "shared" ||
+            agent.workspaceMode === "copy-on-conversation")
+    );
+}
+
 function isGeneratedConfigShape(value: unknown): value is GeneratedConfig {
     if (!value || typeof value !== "object") {
         return false;
     }
 
     const candidate = value as Partial<GeneratedConfig>;
-    const hasValidEntries = (
-        entries: unknown,
-    ): entries is Array<{ id: string }> =>
-        Array.isArray(entries) &&
-        entries.every(
-            (entry) =>
-                entry !== null &&
-                typeof entry === "object" &&
-                typeof (entry as { id?: unknown }).id === "string",
-        );
-
     return (
-        hasValidEntries(candidate.providers) && hasValidEntries(candidate.agents)
+        Array.isArray(candidate.providers) &&
+        candidate.providers.every(isValidGeneratedProvider) &&
+        Array.isArray(candidate.agents) &&
+        candidate.agents.every(isValidGeneratedAgent)
     );
 }
 

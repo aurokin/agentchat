@@ -226,5 +226,31 @@ describe("write-test-agent-config", () => {
                 '{"providers":[],"agents":[{"name":"missing-id"}]}',
             ),
         ).toBeNull();
+        expect(
+            tryParseExistingConfig(
+                JSON.stringify({
+                    providers: [
+                        {
+                            id: "codex-partial",
+                            kind: "codex",
+                        },
+                    ],
+                    agents: [],
+                }),
+            ),
+        ).toBeNull();
+        expect(
+            tryParseExistingConfig(
+                JSON.stringify({
+                    providers: [],
+                    agents: [
+                        {
+                            id: "dilbert",
+                            name: "Dilbert",
+                        },
+                    ],
+                }),
+            ),
+        ).toBeNull();
     });
 });
