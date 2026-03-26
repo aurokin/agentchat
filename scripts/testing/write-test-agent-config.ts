@@ -1,8 +1,10 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { pathsOverlap } from "../../apps/server/src/pathComparison.ts";
+import { isSafePathSegment } from "../../apps/server/src/sandboxPaths.ts";
 
 function getRepoRoot(): string {
     const scriptDir = path.dirname(fileURLToPath(import.meta.url));
@@ -22,6 +24,42 @@ function resolveGitUserEmail(repoRoot: string): string | null {
 }
 
 type AuthMode = "google" | "local";
+const LOCAL_SMOKE_USERNAMES = ["smoke_1", "smoke_2"];
+const MANAGED_AGENT_IDS = new Set([
+    "agentchat-smoke",
+    "agentchat-test",
+    "agentchat-workspace",
+    "warcraft-simple",
+]);
+
+type GeneratedConfig = ReturnType<typeof buildConfig>;
+type GeneratedAgent = GeneratedConfig["agents"][number];
+type GeneratedProvider = GeneratedConfig["providers"][number];
+type PreservedProviderVariant = {
+    id: string;
+    label: string;
+    enabled: boolean;
+};
+type PreservedProviderModel = {
+    id: string;
+    label: string;
+    enabled: boolean;
+    supportsReasoning: boolean;
+    variants?: PreservedProviderVariant[];
+};
+type PreservedProvider = Omit<GeneratedProvider, "models" | "codex"> & {
+    models?: PreservedProviderModel[];
+    codex: Omit<GeneratedProvider["codex"], "args"> & {
+        args?: string[];
+    };
+};
+type PreservedAgent = GeneratedAgent;
+type PreservedConfig = {
+    stateId?: string;
+    sandboxRoot?: string;
+    providers: PreservedProvider[];
+    agents: PreservedAgent[];
+};
 
 function resolveAuthMode(): AuthMode {
     const flag = process.argv.find((arg) => arg.startsWith("--auth-mode="));
@@ -96,8 +134,27 @@ function buildOptionalAgents(homeDir: string) {
     return optionalAgents;
 }
 
-function buildConfig(homeDir: string, authMode: AuthMode, allowedEmail: string) {
+function getFixtureVisibility(authMode: AuthMode) {
+    if (authMode === "local") {
+        return {
+            defaultVisible: false,
+            visibilityOverrides: LOCAL_SMOKE_USERNAMES,
+        };
+    }
+
+    return {
+        defaultVisible: true,
+        visibilityOverrides: [],
+    };
+}
+
+export function buildConfig(
+    homeDir: string,
+    authMode: AuthMode,
+    allowedEmail: string,
+) {
     const fixturesRoot = path.join(homeDir, "agents", "agentchat_test");
+    const fixtureVisibility = getFixtureVisibility(authMode);
 
     return {
         version: 1,
@@ -169,6 +226,7 @@ function buildConfig(homeDir: string, authMode: AuthMode, allowedEmail: string) 
                 description: "Ultra-cheap liveness fixture.",
                 avatar: null,
                 enabled: true,
+                ...fixtureVisibility,
                 rootPath: path.join(fixturesRoot, "smoke"),
                 providerIds: ["codex-main"],
                 defaultProviderId: "codex-main",
@@ -185,6 +243,7 @@ function buildConfig(homeDir: string, authMode: AuthMode, allowedEmail: string) 
                 description: "Deterministic read-only Codex confidence fixture.",
                 avatar: null,
                 enabled: true,
+                ...fixtureVisibility,
                 rootPath: fixturesRoot,
                 providerIds: ["codex-main"],
                 defaultProviderId: "codex-main",
@@ -202,6 +261,7 @@ function buildConfig(homeDir: string, authMode: AuthMode, allowedEmail: string) 
                     "Small mutable workspace fixture for interruption and resume checks.",
                 avatar: null,
                 enabled: true,
+                ...fixtureVisibility,
                 rootPath: path.join(fixturesRoot, "workspace"),
                 providerIds: ["codex-main"],
                 defaultProviderId: "codex-main",
@@ -217,45 +277,345 @@ function buildConfig(homeDir: string, authMode: AuthMode, allowedEmail: string) 
     };
 }
 
-const repoRoot = getRepoRoot();
-const configPath = path.join(repoRoot, "apps/server/agentchat.config.json");
-const dryRun = process.argv.includes("--dry-run");
-const force = process.argv.includes("--force");
-const fixturesRoot = path.join(os.homedir(), "agents", "agentchat_test");
-
-for (const requiredPath of [
-    fixturesRoot,
-    path.join(fixturesRoot, "smoke"),
-    path.join(fixturesRoot, "workspace"),
-]) {
-    if (!existsSync(requiredPath)) {
-        throw new Error(`Missing test fixture path: ${requiredPath}`);
-    }
+function sortAgentsByOrder(agents: GeneratedAgent[]): GeneratedAgent[] {
+    return [...agents].sort((left, right) => left.sortOrder - right.sortOrder);
 }
 
-if (existsSync(configPath) && !force) {
-    throw new Error(
-        `Refusing to overwrite ${configPath}. Re-run with --force if you want to replace it.`,
+function isNonEmptyString(value: unknown): value is string {
+    return typeof value === "string" && value.length > 0;
+}
+
+function isStringRecord(value: unknown): value is Record<string, string> {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+        return false;
+    }
+
+    return Object.values(value).every((entry) => typeof entry === "string");
+}
+
+function isValidProviderVariant(value: unknown): value is PreservedProviderVariant {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+        return false;
+    }
+
+    const variant = value as {
+        id?: unknown;
+        label?: unknown;
+        enabled?: unknown;
+    };
+    return (
+        isNonEmptyString(variant.id) &&
+        isNonEmptyString(variant.label) &&
+        typeof variant.enabled === "boolean"
     );
 }
 
-const allowedEmail =
-    process.env.AGENTCHAT_ALLOWED_EMAIL?.trim() ||
-    resolveGitUserEmail(repoRoot) ||
-    "operator@example.com";
-const authMode = resolveAuthMode();
+function isValidProviderModel(value: unknown): value is PreservedProviderModel {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+        return false;
+    }
 
-const config = buildConfig(os.homedir(), authMode, allowedEmail);
-const json = `${JSON.stringify(config, null, 4)}\n`;
-
-if (dryRun) {
-    console.log(json);
-    process.exit(0);
+    const model = value as {
+        id?: unknown;
+        label?: unknown;
+        enabled?: unknown;
+        supportsReasoning?: unknown;
+        variants?: unknown;
+    };
+    return (
+        isNonEmptyString(model.id) &&
+        isNonEmptyString(model.label) &&
+        typeof model.enabled === "boolean" &&
+        typeof model.supportsReasoning === "boolean" &&
+        (model.variants === undefined ||
+            (Array.isArray(model.variants) &&
+                model.variants.every(isValidProviderVariant)))
+    );
 }
 
-writeFileSync(configPath, json, "utf8");
-console.log(`[agentchat] wrote ${configPath}`);
-console.log(`[agentchat] auth provider kind: ${authMode}`);
-if (authMode === "google") {
-    console.log(`[agentchat] allowlisted email: ${allowedEmail}`);
+function isValidPreservedProvider(value: unknown): value is PreservedProvider {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+        return false;
+    }
+
+    const provider = value as {
+        id?: unknown;
+        kind?: unknown;
+        label?: unknown;
+        enabled?: unknown;
+        idleTtlSeconds?: unknown;
+        modelCacheTtlSeconds?: unknown;
+        models?: unknown;
+        codex?: unknown;
+    };
+    const codexConfig = provider.codex as
+        | {
+              command?: unknown;
+              args?: unknown;
+              baseEnv?: unknown;
+              cwd?: unknown;
+          }
+        | undefined;
+
+    return (
+        isNonEmptyString(provider.id) &&
+        provider.kind === "codex" &&
+        isNonEmptyString(provider.label) &&
+        typeof provider.enabled === "boolean" &&
+        typeof provider.idleTtlSeconds === "number" &&
+        Number.isInteger(provider.idleTtlSeconds) &&
+        provider.idleTtlSeconds > 0 &&
+        typeof provider.modelCacheTtlSeconds === "number" &&
+        Number.isInteger(provider.modelCacheTtlSeconds) &&
+        provider.modelCacheTtlSeconds > 0 &&
+        (provider.models === undefined ||
+            (Array.isArray(provider.models) &&
+                provider.models.every(isValidProviderModel))) &&
+        !!codexConfig &&
+        isNonEmptyString(codexConfig.command) &&
+        (codexConfig.args === undefined ||
+            (Array.isArray(codexConfig.args) &&
+                codexConfig.args.every((arg) => typeof arg === "string"))) &&
+        isStringRecord(codexConfig.baseEnv) &&
+        (codexConfig.cwd === undefined ||
+            (isNonEmptyString(codexConfig.cwd) &&
+                path.isAbsolute(codexConfig.cwd)))
+    );
+}
+
+function isStringArray(value: unknown): value is string[] {
+    return Array.isArray(value) && value.every(isNonEmptyString);
+}
+
+function isOptionalString(value: unknown): value is string {
+    return typeof value === "string";
+}
+
+function isOptionalStringArray(value: unknown): value is string[] {
+    return Array.isArray(value) && value.every((entry) => typeof entry === "string");
+}
+
+function isValidPreservedAgent(value: unknown): value is PreservedAgent {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+        return false;
+    }
+
+    const agent = value as {
+        id?: unknown;
+        name?: unknown;
+        description?: unknown;
+        avatar?: unknown;
+        enabled?: unknown;
+        rootPath?: unknown;
+        providerIds?: unknown;
+        defaultProviderId?: unknown;
+        defaultModel?: unknown;
+        defaultVariant?: unknown;
+        defaultVisible?: unknown;
+        visibilityOverrides?: unknown;
+        modelAllowlist?: unknown;
+        variantAllowlist?: unknown;
+        tags?: unknown;
+        sortOrder?: unknown;
+        workspaceMode?: unknown;
+    };
+    const providerIds = agent.providerIds;
+    const defaultProviderId = agent.defaultProviderId;
+    const workspaceMode = agent.workspaceMode;
+
+    return (
+        isNonEmptyString(agent.id) &&
+        isNonEmptyString(agent.name) &&
+        (agent.description === undefined || isOptionalString(agent.description)) &&
+        (agent.avatar === undefined ||
+            agent.avatar === null ||
+            isOptionalString(agent.avatar)) &&
+        typeof agent.enabled === "boolean" &&
+        isNonEmptyString(agent.rootPath) &&
+        path.isAbsolute(agent.rootPath) &&
+        isStringArray(providerIds) &&
+        providerIds.length > 0 &&
+        isNonEmptyString(defaultProviderId) &&
+        providerIds.includes(defaultProviderId) &&
+        (agent.defaultModel === undefined || isNonEmptyString(agent.defaultModel)) &&
+        (agent.defaultVariant === undefined ||
+            isNonEmptyString(agent.defaultVariant)) &&
+        (agent.defaultVisible === undefined ||
+            typeof agent.defaultVisible === "boolean") &&
+        (agent.visibilityOverrides === undefined ||
+            isStringArray(agent.visibilityOverrides)) &&
+        (agent.modelAllowlist === undefined ||
+            isOptionalStringArray(agent.modelAllowlist)) &&
+        (agent.variantAllowlist === undefined ||
+            isOptionalStringArray(agent.variantAllowlist)) &&
+        (agent.tags === undefined || isOptionalStringArray(agent.tags)) &&
+        (agent.sortOrder === undefined ||
+            (typeof agent.sortOrder === "number" &&
+                Number.isInteger(agent.sortOrder))) &&
+        (workspaceMode === undefined ||
+            workspaceMode === "shared" ||
+            workspaceMode === "copy-on-conversation") &&
+        (workspaceMode !== "copy-on-conversation" ||
+            isSafePathSegment(agent.id))
+    );
+}
+
+function isPreservedConfigShape(value: unknown): value is PreservedConfig {
+    if (!value || typeof value !== "object") {
+        return false;
+    }
+
+    const candidate = value as Partial<PreservedConfig>;
+    const sandboxRoot = candidate.sandboxRoot;
+    const providers = candidate.providers;
+    const agents = candidate.agents;
+    if (
+        (candidate.stateId !== undefined && !isNonEmptyString(candidate.stateId)) ||
+        (sandboxRoot !== undefined &&
+            (!isNonEmptyString(sandboxRoot) || !path.isAbsolute(sandboxRoot))) ||
+        !Array.isArray(providers) ||
+        !providers.every(isValidPreservedProvider) ||
+        !Array.isArray(agents) ||
+        !agents.every(isValidPreservedAgent)
+    ) {
+        return false;
+    }
+
+    const providerIds = new Set<string>();
+    for (const provider of providers) {
+        if (providerIds.has(provider.id)) {
+            return false;
+        }
+        providerIds.add(provider.id);
+    }
+
+    const resolvedSandboxRoot = path.resolve(
+        sandboxRoot ?? path.join(os.homedir(), ".agentchat", "sandboxes"),
+    );
+    const agentIds = new Set<string>();
+    for (const agent of agents) {
+        if (agentIds.has(agent.id)) {
+            return false;
+        }
+        agentIds.add(agent.id);
+
+        if (!providerIds.has(agent.defaultProviderId)) {
+            return false;
+        }
+
+        for (const providerId of agent.providerIds) {
+            if (!providerIds.has(providerId)) {
+                return false;
+            }
+        }
+
+        if (pathsOverlap(resolvedSandboxRoot, path.resolve(agent.rootPath))) {
+            return false;
+        }
+    }
+
+    return (
+        true
+    );
+}
+
+export function tryParseExistingConfig(rawConfig: string): PreservedConfig | null {
+    try {
+        const parsed = JSON.parse(rawConfig) as unknown;
+        return isPreservedConfigShape(parsed) ? parsed : null;
+    } catch {
+        return null;
+    }
+}
+
+function readExistingConfig(configPath: string): PreservedConfig | null {
+    if (!existsSync(configPath)) {
+        return null;
+    }
+
+    return tryParseExistingConfig(readFileSync(configPath, "utf8"));
+}
+
+export function mergePreservedConfig(params: {
+    generatedConfig: GeneratedConfig;
+    existingConfig: PreservedConfig | null;
+}) {
+    const { generatedConfig, existingConfig } = params;
+    if (!existingConfig) {
+        return generatedConfig;
+    }
+
+    const preservedAgents = existingConfig.agents.filter(
+        (agent) => !MANAGED_AGENT_IDS.has(agent.id),
+    );
+    const managedProviderIds = new Set(
+        generatedConfig.providers.map((provider) => provider.id),
+    );
+    const preservedProviders = existingConfig.providers.filter(
+        (provider) => !managedProviderIds.has(provider.id),
+    );
+
+    return {
+        ...generatedConfig,
+        stateId: existingConfig.stateId ?? generatedConfig.stateId,
+        sandboxRoot: existingConfig.sandboxRoot ?? generatedConfig.sandboxRoot,
+        providers: [...generatedConfig.providers, ...preservedProviders],
+        agents: sortAgentsByOrder([
+            ...generatedConfig.agents,
+            ...preservedAgents,
+        ]),
+    };
+}
+
+function main() {
+    const repoRoot = getRepoRoot();
+    const configPath = path.join(repoRoot, "apps/server/agentchat.config.json");
+    const dryRun = process.argv.includes("--dry-run");
+    const force = process.argv.includes("--force");
+    const fixturesRoot = path.join(os.homedir(), "agents", "agentchat_test");
+
+    for (const requiredPath of [
+        fixturesRoot,
+        path.join(fixturesRoot, "smoke"),
+        path.join(fixturesRoot, "workspace"),
+    ]) {
+        if (!existsSync(requiredPath)) {
+            throw new Error(`Missing test fixture path: ${requiredPath}`);
+        }
+    }
+
+    if (existsSync(configPath) && !force) {
+        throw new Error(
+            `Refusing to overwrite ${configPath}. Re-run with --force if you want to replace it.`,
+        );
+    }
+
+    const allowedEmail =
+        process.env.AGENTCHAT_ALLOWED_EMAIL?.trim() ||
+        resolveGitUserEmail(repoRoot) ||
+        "operator@example.com";
+    const authMode = resolveAuthMode();
+
+    const existingConfig = force ? readExistingConfig(configPath) : null;
+    const config = mergePreservedConfig({
+        generatedConfig: buildConfig(os.homedir(), authMode, allowedEmail),
+        existingConfig,
+    });
+    const json = `${JSON.stringify(config, null, 4)}\n`;
+
+    if (dryRun) {
+        console.log(json);
+        return;
+    }
+
+    writeFileSync(configPath, json, "utf8");
+    console.log(`[agentchat] wrote ${configPath}`);
+    console.log(`[agentchat] auth provider kind: ${authMode}`);
+    if (authMode === "google") {
+        console.log(`[agentchat] allowlisted email: ${allowedEmail}`);
+    }
+}
+
+if (import.meta.main) {
+    main();
 }
