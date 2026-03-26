@@ -180,6 +180,48 @@ describe("write-test-agent-config", () => {
         );
     });
 
+    test("accepts preserved providers that rely on server defaults", () => {
+        const parsed = tryParseExistingConfig(
+            JSON.stringify({
+                stateId: "custom-state",
+                sandboxRoot: "/tmp/custom-sandboxes",
+                providers: [
+                    {
+                        id: "codex-notes",
+                        kind: "codex",
+                        label: "Codex Notes",
+                        enabled: true,
+                        idleTtlSeconds: 900,
+                        modelCacheTtlSeconds: 300,
+                        codex: {
+                            command: "codex",
+                            baseEnv: {},
+                            cwd: "/home/tester/notes",
+                        },
+                    },
+                ],
+                agents: [
+                    {
+                        id: "dilbert",
+                        name: "Dilbert",
+                        enabled: true,
+                        rootPath: "/home/tester/notes",
+                        providerIds: ["codex-notes"],
+                        defaultProviderId: "codex-notes",
+                    },
+                ],
+            }),
+        );
+
+        expect(parsed).not.toBeNull();
+        expect(parsed?.providers[0]).toMatchObject({
+            id: "codex-notes",
+        });
+        expect(parsed?.agents[0]).toMatchObject({
+            id: "dilbert",
+        });
+    });
+
     test("replaces managed fixture agents with regenerated values", () => {
         const generatedConfig = buildConfig(
             "/home/tester",
@@ -249,6 +291,24 @@ describe("write-test-agent-config", () => {
                             name: "Dilbert",
                         },
                     ],
+                }),
+            ),
+        ).toBeNull();
+        expect(
+            tryParseExistingConfig(
+                JSON.stringify({
+                    stateId: "",
+                    providers: [],
+                    agents: [],
+                }),
+            ),
+        ).toBeNull();
+        expect(
+            tryParseExistingConfig(
+                JSON.stringify({
+                    sandboxRoot: "relative/path",
+                    providers: [],
+                    agents: [],
                 }),
             ),
         ).toBeNull();

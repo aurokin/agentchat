@@ -27,6 +27,31 @@ const LOCAL_SMOKE_USERNAMES = ["smoke_1", "smoke_2"];
 type GeneratedConfig = ReturnType<typeof buildConfig>;
 type GeneratedAgent = GeneratedConfig["agents"][number];
 type GeneratedProvider = GeneratedConfig["providers"][number];
+type PreservedProviderVariant = {
+    id: string;
+    label: string;
+    enabled: boolean;
+};
+type PreservedProviderModel = {
+    id: string;
+    label: string;
+    enabled: boolean;
+    supportsReasoning: boolean;
+    variants?: PreservedProviderVariant[];
+};
+type PreservedProvider = Omit<GeneratedProvider, "models" | "codex"> & {
+    models?: PreservedProviderModel[];
+    codex: Omit<GeneratedProvider["codex"], "args"> & {
+        args?: string[];
+    };
+};
+type PreservedAgent = GeneratedAgent;
+type PreservedConfig = {
+    stateId?: string;
+    sandboxRoot?: string;
+    providers: PreservedProvider[];
+    agents: PreservedAgent[];
+};
 
 function resolveAuthMode(): AuthMode {
     const flag = process.argv.find((arg) => arg.startsWith("--auth-mode="));
@@ -256,11 +281,7 @@ function isStringRecord(value: unknown): value is Record<string, string> {
     return Object.values(value).every((entry) => typeof entry === "string");
 }
 
-function isValidProviderVariant(value: unknown): value is {
-    id: string;
-    label: string;
-    enabled: boolean;
-} {
+function isValidProviderVariant(value: unknown): value is PreservedProviderVariant {
     if (!value || typeof value !== "object" || Array.isArray(value)) {
         return false;
     }
@@ -277,13 +298,7 @@ function isValidProviderVariant(value: unknown): value is {
     );
 }
 
-function isValidProviderModel(value: unknown): value is {
-    id: string;
-    label: string;
-    enabled: boolean;
-    supportsReasoning: boolean;
-    variants: Array<{ id: string; label: string; enabled: boolean }>;
-} {
+function isValidProviderModel(value: unknown): value is PreservedProviderModel {
     if (!value || typeof value !== "object" || Array.isArray(value)) {
         return false;
     }
@@ -300,12 +315,13 @@ function isValidProviderModel(value: unknown): value is {
         typeof model.label === "string" &&
         typeof model.enabled === "boolean" &&
         typeof model.supportsReasoning === "boolean" &&
-        Array.isArray(model.variants) &&
-        model.variants.every(isValidProviderVariant)
+        (model.variants === undefined ||
+            (Array.isArray(model.variants) &&
+                model.variants.every(isValidProviderVariant)))
     );
 }
 
-function isValidGeneratedProvider(value: unknown): value is GeneratedProvider {
+function isValidPreservedProvider(value: unknown): value is PreservedProvider {
     if (!value || typeof value !== "object" || Array.isArray(value)) {
         return false;
     }
@@ -340,12 +356,14 @@ function isValidGeneratedProvider(value: unknown): value is GeneratedProvider {
         typeof provider.modelCacheTtlSeconds === "number" &&
         Number.isInteger(provider.modelCacheTtlSeconds) &&
         provider.modelCacheTtlSeconds > 0 &&
-        Array.isArray(provider.models) &&
-        provider.models.every(isValidProviderModel) &&
+        (provider.models === undefined ||
+            (Array.isArray(provider.models) &&
+                provider.models.every(isValidProviderModel))) &&
         !!codexConfig &&
         typeof codexConfig.command === "string" &&
-        Array.isArray(codexConfig.args) &&
-        codexConfig.args.every((arg) => typeof arg === "string") &&
+        (codexConfig.args === undefined ||
+            (Array.isArray(codexConfig.args) &&
+                codexConfig.args.every((arg) => typeof arg === "string"))) &&
         isStringRecord(codexConfig.baseEnv) &&
         (codexConfig.cwd === undefined || typeof codexConfig.cwd === "string")
     );
@@ -355,7 +373,7 @@ function isStringArray(value: unknown): value is string[] {
     return Array.isArray(value) && value.every((entry) => typeof entry === "string");
 }
 
-function isValidGeneratedAgent(value: unknown): value is GeneratedAgent {
+function isValidPreservedAgent(value: unknown): value is PreservedAgent {
     if (!value || typeof value !== "object" || Array.isArray(value)) {
         return false;
     }
@@ -414,30 +432,37 @@ function isValidGeneratedAgent(value: unknown): value is GeneratedAgent {
     );
 }
 
-function isGeneratedConfigShape(value: unknown): value is GeneratedConfig {
+function isPreservedConfigShape(value: unknown): value is PreservedConfig {
     if (!value || typeof value !== "object") {
         return false;
     }
 
-    const candidate = value as Partial<GeneratedConfig>;
+    const candidate = value as Partial<PreservedConfig>;
     return (
+        (candidate.stateId === undefined ||
+            (typeof candidate.stateId === "string" &&
+                candidate.stateId.length > 0)) &&
+        (candidate.sandboxRoot === undefined ||
+            (typeof candidate.sandboxRoot === "string" &&
+                candidate.sandboxRoot.length > 0 &&
+                path.isAbsolute(candidate.sandboxRoot))) &&
         Array.isArray(candidate.providers) &&
-        candidate.providers.every(isValidGeneratedProvider) &&
+        candidate.providers.every(isValidPreservedProvider) &&
         Array.isArray(candidate.agents) &&
-        candidate.agents.every(isValidGeneratedAgent)
+        candidate.agents.every(isValidPreservedAgent)
     );
 }
 
-export function tryParseExistingConfig(rawConfig: string): GeneratedConfig | null {
+export function tryParseExistingConfig(rawConfig: string): PreservedConfig | null {
     try {
         const parsed = JSON.parse(rawConfig) as unknown;
-        return isGeneratedConfigShape(parsed) ? parsed : null;
+        return isPreservedConfigShape(parsed) ? parsed : null;
     } catch {
         return null;
     }
 }
 
-function readExistingConfig(configPath: string): GeneratedConfig | null {
+function readExistingConfig(configPath: string): PreservedConfig | null {
     if (!existsSync(configPath)) {
         return null;
     }
@@ -447,8 +472,8 @@ function readExistingConfig(configPath: string): GeneratedConfig | null {
 
 export function mergePreservedConfig(params: {
     generatedConfig: GeneratedConfig;
-    existingConfig: GeneratedConfig | null;
-}): GeneratedConfig {
+    existingConfig: PreservedConfig | null;
+}) {
     const { generatedConfig, existingConfig } = params;
     if (!existingConfig) {
         return generatedConfig;
