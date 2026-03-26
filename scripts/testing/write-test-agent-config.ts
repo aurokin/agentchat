@@ -25,6 +25,12 @@ function resolveGitUserEmail(repoRoot: string): string | null {
 
 type AuthMode = "google" | "local";
 const LOCAL_SMOKE_USERNAMES = ["smoke_1", "smoke_2"];
+const MANAGED_AGENT_IDS = new Set([
+    "agentchat-smoke",
+    "agentchat-test",
+    "agentchat-workspace",
+    "warcraft-simple",
+]);
 
 type GeneratedConfig = ReturnType<typeof buildConfig>;
 type GeneratedAgent = GeneratedConfig["agents"][number];
@@ -381,6 +387,14 @@ function isStringArray(value: unknown): value is string[] {
     return Array.isArray(value) && value.every(isNonEmptyString);
 }
 
+function isOptionalString(value: unknown): value is string {
+    return typeof value === "string";
+}
+
+function isOptionalStringArray(value: unknown): value is string[] {
+    return Array.isArray(value) && value.every((entry) => typeof entry === "string");
+}
+
 function isValidPreservedAgent(value: unknown): value is PreservedAgent {
     if (!value || typeof value !== "object" || Array.isArray(value)) {
         return false;
@@ -412,10 +426,10 @@ function isValidPreservedAgent(value: unknown): value is PreservedAgent {
     return (
         isNonEmptyString(agent.id) &&
         isNonEmptyString(agent.name) &&
-        (agent.description === undefined || isNonEmptyString(agent.description)) &&
+        (agent.description === undefined || isOptionalString(agent.description)) &&
         (agent.avatar === undefined ||
             agent.avatar === null ||
-            isNonEmptyString(agent.avatar)) &&
+            isOptionalString(agent.avatar)) &&
         typeof agent.enabled === "boolean" &&
         isNonEmptyString(agent.rootPath) &&
         path.isAbsolute(agent.rootPath) &&
@@ -431,10 +445,10 @@ function isValidPreservedAgent(value: unknown): value is PreservedAgent {
         (agent.visibilityOverrides === undefined ||
             isStringArray(agent.visibilityOverrides)) &&
         (agent.modelAllowlist === undefined ||
-            isStringArray(agent.modelAllowlist)) &&
+            isOptionalStringArray(agent.modelAllowlist)) &&
         (agent.variantAllowlist === undefined ||
-            isStringArray(agent.variantAllowlist)) &&
-        (agent.tags === undefined || isStringArray(agent.tags)) &&
+            isOptionalStringArray(agent.variantAllowlist)) &&
+        (agent.tags === undefined || isOptionalStringArray(agent.tags)) &&
         (agent.sortOrder === undefined ||
             (typeof agent.sortOrder === "number" &&
                 Number.isInteger(agent.sortOrder))) &&
@@ -531,9 +545,8 @@ export function mergePreservedConfig(params: {
         return generatedConfig;
     }
 
-    const managedAgentIds = new Set(generatedConfig.agents.map((agent) => agent.id));
     const preservedAgents = existingConfig.agents.filter(
-        (agent) => !managedAgentIds.has(agent.id),
+        (agent) => !MANAGED_AGENT_IDS.has(agent.id),
     );
     const managedProviderIds = new Set(
         generatedConfig.providers.map((provider) => provider.id),

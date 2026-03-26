@@ -222,6 +222,50 @@ describe("write-test-agent-config", () => {
         });
     });
 
+    test("accepts preserved agents with empty optional strings", () => {
+        const parsed = tryParseExistingConfig(
+            JSON.stringify({
+                providers: [
+                    {
+                        id: "codex-notes",
+                        kind: "codex",
+                        label: "Codex Notes",
+                        enabled: true,
+                        idleTtlSeconds: 900,
+                        modelCacheTtlSeconds: 300,
+                        codex: {
+                            command: "codex",
+                            baseEnv: {},
+                            cwd: "/home/tester/notes",
+                        },
+                    },
+                ],
+                agents: [
+                    {
+                        id: "dilbert",
+                        name: "Dilbert",
+                        description: "",
+                        avatar: "",
+                        enabled: true,
+                        rootPath: "/home/tester/notes",
+                        providerIds: ["codex-notes"],
+                        defaultProviderId: "codex-notes",
+                        modelAllowlist: [""],
+                        variantAllowlist: [""],
+                        tags: [""],
+                    },
+                ],
+            }),
+        );
+
+        expect(parsed).not.toBeNull();
+        expect(parsed?.agents[0]).toMatchObject({
+            id: "dilbert",
+            description: "",
+            avatar: "",
+        });
+    });
+
     test("rejects preserved providers and agents that violate server constraints", () => {
         expect(
             tryParseExistingConfig(
@@ -504,6 +548,43 @@ describe("write-test-agent-config", () => {
             rootPath: "/home/tester/agents/agentchat_test",
             defaultVariant: "low",
         });
+    });
+
+    test("drops stale optional managed agents when regenerating", () => {
+        const generatedConfig = buildConfig(
+            "/home/tester",
+            "local",
+            "tester@example.com",
+        );
+        const existingConfig = {
+            ...generatedConfig,
+            agents: [
+                ...generatedConfig.agents,
+                {
+                    id: "warcraft-simple",
+                    name: "Warcraft Simple",
+                    enabled: true,
+                    rootPath: "/home/tester/agents/warcraft_simple",
+                    providerIds: ["codex-main"],
+                    defaultProviderId: "codex-main",
+                    defaultModel: "gpt-5.4",
+                    defaultVariant: "low",
+                    modelAllowlist: [],
+                    variantAllowlist: [],
+                    tags: ["warcraft"],
+                    sortOrder: 40,
+                },
+            ],
+        };
+
+        const merged = mergePreservedConfig({
+            generatedConfig,
+            existingConfig,
+        });
+
+        expect(merged.agents.map((agent) => agent.id)).not.toContain(
+            "warcraft-simple",
+        );
     });
 
     test("treats malformed existing config as missing", () => {
