@@ -2,25 +2,50 @@
 
 ## Package Manager
 
-- Use Bun for scripts and installs: `bun install`, `bun run <script>`.
+- Use Bun for installs and scripts: `bun install`, `bun run <script>`.
 - Use `bunx <package>` instead of `npx <package>`.
-- For mobile dependencies: `cd apps/mobile && bun install`.
+
+## Local Wrapper Workflow
+
+For checkout-local setup, use the repo-level wrapper commands first:
+
+- `bun run bootstrap`
+- `bun run status`
+- `bun run doctor`
+- `bun run config:print`
+- `bun run dev`
+- `bun run stop`
+- `bun run worktree:create -- <name>`
+- `bun run worktree:remove -- <name>`
+
+Agents should not begin by hand-editing:
+
+- `apps/web/.env.local`
+- `apps/server/.env.local`
+- `apps/server/agentchat.config.json`
+
+If you deliberately change those generated files, rerun `bun run bootstrap --adopt` to fold the current values into the wrapper-managed manifest. Use `bun run bootstrap --force` only when you intend to discard local drift.
+
+Dev bootstrap refuses shared workspace agents and agent roots outside the current checkout, so wrapper-managed parallel work does not silently fall back to shared mutable state.
+
+Stable host operations now live under `scripts/host/*.sh`; agents should continue treating those as operator-only unless the task is specifically about the protected host installation.
+
+`bun run worktree:create -- <name>` creates a sibling checkout under the repo parent. It refuses to run from a dirty source checkout unless `--allow-dirty` is passed, because git worktrees only contain committed refs.
+
+Legacy process launchers remain available temporarily for flows still outside the wrapper surface, but they are no longer the authoritative setup path:
+
+- `bun run legacy:dev:mobile`
+- `bun run legacy:dev:mobile:expo-go`
+- `bun run legacy:dev:all`
 
 ## Convex CLI
 
 - `CONVEX_DEPLOYMENT` for local Convex CLI/codegen should live in `packages/convex/.env.local`.
+- Dev wrapper bootstrap refuses non-`dev:` Convex deployments.
 
 ## Health Checks
 
 Always run the health task for each app you modify before finishing:
-
-- Web: `cd apps/web && bun run health`
-- Server: `cd apps/server && bun run health`
-- Mobile: `cd apps/mobile && bun run health`
-- Shared: `cd packages/shared && bun run health`
-- Convex: `cd packages/convex && bun run health`
-
-From the repo root, the equivalent commands are:
 
 - Web: `bun run health:web`
 - Server: `bun run health:server`
@@ -28,29 +53,18 @@ From the repo root, the equivalent commands are:
 - Shared: `bun run health:shared`
 - Convex: `bun run health:convex`
 
-`health` is now read-only. It should verify formatting with `format:check` and must not rewrite files.
+`health` is read-only. It should verify formatting with `format:check` and must not rewrite files.
 
 ## Repo Verification
 
 - `bun run lint:architecture` checks cross-surface import boundaries.
-- `bun run docs:check` verifies documented local file links and `bun run` commands still resolve.
+- `bun run env:check` verifies environment variables referenced in code are documented.
+- `bun run docs:check` verifies docs point at real repo files and real Bun scripts.
 - `bun run repo:knip` checks dependency and unlisted-dependency hygiene.
 - `bun run type:suppressions` enforces the checked-in suppression baseline.
 - `bun run lint:repo` runs the repo-policy verification tier.
-- `bun run verify:ci` runs the cheap always-on CI tier:
-  - repo-policy verification
-  - typecheck
-  - lint
-  - tests
-  - script tests
-- `bun run check:affected` runs the smallest reasonable verification set for the current working tree.
-  - Use `bun run check:affected -- --base origin/main` to compare against a specific ref.
-
-Env var docs:
-
-- `bun run env:check` verifies environment variables referenced in code are documented (and that `.env.example` files stay in sync).
-- `bun run docs:check` verifies docs point at real repo files and real Bun scripts.
-- `bun run health` from the repo root runs `env:check` first.
+- `bun run verify:ci` runs the cheap always-on CI tier.
+- `bun run check:affected -- --base origin/main` runs the smallest reasonable verification set for the current working tree.
 
 The health check output may log "Encryption is not configured" from Convex tests; this is expected.
 

@@ -16,6 +16,7 @@ It exists for both humans and agents:
 
 ## Implementation Specs
 
+- [Local Modes](../local-modes.md)
 - [Server Config Spec](./server-config-spec.md)
 - [Operator Guide](./operator-guide.md)
 - [Convex Spec](./convex-spec.md)
@@ -30,6 +31,7 @@ It exists for both humans and agents:
 ## Multi-Runtime Specs
 
 - [Provider-Agent Merge Plan](../../plans/provider-agent-merge-plan.md)
+- [Parallel Worktree And Stable Install Plan](../../plans/parallel-worktree-stable-install-plan.md)
 - [Pi Runtime Spec](./pi-runtime-spec.md)
 - [OpenCode Runtime Spec](./opencode-runtime-spec.md)
 - [Claude Code Runtime Spec](./claude-code-runtime-spec.md)

@@ -54,9 +54,16 @@ const httpFetch = createFetchHandler({
     modelCatalog,
 });
 
+const host = process.env.HOST?.trim() || "0.0.0.0";
+const configuredPort = Number.parseInt(process.env.PORT?.trim() || "", 10);
+const port =
+    Number.isFinite(configuredPort) && configuredPort > 0
+        ? configuredPort
+        : 3030;
+
 const server = Bun.serve<WebSocketData>({
-    hostname: "0.0.0.0",
-    port: 3030,
+    hostname: host,
+    port,
     fetch: async (request, serverRef) => {
         const url = new URL(request.url);
         if (url.pathname === "/ws") {

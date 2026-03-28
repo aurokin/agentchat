@@ -1,0 +1,13 @@
+{
+    "version": 1,
+    "stableCheckoutPath": "/home/auro/code/agentchat/stable",
+    "dev": {
+        "convexEnvPath": "/home/auro/.config/agentchat/dev/convex.env"
+    },
+    "stable": {
+        "webEnvPath": "/home/auro/.config/agentchat/stable/web.env",
+        "serverEnvPath": "/home/auro/.config/agentchat/stable/server.env",
+        "convexEnvPath": "/home/auro/.config/agentchat/stable/convex.env",
+        "serverConfigPath": "/home/auro/.config/agentchat/stable/server-config.json"
+    }
+}
