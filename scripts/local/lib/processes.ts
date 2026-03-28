@@ -1,5 +1,6 @@
 import net from "node:net";
 import path from "node:path";
+import fs from "node:fs";
 
 import type { LocalManifest, ManagedService, ServiceName } from "./model.ts";
 import {
@@ -13,6 +14,11 @@ import { ensureDir, nowIso } from "./util.ts";
 const START_TIMEOUT_MS = 30_000;
 const STOP_TIMEOUT_MS = 5_000;
 const POLL_INTERVAL_MS = 200;
+
+type ProcessSnapshot = {
+    argv: string[] | null;
+    startToken: string | null;
+};
 
 function commandForService(service: ServiceName): string[] {
     switch (service) {
@@ -92,6 +98,126 @@ function isProcessAlive(pid: number): boolean {
     }
 }
 
+function normalizeCommandPart(part: string): string {
+    if (!part) {
+        return part;
+    }
+
+    if (part.includes(path.sep)) {
+        return path.basename(part);
+    }
+
+    return part;
+}
+
+function isCommandSubsequence(
+    expectedCommand: string[],
+    actualArgv: string[] | null,
+): boolean {
+    if (!actualArgv || actualArgv.length === 0) {
+        return false;
+    }
+
+    const expected = expectedCommand.map(normalizeCommandPart);
+    const actual = actualArgv.map(normalizeCommandPart);
+    let actualIndex = 0;
+
+    for (const expectedPart of expected) {
+        while (
+            actualIndex < actual.length &&
+            actual[actualIndex] !== expectedPart
+        ) {
+            actualIndex += 1;
+        }
+        if (actualIndex >= actual.length) {
+            return false;
+        }
+        actualIndex += 1;
+    }
+
+    return true;
+}
+
+function readProcfsSnapshot(pid: number): ProcessSnapshot | null {
+    try {
+        const cmdline = fs.readFileSync(`/proc/${pid}/cmdline`, "utf8");
+        const stat = fs.readFileSync(`/proc/${pid}/stat`, "utf8");
+        const argv = cmdline
+            .split("\0")
+            .map((part) => part.trim())
+            .filter((part) => part.length > 0);
+        const statEnd = stat.lastIndexOf(")");
+        if (statEnd === -1) {
+            return { argv, startToken: null };
+        }
+        const fields = stat
+            .slice(statEnd + 2)
+            .trim()
+            .split(/\s+/);
+        const startTicks = fields[19] ?? null;
+        return {
+            argv,
+            startToken: startTicks,
+        };
+    } catch {
+        return null;
+    }
+}
+
+function readPsOutput(
+    pid: number,
+    field: "command=" | "lstart=",
+): string | null {
+    const proc = Bun.spawnSync(["ps", "-o", field, "-p", String(pid)], {
+        stdout: "pipe",
+        stderr: "ignore",
+    });
+    if (proc.exitCode !== 0) {
+        return null;
+    }
+
+    const output = proc.stdout.toString().trim();
+    return output.length > 0 ? output : null;
+}
+
+function readPsSnapshot(pid: number): ProcessSnapshot | null {
+    const commandLine = readPsOutput(pid, "command=");
+    const startToken = readPsOutput(pid, "lstart=");
+    if (!commandLine && !startToken) {
+        return null;
+    }
+
+    return {
+        argv: commandLine ? commandLine.split(/\s+/).filter(Boolean) : null,
+        startToken,
+    };
+}
+
+function readProcessSnapshot(pid: number): ProcessSnapshot | null {
+    return readProcfsSnapshot(pid) ?? readPsSnapshot(pid);
+}
+
+function isManagedServiceOwned(service: ManagedService): boolean {
+    const snapshot = readProcessSnapshot(service.pid);
+    if (!snapshot) {
+        return false;
+    }
+
+    if (!isCommandSubsequence(service.command, snapshot.argv)) {
+        return false;
+    }
+
+    if (
+        service.processStartToken &&
+        snapshot.startToken &&
+        service.processStartToken !== snapshot.startToken
+    ) {
+        return false;
+    }
+
+    return true;
+}
+
 async function waitForPort(port: number, timeoutMs: number): Promise<boolean> {
     const startedAt = Date.now();
     while (Date.now() - startedAt < timeoutMs) {
@@ -125,10 +251,8 @@ async function waitForExit(pid: number, timeoutMs: number): Promise<boolean> {
     return !isProcessAlive(pid);
 }
 
-async function terminateServiceProcess(
-    service: Pick<ManagedService, "pid" | "pgid">,
-): Promise<void> {
-    if (!isProcessAlive(service.pid)) {
+async function terminateServiceProcess(service: ManagedService): Promise<void> {
+    if (!isManagedServiceOwned(service)) {
         return;
     }
 
@@ -174,7 +298,7 @@ export function summarizeCurrentCheckoutServices(
     manifest: LocalManifest,
 ): ManagedService[] {
     return listCurrentCheckoutServices(manifest).filter((service) =>
-        isProcessAlive(service.pid),
+        isManagedServiceOwned(service),
     );
 }
 
@@ -184,7 +308,7 @@ export async function startManagedServices(
     ensureProcessRegistryFile();
     const currentServices = listCurrentCheckoutServices(manifest);
     const existingServices = currentServices.filter((service) =>
-        isProcessAlive(service.pid),
+        isManagedServiceOwned(service),
     );
     if (existingServices.length > 0) {
         const labels = existingServices
@@ -197,7 +321,7 @@ export async function startManagedServices(
 
     const staleIds = new Set(
         currentServices
-            .filter((service) => !isProcessAlive(service.pid))
+            .filter((service) => !isManagedServiceOwned(service))
             .map((service) => service.sessionId),
     );
     if (staleIds.size > 0) {
@@ -256,6 +380,7 @@ export async function startManagedServices(
                 pid,
                 pgid: pid,
                 command,
+                processStartToken: readProcessSnapshot(pid)?.startToken ?? null,
                 logPath,
                 ports: [port],
                 state: "running",

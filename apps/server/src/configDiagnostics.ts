@@ -143,6 +143,12 @@ function findFirstSymlinkInTree(
         if (entryStats.isSymbolicLink()) {
             return path.relative(rootPath, entryPath);
         }
+        if (entryStats.isDirectory()) {
+            const nestedMatch = findFirstSymlinkInTree(rootPath, entryPath);
+            if (nestedMatch) {
+                return nestedMatch;
+            }
+        }
     }
 
     return null;

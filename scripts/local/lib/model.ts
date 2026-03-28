@@ -92,6 +92,7 @@ export type ManagedService = {
     pid: number;
     pgid: number;
     command: string[];
+    processStartToken?: string | null;
     logPath: string;
     ports: number[];
     state: ManagedServiceState;
