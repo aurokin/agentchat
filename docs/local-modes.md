@@ -34,12 +34,14 @@ Stable host-install commands now available from the repo root:
 ```bash
 scripts/host/install-stable.sh
 scripts/host/doctor-stable.sh
+scripts/host/smoke-stable.sh
 scripts/host/start-stable.sh
 scripts/host/stop-stable.sh
 scripts/host/update-stable.sh
 scripts/host/rollback-stable.sh
 scripts/host/generate-stable-convex-env.sh
 scripts/host/apply-stable-convex-env.sh
+scripts/host/install-stable-user-service.sh --enable-now
 ```
 
 Wrapper-owned runtime commands now cover the current checkout web/server stack:
@@ -161,4 +163,5 @@ Agents should not begin by hand-editing `apps/web/.env.local`, `apps/server/.env
 - [README](../README.md)
 - [Tooling And Tests](./agents/tooling.md)
 - [Local Environment Migration And Advanced Setup](./local_environment_setup_checklist.md)
+- [Stable Host Runbook](./agentchat/stable-host-runbook.md)
 - [Parallel Worktree And Stable Install Plan](../plans/parallel-worktree-stable-install-plan.md)

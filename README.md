@@ -112,10 +112,12 @@ For the protected host install, use the shell-first stable lifecycle:
 ```bash
 scripts/host/install-stable.sh
 scripts/host/doctor-stable.sh
+scripts/host/smoke-stable.sh
 scripts/host/start-stable.sh
 scripts/host/stop-stable.sh
 scripts/host/update-stable.sh
 scripts/host/rollback-stable.sh
+scripts/host/install-stable-user-service.sh --enable-now
 ```
 
 On the current host, the stable LAN entrypoint is `https://bront.home.arpa:4043` behind local Caddy.

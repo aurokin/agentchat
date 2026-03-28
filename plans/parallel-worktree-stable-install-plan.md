@@ -28,11 +28,12 @@ Completed today:
 - stable host lifecycle under `scripts/host/*.sh`
 - stable production Convex wiring, Google auth, and a working host install
 - LAN HTTPS for the stable host through local Caddy at `https://bront.home.arpa:4043`
+- stable smoke coverage under `scripts/host/smoke-stable.sh`
+- systemd user-service support for the stable host install
 
 Still open:
 
 - stronger concurrent multi-worktree confidence testing
-- service-manager integration for the stable host install
 - future public-hostname support
 - mobile parallelization
 - additional hardening around runtime failure recovery and operator diagnostics

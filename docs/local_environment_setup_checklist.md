@@ -76,6 +76,8 @@ Stable Convex deployment secrets now have an operator workflow too:
 ```bash
 scripts/host/generate-stable-convex-env.sh
 scripts/host/apply-stable-convex-env.sh
+scripts/host/smoke-stable.sh
+scripts/host/install-stable-user-service.sh --enable-now
 ```
 
 `generate-stable-convex-env.sh` creates or refreshes `~/.config/agentchat/stable/convex-runtime.env`, generates shared secrets when needed, and syncs the stable server/web host env files. `apply-stable-convex-env.sh` pushes that runtime env into the configured production Convex deployment.

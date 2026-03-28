@@ -19,6 +19,7 @@ It exists for both humans and agents:
 - [Local Modes](../local-modes.md)
 - [Server Config Spec](./server-config-spec.md)
 - [Operator Guide](./operator-guide.md)
+- [Stable Host Runbook](./stable-host-runbook.md)
 - [Convex Spec](./convex-spec.md)
 - [Backend API Spec](./backend-api-spec.md)
 - [Codex Runtime Spec](./codex-runtime-spec.md)
