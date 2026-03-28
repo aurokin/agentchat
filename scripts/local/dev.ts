@@ -1,3 +1,4 @@
+import { buildDoctorReport, prepareBootstrapContext } from "./lib/bootstrap.ts";
 import { loadHostConfig } from "./lib/hostConfig.ts";
 import { loadLocalManifest } from "./lib/manifest.ts";
 import { startManagedServices } from "./lib/processes.ts";
@@ -16,6 +17,22 @@ async function main(): Promise<void> {
     ) {
         throw new Error(
             "This checkout is reserved for the stable installation. Use scripts/host/install-stable.sh or the documented stable host install procedure.",
+        );
+    }
+
+    const doctorReport = buildDoctorReport(
+        await prepareBootstrapContext(),
+        null,
+    );
+    const failingChecks = doctorReport.checks.filter((check) => !check.ok);
+    if (failingChecks.length > 0) {
+        throw new Error(
+            [
+                "Refusing to start wrapper-managed dev services until bun run doctor passes.",
+                ...failingChecks.map(
+                    (check) => `- ${check.label}: ${check.detail}`,
+                ),
+            ].join("\n"),
         );
     }
 

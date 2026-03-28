@@ -6,12 +6,10 @@ import { loadLocalManifest } from "./lib/manifest.ts";
 import type { LocalManifest } from "./lib/model.ts";
 import { stopManagedServices } from "./lib/processes.ts";
 import {
-    loadPortLeases,
-    loadProcessRegistry,
     removeLeasesForCheckout,
     removeManagedServicesForCheckout,
-    savePortLeases,
-    saveProcessRegistry,
+    updatePortLeases,
+    updateProcessRegistry,
 } from "./lib/registry.ts";
 import {
     ensureSafeWorktreeTarget,
@@ -73,9 +71,9 @@ async function main(): Promise<void> {
         label: `git worktree remove ${worktreeName}`,
     });
 
-    savePortLeases(removeLeasesForCheckout(loadPortLeases(), targetPath));
-    saveProcessRegistry(
-        removeManagedServicesForCheckout(loadProcessRegistry(), targetPath),
+    updatePortLeases((leases) => removeLeasesForCheckout(leases, targetPath));
+    updateProcessRegistry((registry) =>
+        removeManagedServicesForCheckout(registry, targetPath),
     );
     cleanupLaneState(manifest);
 

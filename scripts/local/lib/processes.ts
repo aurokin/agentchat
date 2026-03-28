@@ -5,7 +5,7 @@ import type { LocalManifest, ManagedService, ServiceName } from "./model.ts";
 import {
     ensureProcessRegistryFile,
     loadProcessRegistry,
-    saveProcessRegistry,
+    updateProcessRegistry,
     upsertManagedService,
 } from "./registry.ts";
 import { ensureDir, nowIso } from "./util.ts";
@@ -182,7 +182,6 @@ export async function startManagedServices(
     manifest: LocalManifest,
 ): Promise<ManagedService[]> {
     ensureProcessRegistryFile();
-    let registry = loadProcessRegistry();
     const currentServices = listCurrentCheckoutServices(manifest);
     const existingServices = currentServices.filter((service) =>
         isProcessAlive(service.pid),
@@ -202,12 +201,12 @@ export async function startManagedServices(
             .map((service) => service.sessionId),
     );
     if (staleIds.size > 0) {
-        registry = {
+        updateProcessRegistry((registry) => ({
             ...registry,
             services: registry.services.filter(
                 (service) => !staleIds.has(service.sessionId),
             ),
-        };
+        }));
     }
 
     const sessionId = `${manifest.laneId}-${Date.now()}`;
@@ -263,7 +262,9 @@ export async function startManagedServices(
                 startedAt: nowIso(),
                 updatedAt: nowIso(),
             };
-            registry = upsertManagedService(registry, record);
+            updateProcessRegistry((registry) =>
+                upsertManagedService(registry, record),
+            );
             startedServices.push(record);
         }
     } catch (error) {
@@ -273,7 +274,6 @@ export async function startManagedServices(
         throw error;
     }
 
-    saveProcessRegistry(registry);
     return startedServices;
 }
 
@@ -281,7 +281,6 @@ export async function stopManagedServices(
     manifest: LocalManifest,
 ): Promise<ManagedService[]> {
     ensureProcessRegistryFile();
-    let registry = loadProcessRegistry();
     const services = listCurrentCheckoutServices(manifest);
     if (services.length === 0) {
         return [];
@@ -292,12 +291,11 @@ export async function stopManagedServices(
     }
 
     const sessionIds = new Set(services.map((service) => service.sessionId));
-    registry = {
+    updateProcessRegistry((registry) => ({
         ...registry,
         services: registry.services.filter(
             (service) => !sessionIds.has(service.sessionId),
         ),
-    };
-    saveProcessRegistry(registry);
+    }));
     return services;
 }

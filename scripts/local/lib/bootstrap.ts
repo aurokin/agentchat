@@ -22,7 +22,7 @@ import {
     loadPortLeases,
     resolveLeaseConflict,
     saveHostRegistry,
-    savePortLeases,
+    updatePortLeases,
     upsertLease,
 } from "./registry.ts";
 import { renderGeneratedFiles } from "./render.ts";
@@ -423,20 +423,21 @@ export function persistBootstrapContext(context: BootstrapContext): void {
     saveHostRegistry(context.registry);
     ensureProcessRegistryFile();
 
-    let leases = context.leases;
-    leases = upsertLease(leases, {
-        port: context.manifest.webPort,
-        service: "web",
-        laneId: context.manifest.laneId,
-        checkoutPath: context.manifest.checkoutPath,
+    updatePortLeases((leases) => {
+        let next = upsertLease(leases, {
+            port: context.manifest.webPort,
+            service: "web",
+            laneId: context.manifest.laneId,
+            checkoutPath: context.manifest.checkoutPath,
+        });
+        next = upsertLease(next, {
+            port: context.manifest.serverPort,
+            service: "server",
+            laneId: context.manifest.laneId,
+            checkoutPath: context.manifest.checkoutPath,
+        });
+        return next;
     });
-    leases = upsertLease(leases, {
-        port: context.manifest.serverPort,
-        service: "server",
-        laneId: context.manifest.laneId,
-        checkoutPath: context.manifest.checkoutPath,
-    });
-    savePortLeases(leases);
 
     saveLocalManifest(context.manifest);
     writeText(
@@ -505,6 +506,13 @@ export function buildDoctorReport(
             detail:
                 webEnv.NEXT_PUBLIC_AGENTCHAT_SERVER_URL ??
                 "Missing NEXT_PUBLIC_AGENTCHAT_SERVER_URL",
+        },
+        {
+            label: "convexCloudUrl",
+            ok: Boolean(webEnv.NEXT_PUBLIC_CONVEX_URL),
+            detail:
+                webEnv.NEXT_PUBLIC_CONVEX_URL ??
+                "Missing NEXT_PUBLIC_CONVEX_URL",
         },
         {
             label: "serverSecrets",

@@ -99,6 +99,7 @@ bun run dev
 ```
 
 The local wrapper commands are now the authoritative setup path for checkout-local env/config generation.
+`bun run dev` is intentionally gated by the wrapper doctor so incomplete Convex or placeholder-secret setups fail fast instead of starting a broken local stack.
 
 Helpful references:
 
