@@ -19,6 +19,7 @@ AGENTCHAT_DEFAULT_STABLE_WEB_ENV_PATH="${HOME}/.config/agentchat/stable/web.env"
 AGENTCHAT_DEFAULT_STABLE_SERVER_ENV_PATH="${HOME}/.config/agentchat/stable/server.env"
 AGENTCHAT_DEFAULT_STABLE_CONVEX_ENV_PATH="${HOME}/.config/agentchat/stable/convex.env"
 AGENTCHAT_DEFAULT_STABLE_SERVER_CONFIG_PATH="${HOME}/.config/agentchat/stable/server-config.json"
+AGENTCHAT_DEFAULT_STABLE_CONVEX_RUNTIME_ENV_PATH="${HOME}/.config/agentchat/stable/convex-runtime.env"
 AGENTCHAT_STABLE_WEB_PORT=4040
 AGENTCHAT_STABLE_SERVER_PORT=3030
 AGENTCHAT_STABLE_WEB_URL="http://localhost:${AGENTCHAT_STABLE_WEB_PORT}"
@@ -61,7 +62,9 @@ load_host_paths() {
     export AGENTCHAT_STABLE_WEB_ENV_PATH
     export AGENTCHAT_STABLE_SERVER_ENV_PATH
     export AGENTCHAT_STABLE_CONVEX_ENV_PATH
+    AGENTCHAT_STABLE_CONVEX_RUNTIME_ENV_PATH="$AGENTCHAT_DEFAULT_STABLE_CONVEX_RUNTIME_ENV_PATH"
     export AGENTCHAT_STABLE_SERVER_CONFIG_PATH
+    export AGENTCHAT_STABLE_CONVEX_RUNTIME_ENV_PATH
 }
 
 stable_pidfile() {
@@ -82,7 +85,8 @@ ensure_stable_dirs() {
         "$(dirname "$AGENTCHAT_STABLE_WEB_ENV_PATH")" \
         "$(dirname "$AGENTCHAT_STABLE_SERVER_ENV_PATH")" \
         "$(dirname "$AGENTCHAT_STABLE_CONVEX_ENV_PATH")" \
-        "$(dirname "$AGENTCHAT_STABLE_SERVER_CONFIG_PATH")"
+        "$(dirname "$AGENTCHAT_STABLE_SERVER_CONFIG_PATH")" \
+        "$(dirname "$AGENTCHAT_STABLE_CONVEX_RUNTIME_ENV_PATH")"
 }
 
 ensure_host_input_files() {
@@ -113,6 +117,21 @@ EOF_CONVEX
     if [[ ! -f "$AGENTCHAT_STABLE_SERVER_CONFIG_PATH" ]]; then
         cp "$AGENTCHAT_REPO_ROOT/docs/examples/agentchat-stable-server-config.example.json" "$AGENTCHAT_STABLE_SERVER_CONFIG_PATH"
         echo "Scaffolded $AGENTCHAT_STABLE_SERVER_CONFIG_PATH"
+    fi
+
+    if [[ ! -f "$AGENTCHAT_STABLE_CONVEX_RUNTIME_ENV_PATH" ]]; then
+        cat > "$AGENTCHAT_STABLE_CONVEX_RUNTIME_ENV_PATH" <<'EOF_RUNTIME'
+CONVEX_DEPLOYMENT=prod:replace-me
+SITE_URL=http://localhost:4040
+AUTH_GOOGLE_ID=replace-me
+AUTH_GOOGLE_SECRET=replace-me
+BACKEND_TOKEN_SECRET=replace-me
+RUNTIME_INGRESS_SECRET=replace-me
+JWKS=replace-me
+JWT_PRIVATE_KEY=replace-me
+ENCRYPTION_KEY=replace-me
+EOF_RUNTIME
+        echo "Scaffolded $AGENTCHAT_STABLE_CONVEX_RUNTIME_ENV_PATH"
     fi
 }
 
@@ -407,7 +426,8 @@ require_host_inputs() {
         "$AGENTCHAT_STABLE_WEB_ENV_PATH" \
         "$AGENTCHAT_STABLE_SERVER_ENV_PATH" \
         "$AGENTCHAT_STABLE_CONVEX_ENV_PATH" \
-        "$AGENTCHAT_STABLE_SERVER_CONFIG_PATH"
+        "$AGENTCHAT_STABLE_SERVER_CONFIG_PATH" \
+        "$AGENTCHAT_STABLE_CONVEX_RUNTIME_ENV_PATH"
     do
         if [[ ! -f "$path" ]]; then
             echo "Missing required host input: $path" >&2

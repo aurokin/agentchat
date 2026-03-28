@@ -38,6 +38,8 @@ scripts/host/start-stable.sh
 scripts/host/stop-stable.sh
 scripts/host/update-stable.sh
 scripts/host/rollback-stable.sh
+scripts/host/generate-stable-convex-env.sh
+scripts/host/apply-stable-convex-env.sh
 ```
 
 Wrapper-owned runtime commands now cover the current checkout web/server stack:
@@ -87,6 +89,7 @@ Recommended files:
 - `~/.config/agentchat/stable/server.env`
 - `~/.config/agentchat/stable/convex.env`
 - `~/.config/agentchat/stable/server-config.json`
+- `~/.config/agentchat/stable/convex-runtime.env`
 
 Example host config:
 

@@ -63,12 +63,22 @@ Recommended host layout:
 - `~/.config/agentchat/stable/server.env`
 - `~/.config/agentchat/stable/convex.env`
 - `~/.config/agentchat/stable/server-config.json`
+- `~/.config/agentchat/stable/convex-runtime.env`
 
 Example host config:
 
 - [agentchat-host-config.example.json](./examples/agentchat-host-config.example.json)
 
 The wrapper currently uses the host-configured shared dev Convex env path during `bootstrap`. Stable host scripts now read the stable env and server-config files from this same host-level layout.
+
+Stable Convex deployment secrets now have an operator workflow too:
+
+```bash
+scripts/host/generate-stable-convex-env.sh
+scripts/host/apply-stable-convex-env.sh
+```
+
+`generate-stable-convex-env.sh` creates or refreshes `~/.config/agentchat/stable/convex-runtime.env`, generates shared secrets when needed, and syncs the stable server/web host env files. `apply-stable-convex-env.sh` pushes that runtime env into the configured production Convex deployment.
 
 ## Manual Convex Setup
 

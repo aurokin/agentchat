@@ -10,7 +10,7 @@ render_and_register_stable_checkout
 
 checks_ok=1
 
-if grep -Eq 'replace-me|example\.convex\.site|replace-me\.convex\.cloud' "$AGENTCHAT_STABLE_WEB_ENV_PATH" "$AGENTCHAT_STABLE_SERVER_ENV_PATH" "$AGENTCHAT_STABLE_CONVEX_ENV_PATH"; then
+if grep -Eq 'replace-me|example\.convex\.site|replace-me\.convex\.cloud' "$AGENTCHAT_STABLE_WEB_ENV_PATH" "$AGENTCHAT_STABLE_SERVER_ENV_PATH" "$AGENTCHAT_STABLE_CONVEX_ENV_PATH" "$AGENTCHAT_STABLE_CONVEX_RUNTIME_ENV_PATH"; then
     echo "FAIL host-config: stable host env files still contain placeholder values." >&2
     checks_ok=0
 else
