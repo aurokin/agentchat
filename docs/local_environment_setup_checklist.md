@@ -80,6 +80,13 @@ scripts/host/apply-stable-convex-env.sh
 
 `generate-stable-convex-env.sh` creates or refreshes `~/.config/agentchat/stable/convex-runtime.env`, generates shared secrets when needed, and syncs the stable server/web host env files. `apply-stable-convex-env.sh` pushes that runtime env into the configured production Convex deployment.
 
+The current stable host installation is expected to run from a dedicated checkout with:
+
+- host-managed files under `~/.config/agentchat/stable/`
+- lifecycle driven by `scripts/host/*.sh`
+- LAN HTTPS served by local Caddy
+- current LAN entrypoint `https://bront.home.arpa:4043`
+
 ## Manual Convex Setup
 
 Do this only if you need a real local/dev Convex workspace.

@@ -9,13 +9,33 @@ Agentchat now needs two distinct local operating modes on the same host:
 
 Git worktrees solve source isolation, but they do not solve runtime isolation. Today the repo still has several shared-state and fixed-port assumptions that make parallel work brittle:
 
-- the web dev server is hardcoded to port `4040`
-- the backend server is hardcoded to port `3030`
-- docs and examples already drift on port usage
-- server state, copied workspaces, runtime env, and Convex targets are not yet lane-aware by default
-- the default root scripts assume one local stack rather than many coexisting stacks
+- docs and examples can drift from the wrapper-first and stable-host workflow if they are not kept current
+- multi-worktree confidence is not yet proven with deliberate concurrent smoke coverage
+- server state, copied workspaces, runtime env, and Convex targets must keep their checkout-aware defaults as the workflow expands
+- future local workflow changes could still regress back toward one-stack assumptions if the wrapper and host-script model is bypassed
 
 This plan introduces a protected stable installation for regular use, disposable dev lanes for worktrees, and a command overhaul that makes dev-lane configuration mostly implicit for humans and agents.
+
+## Current Status
+
+The plan is already partially implemented.
+
+Completed today:
+
+- checkout-local wrapper workflow under `bun run bootstrap|status|doctor|config:print|dev|stop`
+- disposable worktree lifecycle under `bun run worktree:create` and `bun run worktree:remove`
+- host-scoped manifest and registry plumbing for deterministic checkout-local ports and generated config
+- stable host lifecycle under `scripts/host/*.sh`
+- stable production Convex wiring, Google auth, and a working host install
+- LAN HTTPS for the stable host through local Caddy at `https://bront.home.arpa:4043`
+
+Still open:
+
+- stronger concurrent multi-worktree confidence testing
+- service-manager integration for the stable host install
+- future public-hostname support
+- mobile parallelization
+- additional hardening around runtime failure recovery and operator diagnostics
 
 ## Goals
 
@@ -200,7 +220,7 @@ These commands should infer the current checkout’s lane metadata and do the ri
 - `bun run worktree:create -- <name>`
 - `bun run worktree:remove -- <name>`
 
-These commands exist for worktree lifecycle, not daily development. They are future convenience commands that land after the current-checkout lane workflow is proven.
+These commands exist for worktree lifecycle, not daily development. They are implemented now, but they should still be treated as setup and teardown helpers rather than the primary inner-loop command surface.
 
 ### Stable Host Operations
 
@@ -238,12 +258,12 @@ Add wrapper-driven scripts:
 - `worktree:create`
 - `worktree:remove`
 - host shell scripts under `scripts/host/`
-  - `install-stable.sh`
-  - `start-stable.sh`
-  - `stop-stable.sh`
-  - `doctor-stable.sh`
-  - `update-stable.sh`
-  - `rollback-stable.sh`
+    - `install-stable.sh`
+    - `start-stable.sh`
+    - `stop-stable.sh`
+    - `doctor-stable.sh`
+    - `update-stable.sh`
+    - `rollback-stable.sh`
 
 Keep verification scripts:
 
@@ -354,9 +374,9 @@ The host registry is the source of truth for cross-checkout coordination. It sho
 The implementation must keep authority boundaries explicit:
 
 - host registry is authoritative for cross-checkout ownership:
-  - stable checkout identity
-  - active process ownership
-  - reserved ports and leases
+    - stable checkout identity
+    - active process ownership
+    - reserved ports and leases
 - checkout-local manifest is authoritative for checkout-local desired configuration
 - generated files are derived outputs for wrappers and live launch inputs for runtimes
 - generated files must never be read back by wrappers as canonical inputs
@@ -516,14 +536,14 @@ Port allocation follows one order of operations:
 Commands must follow these tie-break rules:
 
 - manifest vs host-registry mismatch:
-  - refuse and require explicit reconciliation
+    - refuse and require explicit reconciliation
 - generated file drift from manifest-derived content:
-  - refuse by default
-  - overwrite only with `--force`
+    - refuse by default
+    - overwrite only with `--force`
 - missing or corrupted host registry with intact manifest:
-  - rebuild host-scoped ownership state only through bootstrap/status reconciliation, never by trusting generated files
+    - rebuild host-scoped ownership state only through bootstrap/status reconciliation, never by trusting generated files
 - stale stable-checkout pointer:
-  - refuse stable operations until the host registry is repaired or rebound explicitly
+    - refuse stable operations until the host registry is repaired or rebound explicitly
 
 ## Proposed File Layout
 
@@ -711,22 +731,22 @@ To keep parallel-workflow-friendly defaults from regressing:
 - new local setup docs must not reintroduce “edit these three files manually” as the main path
 - changes to local startup must update the canonical local workflow doc in the same PR
 - changes to local startup, config paths, or ports must update:
-  - `README.md`
-  - `docs/local-modes.md`
-  - `docs/local_environment_setup_checklist.md`
-  - `docs/agents/tooling.md`
-  - any affected `.env.example` files
+    - `README.md`
+    - `docs/local-modes.md`
+    - `docs/local_environment_setup_checklist.md`
+    - `docs/agents/tooling.md`
+    - any affected `.env.example` files
 - lane-safety checks should be automated where possible rather than enforced only by prose
 
 ## Migration Matrix
 
-| Phase | Supported commands | Legacy commands | Agent-allowed commands | Docs-authoritative commands |
-| --- | --- | --- | --- | --- |
-| Phase 0 | none new | existing raw workflow | existing workflow only | existing docs |
-| Phase 1a/1b | `bootstrap`, `status`, `doctor`, `config:print` | may still work, but become non-authoritative | wrapper commands only when available | wrapper commands only |
-| Phase 2 | add `dev`, `stop` | compatibility shims only | wrapper commands only | wrapper commands only |
-| Phase 3-4 | add `scripts/host/*.sh` for stable install/lifecycle | compatibility shims only | wrapper commands only for dev; host scripts only for stable | wrapper commands only for dev; host docs for stable |
-| Phase 5+ | add `worktree:*` | compatibility shims may remain for debugging only | wrapper commands only | wrapper commands only |
+| Phase       | Supported commands                                   | Legacy commands                                   | Agent-allowed commands                                      | Docs-authoritative commands                         |
+| ----------- | ---------------------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------- | --------------------------------------------------- |
+| Phase 0     | none new                                             | existing raw workflow                             | existing workflow only                                      | existing docs                                       |
+| Phase 1a/1b | `bootstrap`, `status`, `doctor`, `config:print`      | may still work, but become non-authoritative      | wrapper commands only when available                        | wrapper commands only                               |
+| Phase 2     | add `dev`, `stop`                                    | compatibility shims only                          | wrapper commands only                                       | wrapper commands only                               |
+| Phase 3-4   | add `scripts/host/*.sh` for stable install/lifecycle | compatibility shims only                          | wrapper commands only for dev; host scripts only for stable | wrapper commands only for dev; host docs for stable |
+| Phase 5+    | add `worktree:*`                                     | compatibility shims may remain for debugging only | wrapper commands only                                       | wrapper commands only                               |
 
 As soon as a wrapper command exists for a task, agents must stop using legacy/raw commands for that task.
 
@@ -736,8 +756,8 @@ As soon as a wrapper command exists for a task, agents must stop using legacy/ra
 
 - choose stable as a dedicated checkout outside the worktree pool
 - lock the first-slice Convex policy:
-  - stable uses production Convex on this host
-  - dev lanes do not touch production Convex
+    - stable uses production Convex on this host
+    - dev lanes do not touch production Convex
 - define the host-scoped registry location and data model
 - define manifest versioning and generated-file drift policy
 
@@ -1048,19 +1068,19 @@ The server already treats `apps/server/agentchat.config.json` as a canonical run
 The required authority chain is:
 
 - host registry:
-  - authoritative for cross-checkout ownership
-  - stable checkout identity
-  - active process ownership
-  - port leases
+    - authoritative for cross-checkout ownership
+    - stable checkout identity
+    - active process ownership
+    - port leases
 - checkout-local manifest:
-  - authoritative for desired checkout-local configuration
+    - authoritative for desired checkout-local configuration
 - generated files:
-  - rendered from the manifest by one writer module
-  - consumed by runtimes as launch inputs
-  - never parsed by wrappers as canonical inputs
+    - rendered from the manifest by one writer module
+    - consumed by runtimes as launch inputs
+    - never parsed by wrappers as canonical inputs
 - runtime state:
-  - observed process/runtime state only
-  - never a source of truth for desired config or ownership
+    - observed process/runtime state only
+    - never a source of truth for desired config or ownership
 
 ### Process Ownership Investigation
 
@@ -1148,20 +1168,20 @@ The smallest viable slice is:
 - stable on production Convex
 - dev forbidden from production Convex
 - add only:
-  - explicit lane-scoped `stateId`
-  - checkout-local manifest
-  - host-global registry
-  - generated web/server env and server config
-  - `bootstrap`
-  - `status`
-  - `doctor`
-  - `config:print`
-  - `dev`
-  - `stop`
-  - `scripts/host/install-stable.sh`
-  - `scripts/host/start-stable.sh`
-  - `scripts/host/stop-stable.sh`
-  - `scripts/host/doctor-stable.sh`
+    - explicit lane-scoped `stateId`
+    - checkout-local manifest
+    - host-global registry
+    - generated web/server env and server config
+    - `bootstrap`
+    - `status`
+    - `doctor`
+    - `config:print`
+    - `dev`
+    - `stop`
+    - `scripts/host/install-stable.sh`
+    - `scripts/host/start-stable.sh`
+    - `scripts/host/stop-stable.sh`
+    - `scripts/host/doctor-stable.sh`
 
 Explicitly defer:
 
@@ -1192,11 +1212,11 @@ Explicitly defer:
 - force explicit lane-scoped `stateId`
 - generate lane-scoped `sandboxRoot`
 - rewrite:
-  - `README.md`
-  - `docs/local-modes.md`
-  - `docs/local_environment_setup_checklist.md`
-  - `docs/agents/tooling.md`
-  - `docs/agentchat/operator-guide.md`
+    - `README.md`
+    - `docs/local-modes.md`
+    - `docs/local_environment_setup_checklist.md`
+    - `docs/agents/tooling.md`
+    - `docs/agentchat/operator-guide.md`
 - relabel old commands as legacy shims
 
 ### Second Implementation PR
@@ -1222,12 +1242,12 @@ Explicitly defer:
 - `config:print` emits machine-readable resolved config plus relevant ownership state
 - `status` is sufficient for human/agent context recovery
 - stable and dev have distinct:
-  - `stateId`
-  - `XDG_STATE_HOME`
-  - `sandboxRoot`
-  - server port
-  - web URL
-  - ownership metadata
+    - `stateId`
+    - `XDG_STATE_HOME`
+    - `sandboxRoot`
+    - server port
+    - web URL
+    - ownership metadata
 - dev cannot claim production Convex
 - dev cannot overlap stable on risky shared roots without explicit unsafe override
 - `dev` starts only dev-owned services

@@ -15,6 +15,7 @@ import {
     interruptConversationRun,
     prepareConversationSend,
     requestConversationInterrupt,
+    resolvePendingConversationSendFailure,
     resolveConversationRuntimeSync,
     resolveConversationSocketEvent,
     runConversationSend,
@@ -417,6 +418,44 @@ describe("conversation runtime controller", () => {
         });
 
         expect(calls).toEqual(["queued"]);
+    });
+
+    test("resolves a pending pre-run send failure into retry state", () => {
+        expect(
+            resolvePendingConversationSendFailure({
+                currentChat: { id: "chat-1", agentId: "agent-1" },
+                activeRun: createActiveRun({ runId: null }),
+                pendingSendConversation: {
+                    conversationId: "chat-1",
+                    agentId: "agent-1",
+                },
+                errorMessage: "runtime failed",
+            }),
+        ).toEqual({
+            shouldHandle: true,
+            assistantMessageId: "assistant-1",
+            error: {
+                message: "runtime failed",
+                isRetryable: true,
+            },
+            retryChat: {
+                content: "Hello",
+                contextContent: "Hello",
+            },
+        });
+    });
+
+    test("ignores connection errors when there is no pending send", () => {
+        expect(
+            resolvePendingConversationSendFailure({
+                currentChat: { id: "chat-1", agentId: "agent-1" },
+                activeRun: createActiveRun({ runId: "run-1" }),
+                pendingSendConversation: null,
+                errorMessage: "runtime failed",
+            }),
+        ).toEqual({
+            shouldHandle: false,
+        });
     });
 
     test("flushes a queued interrupt once the run is available", () => {

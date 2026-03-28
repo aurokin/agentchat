@@ -30,6 +30,8 @@ Dev bootstrap refuses shared workspace agents and agent roots outside the curren
 
 Stable host operations now live under `scripts/host/*.sh`; agents should continue treating those as operator-only unless the task is specifically about the protected host installation.
 
+The current stable host install is live behind local Caddy on `https://bront.home.arpa:4043`. When the task is about the stable host itself, prefer `scripts/host/*.sh` and the host-managed files under `~/.config/agentchat/stable/` over checkout-local wrapper commands.
+
 `bun run worktree:create -- <name>` creates a sibling checkout under the repo parent. It refuses to run from a dirty source checkout unless `--allow-dirty` is passed, because git worktrees only contain committed refs.
 
 Legacy process launchers remain available temporarily for flows still outside the wrapper surface, but they are no longer the authoritative setup path:

@@ -6,12 +6,12 @@ Use it when you need to prepare a checkout for local work without colliding with
 
 ## Operating Modes
 
-Agentchat is moving to two local modes:
+Agentchat currently supports two local modes:
 
 - `stable`: protected daily-use installation sourced from a dedicated checkout on this host
 - `dev`: disposable development checkout, usually a git worktree
 
-Stable host scripts, checkout-local wrappers, and worktree lifecycle wrappers are now implemented in-repo. Broader multi-lane automation beyond the current host registry and deterministic port model still lands incrementally.
+Stable host scripts, checkout-local wrappers, and worktree lifecycle wrappers are implemented in-repo. The remaining work is operational hardening, multi-worktree confidence testing, and future public-hostname support.
 
 ## Available Now
 
@@ -129,6 +129,17 @@ This repo intentionally supports only this minimal topology right now:
 - no mobile parallelization yet
 
 Use the remaining legacy dev scripts only for flows that are still outside the wrapper-owned runtime surface.
+
+## Stable Host Reality
+
+The protected stable install is no longer theoretical. The current host model is:
+
+- stable source checkout outside the disposable worktree pool
+- shell-first stable lifecycle under `scripts/host/`
+- production Convex wired through host-managed files under `~/.config/agentchat/stable/`
+- LAN HTTPS currently served through local Caddy at `https://bront.home.arpa:4043`
+
+Treat that stable install as an operator-managed source install, not as another dev lane.
 
 ## Agent Rules
 

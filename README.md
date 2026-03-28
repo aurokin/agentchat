@@ -107,6 +107,19 @@ Helpful references:
 - `bun run doctor:server` for a deliberate runtime readiness check against the generated server config
 - `bun run setup:test-agent-config` only when you intentionally want the dedicated test fixtures, followed by `bun run bootstrap --adopt`
 
+For the protected host install, use the shell-first stable lifecycle:
+
+```bash
+scripts/host/install-stable.sh
+scripts/host/doctor-stable.sh
+scripts/host/start-stable.sh
+scripts/host/stop-stable.sh
+scripts/host/update-stable.sh
+scripts/host/rollback-stable.sh
+```
+
+On the current host, the stable LAN entrypoint is `https://bront.home.arpa:4043` behind local Caddy.
+
 ### Configuration
 
 `bun run bootstrap` generates the local runtime files for the current checkout:

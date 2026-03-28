@@ -1,6 +1,6 @@
 # Agentchat Operator Guide
 
-This guide is the shortest path from a local Agentchat checkout to a usable self-hosted instance with Codex-backed agents. For the protected stable installation on a host, use `scripts/host/install-stable.sh`, `scripts/host/doctor-stable.sh`, `scripts/host/start-stable.sh`, `scripts/host/stop-stable.sh`, `scripts/host/update-stable.sh`, `scripts/host/rollback-stable.sh`, `scripts/host/generate-stable-convex-env.sh`, and `scripts/host/apply-stable-convex-env.sh`; this document remains focused on repo-local operator setup and verification.
+This guide is the shortest path from a local Agentchat checkout to a usable self-hosted instance with Codex-backed agents. For the protected stable installation on a host, use `scripts/host/install-stable.sh`, `scripts/host/doctor-stable.sh`, `scripts/host/start-stable.sh`, `scripts/host/stop-stable.sh`, `scripts/host/update-stable.sh`, `scripts/host/rollback-stable.sh`, `scripts/host/generate-stable-convex-env.sh`, and `scripts/host/apply-stable-convex-env.sh`; this document remains focused on repo-local operator setup and verification. The current stable host install is running behind local Caddy at `https://bront.home.arpa:4043`.
 
 ## Scope
 

@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
-import { resolveMessageRunDisplayState } from "@/components/chat/MessageList";
+import {
+    resolveEmptyAssistantDisplayText,
+    resolveMessageRunDisplayState,
+} from "@/components/chat/MessageList";
 import type { ChatRunSummary, Message } from "@/lib/types";
 
 function createMessage(overrides: Partial<Message> = {}): Message {
@@ -73,5 +76,31 @@ describe("resolveMessageRunDisplayState", () => {
             tone: "error",
             detail: "Codex app-server exited unexpectedly",
         });
+    });
+});
+
+describe("resolveEmptyAssistantDisplayText", () => {
+    test("surfaces a clearer fallback for errored empty assistant messages", () => {
+        expect(
+            resolveEmptyAssistantDisplayText(
+                createMessage({
+                    content: "",
+                    contextContent: "",
+                    status: "errored",
+                }),
+            ),
+        ).toBe("Failed to start reply.");
+    });
+
+    test("keeps the generic placeholder for other empty assistant messages", () => {
+        expect(
+            resolveEmptyAssistantDisplayText(
+                createMessage({
+                    content: "",
+                    contextContent: "",
+                    status: "draft",
+                }),
+            ),
+        ).toBe("...");
     });
 });

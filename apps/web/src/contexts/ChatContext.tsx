@@ -82,7 +82,10 @@ interface ChatContextType {
     updateMessage: (
         id: string,
         updates: Partial<
-            Pick<Message, "content" | "contextContent" | "reasoning">
+            Pick<
+                Message,
+                "content" | "contextContent" | "reasoning" | "status" | "kind"
+            >
         >,
     ) => Promise<void>;
     patchMessage: (
@@ -777,7 +780,14 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         async (
             id: string,
             updates: Partial<
-                Pick<Message, "content" | "contextContent" | "reasoning">
+                Pick<
+                    Message,
+                    | "content"
+                    | "contextContent"
+                    | "reasoning"
+                    | "status"
+                    | "kind"
+                >
             >,
         ) => {
             let updatedMessage: Message | undefined;
