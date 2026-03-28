@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ConvexAuthNextjsServerProvider } from "@convex-dev/auth/nextjs/server";
 import { Outfit, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import "highlight.js/styles/github-dark.css";
@@ -48,15 +49,17 @@ export default function RootLayout({
             <body
                 className={`antialiased ${outfit.variable} ${ibmPlexMono.variable}`}
             >
-                <SafeConvexProvider>
-                    <AgentProvider>
-                        <WorkspaceProvider>
-                            <SettingsProvider>
-                                <ChatProvider>{children}</ChatProvider>
-                            </SettingsProvider>
-                        </WorkspaceProvider>
-                    </AgentProvider>
-                </SafeConvexProvider>
+                <ConvexAuthNextjsServerProvider>
+                    <SafeConvexProvider>
+                        <AgentProvider>
+                            <WorkspaceProvider>
+                                <SettingsProvider>
+                                    <ChatProvider>{children}</ChatProvider>
+                                </SettingsProvider>
+                            </WorkspaceProvider>
+                        </AgentProvider>
+                    </SafeConvexProvider>
+                </ConvexAuthNextjsServerProvider>
             </body>
         </html>
     );
