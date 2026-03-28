@@ -1,5 +1,6 @@
+import { convexAuthNextjsMiddleware } from "@convex-dev/auth/nextjs/server";
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import type { NextFetchEvent, NextRequest } from "next/server";
 
 // Only enforce security headers outside local development (`next dev`).
 const isProduction = process.env.NODE_ENV === "production";
@@ -54,19 +55,10 @@ function applyCommonSecurityHeaders(
     }
 }
 
-export function middleware(request: NextRequest) {
-    if (!isProduction) {
-        return NextResponse.next();
-    }
-
-    let cspValue: string | null = null;
-    const requestHeaders = new Headers(request.headers);
+function buildContentSecurityPolicy(request: NextRequest): string {
     const secureRequest = isSecureRequest(request);
-
     const nonce = createNonce();
-
     const scriptSrc = ["'self'", `'nonce-${nonce}'`].join(" ");
-
     const csp: string[] = [
         "default-src 'self'",
         `script-src ${scriptSrc}`,
@@ -86,12 +78,18 @@ export function middleware(request: NextRequest) {
         csp.push("upgrade-insecure-requests");
     }
 
-    cspValue = csp.join("; ");
+    return csp.join("; ");
+}
 
-    // Next.js App Router can automatically nonce its own inline scripts if it can
-    // extract a nonce from the *request* CSP header. So we set CSP on both the
-    // request (for Next) and response (for the browser).
-    requestHeaders.set("content-security-policy", cspValue);
+const authMiddleware = convexAuthNextjsMiddleware((request) => {
+    const requestHeaders = new Headers(request.headers);
+    const cspValue = isProduction ? buildContentSecurityPolicy(request) : null;
+
+    if (cspValue) {
+        // Next.js App Router can automatically nonce its own inline scripts if it can
+        // extract a nonce from the request CSP header.
+        requestHeaders.set("content-security-policy", cspValue);
+    }
 
     const response = NextResponse.next({
         request: {
@@ -99,13 +97,21 @@ export function middleware(request: NextRequest) {
         },
     });
 
-    applyCommonSecurityHeaders(response, { secureRequest });
+    if (!isProduction) {
+        return response;
+    }
 
+    const secureRequest = isSecureRequest(request);
+    applyCommonSecurityHeaders(response, { secureRequest });
     if (cspValue) {
         response.headers.set("Content-Security-Policy", cspValue);
     }
 
     return response;
+});
+
+export function middleware(request: NextRequest, event: NextFetchEvent) {
+    return authMiddleware(request, event);
 }
 
 export const config = {
