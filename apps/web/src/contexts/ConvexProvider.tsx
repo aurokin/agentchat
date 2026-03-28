@@ -67,11 +67,29 @@ function AuthAwareConvexProvider({
 }) {
     const router = useRouter();
 
+    const replaceURL = (url: string) => {
+        if (typeof window === "undefined") {
+            router.replace(url);
+            return;
+        }
+
+        try {
+            const target = new URL(url, window.location.href);
+            if (target.origin === window.location.origin) {
+                const nextPath = `${target.pathname}${target.search}${target.hash}`;
+                router.replace(nextPath);
+                return;
+            }
+        } catch {
+            router.replace(url);
+            return;
+        }
+
+        window.location.assign(url);
+    };
+
     return (
-        <ConvexAuthProvider
-            client={client}
-            replaceURL={(url) => router.replace(url)}
-        >
+        <ConvexAuthProvider client={client} replaceURL={replaceURL}>
             {children}
         </ConvexAuthProvider>
     );
