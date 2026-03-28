@@ -51,6 +51,8 @@ Each agent has a `workspaceMode` setting:
 
 Use `"shared"` when all users should see the same workspace state. Use `"copy-on-conversation"` when each conversation needs an isolated copy of the codebase.
 
+`"copy-on-conversation"` roots must not contain symlinks. Agentchat copies those trees into managed sandboxes and now fails fast in `doctor:server` when a copy-on-conversation root still depends on symlinked files or directories.
+
 The top-level `sandboxRoot` config field controls where copies are stored. It defaults to `~/.agentchat/sandboxes`. The directory structure is `<sandboxRoot>/<agentId>/<conversationId>/`.
 
 Sandbox cleanup happens in two ways:

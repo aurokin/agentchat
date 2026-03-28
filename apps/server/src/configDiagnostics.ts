@@ -1,4 +1,4 @@
-import { existsSync, statSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 
 import type { AgentConfig, AgentchatConfig, ProviderConfig } from "./config.ts";
@@ -57,6 +57,8 @@ export const PROVIDER_DIAGNOSTIC_ISSUES = {
 
 export const AGENT_DIAGNOSTIC_ISSUES = {
     rootPathMissing: "Agent rootPath does not exist or is not a directory.",
+    copyOnConversationSymlink:
+        "Copy-on-conversation agent root contains symlinks; sandbox copies require real files and directories.",
     noEnabledProviders: "Agent has no enabled providers.",
     defaultProviderFallback:
         "Agent default provider is disabled; fallback will be used.",
@@ -111,6 +113,36 @@ function isExistingDirectory(targetPath: string): boolean {
     }
 
     return statSync(targetPath).isDirectory();
+}
+
+function findFirstSymlinkInTree(
+    rootPath: string,
+    currentPath: string = rootPath,
+): string | null {
+    const entries = readdirSync(currentPath, { withFileTypes: true });
+
+    for (const entry of entries) {
+        const entryPath = path.join(currentPath, entry.name);
+        if (entry.isSymbolicLink()) {
+            return path.relative(rootPath, entryPath);
+        }
+
+        if (entry.isDirectory()) {
+            const nestedMatch = findFirstSymlinkInTree(rootPath, entryPath);
+            if (nestedMatch) {
+                return nestedMatch;
+            }
+            continue;
+        }
+
+        // Handle filesystems that do not reliably populate Dirent kind bits.
+        const entryStats = lstatSync(entryPath);
+        if (entryStats.isSymbolicLink()) {
+            return path.relative(rootPath, entryPath);
+        }
+    }
+
+    return null;
 }
 
 export function getEnabledProviders(config: AgentchatConfig): ProviderConfig[] {
@@ -279,6 +311,19 @@ export function getAgentDiagnostics(
 
     if (agent.enabled && !isExistingDirectory(agent.rootPath)) {
         issues.push(AGENT_DIAGNOSTIC_ISSUES.rootPathMissing);
+    }
+
+    if (
+        agent.enabled &&
+        agent.workspaceMode === "copy-on-conversation" &&
+        isExistingDirectory(agent.rootPath)
+    ) {
+        const symlinkPath = findFirstSymlinkInTree(agent.rootPath);
+        if (symlinkPath) {
+            issues.push(
+                `${AGENT_DIAGNOSTIC_ISSUES.copyOnConversationSymlink} First symlink: ${symlinkPath}.`,
+            );
+        }
     }
 
     if (agent.enabled && availableProviderIds.length === 0) {
