@@ -21,7 +21,7 @@ import {
     loadHostRegistry,
     loadPortLeases,
     resolveLeaseConflict,
-    saveHostRegistry,
+    updateHostRegistry,
     updatePortLeases,
     upsertLease,
 } from "./registry.ts";
@@ -405,7 +405,7 @@ export async function prepareBootstrapContext(): Promise<BootstrapContext> {
         manifest,
     });
 
-    if (!force) {
+    if (!force && !adopt) {
         ensureGeneratedFilesMatch(manifest, generatedFiles);
     }
 
@@ -420,10 +420,27 @@ export async function prepareBootstrapContext(): Promise<BootstrapContext> {
 }
 
 export function persistBootstrapContext(context: BootstrapContext): void {
-    saveHostRegistry(context.registry);
+    updateHostRegistry(() => context.registry);
     ensureProcessRegistryFile();
 
     updatePortLeases((leases) => {
+        for (const [port, service] of [
+            [context.manifest.webPort, "web"],
+            [context.manifest.serverPort, "server"],
+        ] as const) {
+            const conflict = resolveLeaseConflict(leases, {
+                port,
+                service,
+                laneId: context.manifest.laneId,
+                checkoutPath: context.manifest.checkoutPath,
+            });
+            if (conflict) {
+                throw new Error(
+                    `Port ${port} is already leased to ${conflict.checkoutPath} (${conflict.service}).`,
+                );
+            }
+        }
+
         let next = upsertLease(leases, {
             port: context.manifest.webPort,
             service: "web",

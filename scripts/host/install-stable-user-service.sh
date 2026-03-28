@@ -45,10 +45,10 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-WorkingDirectory=$AGENTCHAT_REPO_ROOT
-ExecStart=$AGENTCHAT_REPO_ROOT/scripts/host/start-stable.sh
-ExecStop=$AGENTCHAT_REPO_ROOT/scripts/host/stop-stable.sh
-ExecReload=$AGENTCHAT_REPO_ROOT/scripts/host/update-stable.sh
+WorkingDirectory=$AGENTCHAT_STABLE_CHECKOUT_PATH
+ExecStart=$AGENTCHAT_STABLE_CHECKOUT_PATH/scripts/host/start-stable.sh
+ExecStop=$AGENTCHAT_STABLE_CHECKOUT_PATH/scripts/host/stop-stable.sh
+ExecReload=$AGENTCHAT_STABLE_CHECKOUT_PATH/scripts/host/update-stable.sh
 TimeoutStartSec=900
 TimeoutStopSec=180
 Environment=HOME=%h

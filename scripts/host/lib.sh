@@ -24,6 +24,40 @@ AGENTCHAT_STABLE_WEB_PORT=4040
 AGENTCHAT_STABLE_SERVER_PORT=3030
 AGENTCHAT_STABLE_WEB_URL="http://localhost:${AGENTCHAT_STABLE_WEB_PORT}"
 AGENTCHAT_STABLE_SERVER_URL="http://localhost:${AGENTCHAT_STABLE_SERVER_PORT}"
+AGENTCHAT_FILE_LOCK_STALE_SECONDS=5
+AGENTCHAT_FILE_LOCK_WAIT_SECONDS=5
+
+with_host_file_lock() {
+    local lock_path="$1"
+    shift
+
+    mkdir -p "$(dirname "$lock_path")"
+    local deadline=$((SECONDS + AGENTCHAT_FILE_LOCK_WAIT_SECONDS))
+
+    while ! mkdir "$lock_path" 2>/dev/null; do
+        if [[ -d "$lock_path" ]]; then
+            local now epoch_mtime
+            now="$(date +%s)"
+            epoch_mtime="$(stat -c %Y "$lock_path" 2>/dev/null || echo 0)"
+            if (( now - epoch_mtime >= AGENTCHAT_FILE_LOCK_STALE_SECONDS )); then
+                rm -rf "$lock_path"
+                continue
+            fi
+        fi
+
+        if (( SECONDS >= deadline )); then
+            echo "Timed out acquiring file lock for $lock_path" >&2
+            return 1
+        fi
+
+        sleep 0.05
+    done
+
+    local exit_code=0
+    "$@" || exit_code=$?
+    rm -rf "$lock_path"
+    return "$exit_code"
+}
 
 host_config_value() {
     local key="$1"
@@ -228,16 +262,18 @@ PYRENDER
 }
 
 update_host_registry_for_stable() {
-    CHECKOUT_PATH="$AGENTCHAT_STABLE_CHECKOUT_PATH" \
-    REGISTRY_PATH="$AGENTCHAT_HOST_REGISTRY_PATH" \
-    PORT_LEASES_PATH="$AGENTCHAT_HOST_PORT_LEASES_PATH" \
-    STABLE_WEB_ENV="$AGENTCHAT_STABLE_CHECKOUT_PATH/apps/web/.env.local" \
-    STABLE_SERVER_ENV="$AGENTCHAT_STABLE_CHECKOUT_PATH/apps/server/.env.local" \
-    STABLE_WEB_PORT="$AGENTCHAT_STABLE_WEB_PORT" \
-    STABLE_SERVER_PORT="$AGENTCHAT_STABLE_SERVER_PORT" \
-    python3 - <<'PYREG'
+    local registry_lock_path="${AGENTCHAT_HOST_REGISTRY_PATH}.lock"
+    local leases_lock_path="${AGENTCHAT_HOST_PORT_LEASES_PATH}.lock"
+
+    with_host_file_lock "$registry_lock_path" env \
+        CHECKOUT_PATH="$AGENTCHAT_STABLE_CHECKOUT_PATH" \
+        REGISTRY_PATH="$AGENTCHAT_HOST_REGISTRY_PATH" \
+        STABLE_WEB_ENV="$AGENTCHAT_STABLE_CHECKOUT_PATH/apps/web/.env.local" \
+        STABLE_SERVER_ENV="$AGENTCHAT_STABLE_CHECKOUT_PATH/apps/server/.env.local" \
+        python3 - <<'PYREG'
 import json
 import os
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -275,7 +311,28 @@ registry['stableCheckoutPath'] = os.environ['CHECKOUT_PATH']
 registry['stableConvexCloudUrl'] = web_env.get('NEXT_PUBLIC_CONVEX_URL')
 registry['stableConvexSiteUrl'] = server_env.get('AGENTCHAT_CONVEX_SITE_URL')
 registry['updatedAt'] = updated_at
-registry_path.write_text(json.dumps(registry, indent=4) + '\n')
+with tempfile.NamedTemporaryFile(
+    "w",
+    encoding="utf-8",
+    delete=False,
+    dir=registry_path.parent,
+) as handle:
+    handle.write(json.dumps(registry, indent=4) + '\n')
+    temp_path = Path(handle.name)
+temp_path.replace(registry_path)
+PYREG
+
+    with_host_file_lock "$leases_lock_path" env \
+        CHECKOUT_PATH="$AGENTCHAT_STABLE_CHECKOUT_PATH" \
+        PORT_LEASES_PATH="$AGENTCHAT_HOST_PORT_LEASES_PATH" \
+        STABLE_WEB_PORT="$AGENTCHAT_STABLE_WEB_PORT" \
+        STABLE_SERVER_PORT="$AGENTCHAT_STABLE_SERVER_PORT" \
+        python3 - <<'PYLEASES'
+import json
+import os
+import tempfile
+from datetime import datetime, timezone
+from pathlib import Path
 
 leases_path = Path(os.environ['PORT_LEASES_PATH'])
 leases_path.parent.mkdir(parents=True, exist_ok=True)
@@ -285,6 +342,7 @@ if leases_path.exists():
         port_leases |= json.loads(leases_path.read_text())
     except Exception:
         pass
+updated_at = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
 filtered = [
     lease
     for lease in port_leases.get('leases', [])
@@ -310,8 +368,16 @@ filtered.extend([
     },
 ])
 port_leases['leases'] = sorted(filtered, key=lambda lease: (lease['port'], lease['service']))
-leases_path.write_text(json.dumps(port_leases, indent=4) + '\n')
-PYREG
+with tempfile.NamedTemporaryFile(
+    "w",
+    encoding="utf-8",
+    delete=False,
+    dir=leases_path.parent,
+) as handle:
+    handle.write(json.dumps(port_leases, indent=4) + '\n')
+    temp_path = Path(handle.name)
+temp_path.replace(leases_path)
+PYLEASES
 }
 
 wait_for_port() {

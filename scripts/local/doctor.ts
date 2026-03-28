@@ -40,4 +40,9 @@ async function main(): Promise<void> {
     }
 }
 
-await main();
+main().catch((error) => {
+    console.error(
+        error instanceof Error ? error.message : "Local wrapper doctor failed.",
+    );
+    process.exitCode = 1;
+});

@@ -92,6 +92,10 @@ function portLeasesLockPath(): string {
     return `${HOST_PORT_LEASES_PATH}.lock`;
 }
 
+function hostRegistryLockPath(): string {
+    return `${HOST_REGISTRY_PATH}.lock`;
+}
+
 export function loadHostRegistry(hostConfig?: HostConfig): HostRegistry {
     return (
         readJsonIfExists<HostRegistry>(HOST_REGISTRY_PATH) ?? {
@@ -106,9 +110,20 @@ export function loadHostRegistry(hostConfig?: HostConfig): HostRegistry {
 }
 
 export function saveHostRegistry(registry: HostRegistry): void {
-    writeJson(HOST_REGISTRY_PATH, {
-        ...registry,
-        updatedAt: nowIso(),
+    updateHostRegistry(() => registry);
+}
+
+export function updateHostRegistry(
+    mutator: (registry: HostRegistry) => HostRegistry,
+): HostRegistry {
+    return withFileLock(hostRegistryLockPath(), () => {
+        const next = mutator(loadHostRegistry());
+        const saved = {
+            ...next,
+            updatedAt: nowIso(),
+        };
+        writeJson(HOST_REGISTRY_PATH, saved);
+        return saved;
     });
 }
 
@@ -182,7 +197,6 @@ export function resolveLeaseConflict(
         leases.leases.find(
             (lease) =>
                 lease.port === params.port &&
-                lease.service === params.service &&
                 !(
                     lease.laneId === params.laneId &&
                     path.resolve(lease.checkoutPath) ===

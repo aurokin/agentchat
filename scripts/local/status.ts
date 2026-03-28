@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import path from "node:path";
 
 import { loadHostConfig } from "./lib/hostConfig.ts";
 import { buildConfigPrintPayload, loadLocalManifest } from "./lib/manifest.ts";
@@ -25,10 +26,11 @@ async function main(): Promise<void> {
         hostConfig,
         checkoutPath: process.cwd(),
     });
+    const resolvedCheckoutPath = path.resolve(manifest.checkoutPath);
     const leases = loadPortLeases().leases.filter(
         (lease) =>
             lease.laneId === manifest.laneId &&
-            lease.checkoutPath === manifest.checkoutPath,
+            path.resolve(lease.checkoutPath) === resolvedCheckoutPath,
     );
     const services = summarizeCurrentCheckoutServices(manifest);
     const generatedFiles = [

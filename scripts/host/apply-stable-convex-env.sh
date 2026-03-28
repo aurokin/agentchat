@@ -45,7 +45,14 @@ cleanup() {
         rm -f "$target_env_file"
     fi
 }
-trap cleanup EXIT
+cleanup_on_error() {
+    local exit_code=$?
+    if [[ "$exit_code" -ne 0 ]]; then
+        cleanup
+    fi
+    return "$exit_code"
+}
+trap cleanup_on_error EXIT
 
 if [[ -f "$target_env_file" ]]; then
     backup_file="$(mktemp)"
@@ -57,5 +64,6 @@ cp "$runtime_env_path" "$target_env_file"
     cd "$AGENTCHAT_STABLE_CHECKOUT_PATH"
     bun run convex:env -- --deployment "$deployment"
 )
+trap - EXIT
 
 echo "Applied stable Convex runtime env to deployment $deployment"

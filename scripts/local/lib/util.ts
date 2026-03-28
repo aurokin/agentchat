@@ -19,17 +19,28 @@ export function readJsonIfExists<T>(absPath: string): T | null {
         return null;
     }
 
-    return JSON.parse(fs.readFileSync(absPath, "utf8")) as T;
+    try {
+        return JSON.parse(fs.readFileSync(absPath, "utf8")) as T;
+    } catch (error) {
+        throw new Error(
+            `Failed to parse JSON file ${absPath}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+    }
+}
+
+function writeFileAtomically(absPath: string, value: string): void {
+    ensureDir(path.dirname(absPath));
+    const tempPath = `${absPath}.${process.pid}.${Date.now()}.tmp`;
+    fs.writeFileSync(tempPath, value, "utf8");
+    fs.renameSync(tempPath, absPath);
 }
 
 export function writeJson(absPath: string, value: unknown): void {
-    ensureDir(path.dirname(absPath));
-    fs.writeFileSync(absPath, `${JSON.stringify(value, null, 4)}\n`, "utf8");
+    writeFileAtomically(absPath, `${JSON.stringify(value, null, 4)}\n`);
 }
 
 export function writeText(absPath: string, value: string): void {
-    ensureDir(path.dirname(absPath));
-    fs.writeFileSync(absPath, value, "utf8");
+    writeFileAtomically(absPath, value);
 }
 
 export function hashShort(value: string): string {
