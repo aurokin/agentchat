@@ -54,6 +54,7 @@ bun run stop
 `bun run dev` now refuses to start when the wrapper doctor still reports missing Convex or server-secret configuration, so broken placeholder stacks fail fast instead of booting partially.
 
 New worktrees are created as sibling checkouts under the repo parent directory, for example `/home/auro/code/agentchat/<name>`. `worktree:create` refuses to run from a dirty source checkout by default so agents do not accidentally create a checkout that is missing local uncommitted changes.
+If you reuse an existing worktree name, Git reattaches that branch at its current commit; it does not automatically move the branch to the source checkout's latest `HEAD`.
 
 Legacy escape hatches still exist for workflows that are not yet wrapper-owned:
 

@@ -79,6 +79,10 @@ async function main(): Promise<void> {
         spawnOrThrow({
             cmd: ["bun", "install"],
             cwd: targetPath,
+            env: {
+                ...process.env,
+                HUSKY: "0",
+            },
             label: `bun install (${worktreeName})`,
         });
         spawnOrThrow({
@@ -117,6 +121,11 @@ async function main(): Promise<void> {
         console.log(`Lane: ${manifest.laneId}`);
         console.log(`Web URL: ${manifest.webUrl}`);
         console.log(`Server URL: ${manifest.serverUrl}`);
+    }
+    if (branchAlreadyExisted) {
+        console.log(
+            "Note: this worktree reused an existing branch name, so it checked out that branch's current commit instead of cloning the source checkout's latest HEAD.",
+        );
     }
     console.log("Next safe commands:");
     console.log(`- cd ${targetPath}`);

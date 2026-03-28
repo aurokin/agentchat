@@ -173,9 +173,11 @@ export function spawnOrThrow(params: {
     cmd: string[];
     cwd: string;
     label: string;
+    env?: Record<string, string | undefined>;
 }): void {
     const proc = Bun.spawnSync(params.cmd, {
         cwd: params.cwd,
+        env: params.env,
         stdout: "inherit",
         stderr: "inherit",
     });

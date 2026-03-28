@@ -39,6 +39,7 @@ Current stable host helpers include:
 - `scripts/host/install-stable-user-service.sh`
 
 `bun run worktree:create -- <name>` creates a sibling checkout under the repo parent. It refuses to run from a dirty source checkout unless `--allow-dirty` is passed, because git worktrees only contain committed refs.
+If a worktree name already has a Git branch behind it, reusing that name checks out the branch at its current commit. Agents should treat that as a Git gotcha, not as a wrapper bug.
 
 Legacy process launchers remain available temporarily for flows still outside the wrapper surface, but they are no longer the authoritative setup path:
 

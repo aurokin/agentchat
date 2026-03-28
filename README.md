@@ -91,6 +91,7 @@ bun run worktree:create -- <name>
 ```
 
 `worktree:create` refuses to run from a dirty source checkout by default, because uncommitted changes are not transferred into a git worktree. Commit or stash first, or use `--allow-dirty` only when you intentionally want the new worktree to start from `HEAD` without local changes.
+If you reuse an existing worktree name, Git will attach the worktree to that branch's current commit instead of cloning the source checkout's latest `HEAD`.
 
 Then start the wrapper-owned dev runtime for this checkout:
 
