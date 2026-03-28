@@ -17,7 +17,19 @@ function createNonce(): string {
     return btoa(binary);
 }
 
-function applyCommonSecurityHeaders(response: NextResponse): void {
+function isSecureRequest(request: NextRequest): boolean {
+    const forwardedProto = request.headers.get("x-forwarded-proto");
+    if (forwardedProto) {
+        return forwardedProto.split(",")[0]?.trim() === "https";
+    }
+
+    return request.nextUrl.protocol === "https:";
+}
+
+function applyCommonSecurityHeaders(
+    response: NextResponse,
+    options: { secureRequest: boolean },
+): void {
     response.headers.set("X-Content-Type-Options", "nosniff");
     response.headers.set("Referrer-Policy", "no-referrer");
     response.headers.set("X-Frame-Options", "DENY");
@@ -34,11 +46,12 @@ function applyCommonSecurityHeaders(response: NextResponse): void {
         "camera=(self), microphone=(self), geolocation=(), payment=(), usb=(), browsing-topics=()",
     );
 
-    // HSTS is only respected by browsers over HTTPS and ignored over HTTP.
-    response.headers.set(
-        "Strict-Transport-Security",
-        "max-age=31536000; includeSubDomains",
-    );
+    if (options.secureRequest) {
+        response.headers.set(
+            "Strict-Transport-Security",
+            "max-age=31536000; includeSubDomains",
+        );
+    }
 }
 
 export function middleware(request: NextRequest) {
@@ -48,6 +61,7 @@ export function middleware(request: NextRequest) {
 
     let cspValue: string | null = null;
     const requestHeaders = new Headers(request.headers);
+    const secureRequest = isSecureRequest(request);
 
     const nonce = createNonce();
 
@@ -66,8 +80,11 @@ export function middleware(request: NextRequest) {
         "form-action 'self'",
         "worker-src 'self' blob:",
         "manifest-src 'self'",
-        "upgrade-insecure-requests",
     ];
+
+    if (secureRequest) {
+        csp.push("upgrade-insecure-requests");
+    }
 
     cspValue = csp.join("; ");
 
@@ -82,7 +99,7 @@ export function middleware(request: NextRequest) {
         },
     });
 
-    applyCommonSecurityHeaders(response);
+    applyCommonSecurityHeaders(response, { secureRequest });
 
     if (cspValue) {
         response.headers.set("Content-Security-Policy", cspValue);
