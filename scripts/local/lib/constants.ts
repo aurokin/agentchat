@@ -1,7 +1,12 @@
 import os from "node:os";
 import path from "node:path";
 
-export const STABLE_CHECKOUT_PATH = "/home/auro/code/agentchat/stable";
+export const STABLE_CHECKOUT_PATH = path.join(
+    os.homedir(),
+    "code",
+    "agentchat",
+    "stable",
+);
 
 export const HOST_CONFIG_ROOT = path.join(os.homedir(), ".config", "agentchat");
 export const HOST_CONFIG_PATH = path.join(HOST_CONFIG_ROOT, "config.json");

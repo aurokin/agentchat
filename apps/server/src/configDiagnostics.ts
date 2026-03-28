@@ -3,6 +3,9 @@ import path from "node:path";
 
 import type { AgentConfig, AgentchatConfig, ProviderConfig } from "./config.ts";
 
+const SYMLINK_SCAN_CACHE_TTL_MS = 30_000;
+const SYMLINK_SCAN_CACHE_MAX_ENTRIES = 128;
+
 export type ProviderDiagnostics = {
     id: string;
     label: string;
@@ -143,6 +146,47 @@ function findFirstSymlinkInTree(
     }
 
     return null;
+}
+
+type SymlinkScanCacheEntry = {
+    expiresAt: number;
+    rootMtimeMs: number;
+    firstSymlink: string | null;
+};
+
+const symlinkScanCache = new Map<string, SymlinkScanCacheEntry>();
+
+function trimSymlinkScanCache(): void {
+    while (symlinkScanCache.size > SYMLINK_SCAN_CACHE_MAX_ENTRIES) {
+        const firstKey = symlinkScanCache.keys().next().value;
+        if (!firstKey) {
+            return;
+        }
+        symlinkScanCache.delete(firstKey);
+    }
+}
+
+function getCachedFirstSymlinkInTree(rootPath: string): string | null {
+    const rootMtimeMs = statSync(rootPath).mtimeMs;
+    const now = Date.now();
+    const cached = symlinkScanCache.get(rootPath);
+
+    if (
+        cached &&
+        cached.expiresAt > now &&
+        cached.rootMtimeMs === rootMtimeMs
+    ) {
+        return cached.firstSymlink;
+    }
+
+    const firstSymlink = findFirstSymlinkInTree(rootPath);
+    symlinkScanCache.set(rootPath, {
+        expiresAt: now + SYMLINK_SCAN_CACHE_TTL_MS,
+        rootMtimeMs,
+        firstSymlink,
+    });
+    trimSymlinkScanCache();
+    return firstSymlink;
 }
 
 export function getEnabledProviders(config: AgentchatConfig): ProviderConfig[] {
@@ -318,7 +362,7 @@ export function getAgentDiagnostics(
         agent.workspaceMode === "copy-on-conversation" &&
         isExistingDirectory(agent.rootPath)
     ) {
-        const symlinkPath = findFirstSymlinkInTree(agent.rootPath);
+        const symlinkPath = getCachedFirstSymlinkInTree(agent.rootPath);
         if (symlinkPath) {
             issues.push(
                 `${AGENT_DIAGNOSTIC_ISSUES.copyOnConversationSymlink} First symlink: ${symlinkPath}.`,
