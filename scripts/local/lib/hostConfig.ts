@@ -75,18 +75,22 @@ export function loadHostConfig(): HostConfig {
         ["dev.convexEnvPath", override.dev?.convexEnvPath],
         ["dev.defaultHost", override.dev?.defaultHost],
         ["stable.defaultHost", override.stable?.defaultHost],
-        ["stable.lanUrl", override.stable?.lanUrl],
-        ["stable.publicUrl", override.stable?.publicUrl],
         ["stable.webEnvPath", override.stable?.webEnvPath],
         ["stable.serverEnvPath", override.stable?.serverEnvPath],
         ["stable.convexEnvPath", override.stable?.convexEnvPath],
         ["stable.serverConfigPath", override.stable?.serverConfigPath],
     ] as const) {
-        if (
-            value !== undefined &&
-            value !== null &&
-            typeof value !== "string"
-        ) {
+        if (value !== undefined && typeof value !== "string") {
+            throw new Error(
+                `Invalid ${label} in host config ${HOST_CONFIG_PATH}.`,
+            );
+        }
+    }
+    for (const [label, value] of [
+        ["stable.lanUrl", override.stable?.lanUrl],
+        ["stable.publicUrl", override.stable?.publicUrl],
+    ] as const) {
+        if (value !== undefined && value !== null && typeof value !== "string") {
             throw new Error(
                 `Invalid ${label} in host config ${HOST_CONFIG_PATH}.`,
             );
