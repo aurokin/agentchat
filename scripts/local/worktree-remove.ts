@@ -72,7 +72,26 @@ async function main(): Promise<void> {
 
     const worktree = findWorktreeByPath(repoRoot, targetPath);
     if (!worktree) {
-        throw new Error(`No git worktree is registered at ${targetPath}.`);
+        if (!force) {
+            throw new Error(`No git worktree is registered at ${targetPath}.`);
+        }
+
+        await stopManagedServicesForCheckoutPath(targetPath);
+        updatePortLeases((leases) =>
+            removeLeasesForCheckout(leases, targetPath),
+        );
+        updateProcessRegistry((registry) =>
+            removeManagedServicesForCheckout(registry, targetPath),
+        );
+        cleanupLaneState(targetPath, tryLoadLocalManifest(targetPath));
+
+        console.log(
+            "No git worktree was registered for this path; removed wrapper-managed state only.",
+        );
+        console.log(`Name: ${worktreeName}`);
+        console.log(`Path: ${targetPath}`);
+        console.log("Force: yes");
+        return;
     }
 
     const manifest = tryLoadLocalManifest(targetPath);

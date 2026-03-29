@@ -1,4 +1,12 @@
-import { loadLocalManifest } from "./lib/manifest.ts";
+import fs from "node:fs";
+
+import { deriveLaneStateRoot, loadLocalManifest } from "./lib/manifest.ts";
+import {
+    removeLeasesForCheckout,
+    removeManagedServicesForCheckout,
+    updatePortLeases,
+    updateProcessRegistry,
+} from "./lib/registry.ts";
 import {
     assertPathAvailable,
     branchExists,
@@ -50,6 +58,17 @@ function createWorktree(params: {
         label: `git worktree add ${params.worktreeName}`,
     });
     return { created: true, branchAlreadyExisted };
+}
+
+function cleanupFailedWorktreeState(targetPath: string): void {
+    updatePortLeases((leases) => removeLeasesForCheckout(leases, targetPath));
+    updateProcessRegistry((registry) =>
+        removeManagedServicesForCheckout(registry, targetPath),
+    );
+    fs.rmSync(deriveLaneStateRoot(targetPath), {
+        recursive: true,
+        force: true,
+    });
 }
 
 async function main(): Promise<void> {
@@ -105,6 +124,7 @@ async function main(): Promise<void> {
                 });
             }
         }
+        cleanupFailedWorktreeState(targetPath);
         throw error;
     }
 
