@@ -383,21 +383,24 @@ PYLEASES
 }
 
 wait_for_port() {
-    local port="$1"
-    local timeout_seconds="$2"
-    PORT="$port" TIMEOUT_SECONDS="$timeout_seconds" python3 - <<'PYWAIT'
+    local host="$1"
+    local port="$2"
+    local timeout_seconds="$3"
+    HOST="$host" PORT="$port" TIMEOUT_SECONDS="$timeout_seconds" python3 - <<'PYWAIT'
 import os
 import socket
 import time
 
+host = os.environ['HOST'].strip()
 port = int(os.environ['PORT'])
 timeout_seconds = float(os.environ['TIMEOUT_SECONDS'])
 deadline = time.time() + timeout_seconds
+probe_host = '127.0.0.1' if host in ('', '127.0.0.1', '0.0.0.0', 'localhost', '::', '::0') else host
 while time.time() < deadline:
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.settimeout(0.5)
     try:
-        sock.connect(('127.0.0.1', port))
+        sock.connect((probe_host, port))
     except OSError:
         time.sleep(0.2)
     else:
@@ -413,10 +416,11 @@ PYWAIT
 }
 
 ensure_port_available() {
-    local port="$1"
-    local label="$2"
-    if wait_for_port "$port" 0.2; then
-        echo "$label port $port is already in use." >&2
+    local host="$1"
+    local port="$2"
+    local label="$3"
+    if wait_for_port "$host" "$port" 0.2; then
+        echo "$label port $port is already in use on ${host}." >&2
         return 1
     fi
 }

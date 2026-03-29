@@ -344,14 +344,25 @@ function assertSafeDevServerConfig(params: {
     }
 }
 
-async function isPortAvailable(port: number): Promise<boolean> {
+function normalizePortCheckHost(host: string): string {
+    const trimmed = host.trim().toLowerCase();
+    if (!trimmed || trimmed === "localhost") {
+        return "127.0.0.1";
+    }
+    return host;
+}
+
+async function isPortAvailableOnHost(
+    host: string,
+    port: number,
+): Promise<boolean> {
     return await new Promise((resolve) => {
         const server = net.createServer();
         server.once("error", () => resolve(false));
         server.once("listening", () => {
             server.close(() => resolve(true));
         });
-        server.listen(port, "127.0.0.1");
+        server.listen(port, normalizePortCheckHost(host));
     });
 }
 
@@ -404,9 +415,13 @@ async function assertDesiredPortsAvailable(
             );
         }
 
-        if (!(await isPortAvailable(port))) {
+        const bindHost =
+            service === "web"
+                ? manifest.managedEnv.web.host
+                : manifest.managedEnv.server.host;
+        if (!(await isPortAvailableOnHost(bindHost, port))) {
             throw new Error(
-                `Preferred ${service} port ${port} is already in use. Reassignment is not automatic in this slice.`,
+                `Preferred ${service} port ${port} is already in use on ${bindHost}. Reassignment is not automatic in this slice.`,
             );
         }
     }
