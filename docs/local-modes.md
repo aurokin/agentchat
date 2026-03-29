@@ -27,6 +27,7 @@ bun run dev
 bun run stop
 bun run worktree:create -- <name>
 bun run worktree:remove -- <name>
+bun run worktree:gc
 ```
 
 Stable host-install commands now available from the repo root:
@@ -171,6 +172,7 @@ Agents should follow this order:
 6. `bun run stop` when the task is complete or the runtime should be torn down
 
 When agents need a disposable checkout instead of modifying the current one, create it with `bun run worktree:create -- <name>` from an existing checkout, then continue the same bootstrap/status/doctor/dev flow inside that worktree. Remove it with `bun run worktree:remove -- <name>` from the source checkout that created it.
+If a worktree was deleted or drifted out-of-band, run `bun run worktree:gc` to reclaim stale wrapper-managed leases, process entries, and lane-state directories. Use `bun run worktree:gc -- --dry-run` to inspect first.
 
 Agents should not begin by hand-editing `apps/web/.env.local`, `apps/server/.env.local`, or `apps/server/agentchat.config.json` unless they are deliberately doing a drift migration and then re-running `bun run bootstrap --adopt`.
 

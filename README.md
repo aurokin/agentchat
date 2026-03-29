@@ -82,6 +82,7 @@ bun install
 bun run bootstrap
 bun run status
 bun run doctor
+bun run worktree:gc -- --dry-run
 ```
 
 If you want a disposable git worktree for an agent or parallel task:
@@ -97,6 +98,12 @@ Then start the wrapper-owned dev runtime for this checkout:
 
 ```bash
 bun run dev
+```
+
+If a disposable worktree was deleted or drifted outside the wrapper flow, reclaim stale wrapper-managed state with:
+
+```bash
+bun run worktree:gc
 ```
 
 The local wrapper commands are now the authoritative setup path for checkout-local env/config generation.
