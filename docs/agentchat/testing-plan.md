@@ -8,6 +8,16 @@ This document records the manual, integration, and end-to-end testing strategy f
 - validate the real web/server/Convex/Codex runtime path
 - make mobile parity measurable against the same fixtures
 - keep tests manual or explicitly invoked, not automatic CI
+- keep heavier wrapper and stable-host guardrails available in GitHub without turning them into mandatory push-time checks yet
+
+## Manual GitHub Guardrails
+
+The repo now includes two manual-only GitHub Actions workflows for explicit confidence runs:
+
+- `.github/workflows/manual-wrapper-guardrails.yml`
+- `.github/workflows/manual-host-guardrails.yml`
+
+These stay on `workflow_dispatch` for now. They are meant to exercise the wrapper lifecycle and stable-host scaffolding deliberately, not to run automatically on every push or PR.
 
 ## Test Agent Fixtures
 

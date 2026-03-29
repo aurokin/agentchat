@@ -30,6 +30,8 @@ Completed today:
 - LAN HTTPS for the stable host through local Caddy at `https://bront.home.arpa:4043`
 - stable smoke coverage under `scripts/host/smoke-stable.sh`
 - systemd user-service support for the stable host install
+- manual-only GitHub guardrail workflows for wrapper and stable-host confidence runs
+- dormant host-config metadata for a future public hostname without turning that cutover on yet
 
 Still open:
 

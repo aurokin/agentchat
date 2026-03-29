@@ -32,6 +32,13 @@ Stable host operations now live under `scripts/host/*.sh`; agents should continu
 
 The current stable host install is live behind local Caddy on `https://bront.home.arpa:4043`. When the task is about the stable host itself, prefer `scripts/host/*.sh` and the host-managed files under `~/.config/agentchat/stable/` over checkout-local wrapper commands.
 
+The repo now also includes manual-only GitHub Actions guardrails:
+
+- `.github/workflows/manual-wrapper-guardrails.yml`
+- `.github/workflows/manual-host-guardrails.yml`
+
+Those workflows are intentionally `workflow_dispatch` only for now. Treat them as explicit confidence tools, not as always-on CI.
+
 Current stable host helpers include:
 
 - `scripts/host/doctor-stable.sh`

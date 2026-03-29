@@ -11,7 +11,7 @@ Agentchat currently supports two local modes:
 - `stable`: protected daily-use installation sourced from a dedicated checkout on this host
 - `dev`: disposable development checkout, usually a git worktree
 
-Stable host scripts, checkout-local wrappers, and worktree lifecycle wrappers are implemented in-repo. The remaining work is operational hardening, multi-worktree confidence testing, and future public-hostname support.
+Stable host scripts, checkout-local wrappers, and worktree lifecycle wrappers are implemented in-repo. The remaining work is public-hostname activation, deeper multi-worktree confidence coverage, and future mobile parallelization.
 
 ## Available Now
 
@@ -43,6 +43,13 @@ scripts/host/generate-stable-convex-env.sh
 scripts/host/apply-stable-convex-env.sh
 scripts/host/install-stable-user-service.sh --enable-now
 ```
+
+Manual-only GitHub guardrail workflows are also checked in now:
+
+- `.github/workflows/manual-wrapper-guardrails.yml`
+- `.github/workflows/manual-host-guardrails.yml`
+
+They use `workflow_dispatch` only. They are intentionally not enabled as automatic GitHub checks yet.
 
 Wrapper-owned runtime commands now cover the current checkout web/server stack:
 
@@ -104,8 +111,11 @@ Current dev bootstrap behavior:
 
 - reads shared dev Convex input from the host-configured `dev/convex.env` path first
 - respects `dev.defaultHost` and `stable.defaultHost` from `config.json` when generating wrapper-managed env files
+- exposes dormant `stable.lanUrl`, `stable.publicUrl`, and `stable.secondaryUrls` fields for future public-hostname cutover planning
 - can still adopt existing repo-local `.env` values during migration
 - renders checkout-local `.env.local` files from the manifest after bootstrap
+
+Those stable URL fields are metadata only right now. They do not change the live routing, Convex `SITE_URL`, or Caddy behavior until you intentionally turn the public hostname on.
 
 ## Drift And Adoption
 
@@ -132,6 +142,7 @@ This repo intentionally supports only this minimal topology right now:
 - wrapper-owned `dev` / `stop` for web plus server only
 - shell-based stable install/start/stop/doctor flow
 - `worktree:create` / `worktree:remove` for disposable checkout lifecycle
+- manual-only GitHub guardrail workflows for wrapper and stable-host scaffolding
 - no mobile parallelization yet
 
 Use the remaining legacy dev scripts only for flows that are still outside the wrapper-owned runtime surface.
@@ -144,6 +155,7 @@ The protected stable install is no longer theoretical. The current host model is
 - shell-first stable lifecycle under `scripts/host/`
 - production Convex wired through host-managed files under `~/.config/agentchat/stable/`
 - LAN HTTPS currently served through local Caddy at `https://bront.home.arpa:4043`
+- dormant host-config metadata for a future public entrypoint such as `https://agentchat.maleniaslab.com`
 
 Treat that stable install as an operator-managed source install, not as another dev lane.
 

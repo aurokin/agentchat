@@ -25,6 +25,9 @@ export function getDefaultHostConfig(): HostConfig {
         },
         stable: {
             defaultHost: "127.0.0.1",
+            lanUrl: null,
+            publicUrl: null,
+            secondaryUrls: [],
             webEnvPath: HOST_STABLE_WEB_ENV_PATH,
             serverEnvPath: HOST_STABLE_SERVER_ENV_PATH,
             convexEnvPath: HOST_STABLE_CONVEX_ENV_PATH,
@@ -72,16 +75,33 @@ export function loadHostConfig(): HostConfig {
         ["dev.convexEnvPath", override.dev?.convexEnvPath],
         ["dev.defaultHost", override.dev?.defaultHost],
         ["stable.defaultHost", override.stable?.defaultHost],
+        ["stable.lanUrl", override.stable?.lanUrl],
+        ["stable.publicUrl", override.stable?.publicUrl],
         ["stable.webEnvPath", override.stable?.webEnvPath],
         ["stable.serverEnvPath", override.stable?.serverEnvPath],
         ["stable.convexEnvPath", override.stable?.convexEnvPath],
         ["stable.serverConfigPath", override.stable?.serverConfigPath],
     ] as const) {
-        if (value !== undefined && typeof value !== "string") {
+        if (
+            value !== undefined &&
+            value !== null &&
+            typeof value !== "string"
+        ) {
             throw new Error(
                 `Invalid ${label} in host config ${HOST_CONFIG_PATH}.`,
             );
         }
+    }
+    if (
+        override.stable?.secondaryUrls !== undefined &&
+        (!Array.isArray(override.stable.secondaryUrls) ||
+            override.stable.secondaryUrls.some(
+                (value) => typeof value !== "string",
+            ))
+    ) {
+        throw new Error(
+            `Invalid stable.secondaryUrls in host config ${HOST_CONFIG_PATH}.`,
+        );
     }
 
     return {
@@ -96,6 +116,10 @@ export function loadHostConfig(): HostConfig {
         stable: {
             defaultHost:
                 override.stable?.defaultHost ?? defaults.stable.defaultHost,
+            lanUrl: override.stable?.lanUrl ?? defaults.stable.lanUrl,
+            publicUrl: override.stable?.publicUrl ?? defaults.stable.publicUrl,
+            secondaryUrls:
+                override.stable?.secondaryUrls ?? defaults.stable.secondaryUrls,
             webEnvPath:
                 override.stable?.webEnvPath ?? defaults.stable.webEnvPath,
             serverEnvPath:
