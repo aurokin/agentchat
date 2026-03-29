@@ -4,7 +4,10 @@ import path from "node:path";
 import { loadHostConfig } from "./lib/hostConfig.ts";
 import { loadLocalManifest } from "./lib/manifest.ts";
 import type { LocalManifest } from "./lib/model.ts";
-import { stopManagedServices } from "./lib/processes.ts";
+import {
+    stopManagedServices,
+    stopManagedServicesForCheckoutPath,
+} from "./lib/processes.ts";
 import {
     removeLeasesForCheckout,
     removeManagedServicesForCheckout,
@@ -58,6 +61,8 @@ async function main(): Promise<void> {
     const manifest = loadLocalManifest(targetPath);
     if (manifest) {
         await stopManagedServices(manifest);
+    } else {
+        await stopManagedServicesForCheckoutPath(targetPath);
     }
 
     const cmd = ["git", "worktree", "remove"];

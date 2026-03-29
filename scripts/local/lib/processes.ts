@@ -310,11 +310,17 @@ async function terminateServiceProcess(service: ManagedService): Promise<void> {
 function listCurrentCheckoutServices(
     manifest: LocalManifest,
 ): ManagedService[] {
+    return listManagedServicesForCheckoutPath(manifest.checkoutPath).filter(
+        (service) => service.laneId === manifest.laneId,
+    );
+}
+
+function listManagedServicesForCheckoutPath(
+    checkoutPath: string,
+): ManagedService[] {
     return loadProcessRegistry().services.filter(
         (service) =>
-            service.laneId === manifest.laneId &&
-            path.resolve(service.checkoutPath) ===
-                path.resolve(manifest.checkoutPath),
+            path.resolve(service.checkoutPath) === path.resolve(checkoutPath),
     );
 }
 
@@ -440,6 +446,29 @@ export async function stopManagedServices(
 ): Promise<ManagedService[]> {
     ensureProcessRegistryFile();
     const services = listCurrentCheckoutServices(manifest);
+    if (services.length === 0) {
+        return [];
+    }
+
+    for (const service of services) {
+        await terminateServiceProcess(service);
+    }
+
+    const sessionIds = new Set(services.map((service) => service.sessionId));
+    updateProcessRegistry((registry) => ({
+        ...registry,
+        services: registry.services.filter(
+            (service) => !sessionIds.has(service.sessionId),
+        ),
+    }));
+    return services;
+}
+
+export async function stopManagedServicesForCheckoutPath(
+    checkoutPath: string,
+): Promise<ManagedService[]> {
+    ensureProcessRegistryFile();
+    const services = listManagedServicesForCheckoutPath(checkoutPath);
     if (services.length === 0) {
         return [];
     }

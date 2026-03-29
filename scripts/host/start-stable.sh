@@ -14,6 +14,8 @@ web_host="$(stable_service_host web)"
 
 server_running=0
 web_running=0
+started_server=0
+started_web=0
 
 if service_pid_running server; then
     server_running=1
@@ -28,17 +30,24 @@ else
 fi
 
 cleanup() {
-    "$AGENTCHAT_HOST_SCRIPT_DIR/stop-stable.sh" >/dev/null 2>&1 || true
+    if [[ "$started_web" -eq 1 ]]; then
+        stop_stable_service web >/dev/null 2>&1 || true
+    fi
+    if [[ "$started_server" -eq 1 ]]; then
+        stop_stable_service server >/dev/null 2>&1 || true
+    fi
 }
 trap cleanup ERR
 
 if [[ "$server_running" -ne 1 ]]; then
     start_stable_service server bun run --cwd apps/server start
+    started_server=1
     wait_for_port "$server_host" "$AGENTCHAT_STABLE_SERVER_PORT" 30
 fi
 
 if [[ "$web_running" -ne 1 ]]; then
     start_stable_service web bun run --cwd apps/web start
+    started_web=1
     wait_for_port "$web_host" "$AGENTCHAT_STABLE_WEB_PORT" 30
 fi
 trap - ERR
