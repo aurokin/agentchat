@@ -19,6 +19,12 @@ The repo now includes two manual-only GitHub Actions workflows for explicit conf
 
 These stay on `workflow_dispatch` for now. They are meant to exercise the wrapper lifecycle and stable-host scaffolding deliberately, not to run automatically on every push or PR.
 
+There is also a repo-local manual command for the disposable worktree lifecycle:
+
+- `bun run test:manual:worktree-lifecycle`
+
+That command creates a temporary worktree, runs the wrapper status and doctor flow there, runs `dev` and `stop` only when doctor passes, tears the worktree down, and finishes with `worktree:gc -- --dry-run`.
+
 ## Test Agent Fixtures
 
 Agentchat uses a dedicated local test workspace outside the repo:

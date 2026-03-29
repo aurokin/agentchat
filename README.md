@@ -82,7 +82,6 @@ bun install
 bun run bootstrap
 bun run status
 bun run doctor
-bun run worktree:gc -- --dry-run
 ```
 
 If you want a disposable git worktree for an agent or parallel task:
@@ -94,7 +93,13 @@ bun run worktree:create -- <name>
 `worktree:create` refuses to run from a dirty source checkout by default, because uncommitted changes are not transferred into a git worktree. Commit or stash first, or use `--allow-dirty` only when you intentionally want the new worktree to start from `HEAD` without local changes.
 If you reuse an existing worktree name, Git will attach the worktree to that branch's current commit instead of cloning the source checkout's latest `HEAD`.
 
-Then start the wrapper-owned dev runtime for this checkout:
+Then switch into that worktree checkout:
+
+```bash
+cd ../<name>
+```
+
+Then start the wrapper-owned dev runtime for that checkout:
 
 ```bash
 bun run dev
@@ -104,6 +109,12 @@ If a disposable worktree was deleted or drifted outside the wrapper flow, reclai
 
 ```bash
 bun run worktree:gc
+```
+
+For an explicit manual lifecycle confidence pass:
+
+```bash
+bun run test:manual:worktree-lifecycle
 ```
 
 The local wrapper commands are now the authoritative setup path for checkout-local env/config generation.

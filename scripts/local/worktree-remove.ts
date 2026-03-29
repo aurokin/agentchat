@@ -17,15 +17,20 @@ import {
 import {
     ensureSafeWorktreeTarget,
     findWorktreeByPath,
+    normalizeWorktreeName,
     requireRepoRoot,
     resolveWorktreeTargetPath,
     spawnOrThrow,
     validateWorktreeName,
 } from "./lib/worktrees.ts";
 
-function worktreeNameArg(): string {
+function worktreeNameArg(): { input: string; name: string } {
     const args = process.argv.slice(2).filter((arg) => !arg.startsWith("--"));
-    return validateWorktreeName(args[0] ?? "");
+    const input = args[0] ?? "";
+    return {
+        input,
+        name: validateWorktreeName(input),
+    };
 }
 
 function cleanupLaneState(
@@ -56,7 +61,7 @@ function tryLoadLocalManifest(checkoutPath: string): LocalManifest | null {
 
 async function main(): Promise<void> {
     const repoRoot = requireRepoRoot();
-    const worktreeName = worktreeNameArg();
+    const { input: requestedName, name: worktreeName } = worktreeNameArg();
     const targetPath = resolveWorktreeTargetPath(repoRoot, worktreeName);
     const force = process.argv.includes("--force");
     ensureSafeWorktreeTarget(targetPath);
@@ -88,9 +93,18 @@ async function main(): Promise<void> {
         console.log(
             "No git worktree was registered for this path; removed wrapper-managed state only.",
         );
+        if (
+            requestedName.trim() &&
+            normalizeWorktreeName(requestedName) !== requestedName.trim()
+        ) {
+            console.log(
+                `Normalized worktree name: ${requestedName.trim()} -> ${worktreeName}`,
+            );
+        }
         console.log(`Name: ${worktreeName}`);
         console.log(`Path: ${targetPath}`);
         console.log("Force: yes");
+        console.log("Branch: unchanged");
         return;
     }
 
@@ -119,9 +133,18 @@ async function main(): Promise<void> {
     cleanupLaneState(targetPath, manifest);
 
     console.log("Worktree removed.");
+    if (
+        requestedName.trim() &&
+        normalizeWorktreeName(requestedName) !== requestedName.trim()
+    ) {
+        console.log(
+            `Normalized worktree name: ${requestedName.trim()} -> ${worktreeName}`,
+        );
+    }
     console.log(`Name: ${worktreeName}`);
     console.log(`Path: ${targetPath}`);
     console.log(`Force: ${force ? "yes" : "no"}`);
+    console.log("Branch: kept");
 }
 
 main().catch((error) => {

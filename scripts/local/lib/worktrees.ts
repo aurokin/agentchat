@@ -105,20 +105,28 @@ export function resolveWorktreeTargetPath(
 }
 
 export function validateWorktreeName(rawName: string): string {
-    const name = rawName.trim();
-    if (!name) {
+    const normalized = normalizeWorktreeName(rawName);
+    if (!normalized) {
         throw new Error(
             "Missing worktree name. Usage: bun run worktree:create -- <name>",
         );
     }
+    return normalized;
+}
 
-    if (sanitizeLabel(name) !== name || name.includes(path.sep)) {
-        throw new Error(
-            "Worktree names must use only letters, numbers, dots, underscores, and dashes.",
-        );
+export function normalizeWorktreeName(rawName: string): string {
+    const trimmed = rawName.trim();
+    if (!trimmed) {
+        return "";
     }
 
-    return name;
+    const normalized = sanitizeLabel(trimmed)
+        .replace(/-+/g, "-")
+        .replace(/^[.-]+|[.-]+$/g, "");
+    if (!normalized || normalized === "." || normalized === "..") {
+        return "";
+    }
+    return normalized;
 }
 
 export function ensureSafeWorktreeTarget(targetPath: string): void {
