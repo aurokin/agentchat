@@ -458,6 +458,22 @@ describe("conversation runtime controller", () => {
         });
     });
 
+    test("ignores pending send failures after switching to a different chat", () => {
+        expect(
+            resolvePendingConversationSendFailure({
+                currentChat: { id: "chat-2", agentId: "agent-1" },
+                activeRun: createActiveRun({ runId: null }),
+                pendingSendConversation: {
+                    conversationId: "chat-1",
+                    agentId: "agent-1",
+                },
+                errorMessage: "runtime failed",
+            }),
+        ).toEqual({
+            shouldHandle: false,
+        });
+    });
+
     test("flushes a queued interrupt once the run is available", () => {
         const commands: string[] = [];
 

@@ -47,6 +47,26 @@ function portForService(manifest: LocalManifest, service: ServiceName): number {
     return service === "web" ? manifest.webPort : manifest.serverPort;
 }
 
+function readinessHostForService(
+    manifest: LocalManifest,
+    service: ServiceName,
+): string {
+    const configuredHost =
+        service === "web"
+            ? manifest.managedEnv.web.host
+            : manifest.managedEnv.server.host;
+    const trimmed = configuredHost.trim().toLowerCase();
+    if (
+        trimmed === "0.0.0.0" ||
+        trimmed === "::" ||
+        trimmed === "::0" ||
+        trimmed === "localhost"
+    ) {
+        return "127.0.0.1";
+    }
+    return configuredHost;
+}
+
 function envForService(
     manifest: LocalManifest,
     service: ServiceName,
@@ -218,11 +238,15 @@ function isManagedServiceOwned(service: ManagedService): boolean {
     return true;
 }
 
-async function waitForPort(port: number, timeoutMs: number): Promise<boolean> {
+async function waitForPort(
+    host: string,
+    port: number,
+    timeoutMs: number,
+): Promise<boolean> {
     const startedAt = Date.now();
     while (Date.now() - startedAt < timeoutMs) {
         const open = await new Promise<boolean>((resolve) => {
-            const socket = net.connect({ host: "127.0.0.1", port });
+            const socket = net.connect({ host, port });
             socket.once("connect", () => {
                 socket.destroy();
                 resolve(true);
@@ -353,14 +377,17 @@ export async function startManagedServices(
 
             const pid = subprocess.pid;
             const port = portForService(manifest, service);
+            const readinessHost = readinessHostForService(manifest, service);
             await Promise.race([
-                waitForPort(port, START_TIMEOUT_MS).then((ready) => {
-                    if (!ready) {
-                        throw new Error(
-                            `${service} did not start listening on port ${port} within ${START_TIMEOUT_MS}ms. Check ${logPath}.`,
-                        );
-                    }
-                }),
+                waitForPort(readinessHost, port, START_TIMEOUT_MS).then(
+                    (ready) => {
+                        if (!ready) {
+                            throw new Error(
+                                `${service} did not start listening on ${readinessHost}:${port} within ${START_TIMEOUT_MS}ms. Check ${logPath}.`,
+                            );
+                        }
+                    },
+                ),
                 subprocess.exited.then((code) => {
                     throw new Error(
                         `${service} exited during startup with code ${code}. Check ${logPath}.`,

@@ -137,23 +137,21 @@ export function resolvePendingConversationSendFailure(params: {
             ? params.activeRun
             : null;
 
-    if (!pendingRun && !matchesPendingConversation) {
+    if (!pendingRun || !matchesPendingConversation) {
         return { shouldHandle: false };
     }
 
     return {
         shouldHandle: true,
-        assistantMessageId: pendingRun?.assistantMessageId ?? null,
+        assistantMessageId: pendingRun.assistantMessageId,
         error: {
             message: params.errorMessage,
             isRetryable: true,
         },
-        retryChat: pendingRun
-            ? {
-                  content: pendingRun.userContent,
-                  contextContent: pendingRun.userContent,
-              }
-            : null,
+        retryChat: {
+            content: pendingRun.userContent,
+            contextContent: pendingRun.userContent,
+        },
     };
 }
 
