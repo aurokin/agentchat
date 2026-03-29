@@ -85,6 +85,17 @@ export function deriveLaneId(checkoutPath: string): string {
     return `dev-${base}-${hashShort(path.resolve(checkoutPath))}`;
 }
 
+export function deriveLaneStateRoot(checkoutPath: string): string {
+    return path.join(
+        os.homedir(),
+        ".local",
+        "state",
+        "agentchat",
+        "lanes",
+        deriveLaneId(checkoutPath),
+    );
+}
+
 export function buildDevManifest(params: {
     checkoutPath: string;
     convexDeployment: string | null;
@@ -96,14 +107,7 @@ export function buildDevManifest(params: {
 }): LocalManifest {
     const checkoutPath = path.resolve(params.checkoutPath);
     const laneId = deriveLaneId(checkoutPath);
-    const laneStateRoot = path.join(
-        os.homedir(),
-        ".local",
-        "state",
-        "agentchat",
-        "lanes",
-        laneId,
-    );
+    const laneStateRoot = deriveLaneStateRoot(checkoutPath);
     const { webPort, serverPort } = deriveLanePorts(checkoutPath);
 
     return {
