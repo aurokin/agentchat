@@ -36,6 +36,6 @@ jobs:
             - name: Exercise worktree lifecycle
               run: |
                   bun run worktree:create -- gha-wrapper-guardrail
-                  ../gha-wrapper-guardrail/bun run status
-                  ../gha-wrapper-guardrail/bun run config:print
+                  bun --cwd ../gha-wrapper-guardrail run status
+                  bun --cwd ../gha-wrapper-guardrail run config:print
                   bun run worktree:remove -- gha-wrapper-guardrail --force
