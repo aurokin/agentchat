@@ -180,4 +180,3 @@ Agents should not begin by hand-editing `apps/web/.env.local`, `apps/server/.env
 - [Tooling And Tests](./agents/tooling.md)
 - [Local Environment Migration And Advanced Setup](./local_environment_setup_checklist.md)
 - [Stable Host Runbook](./agentchat/stable-host-runbook.md)
-- [Parallel Worktree And Stable Install Plan](../plans/parallel-worktree-stable-install-plan.md)

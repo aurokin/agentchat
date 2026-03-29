@@ -32,7 +32,6 @@ It exists for both humans and agents:
 ## Multi-Runtime Specs
 
 - [Provider-Agent Merge Plan](../../plans/provider-agent-merge-plan.md)
-- [Parallel Worktree And Stable Install Plan](../../plans/parallel-worktree-stable-install-plan.md)
 - [Pi Runtime Spec](./pi-runtime-spec.md)
 - [OpenCode Runtime Spec](./opencode-runtime-spec.md)
 - [Claude Code Runtime Spec](./claude-code-runtime-spec.md)
