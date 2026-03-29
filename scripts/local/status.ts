@@ -51,6 +51,19 @@ async function main(): Promise<void> {
     console.log(`Host config: ${payload.hostConfig.path}`);
     console.log(`Stable checkout: ${payload.hostRegistry.stableCheckoutPath}`);
     console.log(
+        `Stable LAN URL: ${payload.hostConfig.values.stable.lanUrl ?? "unset"}`,
+    );
+    console.log(
+        `Stable public URL: ${payload.hostConfig.values.stable.publicUrl ?? "unset"}`,
+    );
+    console.log(
+        `Stable secondary URLs: ${
+            payload.hostConfig.values.stable.secondaryUrls.length > 0
+                ? payload.hostConfig.values.stable.secondaryUrls.join(", ")
+                : "none"
+        }`,
+    );
+    console.log(
         `Shared dev Convex env: ${payload.hostConfig.values.dev.convexEnvPath}`,
     );
     console.log("Generated files:");

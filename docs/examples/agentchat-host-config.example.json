@@ -7,6 +7,9 @@
     },
     "stable": {
         "defaultHost": "127.0.0.1",
+        "lanUrl": "https://bront.home.arpa:4043",
+        "publicUrl": "https://agentchat.maleniaslab.com",
+        "secondaryUrls": [],
         "webEnvPath": "/home/<user>/.config/agentchat/stable/web.env",
         "serverEnvPath": "/home/<user>/.config/agentchat/stable/server.env",
         "convexEnvPath": "/home/<user>/.config/agentchat/stable/convex.env",

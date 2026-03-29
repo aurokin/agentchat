@@ -106,6 +106,7 @@ Helpful references:
 
 - `docs/local-modes.md` for the wrapper-first local workflow, including worktree lifecycle wrappers and stable host scripts
 - `docs/local_environment_setup_checklist.md` for host-level layout, stable host-script setup, migration, and advanced manual setup
+- `.github/workflows/manual-wrapper-guardrails.yml` and `.github/workflows/manual-host-guardrails.yml` for manual-only GitHub guardrail runs that exercise the wrapper and stable-host scaffolding without enabling automatic checks yet
 - `bun run doctor:server` for a deliberate runtime readiness check against the generated server config
 - `bun run setup:test-agent-config` only when you intentionally want the dedicated test fixtures, followed by `bun run bootstrap --adopt`
 
@@ -123,6 +124,7 @@ scripts/host/install-stable-user-service.sh --enable-now
 ```
 
 On the current host, the stable LAN entrypoint is `https://bront.home.arpa:4043` behind local Caddy.
+Future public-hostname support is scaffolded in the host config model and docs, but it is intentionally dormant until that cutover is explicitly enabled.
 
 ### Configuration
 
@@ -133,6 +135,14 @@ On the current host, the stable LAN entrypoint is `https://bront.home.arpa:4043`
 - `apps/server/agentchat.config.json`
 
 If you intentionally edit those generated files by hand, run `bun run bootstrap --adopt` to fold the current values back into the wrapper-managed manifest. Use `bun run bootstrap --force` only when you want to discard drift and regenerate from the manifest.
+
+Host-level wrapper defaults live under `~/.config/agentchat/config.json`. That file now also supports dormant stable URL metadata:
+
+- `stable.lanUrl`
+- `stable.publicUrl`
+- `stable.secondaryUrls`
+
+Those fields are planning metadata only right now. They do not change live routing, Convex `SITE_URL`, or reverse-proxy behavior until the public-hostname cutover is intentionally turned on.
 
 #### Environment variables
 

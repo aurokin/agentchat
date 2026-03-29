@@ -15,6 +15,10 @@ Agentchat already has:
 - multi-message assistant output with `message.started` support through server, Convex, web, and mobile
 - manual live runtime, browser, LAN, operator, and stale-resume confidence commands
 - targeted server, web, mobile, shared, and script coverage for the most failure-prone runtime and recovery paths
+- a wrapper-first local workflow for checkout bootstrap, status, doctor, dev, stop, and config inspection
+- disposable worktree lifecycle helpers for parallel local development
+- a protected stable host install with shell-based lifecycle, smoke coverage, and systemd user-service support
+- LAN HTTPS for the stable host through local Caddy, plus dormant public-hostname scaffolding and manual-only GitHub guardrail workflows
 - a completed manual confirmation pass on:
     - Local Browser
     - Remote Browser via Luma
@@ -35,6 +39,8 @@ Agentchat already has:
 - keep diagnostics, doctor output, and config-reload behavior explicit and operator-friendly
 - keep model discovery well-tested and safe under degraded conditions
 - keep low-token operator smoke paths current with real operator workflows
+- finish deeper concurrent multi-worktree confidence coverage now that the wrapper and stable-host foundation is live
+- keep the dormant public-hostname support documented and ready without turning it on prematurely
 
 ### 3. Mobile Polish
 

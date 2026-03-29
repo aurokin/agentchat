@@ -26,6 +26,9 @@ export type HostConfig = {
     };
     stable: {
         defaultHost: string;
+        lanUrl: string | null;
+        publicUrl: string | null;
+        secondaryUrls: string[];
         webEnvPath: string;
         serverEnvPath: string;
         convexEnvPath: string;

@@ -71,6 +71,13 @@ Example host config:
 
 The wrapper currently uses the host-configured shared dev Convex env path during `bootstrap`. Stable host scripts now read the stable env and server-config files from this same host-level layout.
 If this host needs LAN-reachable bindings, set `dev.defaultHost` and `stable.defaultHost` in `config.json` instead of editing generated `.env.local` files by hand.
+If you want to stage a future public cutover without enabling it yet, `config.json` also supports:
+
+- `stable.lanUrl`
+- `stable.publicUrl`
+- `stable.secondaryUrls`
+
+Those URL fields are metadata only until you intentionally update live routing, trusted origins, and Convex `SITE_URL`.
 
 Stable Convex deployment secrets now have an operator workflow too:
 
@@ -89,6 +96,13 @@ The current stable host installation is expected to run from a dedicated checkou
 - lifecycle driven by `scripts/host/*.sh`
 - LAN HTTPS served by local Caddy
 - current LAN entrypoint `https://bront.home.arpa:4043`
+
+Manual GitHub guardrail workflows are also checked in now:
+
+- `.github/workflows/manual-wrapper-guardrails.yml`
+- `.github/workflows/manual-host-guardrails.yml`
+
+They remain `workflow_dispatch` only for now, so they can be used as explicit confidence runs without becoming automatic required checks yet.
 
 ## Manual Convex Setup
 

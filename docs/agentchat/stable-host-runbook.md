@@ -8,6 +8,7 @@ Current host model:
 - host-managed files under `~/.config/agentchat/stable/`
 - lifecycle driven by `scripts/host/*.sh`
 - current LAN HTTPS entrypoint `https://bront.home.arpa:4043`
+- dormant public-hostname metadata available in `~/.config/agentchat/config.json` for future cutover planning
 
 ## Core Commands
 
@@ -70,11 +71,19 @@ sudo loginctl enable-linger "$USER"
 
 ## Expected Paths
 
-- stable checkout: `/home/auro/code/agentchat/stable`
+- stable checkout: `$HOME/code/agentchat/stable`
 - host config root: `~/.config/agentchat/`
 - stable env/config: `~/.config/agentchat/stable/`
 - stable state root: `~/.local/state/agentchat/stable/`
 - stable logs: `~/.local/state/agentchat/stable/logs/`
+
+Useful host-config metadata fields:
+
+- `stable.lanUrl`
+- `stable.publicUrl`
+- `stable.secondaryUrls`
+
+Those fields do not switch the live stable host over by themselves. They are there so the future public hostname can be documented and staged before it is activated.
 
 ## Fast Triage
 
@@ -106,21 +115,24 @@ scripts/host/start-stable.sh
 ### Stable checkout refuses update
 
 Cause:
+
 - local changes exist in the stable checkout
 
 Check:
 
 ```bash
-git -C /home/auro/code/agentchat/stable status --short
+git -C "$HOME/code/agentchat/stable" status --short
 ```
 
 Fix:
+
 - remove or commit the unexpected local drift
 - rerun `scripts/host/update-stable.sh`
 
 ### Copy-on-conversation agent fails on send
 
 Cause:
+
 - the agent root contains symlinks, so sandbox creation is rejected
 
 Check:
@@ -130,16 +142,19 @@ scripts/host/doctor-stable.sh
 ```
 
 Fix:
+
 - replace the symlink with real files/directories inside the agent root
 - rerun `scripts/host/doctor-stable.sh`
 
 ### Google auth completes but the app stays unauthenticated
 
 Check:
+
 - `SITE_URL` in `~/.config/agentchat/stable/convex-runtime.env`
 - local Caddy routing for the public stable entrypoint
 
 Fix:
+
 - update the runtime env
 - reapply with `scripts/host/apply-stable-convex-env.sh`
 - restart stable
@@ -153,8 +168,20 @@ curl -kI https://bront.home.arpa:4043
 ```
 
 Fix:
+
 - verify the local Caddy config and deployment
 - keep the stable app itself on local HTTP; terminate TLS in Caddy
+
+### Future public hostname is configured in host metadata but should stay inactive
+
+Cause:
+
+- `stable.publicUrl` or related Caddy examples were prepared ahead of time, but the actual public cutover has not happened yet
+
+Fix:
+
+- treat `stable.publicUrl` and `stable.secondaryUrls` as planning metadata only
+- leave Convex `SITE_URL`, reverse-proxy routing, and trusted origins on the current live LAN entrypoint until the public rollout is intentional
 
 ## Reliability Baseline
 
