@@ -90,7 +90,11 @@ export function loadHostConfig(): HostConfig {
         ["stable.lanUrl", override.stable?.lanUrl],
         ["stable.publicUrl", override.stable?.publicUrl],
     ] as const) {
-        if (value !== undefined && value !== null && typeof value !== "string") {
+        if (
+            value !== undefined &&
+            value !== null &&
+            typeof value !== "string"
+        ) {
             throw new Error(
                 `Invalid ${label} in host config ${HOST_CONFIG_PATH}.`,
             );
