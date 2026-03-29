@@ -198,6 +198,7 @@ export async function runConversationSend(params: {
                 await params.dependencies.updateMessage(assistantMessageId, {
                     content: "",
                     contextContent: "",
+                    status: "errored",
                 });
             } catch {
                 // Preserve the original send error as the surfaced failure.

@@ -75,7 +75,12 @@ function resolveManagedHost(
     defaultHost: string,
 ): string {
     const trimmed = value?.trim();
-    if (!trimmed || trimmed === "0.0.0.0" || trimmed === "127.0.0.1") {
+    if (
+        !trimmed ||
+        trimmed === "0.0.0.0" ||
+        trimmed === "127.0.0.1" ||
+        trimmed === "localhost"
+    ) {
         return defaultHost;
     }
     return trimmed;

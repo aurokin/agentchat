@@ -321,8 +321,12 @@ describe("conversation runtime controller", () => {
     });
 
     test("cleans up the assistant draft when connection setup fails", async () => {
-        const updates: Array<{ id: string; content: string; context: string }> =
-            [];
+        const updates: Array<{
+            id: string;
+            content: string;
+            context: string;
+            status: string | null;
+        }> = [];
         const result = await runConversationSend({
             chat: createChat(),
             messages: [],
@@ -345,6 +349,7 @@ describe("conversation runtime controller", () => {
                         id,
                         content: update.content ?? "",
                         context: update.contextContent ?? "",
+                        status: update.status ?? null,
                     });
                 },
                 queueStreamingMessageUpdate: () => {},
@@ -379,6 +384,7 @@ describe("conversation runtime controller", () => {
                 id: result.assistantMessageId,
                 content: "",
                 context: "",
+                status: "errored",
             },
         ]);
     });
