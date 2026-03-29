@@ -17,9 +17,9 @@ cleanup() {
 }
 trap cleanup ERR
 
-start_stable_service server "bun run --cwd apps/server start"
+start_stable_service server bun run --cwd apps/server start
 wait_for_port "$AGENTCHAT_STABLE_SERVER_PORT" 30
-start_stable_service web "bun run --cwd apps/web start"
+start_stable_service web bun run --cwd apps/web start
 wait_for_port "$AGENTCHAT_STABLE_WEB_PORT" 30
 trap - ERR
 

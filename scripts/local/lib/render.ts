@@ -2,6 +2,12 @@ import prettier from "prettier";
 
 import type { DesiredGeneratedFiles, LocalManifest } from "./model.ts";
 
+function renderDotEnvValue(value: string): string {
+    return /^[A-Za-z0-9_./:@%+=,-]+$/.test(value)
+        ? value
+        : JSON.stringify(value);
+}
+
 function renderDotEnv(
     entries: Array<[string, string | null | undefined]>,
 ): string {
@@ -15,7 +21,7 @@ function renderDotEnv(
         if (value === null || value === undefined || value.length === 0) {
             continue;
         }
-        lines.push(`${key}=${value}`);
+        lines.push(`${key}=${renderDotEnvValue(value)}`);
     }
 
     return `${lines.join("\n")}\n`;

@@ -8,7 +8,7 @@ import {
     STABLE_CHECKOUT_PATH,
 } from "./constants.ts";
 import type { HostConfig } from "./model.ts";
-import { readJsonIfExists } from "./util.ts";
+import { isRecord, readJsonIfExists } from "./util.ts";
 
 type PartialHostConfig = Partial<HostConfig> & {
     dev?: Partial<HostConfig["dev"]>;
@@ -37,6 +37,47 @@ export function loadHostConfig(): HostConfig {
 
     if (!override) {
         return defaults;
+    }
+
+    if (!isRecord(override)) {
+        throw new Error(`Invalid host config at ${HOST_CONFIG_PATH}.`);
+    }
+
+    if (
+        "stableCheckoutPath" in override &&
+        override.stableCheckoutPath !== undefined &&
+        typeof override.stableCheckoutPath !== "string"
+    ) {
+        throw new Error(
+            `Invalid stableCheckoutPath in host config ${HOST_CONFIG_PATH}.`,
+        );
+    }
+    if (
+        "dev" in override &&
+        override.dev !== undefined &&
+        !isRecord(override.dev)
+    ) {
+        throw new Error(`Invalid dev config in ${HOST_CONFIG_PATH}.`);
+    }
+    if (
+        "stable" in override &&
+        override.stable !== undefined &&
+        !isRecord(override.stable)
+    ) {
+        throw new Error(`Invalid stable config in ${HOST_CONFIG_PATH}.`);
+    }
+    for (const [label, value] of [
+        ["dev.convexEnvPath", override.dev?.convexEnvPath],
+        ["stable.webEnvPath", override.stable?.webEnvPath],
+        ["stable.serverEnvPath", override.stable?.serverEnvPath],
+        ["stable.convexEnvPath", override.stable?.convexEnvPath],
+        ["stable.serverConfigPath", override.stable?.serverConfigPath],
+    ] as const) {
+        if (value !== undefined && typeof value !== "string") {
+            throw new Error(
+                `Invalid ${label} in host config ${HOST_CONFIG_PATH}.`,
+            );
+        }
     }
 
     return {

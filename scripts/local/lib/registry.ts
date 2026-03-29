@@ -15,7 +15,7 @@ import type {
     PortLeases,
     ProcessRegistry,
 } from "./model.ts";
-import { nowIso, readJsonIfExists, writeJson } from "./util.ts";
+import { isRecord, nowIso, readJsonIfExists, writeJson } from "./util.ts";
 
 const FILE_LOCK_STALE_MS = 5_000;
 const FILE_LOCK_WAIT_MS = 5_000;
@@ -96,17 +96,98 @@ function hostRegistryLockPath(): string {
     return `${HOST_REGISTRY_PATH}.lock`;
 }
 
-export function loadHostRegistry(hostConfig?: HostConfig): HostRegistry {
+function isNullableString(value: unknown): value is string | null {
+    return value === null || typeof value === "string";
+}
+
+function isValidHostRegistry(value: unknown): value is HostRegistry {
     return (
-        readJsonIfExists<HostRegistry>(HOST_REGISTRY_PATH) ?? {
+        isRecord(value) &&
+        value.version === 1 &&
+        typeof value.stableCheckoutPath === "string" &&
+        isNullableString(value.stableConvexSiteUrl) &&
+        isNullableString(value.stableConvexCloudUrl) &&
+        typeof value.updatedAt === "string"
+    );
+}
+
+function isValidPortLease(value: unknown): value is PortLease {
+    return (
+        isRecord(value) &&
+        typeof value.laneId === "string" &&
+        typeof value.checkoutPath === "string" &&
+        (value.service === "web" || value.service === "server") &&
+        typeof value.port === "number" &&
+        Number.isInteger(value.port) &&
+        value.port > 0 &&
+        typeof value.updatedAt === "string"
+    );
+}
+
+function isValidPortLeases(value: unknown): value is PortLeases {
+    return (
+        isRecord(value) &&
+        value.version === 1 &&
+        Array.isArray(value.leases) &&
+        value.leases.every((lease) => isValidPortLease(lease))
+    );
+}
+
+function isValidManagedService(value: unknown): value is ManagedService {
+    return (
+        isRecord(value) &&
+        typeof value.laneId === "string" &&
+        (value.laneType === "dev" || value.laneType === "stable") &&
+        typeof value.sessionId === "string" &&
+        (value.service === "web" || value.service === "server") &&
+        typeof value.checkoutPath === "string" &&
+        typeof value.cwd === "string" &&
+        typeof value.pid === "number" &&
+        Number.isInteger(value.pid) &&
+        typeof value.pgid === "number" &&
+        Number.isInteger(value.pgid) &&
+        Array.isArray(value.command) &&
+        value.command.every((part) => typeof part === "string") &&
+        (value.processStartToken === undefined ||
+            value.processStartToken === null ||
+            typeof value.processStartToken === "string") &&
+        typeof value.logPath === "string" &&
+        Array.isArray(value.ports) &&
+        value.ports.every(
+            (port) =>
+                typeof port === "number" && Number.isInteger(port) && port > 0,
+        ) &&
+        (value.state === "running" || value.state === "stopped") &&
+        typeof value.startedAt === "string" &&
+        typeof value.updatedAt === "string"
+    );
+}
+
+function isValidProcessRegistry(value: unknown): value is ProcessRegistry {
+    return (
+        isRecord(value) &&
+        value.version === 1 &&
+        Array.isArray(value.services) &&
+        value.services.every((service) => isValidManagedService(service))
+    );
+}
+
+export function loadHostRegistry(hostConfig?: HostConfig): HostRegistry {
+    const value = readJsonIfExists<HostRegistry>(HOST_REGISTRY_PATH);
+    if (!value) {
+        return {
             version: 1,
             stableCheckoutPath:
                 hostConfig?.stableCheckoutPath ?? STABLE_CHECKOUT_PATH,
             stableConvexSiteUrl: null,
             stableConvexCloudUrl: null,
             updatedAt: nowIso(),
-        }
-    );
+        };
+    }
+    if (!isValidHostRegistry(value)) {
+        throw new Error(`Invalid host registry at ${HOST_REGISTRY_PATH}.`);
+    }
+    return value;
 }
 
 export function saveHostRegistry(registry: HostRegistry): void {
@@ -128,12 +209,19 @@ export function updateHostRegistry(
 }
 
 export function loadPortLeases(): PortLeases {
-    return (
-        readJsonIfExists<PortLeases>(HOST_PORT_LEASES_PATH) ?? {
+    const value = readJsonIfExists<PortLeases>(HOST_PORT_LEASES_PATH);
+    if (!value) {
+        return {
             version: 1,
             leases: [],
-        }
-    );
+        };
+    }
+    if (!isValidPortLeases(value)) {
+        throw new Error(
+            `Invalid port lease registry at ${HOST_PORT_LEASES_PATH}.`,
+        );
+    }
+    return value;
 }
 
 export function savePortLeases(portLeases: PortLeases): void {
@@ -151,12 +239,19 @@ export function updatePortLeases(
 }
 
 export function loadProcessRegistry(): ProcessRegistry {
-    return (
-        readJsonIfExists<ProcessRegistry>(HOST_PROCESS_REGISTRY_PATH) ?? {
+    const value = readJsonIfExists<ProcessRegistry>(HOST_PROCESS_REGISTRY_PATH);
+    if (!value) {
+        return {
             version: 1,
             services: [],
-        }
-    );
+        };
+    }
+    if (!isValidProcessRegistry(value)) {
+        throw new Error(
+            `Invalid process registry at ${HOST_PROCESS_REGISTRY_PATH}.`,
+        );
+    }
+    return value;
 }
 
 export function saveProcessRegistry(processRegistry: ProcessRegistry): void {

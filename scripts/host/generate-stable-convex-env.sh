@@ -21,44 +21,24 @@ WEB_ENV_PATH="$AGENTCHAT_STABLE_WEB_ENV_PATH" \
 CONVEX_ENV_PATH="$AGENTCHAT_STABLE_CONVEX_ENV_PATH" \
 GENERATED_SECRETS_PATH="$tmp_secrets" \
 DEFAULT_SITE_URL="$AGENTCHAT_STABLE_WEB_URL" \
+HOST_HELPER_DIR="$AGENTCHAT_HOST_HELPER_DIR" \
 python3 - <<'PY'
 import secrets
-from pathlib import Path
 import os
+import sys
 
 PLACEHOLDERS = {"", "replace-me", "https://replace-me.convex.site", "https://replace-me.convex.cloud", "prod:replace-me"}
-
-def parse_env(path_str: str) -> dict[str, str]:
-    path = Path(path_str)
-    data: dict[str, str] = {}
-    if not path.exists():
-        return data
-    for raw in path.read_text().splitlines():
-        line = raw.strip()
-        if not line or line.startswith('#') or '=' not in line:
-            continue
-        key, value = line.split('=', 1)
-        data[key.strip()] = value.strip()
-    return data
-
-def write_env(path_str: str, values: dict[str, str], heading: str) -> None:
-    path = Path(path_str)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    lines = [heading, ""]
-    for key in sorted(values):
-        value = values[key]
-        if value:
-            lines.append(f"{key}={value}")
-    path.write_text("\n".join(lines) + "\n")
+sys.path.append(os.environ["HOST_HELPER_DIR"])
+from envfile import parse_env_file, write_env_file
 
 def is_missing(value: str | None) -> bool:
     return value is None or value.strip() in PLACEHOLDERS
 
-runtime_env = parse_env(os.environ["RUNTIME_ENV_PATH"])
-server_env = parse_env(os.environ["SERVER_ENV_PATH"])
-web_env = parse_env(os.environ["WEB_ENV_PATH"])
-convex_env = parse_env(os.environ["CONVEX_ENV_PATH"])
-generated = parse_env(os.environ["GENERATED_SECRETS_PATH"])
+runtime_env = parse_env_file(os.environ["RUNTIME_ENV_PATH"])
+server_env = parse_env_file(os.environ["SERVER_ENV_PATH"])
+web_env = parse_env_file(os.environ["WEB_ENV_PATH"])
+convex_env = parse_env_file(os.environ["CONVEX_ENV_PATH"])
+generated = parse_env_file(os.environ["GENERATED_SECRETS_PATH"])
 
 convex_deployment = convex_env.get("CONVEX_DEPLOYMENT", "prod:replace-me")
 convex_url = convex_env.get("CONVEX_URL", "https://replace-me.convex.cloud")
@@ -84,17 +64,17 @@ server_env["RUNTIME_INGRESS_SECRET"] = runtime_env["RUNTIME_INGRESS_SECRET"]
 server_env["AGENTCHAT_CONVEX_SITE_URL"] = convex_site_url
 web_env["NEXT_PUBLIC_CONVEX_URL"] = convex_url
 
-write_env(
+write_env_file(
     os.environ["RUNTIME_ENV_PATH"],
     runtime_env,
     "# Host-managed Convex runtime env for the stable Agentchat install",
 )
-write_env(
+write_env_file(
     os.environ["SERVER_ENV_PATH"],
     server_env,
     "# Host-managed server env for the stable Agentchat install",
 )
-write_env(
+write_env_file(
     os.environ["WEB_ENV_PATH"],
     web_env,
     "# Host-managed web env for the stable Agentchat install",

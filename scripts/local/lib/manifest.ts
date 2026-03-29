@@ -20,6 +20,7 @@ import type {
 } from "./model.ts";
 import {
     hashShort,
+    isRecord,
     nowIso,
     readJsonIfExists,
     sanitizeLabel,
@@ -33,7 +34,29 @@ export function resolveManifestPath(checkoutPath = process.cwd()): string {
 export function loadLocalManifest(
     checkoutPath = process.cwd(),
 ): LocalManifest | null {
-    return readJsonIfExists<LocalManifest>(resolveManifestPath(checkoutPath));
+    const manifestPath = resolveManifestPath(checkoutPath);
+    const value = readJsonIfExists<LocalManifest>(manifestPath);
+    if (!value) {
+        return null;
+    }
+    if (
+        !isRecord(value) ||
+        value.manifestVersion !== 1 ||
+        typeof value.laneId !== "string" ||
+        typeof value.checkoutPath !== "string" ||
+        typeof value.webPort !== "number" ||
+        typeof value.serverPort !== "number" ||
+        !isRecord(value.generatedFiles) ||
+        typeof value.generatedFiles.webEnvPath !== "string" ||
+        typeof value.generatedFiles.serverEnvPath !== "string" ||
+        typeof value.generatedFiles.serverConfigPath !== "string" ||
+        !isRecord(value.managedEnv) ||
+        !isRecord(value.managedEnv.web) ||
+        !isRecord(value.managedEnv.server)
+    ) {
+        throw new Error(`Invalid local manifest at ${manifestPath}.`);
+    }
+    return value;
 }
 
 export function saveLocalManifest(manifest: LocalManifest): void {

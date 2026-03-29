@@ -293,7 +293,7 @@ Migration strategy:
 
 Requirements:
 
-- `dev` must read `PORT` and `HOST` from env, defaulting to `4040` and `0.0.0.0`
+- `dev` must read `PORT` and `HOST` from env, defaulting to `4040` and `127.0.0.1`
 - `start` must also accept generated stable-install `PORT` and `HOST`
 - `build`, `health`, `lint`, `typecheck`, and `test` remain unchanged
 

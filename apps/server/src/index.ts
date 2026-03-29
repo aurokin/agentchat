@@ -54,7 +54,7 @@ const httpFetch = createFetchHandler({
     modelCatalog,
 });
 
-const host = process.env.HOST?.trim() || "0.0.0.0";
+const host = process.env.HOST?.trim() || "127.0.0.1";
 const configuredPort = Number.parseInt(process.env.PORT?.trim() || "", 10);
 const port =
     Number.isFinite(configuredPort) && configuredPort > 0

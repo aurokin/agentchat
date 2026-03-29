@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import net from "node:net";
 import path from "node:path";
@@ -67,6 +68,22 @@ function toDeploymentName(value: string | undefined): string | null {
 
     const separator = trimmed.indexOf(":");
     return separator === -1 ? trimmed : trimmed.slice(separator + 1);
+}
+
+function normalizeManagedHost(value: string | undefined): string {
+    const trimmed = value?.trim();
+    if (!trimmed || trimmed === "0.0.0.0") {
+        return "127.0.0.1";
+    }
+    return trimmed;
+}
+
+function normalizeManagedSecret(value: string | undefined): string | null {
+    const trimmed = value?.trim();
+    if (!trimmed || trimmed === "replace-me") {
+        return null;
+    }
+    return trimmed;
 }
 
 function parseJsonObject(absPath: string): Record<string, unknown> | null {
@@ -195,7 +212,7 @@ function buildManagedWebEnv(params: {
     existingWebEnv: Record<string, string | undefined>;
 }): ManagedWebEnv {
     return {
-        host: params.existingWebEnv.HOST?.trim() || "0.0.0.0",
+        host: normalizeManagedHost(params.existingWebEnv.HOST),
         nextPublicConvexUrl:
             params.existingWebEnv.NEXT_PUBLIC_CONVEX_URL ??
             params.convexCloudUrl,
@@ -209,17 +226,19 @@ function buildManagedServerEnv(params: {
     existingServerEnv: Record<string, string | undefined>;
 }): ManagedServerEnv {
     return {
-        host: params.existingServerEnv.HOST?.trim() || "0.0.0.0",
+        host: normalizeManagedHost(params.existingServerEnv.HOST),
         backendTokenSecret:
-            params.existingServerEnv.BACKEND_TOKEN_SECRET?.trim() ||
-            "replace-me",
+            normalizeManagedSecret(
+                params.existingServerEnv.BACKEND_TOKEN_SECRET,
+            ) || randomBytes(24).toString("base64url"),
         agentchatConvexSiteUrl:
             params.existingServerEnv.AGENTCHAT_CONVEX_SITE_URL?.trim() ||
             params.convexSiteUrl ||
             "https://example.convex.site",
         runtimeIngressSecret:
-            params.existingServerEnv.RUNTIME_INGRESS_SECRET?.trim() ||
-            "replace-me",
+            normalizeManagedSecret(
+                params.existingServerEnv.RUNTIME_INGRESS_SECRET,
+            ) || randomBytes(24).toString("base64url"),
     };
 }
 

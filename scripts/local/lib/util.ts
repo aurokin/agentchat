@@ -6,6 +6,10 @@ export function nowIso(): string {
     return new Date().toISOString();
 }
 
+export function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 export function repoRootPath(...parts: string[]): string {
     return path.join(process.cwd(), ...parts);
 }

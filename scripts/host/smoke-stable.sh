@@ -48,22 +48,16 @@ trap 'rm -f "$web_headers"' EXIT
 curl -fsS -D "$web_headers" -o /dev/null "$AGENTCHAT_STABLE_WEB_URL/chat"
 
 SITE_URL="$(
-    CONVEX_RUNTIME_ENV_PATH="$AGENTCHAT_STABLE_CONVEX_RUNTIME_ENV_PATH" python3 - <<'PYENV'
-from pathlib import Path
+    CONVEX_RUNTIME_ENV_PATH="$AGENTCHAT_STABLE_CONVEX_RUNTIME_ENV_PATH" \
+    HOST_HELPER_DIR="$AGENTCHAT_HOST_HELPER_DIR" \
+    python3 - <<'PYENV'
 import os
+import sys
 
-path = Path(os.environ["CONVEX_RUNTIME_ENV_PATH"])
-value = ""
-if path.exists():
-    for raw_line in path.read_text().splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, val = line.split("=", 1)
-        if key.strip() == "SITE_URL":
-            value = val.strip()
-            break
-print(value)
+sys.path.append(os.environ["HOST_HELPER_DIR"])
+from envfile import parse_env_file
+
+print(parse_env_file(os.environ["CONVEX_RUNTIME_ENV_PATH"]).get("SITE_URL", ""))
 PYENV
 )"
 
