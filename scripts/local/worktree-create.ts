@@ -124,7 +124,9 @@ async function main(): Promise<void> {
                 });
             }
         }
-        cleanupFailedWorktreeState(targetPath);
+        if (created) {
+            cleanupFailedWorktreeState(targetPath);
+        }
         throw error;
     }
 
