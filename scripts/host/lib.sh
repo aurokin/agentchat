@@ -705,18 +705,20 @@ PY
     if [[ -n "$pid" ]] && service_pid_running "$service"; then
         owned=1
     fi
-    rm -f "$pidfile"
     if [[ -z "$pid" ]] || [[ "$owned" -ne 1 ]]; then
+        rm -f "$pidfile"
         return 0
     fi
     kill -TERM -- "-${pgid:-$pid}" 2>/dev/null || kill -TERM "$pid" 2>/dev/null || true
     for _ in $(seq 1 25); do
         if ! service_pid_running "$service"; then
+            rm -f "$pidfile"
             return 0
         fi
         sleep 0.2
     done
     kill -KILL -- "-${pgid:-$pid}" 2>/dev/null || kill -KILL "$pid" 2>/dev/null || true
+    rm -f "$pidfile"
 }
 
 require_stable_checkout() {

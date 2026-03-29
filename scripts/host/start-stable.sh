@@ -12,18 +12,35 @@ render_and_register_stable_checkout
 server_host="$(stable_service_host server)"
 web_host="$(stable_service_host web)"
 
-ensure_port_available "$server_host" "$AGENTCHAT_STABLE_SERVER_PORT" server
-ensure_port_available "$web_host" "$AGENTCHAT_STABLE_WEB_PORT" web
+server_running=0
+web_running=0
+
+if service_pid_running server; then
+    server_running=1
+else
+    ensure_port_available "$server_host" "$AGENTCHAT_STABLE_SERVER_PORT" server
+fi
+
+if service_pid_running web; then
+    web_running=1
+else
+    ensure_port_available "$web_host" "$AGENTCHAT_STABLE_WEB_PORT" web
+fi
 
 cleanup() {
     "$AGENTCHAT_HOST_SCRIPT_DIR/stop-stable.sh" >/dev/null 2>&1 || true
 }
 trap cleanup ERR
 
-start_stable_service server bun run --cwd apps/server start
-wait_for_port "$server_host" "$AGENTCHAT_STABLE_SERVER_PORT" 30
-start_stable_service web bun run --cwd apps/web start
-wait_for_port "$web_host" "$AGENTCHAT_STABLE_WEB_PORT" 30
+if [[ "$server_running" -ne 1 ]]; then
+    start_stable_service server bun run --cwd apps/server start
+    wait_for_port "$server_host" "$AGENTCHAT_STABLE_SERVER_PORT" 30
+fi
+
+if [[ "$web_running" -ne 1 ]]; then
+    start_stable_service web bun run --cwd apps/web start
+    wait_for_port "$web_host" "$AGENTCHAT_STABLE_WEB_PORT" 30
+fi
 trap - ERR
 
 echo "Stable services started."
