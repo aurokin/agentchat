@@ -359,6 +359,7 @@ export async function startManagedServices(
 
     const sessionId = `${manifest.laneId}-${Date.now()}`;
     const startedServices: ManagedService[] = [];
+    let pendingService: ManagedService | null = null;
 
     try {
         for (const service of ["server", "web"] as const) {
@@ -378,6 +379,23 @@ export async function startManagedServices(
             const pid = subprocess.pid;
             const port = portForService(manifest, service);
             const readinessHost = readinessHostForService(manifest, service);
+            pendingService = {
+                laneId: manifest.laneId,
+                laneType: manifest.laneType,
+                sessionId,
+                service,
+                checkoutPath: manifest.checkoutPath,
+                cwd: manifest.checkoutPath,
+                pid,
+                pgid: pid,
+                command,
+                processStartToken: readProcessSnapshot(pid)?.startToken ?? null,
+                logPath,
+                ports: [port],
+                state: "running",
+                startedAt: nowIso(),
+                updatedAt: nowIso(),
+            };
             await Promise.race([
                 waitForPort(readinessHost, port, START_TIMEOUT_MS).then(
                     (ready) => {
@@ -397,29 +415,17 @@ export async function startManagedServices(
                 subprocess.unref();
             });
 
-            const record: ManagedService = {
-                laneId: manifest.laneId,
-                laneType: manifest.laneType,
-                sessionId,
-                service,
-                checkoutPath: manifest.checkoutPath,
-                cwd: manifest.checkoutPath,
-                pid,
-                pgid: pid,
-                command,
-                processStartToken: readProcessSnapshot(pid)?.startToken ?? null,
-                logPath,
-                ports: [port],
-                state: "running",
-                startedAt: nowIso(),
-                updatedAt: nowIso(),
-            };
+            const record = pendingService;
             updateProcessRegistry((registry) =>
                 upsertManagedService(registry, record),
             );
             startedServices.push(record);
+            pendingService = null;
         }
     } catch (error) {
+        if (pendingService) {
+            await terminateServiceProcess(pendingService);
+        }
         for (const service of startedServices) {
             await terminateServiceProcess(service);
         }

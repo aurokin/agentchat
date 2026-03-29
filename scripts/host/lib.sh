@@ -132,6 +132,25 @@ stable_service_envfile() {
     esac
 }
 
+stable_service_host() {
+    local service="$1"
+    local envfile
+    envfile="$(stable_service_envfile "$service")" || return 1
+    HOST_ENVFILE="$envfile" HOST_HELPER_DIR="$AGENTCHAT_HOST_HELPER_DIR" DEFAULT_HOST="$AGENTCHAT_STABLE_DEFAULT_HOST" python3 - <<'PY'
+import os
+import sys
+
+sys.path.append(os.environ["HOST_HELPER_DIR"])
+from envfile import parse_env_file
+
+value = parse_env_file(os.environ["HOST_ENVFILE"]).get("HOST", "").strip()
+if value in ("", "0.0.0.0", "127.0.0.1", "localhost", "::", "::0"):
+    print(os.environ["DEFAULT_HOST"])
+else:
+    print(value)
+PY
+}
+
 ensure_stable_dirs() {
     mkdir -p \
         "$AGENTCHAT_STABLE_LOG_DIR" \
