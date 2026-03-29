@@ -151,6 +151,18 @@ else:
 PY
 }
 
+stable_probe_host() {
+    local host="${1:-}"
+    case "$host" in
+        ""|"0.0.0.0"|"127.0.0.1"|"localhost"|"::"|"::0")
+            printf '%s\n' "127.0.0.1"
+            ;;
+        *)
+            printf '%s\n' "$host"
+            ;;
+    esac
+}
+
 ensure_stable_dirs() {
     mkdir -p \
         "$AGENTCHAT_STABLE_LOG_DIR" \
@@ -239,7 +251,7 @@ def resolve_host(value: str | None, default_host: str) -> str:
     if value is None:
         return default_host
     trimmed = value.strip()
-    return default_host if not trimmed or trimmed in {"0.0.0.0", "127.0.0.1"} else trimmed
+    return default_host if not trimmed or trimmed in {"0.0.0.0", "127.0.0.1", "localhost"} else trimmed
 
 checkout = Path(os.environ['CHECKOUT_PATH'])
 web_source = parse_env_file(os.environ['WEB_ENV_SOURCE'])

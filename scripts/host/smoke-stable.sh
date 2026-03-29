@@ -41,11 +41,18 @@ fi
 
 "$AGENTCHAT_HOST_SCRIPT_DIR/doctor-stable.sh"
 
-server_health="$(curl -fsS "$AGENTCHAT_STABLE_SERVER_URL/health")"
-bootstrap_payload="$(curl -fsS "$AGENTCHAT_STABLE_SERVER_URL/api/bootstrap")"
+server_bind_host="$(stable_service_host server)"
+web_bind_host="$(stable_service_host web)"
+server_probe_host="$(stable_probe_host "$server_bind_host")"
+web_probe_host="$(stable_probe_host "$web_bind_host")"
+server_probe_url="http://${server_probe_host}:${AGENTCHAT_STABLE_SERVER_PORT}"
+web_probe_url="http://${web_probe_host}:${AGENTCHAT_STABLE_WEB_PORT}"
+
+server_health="$(curl -fsS "$server_probe_url/health")"
+bootstrap_payload="$(curl -fsS "$server_probe_url/api/bootstrap")"
 web_headers="$(mktemp)"
 trap 'rm -f "$web_headers"' EXIT
-curl -fsS -D "$web_headers" -o /dev/null "$AGENTCHAT_STABLE_WEB_URL/chat"
+curl -fsS -D "$web_headers" -o /dev/null "$web_probe_url/chat"
 
 SITE_URL="$(
     CONVEX_RUNTIME_ENV_PATH="$AGENTCHAT_STABLE_CONVEX_RUNTIME_ENV_PATH" \
@@ -87,6 +94,6 @@ if [[ -n "$SITE_URL" ]]; then
     echo "OK site-url: $SITE_URL"
 fi
 
-echo "OK local-web: $AGENTCHAT_STABLE_WEB_URL/chat"
-echo "OK local-server: $AGENTCHAT_STABLE_SERVER_URL/health"
+echo "OK local-web: $web_probe_url/chat"
+echo "OK local-server: $server_probe_url/health"
 echo "Stable smoke passed."
