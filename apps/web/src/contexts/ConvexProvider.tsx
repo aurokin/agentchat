@@ -1,10 +1,9 @@
 "use client";
 
-import { ConvexReactClient } from "convex/react";
-import { ConvexAuthProvider } from "@convex-dev/auth/react";
-import { createContext, useContext, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { ConvexAuthNextjsProvider } from "@convex-dev/auth/nextjs";
 import { isConvexConfigured, getConvexUrl } from "@/lib/workspace/config";
+import { ConvexReactClient } from "convex/react";
+import { createContext, useContext, type ReactNode } from "react";
 
 interface ConvexAvailabilityContextType {
     isAvailable: boolean;
@@ -65,15 +64,10 @@ function AuthAwareConvexProvider({
     client: ConvexReactClient;
     children: ReactNode;
 }) {
-    const router = useRouter();
-
     return (
-        <ConvexAuthProvider
-            client={client}
-            replaceURL={(url) => router.replace(url)}
-        >
+        <ConvexAuthNextjsProvider client={client}>
             {children}
-        </ConvexAuthProvider>
+        </ConvexAuthNextjsProvider>
     );
 }
 

@@ -1,5 +1,6 @@
+import { convexAuthNextjsMiddleware } from "@convex-dev/auth/nextjs/server";
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import type { NextFetchEvent, NextRequest } from "next/server";
 
 // Only enforce security headers outside local development (`next dev`).
 const isProduction = process.env.NODE_ENV === "production";
@@ -17,7 +18,19 @@ function createNonce(): string {
     return btoa(binary);
 }
 
-function applyCommonSecurityHeaders(response: NextResponse): void {
+function isSecureRequest(request: NextRequest): boolean {
+    const forwardedProto = request.headers.get("x-forwarded-proto");
+    if (forwardedProto) {
+        return forwardedProto.split(",")[0]?.trim() === "https";
+    }
+
+    return request.nextUrl.protocol === "https:";
+}
+
+function applyCommonSecurityHeaders(
+    response: NextResponse,
+    options: { secureRequest: boolean },
+): void {
     response.headers.set("X-Content-Type-Options", "nosniff");
     response.headers.set("Referrer-Policy", "no-referrer");
     response.headers.set("X-Frame-Options", "DENY");
@@ -34,25 +47,18 @@ function applyCommonSecurityHeaders(response: NextResponse): void {
         "camera=(self), microphone=(self), geolocation=(), payment=(), usb=(), browsing-topics=()",
     );
 
-    // HSTS is only respected by browsers over HTTPS and ignored over HTTP.
-    response.headers.set(
-        "Strict-Transport-Security",
-        "max-age=31536000; includeSubDomains",
-    );
+    if (options.secureRequest) {
+        response.headers.set(
+            "Strict-Transport-Security",
+            "max-age=31536000; includeSubDomains",
+        );
+    }
 }
 
-export function middleware(request: NextRequest) {
-    if (!isProduction) {
-        return NextResponse.next();
-    }
-
-    let cspValue: string | null = null;
-    const requestHeaders = new Headers(request.headers);
-
+function buildContentSecurityPolicy(request: NextRequest): string {
+    const secureRequest = isSecureRequest(request);
     const nonce = createNonce();
-
     const scriptSrc = ["'self'", `'nonce-${nonce}'`].join(" ");
-
     const csp: string[] = [
         "default-src 'self'",
         `script-src ${scriptSrc}`,
@@ -66,15 +72,24 @@ export function middleware(request: NextRequest) {
         "form-action 'self'",
         "worker-src 'self' blob:",
         "manifest-src 'self'",
-        "upgrade-insecure-requests",
     ];
 
-    cspValue = csp.join("; ");
+    if (secureRequest) {
+        csp.push("upgrade-insecure-requests");
+    }
 
-    // Next.js App Router can automatically nonce its own inline scripts if it can
-    // extract a nonce from the *request* CSP header. So we set CSP on both the
-    // request (for Next) and response (for the browser).
-    requestHeaders.set("content-security-policy", cspValue);
+    return csp.join("; ");
+}
+
+const authMiddleware = convexAuthNextjsMiddleware((request) => {
+    const requestHeaders = new Headers(request.headers);
+    const cspValue = isProduction ? buildContentSecurityPolicy(request) : null;
+
+    if (cspValue) {
+        // Next.js App Router can automatically nonce its own inline scripts if it can
+        // extract a nonce from the request CSP header.
+        requestHeaders.set("content-security-policy", cspValue);
+    }
 
     const response = NextResponse.next({
         request: {
@@ -82,13 +97,21 @@ export function middleware(request: NextRequest) {
         },
     });
 
-    applyCommonSecurityHeaders(response);
+    if (!isProduction) {
+        return response;
+    }
 
+    const secureRequest = isSecureRequest(request);
+    applyCommonSecurityHeaders(response, { secureRequest });
     if (cspValue) {
         response.headers.set("Content-Security-Policy", cspValue);
     }
 
     return response;
+});
+
+export function middleware(request: NextRequest, event: NextFetchEvent) {
+    return authMiddleware(request, event);
 }
 
 export const config = {

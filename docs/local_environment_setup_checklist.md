@@ -1,200 +1,170 @@
-# Local Development Setup
+# Local Environment Migration And Advanced Setup
 
-Goal: get Agentchat running locally for development.
+Use [local-modes.md](./local-modes.md) first.
 
-Agentchat runs against Convex plus a local Agentchat backend server.
+This document is now the migration and advanced-reference companion for the local wrapper workflow. It exists for cases where you need to understand the underlying Convex, auth, fixture, or mobile setup in more detail.
 
-## 1) Local-Only (Fast Path)
+## Wrapper-First Baseline
 
-1A) Install dependencies:
+Prepare the current checkout with:
 
 ```bash
 bun install
+bun run bootstrap
+bun run status
+bun run doctor
 ```
 
-1B) Start the web dev server:
+If you need a disposable worktree for parallel work, create it from the current checkout with:
 
 ```bash
-cd apps/web && bun dev
+bun run worktree:create -- <name>
 ```
 
-1C) Open the app:
+This creates a sibling checkout under the repo parent directory. It refuses to run from a dirty source checkout unless you pass `--allow-dirty`, because uncommitted changes are not copied into git worktrees.
 
-- `http://localhost:4040`
+If you need a live local web/server stack for this checkout, use:
 
-1D) If the local workspace uses `AGENTCHAT_AUTH_MODE=google`, sign in with an allowed Google account. If it uses `local`, sign in with a seeded local user such as `smoke_1`.
+```bash
+bun run dev
+```
 
-## 2) Optional: Local Dev With Convex
+Then stop it with:
 
-Only do this if you need to develop against a real Convex workspace. Otherwise, stick to Step 1.
+```bash
+bun run stop
+```
 
-2A) Manual step: create or choose a Convex dev deployment for local development.
+When the disposable worktree is no longer needed, remove it from the source checkout with:
 
-Notes:
+```bash
+bun run worktree:remove -- <name>
+```
 
-- The web app runs at `http://localhost:4040` in this repo.
-- The app needs the Convex **client URL** (`*.convex.cloud`) at runtime.
-- Convex Auth and HTTP actions use the Convex **site URL** (`*.convex.site`).
+If you intentionally edit generated checkout-local files and want to keep those values:
 
-2B) Create a gitignored Convex runtime env file in the repo root:
+```bash
+bun run bootstrap --adopt
+```
 
-- Copy `./.env.convex.local.example` to `./.env.convex.local`
-- Fill in:
+If you want to replace drifted generated files from the current manifest:
+
+```bash
+bun run bootstrap --force
+```
+
+## Host-Level Config
+
+Recommended host layout:
+
+- `~/.config/agentchat/config.json`
+- `~/.config/agentchat/dev/convex.env`
+- `~/.config/agentchat/stable/web.env`
+- `~/.config/agentchat/stable/server.env`
+- `~/.config/agentchat/stable/convex.env`
+- `~/.config/agentchat/stable/server-config.json`
+- `~/.config/agentchat/stable/convex-runtime.env`
+
+Example host config:
+
+- [agentchat-host-config.example.json](./examples/agentchat-host-config.example.json)
+
+The wrapper currently uses the host-configured shared dev Convex env path during `bootstrap`. Stable host scripts now read the stable env and server-config files from this same host-level layout.
+If this host needs LAN-reachable bindings, set `dev.defaultHost` and `stable.defaultHost` in `config.json` instead of editing generated `.env.local` files by hand.
+
+Stable Convex deployment secrets now have an operator workflow too:
+
+```bash
+scripts/host/generate-stable-convex-env.sh
+scripts/host/apply-stable-convex-env.sh
+scripts/host/smoke-stable.sh
+scripts/host/install-stable-user-service.sh --enable-now
+```
+
+`generate-stable-convex-env.sh` creates or refreshes `~/.config/agentchat/stable/convex-runtime.env`, generates shared secrets when needed, and syncs the stable server/web host env files. `apply-stable-convex-env.sh` pushes that runtime env into the configured production Convex deployment.
+
+The current stable host installation is expected to run from a dedicated checkout with:
+
+- host-managed files under `~/.config/agentchat/stable/`
+- lifecycle driven by `scripts/host/*.sh`
+- LAN HTTPS served by local Caddy
+- current LAN entrypoint `https://bront.home.arpa:4043`
+
+## Manual Convex Setup
+
+Do this only if you need a real local/dev Convex workspace.
+
+1. Create or choose a dev Convex deployment.
+2. Create `~/.config/agentchat/dev/convex.env`.
+3. Set:
     - `CONVEX_DEPLOYMENT=dev:<your-deployment>`
-    - `AGENTCHAT_AUTH_MODE=google` or `AGENTCHAT_AUTH_MODE=local`
-    - `AUTH_GOOGLE_ID=...` and `AUTH_GOOGLE_SECRET=...` only if auth mode is `google`
-    - `JWKS=...`, `JWT_PRIVATE_KEY=...`
-    - `BACKEND_TOKEN_SECRET=...`
-    - `RUNTIME_INGRESS_SECRET=...`
-
-2C) Generate Convex Auth secrets and paste them into `./.env.convex.local`:
+4. Copy `.env.convex.local.example` to `.env.convex.local` only if you still need the legacy repo-root Convex helper flow.
+5. Generate local Convex auth secrets if needed:
 
 ```bash
 bun run convex:gen-secrets
 ```
 
-2D) Apply the Convex runtime env vars to that dev deployment (safe to run repeatedly):
+6. Apply the Convex runtime env vars:
 
 ```bash
 bun run convex:env
 ```
 
-2E) Configure the Convex CLI target for local `convex dev` + codegen:
+7. Copy `packages/convex/.env.example` to `packages/convex/.env.local` only if you need direct Convex CLI usage in this checkout.
 
-- Copy `packages/convex/.env.example` to `packages/convex/.env.local`
-- Set:
-    - `CONVEX_DEPLOYMENT=dev:<your-deployment>`
-
-2F) Configure the local web app runtime to point at your Convex workspace:
-
-- Copy `apps/web/.env.example` to `apps/web/.env.local`
-- Set:
-    - `NEXT_PUBLIC_CONVEX_URL=https://<your-deployment>.convex.cloud`
-
-2G) Configure the local Agentchat backend server runtime:
-
-- Copy `apps/server/.env.example` to `apps/server/.env.local`
-- Set:
-    - `BACKEND_TOKEN_SECRET=<same value you set in Convex>`
-    - `AGENTCHAT_CONVEX_SITE_URL=https://<your-deployment>.convex.site`
-    - `RUNTIME_INGRESS_SECRET=<same value you set in Convex>`
-
-Optional shortcut for the dedicated local test fixtures:
+8. Re-run wrapper bootstrap so the checkout-local web/server files pick up the current Convex values:
 
 ```bash
-bun run setup:test-agent-config
+bun run bootstrap --adopt
 ```
 
-This writes `apps/server/agentchat.config.json` pointing at:
+## Dedicated Local Fixture Config
 
-- `~/agents/agentchat_test/smoke`
-- `~/agents/agentchat_test`
-- `~/agents/agentchat_test/workspace`
-
-By default, this generated config uses local seeded users:
+If you want the built-in low-token fixtures instead of the default current-checkout agent:
 
 ```bash
 bun run setup:test-agent-config -- --force
+bun run bootstrap --adopt
+```
+
+For local seeded users:
+
+```bash
 bun run setup:local-smoke-users
 ```
 
-Or run the combined helper:
+Or use the combined helper:
 
 ```bash
 bun run setup:local-auth-smoke
+bun run bootstrap --adopt
 ```
 
-That combined helper also generates missing Convex auth secrets locally and applies them to the active deployment before seeding `smoke_1` and `smoke_2`.
+## Manual Runtime Validation
 
-Re-run with `--force` only if you want to replace an existing local config:
-
-```bash
-bun run setup:test-agent-config -- --force
-```
-
-2H) Start local development (Convex + backend server + web):
-
-```bash
-bun run dev:web
-```
-
-2I) Validate the configured agents, provider runtime paths, and live Codex model access before a manual confidence pass:
+Before a deliberate manual confidence pass, validate the runtime surfaces:
 
 ```bash
 bun run --cwd packages/convex codegen
 bun run doctor:server
 ```
 
-`bun run doctor:server` now also reports whether the local `apps/server` runtime has the required env values for backend token verification and Convex runtime persistence.
+## Mobile
 
-2J) Manual step (only if needed and only when auth mode is `google`): fix Google OAuth redirect URI.
+Mobile is not part of the first parallel-workflow wrapper slice.
 
-- If sign-in fails with `Error 400: redirect_uri_mismatch`, add this Authorized redirect URI to the OAuth client matching `AUTH_GOOGLE_ID`:
-    - `https://<your-deployment>.convex.site/api/auth/callback/google`
+If you need it anyway:
 
-## 3) Optional: Local Mobile Development
+1. Create `apps/mobile/.env` from `apps/mobile/.env.example`.
+2. Set:
+    - `EXPO_PUBLIC_CONVEX_URL=https://<your-deployment>.convex.cloud`
+    - `EXPO_PUBLIC_AGENTCHAT_SERVER_URL=http://<your-local-server-host>:3030`
 
-Only do this if you want to exercise the current mobile app alongside the web/server stack.
+Then use the existing mobile launchers directly.
 
-3A) Prerequisites:
+## Google Redirect Note
 
-- Expo tooling
-- Android Studio or a physical Android device
-- Xcode only if you are on macOS and need iOS simulator or local native iOS builds
+If Google sign-in fails with `redirect_uri_mismatch`, add this redirect URI to the OAuth client that matches `AUTH_GOOGLE_ID`:
 
-3B) Create `apps/mobile/.env` from `apps/mobile/.env.example`.
-
-Set:
-
-- `EXPO_PUBLIC_CONVEX_URL=https://<your-deployment>.convex.cloud`
-- `EXPO_PUBLIC_AGENTCHAT_SERVER_URL=http://<your-local-server-host>:3030`
-
-3C) Best-effort iPhone path from Linux: Expo Go over LAN.
-
-```bash
-bun run dev:mobile:expo-go
-```
-
-Then scan the QR code in Expo Go on the iPhone.
-
-Use a reachable LAN host for `EXPO_PUBLIC_AGENTCHAT_SERVER_URL`; do not leave it at `localhost` when testing from another device.
-
-If Expo Go reports that the project is incompatible with the installed Expo Go release, switch to an EAS development build instead:
-
-```bash
-cd apps/mobile && bun run ios:eas-register-device
-cd apps/mobile && bun run ios:eas-device
-```
-
-Then start Metro for the installed development build:
-
-```bash
-cd apps/mobile && bun run dev-client
-```
-
-This now starts the Expo development client in LAN mode so a physical iPhone can reach Metro directly.
-
-3D) Start a native mobile build:
-
-```bash
-cd apps/mobile && bun run android
-```
-
-or
-
-```bash
-cd apps/mobile && bun run ios
-```
-
-3E) For development client workflows:
-
-```bash
-cd apps/mobile && bun run dev-client
-```
-
-3F) Current expectation:
-
-- Mobile follows the same backend-driven runtime model as web.
-- Mobile is still catching up to web in a few UX and parity areas.
-- Use `docs/agentchat/mobile-followup.md` for the remaining mobile work list.
-- Use `docs/agentchat/mobile-integration-testing.md` for the supported-platform testing boundaries.
+- `https://<your-deployment>.convex.site/api/auth/callback/google`

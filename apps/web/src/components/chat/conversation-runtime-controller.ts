@@ -40,7 +40,10 @@ export type {
 };
 
 type MessageUpdate = Partial<
-    Pick<Message, "content" | "contextContent" | "reasoning">
+    Pick<
+        Message,
+        "content" | "contextContent" | "reasoning" | "status" | "kind"
+    >
 >;
 
 export type ConversationSendRuntimeDependencies = {
@@ -84,6 +87,11 @@ export type ConversationSendRuntimeResult =
           assistantMessageId: string | null;
       };
 
+export type PendingConversationSendTarget = {
+    conversationId: string;
+    agentId: string;
+} | null;
+
 export function connectConversationSocket(params: {
     currentChat: Pick<ChatSession, "id" | "agentId"> | null;
     dependencies: ConversationSocketSessionDependencies;
@@ -101,6 +109,50 @@ export function connectConversationSocket(params: {
     });
 
     return unsubscribe;
+}
+
+export function resolvePendingConversationSendFailure(params: {
+    currentChat: Pick<ChatSession, "id" | "agentId"> | null;
+    activeRun: ActiveRunState | null;
+    pendingSendConversation: PendingConversationSendTarget;
+    errorMessage: string;
+}):
+    | {
+          shouldHandle: true;
+          assistantMessageId: string | null;
+          error: RuntimeErrorState;
+          retryChat: RetryChatState | null;
+      }
+    | {
+          shouldHandle: false;
+      } {
+    const matchesPendingConversation =
+        !!params.currentChat &&
+        !!params.pendingSendConversation &&
+        params.pendingSendConversation.conversationId ===
+            params.currentChat.id &&
+        params.pendingSendConversation.agentId === params.currentChat.agentId;
+    const pendingRun =
+        params.activeRun && params.activeRun.runId === null
+            ? params.activeRun
+            : null;
+
+    if (!pendingRun || !matchesPendingConversation) {
+        return { shouldHandle: false };
+    }
+
+    return {
+        shouldHandle: true,
+        assistantMessageId: pendingRun.assistantMessageId,
+        error: {
+            message: params.errorMessage,
+            isRetryable: true,
+        },
+        retryChat: {
+            content: pendingRun.userContent,
+            contextContent: pendingRun.userContent,
+        },
+    };
 }
 
 export async function runConversationSend(params: {
@@ -146,6 +198,7 @@ export async function runConversationSend(params: {
                 await params.dependencies.updateMessage(assistantMessageId, {
                     content: "",
                     contextContent: "",
+                    status: "errored",
                 });
             } catch {
                 // Preserve the original send error as the surfaced failure.

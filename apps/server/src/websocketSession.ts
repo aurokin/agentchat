@@ -148,12 +148,23 @@ export async function handleConnectedSocketMessage(params: {
             throw new Error("Unsupported websocket command");
         }
 
-        await params.runtimeManager.sendMessage({
-            userId: params.session.userId,
-            subscriberId: params.connectionId,
-            command,
-            sendEvent,
-        });
+        try {
+            await params.runtimeManager.sendMessage({
+                userId: params.session.userId,
+                subscriberId: params.connectionId,
+                command,
+                sendEvent,
+            });
+        } catch (error) {
+            console.error("[agentchat-server] conversation.send failed:", {
+                connectionId: params.connectionId,
+                conversationId: command.payload.conversationId,
+                agentId: command.payload.agentId,
+                assistantMessageId: command.payload.assistantMessageId,
+                error: error instanceof Error ? error.message : String(error),
+            });
+            throw error;
+        }
     } catch (error) {
         params.sendJson(
             toConnectionErrorEvent(

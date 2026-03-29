@@ -1,4 +1,10 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+    mkdirSync,
+    mkdtempSync,
+    rmSync,
+    symlinkSync,
+    writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -155,6 +161,27 @@ describe("configDiagnostics", () => {
         );
         expect(agentDiagnostics.issues).toContain(
             "Agent default provider is disabled; fallback will be used.",
+        );
+    });
+
+    test("reports symlinks inside copy-on-conversation agent roots", () => {
+        const config = createConfig();
+        const sharedSkillRoot = makeTempDir("shared-skill-root");
+        const agentSkillsRoot = path.join(config.agents[0]!.rootPath, "skills");
+        mkdirSync(agentSkillsRoot, { recursive: true });
+        writeFileSync(path.join(sharedSkillRoot, "SKILL.md"), "# skill\n");
+        symlinkSync(
+            sharedSkillRoot,
+            path.join(agentSkillsRoot, "warcraft"),
+            "dir",
+        );
+        config.agents[0]!.workspaceMode = "copy-on-conversation";
+
+        const agentDiagnostics = getAgentDiagnostics(config, config.agents[0]!);
+
+        expect(agentDiagnostics.ready).toBe(false);
+        expect(agentDiagnostics.issues).toContain(
+            "Copy-on-conversation agent root contains symlinks; sandbox copies require real files and directories. First symlink: skills/warcraft.",
         );
     });
 

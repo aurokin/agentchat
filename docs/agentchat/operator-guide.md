@@ -1,6 +1,6 @@
 # Agentchat Operator Guide
 
-This guide is the shortest path from a local Agentchat checkout to a usable self-hosted instance with Codex-backed agents.
+This guide is the shortest path from a local Agentchat checkout to a usable self-hosted instance with Codex-backed agents. For the protected stable installation on a host, use `scripts/host/install-stable.sh`, `scripts/host/doctor-stable.sh`, `scripts/host/smoke-stable.sh`, `scripts/host/start-stable.sh`, `scripts/host/stop-stable.sh`, `scripts/host/update-stable.sh`, `scripts/host/rollback-stable.sh`, `scripts/host/generate-stable-convex-env.sh`, `scripts/host/apply-stable-convex-env.sh`, and `scripts/host/install-stable-user-service.sh`; this document remains focused on repo-local operator setup and verification. The current stable host install is running behind local Caddy at `https://bront.home.arpa:4043`. For day-2 host operations, use the dedicated [Stable Host Runbook](./stable-host-runbook.md).
 
 ## Scope
 
@@ -16,6 +16,7 @@ This guide assumes:
 - you are using the current Codex-first architecture
 - Convex is configured for conversation persistence and a valid instance access path
 - `apps/server` runs locally on the same machine that has access to the agent workspaces
+- you have already prepared the current checkout with `bun run bootstrap`
 
 Required shared secrets:
 
@@ -50,6 +51,8 @@ Each agent has a `workspaceMode` setting:
 
 Use `"shared"` when all users should see the same workspace state. Use `"copy-on-conversation"` when each conversation needs an isolated copy of the codebase.
 
+`"copy-on-conversation"` roots must not contain symlinks. Agentchat copies those trees into managed sandboxes and now fails fast in `doctor:server` when a copy-on-conversation root still depends on symlinked files or directories.
+
 The top-level `sandboxRoot` config field controls where copies are stored. It defaults to `~/.agentchat/sandboxes`. The directory structure is `<sandboxRoot>/<agentId>/<conversationId>/`.
 
 Sandbox cleanup happens in two ways:
@@ -69,7 +72,10 @@ If you want the built-in low-token fixtures, generate a ready-made local config:
 
 ```bash
 bun run setup:test-agent-config
+bun run bootstrap --adopt
 ```
+
+The second command folds the fixture config back into the checkout-local wrapper manifest.
 
 That writes a gitignored:
 
@@ -85,6 +91,7 @@ If you already have a local config and want to replace it:
 
 ```bash
 bun run setup:test-agent-config -- --force
+bun run bootstrap --adopt
 ```
 
 By default this helper writes a local auth provider with the seeded smoke-user path. If you want to be explicit or switch to Google auth instead:
@@ -167,22 +174,30 @@ When live model discovery degrades softly, the provider models API now falls bac
 
 ## 5. Start The Local Stack
 
-Web + server + Convex:
+Wrapper-first local preparation:
 
 ```bash
-bun run dev:web
+bun run status
+bun run doctor
 ```
 
-Mobile + Convex:
+Wrapper-owned launcher for the current checkout web/server stack:
 
 ```bash
-bun run dev:mobile
+bun run dev
 ```
 
-If you need the full local stack:
+Stop it with:
 
 ```bash
-bun run dev:all
+bun run stop
+```
+
+Legacy mobile launchers still exist when you need them:
+
+```bash
+bun run legacy:dev:mobile
+bun run legacy:dev:all
 ```
 
 ## 6. Run The Deliberate Confidence Pass

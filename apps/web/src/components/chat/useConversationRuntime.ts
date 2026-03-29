@@ -28,6 +28,7 @@ import {
     connectConversationSocket,
     flushPendingConversationInterrupt,
     requestConversationInterrupt,
+    resolvePendingConversationSendFailure,
     resolveConversationRuntimeSync,
     resolveConversationSocketEvent,
     runConversationSend,
@@ -58,7 +59,10 @@ type UseConversationRuntimeParams = {
     updateMessage: (
         id: string,
         updates: Partial<
-            Pick<Message, "content" | "contextContent" | "reasoning">
+            Pick<
+                Message,
+                "content" | "contextContent" | "reasoning" | "status" | "kind"
+            >
         >,
     ) => Promise<void>;
     patchMessage: (
@@ -234,10 +238,61 @@ export function useConversationRuntime({
         setSending(false);
     }, [clearStreamingMessage]);
 
+    const handlePendingSendFailure = useCallback(
+        (message: string) => {
+            const failure = resolvePendingConversationSendFailure({
+                currentChat: currentChatRef.current
+                    ? {
+                          id: currentChatRef.current.id,
+                          agentId: currentChatRef.current.agentId,
+                      }
+                    : null,
+                activeRun: activeRunRef.current,
+                pendingSendConversation: pendingSendConversationRef.current,
+                errorMessage: message,
+            });
+
+            if (!failure.shouldHandle) {
+                return false;
+            }
+
+            if (failure.assistantMessageId) {
+                patchMessage(failure.assistantMessageId, {
+                    content: "",
+                    contextContent: "",
+                    kind: "assistant_message",
+                    status: "errored",
+                });
+                void updateMessage(failure.assistantMessageId, {
+                    content: "",
+                    contextContent: "",
+                    kind: "assistant_message",
+                    status: "errored",
+                }).catch((persistError) => {
+                    console.error(
+                        "Failed to persist pending send failure state:",
+                        persistError,
+                    );
+                });
+            }
+
+            clearActiveRun();
+            setError(failure.error);
+            setRetryChat(failure.retryChat);
+            return true;
+        },
+        [clearActiveRun, patchMessage, updateMessage],
+    );
+
     const handleSocketEvent = useCallback(
         (event: AgentchatSocketEvent) => {
             if (event.type === "connection.reconnected") {
                 pendingReconnectNoticeRef.current = true;
+                return;
+            }
+
+            if (event.type === "connection.error") {
+                void handlePendingSendFailure(event.payload.message);
                 return;
             }
 
@@ -398,6 +453,7 @@ export function useConversationRuntime({
         },
         [
             clearActiveRun,
+            handlePendingSendFailure,
             insertMessage,
             patchMessage,
             persistActiveAssistantMessage,

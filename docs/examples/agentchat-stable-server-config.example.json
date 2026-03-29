@@ -1,0 +1,79 @@
+{
+    "version": 1,
+    "auth": {
+        "defaultProviderId": "google-main",
+        "providers": [
+            {
+                "id": "google-main",
+                "kind": "google",
+                "enabled": true,
+                "allowlistMode": "email",
+                "allowedEmails": ["operator@example.com"],
+                "allowedDomains": [],
+                "googleHostedDomain": null
+            }
+        ]
+    },
+    "providers": [
+        {
+            "id": "codex-main",
+            "kind": "codex",
+            "label": "Codex Main",
+            "enabled": true,
+            "idleTtlSeconds": 900,
+            "modelCacheTtlSeconds": 300,
+            "models": [
+                {
+                    "id": "gpt-5.4",
+                    "label": "GPT-5.4",
+                    "enabled": true,
+                    "supportsReasoning": true,
+                    "variants": [
+                        {
+                            "id": "low",
+                            "label": "Low",
+                            "enabled": true
+                        },
+                        {
+                            "id": "medium",
+                            "label": "Medium",
+                            "enabled": true
+                        },
+                        {
+                            "id": "high",
+                            "label": "High",
+                            "enabled": true
+                        }
+                    ]
+                }
+            ],
+            "codex": {
+                "command": "codex",
+                "args": ["app-server"],
+                "baseEnv": {},
+                "cwd": "/absolute/path/to/workspace/root"
+            }
+        }
+    ],
+    "agents": [
+        {
+            "id": "primary-workspace",
+            "name": "Primary Workspace",
+            "description": "Stable host-managed workspace exposed by the local Agentchat install.",
+            "avatar": null,
+            "enabled": true,
+            "defaultVisible": true,
+            "visibilityOverrides": [],
+            "rootPath": "/absolute/path/to/workspace/root",
+            "providerIds": ["codex-main"],
+            "defaultProviderId": "codex-main",
+            "defaultModel": "gpt-5.4",
+            "defaultVariant": "medium",
+            "modelAllowlist": [],
+            "variantAllowlist": [],
+            "workspaceMode": "copy-on-conversation",
+            "tags": ["stable"],
+            "sortOrder": 10
+        }
+    ]
+}

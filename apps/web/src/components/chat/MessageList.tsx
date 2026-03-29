@@ -81,6 +81,22 @@ export function resolveMessageRunDisplayState(params: {
     return null;
 }
 
+export function resolveEmptyAssistantDisplayText(message: Message): string {
+    if (message.role !== "assistant") {
+        return "...";
+    }
+
+    if (message.status === "errored") {
+        return "Failed to start reply.";
+    }
+
+    if (message.status === "interrupted") {
+        return "Interrupted before any output.";
+    }
+
+    return "...";
+}
+
 export function MessageList({
     messages,
     sending,
@@ -330,8 +346,15 @@ function MessageItem({
                                     {displayContent}
                                 </ReactMarkdown>
                             ) : (
-                                <span className="text-muted-foreground italic">
-                                    ...
+                                <span
+                                    className={cn(
+                                        "italic",
+                                        message.status === "errored"
+                                            ? "text-error"
+                                            : "text-muted-foreground",
+                                    )}
+                                >
+                                    {resolveEmptyAssistantDisplayText(message)}
                                 </span>
                             )}
                         </div>

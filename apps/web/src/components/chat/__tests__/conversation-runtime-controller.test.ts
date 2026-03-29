@@ -15,6 +15,7 @@ import {
     interruptConversationRun,
     prepareConversationSend,
     requestConversationInterrupt,
+    resolvePendingConversationSendFailure,
     resolveConversationRuntimeSync,
     resolveConversationSocketEvent,
     runConversationSend,
@@ -320,8 +321,12 @@ describe("conversation runtime controller", () => {
     });
 
     test("cleans up the assistant draft when connection setup fails", async () => {
-        const updates: Array<{ id: string; content: string; context: string }> =
-            [];
+        const updates: Array<{
+            id: string;
+            content: string;
+            context: string;
+            status: string | null;
+        }> = [];
         const result = await runConversationSend({
             chat: createChat(),
             messages: [],
@@ -344,6 +349,7 @@ describe("conversation runtime controller", () => {
                         id,
                         content: update.content ?? "",
                         context: update.contextContent ?? "",
+                        status: update.status ?? null,
                     });
                 },
                 queueStreamingMessageUpdate: () => {},
@@ -378,6 +384,7 @@ describe("conversation runtime controller", () => {
                 id: result.assistantMessageId,
                 content: "",
                 context: "",
+                status: "errored",
             },
         ]);
     });
@@ -417,6 +424,60 @@ describe("conversation runtime controller", () => {
         });
 
         expect(calls).toEqual(["queued"]);
+    });
+
+    test("resolves a pending pre-run send failure into retry state", () => {
+        expect(
+            resolvePendingConversationSendFailure({
+                currentChat: { id: "chat-1", agentId: "agent-1" },
+                activeRun: createActiveRun({ runId: null }),
+                pendingSendConversation: {
+                    conversationId: "chat-1",
+                    agentId: "agent-1",
+                },
+                errorMessage: "runtime failed",
+            }),
+        ).toEqual({
+            shouldHandle: true,
+            assistantMessageId: "assistant-1",
+            error: {
+                message: "runtime failed",
+                isRetryable: true,
+            },
+            retryChat: {
+                content: "Hello",
+                contextContent: "Hello",
+            },
+        });
+    });
+
+    test("ignores connection errors when there is no pending send", () => {
+        expect(
+            resolvePendingConversationSendFailure({
+                currentChat: { id: "chat-1", agentId: "agent-1" },
+                activeRun: createActiveRun({ runId: "run-1" }),
+                pendingSendConversation: null,
+                errorMessage: "runtime failed",
+            }),
+        ).toEqual({
+            shouldHandle: false,
+        });
+    });
+
+    test("ignores pending send failures after switching to a different chat", () => {
+        expect(
+            resolvePendingConversationSendFailure({
+                currentChat: { id: "chat-2", agentId: "agent-1" },
+                activeRun: createActiveRun({ runId: null }),
+                pendingSendConversation: {
+                    conversationId: "chat-1",
+                    agentId: "agent-1",
+                },
+                errorMessage: "runtime failed",
+            }),
+        ).toEqual({
+            shouldHandle: false,
+        });
     });
 
     test("flushes a queued interrupt once the run is available", () => {
