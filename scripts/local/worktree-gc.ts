@@ -64,6 +64,30 @@ function isStaleManagedCheckoutPath(params: {
     });
 }
 
+function collectManagedSiblingManifestPaths(params: {
+    worktreeParent: string;
+    stableCheckoutPath: string;
+    activeWorktreePaths: Set<string>;
+}): string[] {
+    if (!fs.existsSync(params.worktreeParent)) {
+        return [];
+    }
+
+    return fs
+        .readdirSync(params.worktreeParent, {
+            withFileTypes: true,
+        })
+        .filter((entry) => entry.isDirectory())
+        .map((entry) => path.resolve(params.worktreeParent, entry.name))
+        .filter((checkoutPath) => checkoutPath !== params.stableCheckoutPath)
+        .filter((checkoutPath) => !params.activeWorktreePaths.has(checkoutPath))
+        .filter((checkoutPath) =>
+            fs.existsSync(
+                path.join(checkoutPath, ".agentchat", "local", "manifest.json"),
+            ),
+        );
+}
+
 async function main(): Promise<void> {
     const dryRun = process.argv.includes("--dry-run");
     const repoRoot = requireRepoRoot();
@@ -82,6 +106,13 @@ async function main(): Promise<void> {
     }
     for (const service of loadProcessRegistry().services) {
         candidateCheckoutPaths.add(path.resolve(service.checkoutPath));
+    }
+    for (const checkoutPath of collectManagedSiblingManifestPaths({
+        worktreeParent,
+        stableCheckoutPath,
+        activeWorktreePaths,
+    })) {
+        candidateCheckoutPaths.add(checkoutPath);
     }
 
     const staleCheckoutPaths = [...candidateCheckoutPaths]
