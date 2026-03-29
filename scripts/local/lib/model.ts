@@ -22,8 +22,10 @@ export type HostConfig = {
     stableCheckoutPath: string;
     dev: {
         convexEnvPath: string;
+        defaultHost: string;
     };
     stable: {
+        defaultHost: string;
         webEnvPath: string;
         serverEnvPath: string;
         convexEnvPath: string;

@@ -70,10 +70,13 @@ function toDeploymentName(value: string | undefined): string | null {
     return separator === -1 ? trimmed : trimmed.slice(separator + 1);
 }
 
-function normalizeManagedHost(value: string | undefined): string {
+function resolveManagedHost(
+    value: string | undefined,
+    defaultHost: string,
+): string {
     const trimmed = value?.trim();
-    if (!trimmed || trimmed === "0.0.0.0") {
-        return "127.0.0.1";
+    if (!trimmed || trimmed === "0.0.0.0" || trimmed === "127.0.0.1") {
+        return defaultHost;
     }
     return trimmed;
 }
@@ -210,9 +213,13 @@ function buildDefaultServerConfig(
 function buildManagedWebEnv(params: {
     convexCloudUrl: string | null;
     existingWebEnv: Record<string, string | undefined>;
+    defaultHost: string;
 }): ManagedWebEnv {
     return {
-        host: normalizeManagedHost(params.existingWebEnv.HOST),
+        host: resolveManagedHost(
+            params.existingWebEnv.HOST,
+            params.defaultHost,
+        ),
         nextPublicConvexUrl:
             params.existingWebEnv.NEXT_PUBLIC_CONVEX_URL ??
             params.convexCloudUrl,
@@ -224,9 +231,13 @@ function buildManagedWebEnv(params: {
 function buildManagedServerEnv(params: {
     convexSiteUrl: string | null;
     existingServerEnv: Record<string, string | undefined>;
+    defaultHost: string;
 }): ManagedServerEnv {
     return {
-        host: normalizeManagedHost(params.existingServerEnv.HOST),
+        host: resolveManagedHost(
+            params.existingServerEnv.HOST,
+            params.defaultHost,
+        ),
         backendTokenSecret:
             normalizeManagedSecret(
                 params.existingServerEnv.BACKEND_TOKEN_SECRET,
@@ -244,6 +255,7 @@ function buildManagedServerEnv(params: {
 
 function buildInitialManifest(): LocalManifest {
     const checkoutPath = process.cwd();
+    const hostConfig = loadHostConfig();
     const convexInputs = loadConvexInputs();
     const existingWebEnv = loadDotEnvIfExists(
         path.join(checkoutPath, "apps/web/.env.local"),
@@ -263,10 +275,12 @@ function buildInitialManifest(): LocalManifest {
         managedWebEnv: buildManagedWebEnv({
             convexCloudUrl: convexInputs.convexCloudUrl,
             existingWebEnv,
+            defaultHost: hostConfig.dev.defaultHost,
         }),
         managedServerEnv: buildManagedServerEnv({
             convexSiteUrl: convexInputs.convexSiteUrl,
             existingServerEnv,
+            defaultHost: hostConfig.dev.defaultHost,
         }),
         serverConfig:
             existingServerConfig ?? buildDefaultServerConfig(checkoutPath),

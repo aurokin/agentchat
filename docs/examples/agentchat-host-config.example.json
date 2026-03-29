@@ -2,12 +2,14 @@
     "version": 1,
     "stableCheckoutPath": "/home/<user>/code/agentchat/stable",
     "dev": {
-        "convexEnvPath": "/home/auro/.config/agentchat/dev/convex.env"
+        "convexEnvPath": "/home/<user>/.config/agentchat/dev/convex.env",
+        "defaultHost": "127.0.0.1"
     },
     "stable": {
-        "webEnvPath": "/home/auro/.config/agentchat/stable/web.env",
-        "serverEnvPath": "/home/auro/.config/agentchat/stable/server.env",
-        "convexEnvPath": "/home/auro/.config/agentchat/stable/convex.env",
-        "serverConfigPath": "/home/auro/.config/agentchat/stable/server-config.json"
+        "defaultHost": "127.0.0.1",
+        "webEnvPath": "/home/<user>/.config/agentchat/stable/web.env",
+        "serverEnvPath": "/home/<user>/.config/agentchat/stable/server.env",
+        "convexEnvPath": "/home/<user>/.config/agentchat/stable/convex.env",
+        "serverConfigPath": "/home/<user>/.config/agentchat/stable/server-config.json"
     }
 }

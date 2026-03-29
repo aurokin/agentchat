@@ -21,8 +21,10 @@ export function getDefaultHostConfig(): HostConfig {
         stableCheckoutPath: STABLE_CHECKOUT_PATH,
         dev: {
             convexEnvPath: HOST_DEV_CONVEX_ENV_PATH,
+            defaultHost: "127.0.0.1",
         },
         stable: {
+            defaultHost: "127.0.0.1",
             webEnvPath: HOST_STABLE_WEB_ENV_PATH,
             serverEnvPath: HOST_STABLE_SERVER_ENV_PATH,
             convexEnvPath: HOST_STABLE_CONVEX_ENV_PATH,
@@ -68,6 +70,8 @@ export function loadHostConfig(): HostConfig {
     }
     for (const [label, value] of [
         ["dev.convexEnvPath", override.dev?.convexEnvPath],
+        ["dev.defaultHost", override.dev?.defaultHost],
+        ["stable.defaultHost", override.stable?.defaultHost],
         ["stable.webEnvPath", override.stable?.webEnvPath],
         ["stable.serverEnvPath", override.stable?.serverEnvPath],
         ["stable.convexEnvPath", override.stable?.convexEnvPath],
@@ -87,8 +91,11 @@ export function loadHostConfig(): HostConfig {
         dev: {
             convexEnvPath:
                 override.dev?.convexEnvPath ?? defaults.dev.convexEnvPath,
+            defaultHost: override.dev?.defaultHost ?? defaults.dev.defaultHost,
         },
         stable: {
+            defaultHost:
+                override.stable?.defaultHost ?? defaults.stable.defaultHost,
             webEnvPath:
                 override.stable?.webEnvPath ?? defaults.stable.webEnvPath,
             serverEnvPath:

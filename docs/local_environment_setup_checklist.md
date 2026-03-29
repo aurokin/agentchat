@@ -70,6 +70,7 @@ Example host config:
 - [agentchat-host-config.example.json](./examples/agentchat-host-config.example.json)
 
 The wrapper currently uses the host-configured shared dev Convex env path during `bootstrap`. Stable host scripts now read the stable env and server-config files from this same host-level layout.
+If this host needs LAN-reachable bindings, set `dev.defaultHost` and `stable.defaultHost` in `config.json` instead of editing generated `.env.local` files by hand.
 
 Stable Convex deployment secrets now have an operator workflow too:
 

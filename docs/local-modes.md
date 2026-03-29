@@ -103,6 +103,7 @@ Example host config:
 Current dev bootstrap behavior:
 
 - reads shared dev Convex input from the host-configured `dev/convex.env` path first
+- respects `dev.defaultHost` and `stable.defaultHost` from `config.json` when generating wrapper-managed env files
 - can still adopt existing repo-local `.env` values during migration
 - renders checkout-local `.env.local` files from the manifest after bootstrap
 
