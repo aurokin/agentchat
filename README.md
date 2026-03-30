@@ -124,7 +124,7 @@ Helpful references:
 
 - `docs/local-modes.md` for the wrapper-first local workflow, including worktree lifecycle wrappers and stable host scripts
 - `docs/local_environment_setup_checklist.md` for host-level layout, stable host-script setup, migration, and advanced manual setup
-- `.github/workflows/manual-wrapper-guardrails.yml` and `.github/workflows/manual-host-guardrails.yml` for manual-only GitHub guardrail runs that exercise the wrapper and stable-host scaffolding without enabling automatic checks yet
+- `.github/workflows/manual-wrapper-guardrails.yml` and `.github/workflows/host-guardrails-manual.yml` for manual-only GitHub guardrail runs that exercise the wrapper and stable-host scaffolding without enabling automatic checks yet
 - `bun run doctor:server` for a deliberate runtime readiness check against the generated server config
 - `bun run setup:test-agent-config` only when you intentionally want the dedicated test fixtures, followed by `bun run bootstrap --adopt`
 

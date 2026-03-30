@@ -37,7 +37,7 @@ The current stable host install is live behind local Caddy on `https://bront.hom
 The repo now also includes manual-only GitHub Actions guardrails:
 
 - `.github/workflows/manual-wrapper-guardrails.yml`
-- `.github/workflows/manual-host-guardrails.yml`
+- `.github/workflows/host-guardrails-manual.yml`
 
 Those workflows are intentionally `workflow_dispatch` only for now. Treat them as explicit confidence tools, not as always-on CI.
 

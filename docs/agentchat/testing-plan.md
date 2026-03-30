@@ -15,7 +15,7 @@ This document records the manual, integration, and end-to-end testing strategy f
 The repo now includes two manual-only GitHub Actions workflows for explicit confidence runs:
 
 - `.github/workflows/manual-wrapper-guardrails.yml`
-- `.github/workflows/manual-host-guardrails.yml`
+- `.github/workflows/host-guardrails-manual.yml`
 
 These stay on `workflow_dispatch` for now. They are meant to exercise the wrapper lifecycle and stable-host scaffolding deliberately, not to run automatically on every push or PR.
 

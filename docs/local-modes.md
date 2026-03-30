@@ -47,7 +47,7 @@ scripts/host/install-stable-user-service.sh --enable-now
 Manual-only GitHub guardrail workflows are also checked in now:
 
 - `.github/workflows/manual-wrapper-guardrails.yml`
-- `.github/workflows/manual-host-guardrails.yml`
+- `.github/workflows/host-guardrails-manual.yml`
 
 They use `workflow_dispatch` only. They are intentionally not enabled as automatic GitHub checks yet.
 
