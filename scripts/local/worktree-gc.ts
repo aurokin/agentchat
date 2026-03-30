@@ -15,6 +15,7 @@ import {
 import {
     listGitWorktrees,
     requireRepoRoot,
+    resolveGitCommonDir,
     resolveWorktreeParent,
 } from "./lib/worktrees.ts";
 
@@ -38,8 +39,32 @@ function laneStateRootsForCheckout(checkoutPath: string): string[] {
 function isManagedSiblingWorktreePath(params: {
     checkoutPath: string;
     worktreeParent: string;
+    repoGitWorktreesDir: string;
 }): boolean {
-    return path.dirname(params.checkoutPath) === params.worktreeParent;
+    if (path.dirname(params.checkoutPath) !== params.worktreeParent) {
+        return false;
+    }
+
+    const gitPath = path.join(params.checkoutPath, ".git");
+    if (!fs.existsSync(gitPath) || !fs.statSync(gitPath).isFile()) {
+        return false;
+    }
+
+    const pointer = fs.readFileSync(gitPath, "utf8").trim();
+    if (!pointer.startsWith("gitdir:")) {
+        return false;
+    }
+
+    const rawGitDir = pointer.slice("gitdir:".length).trim();
+    const resolvedGitDir = path.resolve(params.checkoutPath, rawGitDir);
+    const normalizedWorktreesDir = path.join(
+        params.repoGitWorktreesDir,
+        path.sep,
+    );
+    return (
+        resolvedGitDir === params.repoGitWorktreesDir ||
+        resolvedGitDir.startsWith(normalizedWorktreesDir)
+    );
 }
 
 function isStaleManagedCheckoutPath(params: {
@@ -47,6 +72,7 @@ function isStaleManagedCheckoutPath(params: {
     stableCheckoutPath: string;
     activeWorktreePaths: Set<string>;
     worktreeParent: string;
+    repoGitWorktreesDir: string;
 }): boolean {
     const resolvedCheckoutPath = path.resolve(params.checkoutPath);
     if (resolvedCheckoutPath === params.stableCheckoutPath) {
@@ -61,37 +87,18 @@ function isStaleManagedCheckoutPath(params: {
     return isManagedSiblingWorktreePath({
         checkoutPath: resolvedCheckoutPath,
         worktreeParent: params.worktreeParent,
+        repoGitWorktreesDir: params.repoGitWorktreesDir,
     });
-}
-
-function collectManagedSiblingManifestPaths(params: {
-    worktreeParent: string;
-    stableCheckoutPath: string;
-    activeWorktreePaths: Set<string>;
-}): string[] {
-    if (!fs.existsSync(params.worktreeParent)) {
-        return [];
-    }
-
-    return fs
-        .readdirSync(params.worktreeParent, {
-            withFileTypes: true,
-        })
-        .filter((entry) => entry.isDirectory())
-        .map((entry) => path.resolve(params.worktreeParent, entry.name))
-        .filter((checkoutPath) => checkoutPath !== params.stableCheckoutPath)
-        .filter((checkoutPath) => !params.activeWorktreePaths.has(checkoutPath))
-        .filter((checkoutPath) =>
-            fs.existsSync(
-                path.join(checkoutPath, ".agentchat", "local", "manifest.json"),
-            ),
-        );
 }
 
 async function main(): Promise<void> {
     const dryRun = process.argv.includes("--dry-run");
     const repoRoot = requireRepoRoot();
     const worktreeParent = path.resolve(resolveWorktreeParent(repoRoot));
+    const repoGitWorktreesDir = path.join(
+        resolveGitCommonDir(repoRoot),
+        "worktrees",
+    );
     const hostConfig = loadHostConfig();
     const stableCheckoutPath = path.resolve(hostConfig.stableCheckoutPath);
     const activeWorktreePaths = new Set(
@@ -107,13 +114,6 @@ async function main(): Promise<void> {
     for (const service of loadProcessRegistry().services) {
         candidateCheckoutPaths.add(path.resolve(service.checkoutPath));
     }
-    for (const checkoutPath of collectManagedSiblingManifestPaths({
-        worktreeParent,
-        stableCheckoutPath,
-        activeWorktreePaths,
-    })) {
-        candidateCheckoutPaths.add(checkoutPath);
-    }
 
     const staleCheckoutPaths = [...candidateCheckoutPaths]
         .filter((checkoutPath) =>
@@ -122,6 +122,7 @@ async function main(): Promise<void> {
                 stableCheckoutPath,
                 activeWorktreePaths,
                 worktreeParent,
+                repoGitWorktreesDir,
             }),
         )
         .sort((left, right) => left.localeCompare(right));

@@ -2,6 +2,7 @@ import path from "node:path";
 
 import {
     isWorkingTreeDirty,
+    normalizeWorktreeName,
     requireRepoRoot,
     resolveWorktreeTargetPath,
 } from "./lib/worktrees.ts";
@@ -55,10 +56,13 @@ function isPortCollisionError(message: string): boolean {
 async function main(): Promise<void> {
     const repoRoot = requireRepoRoot();
     const requestedName = smokeName();
+    const explicitNameProvided = process.argv
+        .slice(2)
+        .some((arg) => !arg.startsWith("--"));
     const allowDirty =
         process.argv.includes("--allow-dirty") || isWorkingTreeDirty(repoRoot);
     let created = false;
-    let name = requestedName;
+    let name = normalizeWorktreeName(requestedName) || requestedName;
     let targetPath = resolveWorktreeTargetPath(repoRoot, name);
 
     try {
@@ -70,10 +74,11 @@ async function main(): Promise<void> {
             : 5;
 
         for (let attempt = 0; attempt < maxAttemptsCount; attempt += 1) {
-            name =
+            const rawAttemptName =
                 attempt === 0
                     ? requestedName
                     : `${requestedName}-${attempt + 1}`;
+            name = normalizeWorktreeName(rawAttemptName) || rawAttemptName;
             targetPath = resolveWorktreeTargetPath(repoRoot, name);
             const createArgs = ["bun", "run", "worktree:create", "--", name];
             if (allowDirty) {
@@ -97,9 +102,7 @@ async function main(): Promise<void> {
                     error instanceof Error ? error.message : String(error);
                 if (
                     attempt + 1 < maxAttemptsCount &&
-                    !process.argv
-                        .slice(2)
-                        .some((arg) => !arg.startsWith("--")) &&
+                    !explicitNameProvided &&
                     isPortCollisionError(message)
                 ) {
                     console.log(

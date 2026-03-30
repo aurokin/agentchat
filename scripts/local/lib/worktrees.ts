@@ -35,6 +35,16 @@ export function requireRepoRoot(cwd = process.cwd()): string {
     return result.stdout.trim();
 }
 
+export function resolveGitCommonDir(repoRoot = process.cwd()): string {
+    const result = runGit(["rev-parse", "--git-common-dir"], repoRoot);
+    if (result.exitCode !== 0) {
+        throw new Error(
+            result.stderr.trim() || "Failed to resolve git common dir.",
+        );
+    }
+    return path.resolve(repoRoot, result.stdout.trim());
+}
+
 export function isWorkingTreeDirty(repoRoot: string): boolean {
     const result = runGit(["status", "--short"], repoRoot);
     if (result.exitCode !== 0) {
