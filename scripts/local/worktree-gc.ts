@@ -102,9 +102,12 @@ async function main(): Promise<void> {
     const hostConfig = loadHostConfig();
     const stableCheckoutPath = path.resolve(hostConfig.stableCheckoutPath);
     const activeWorktreePaths = new Set(
-        listGitWorktrees(repoRoot).map((worktree) =>
-            path.resolve(worktree.path),
-        ),
+        listGitWorktrees(repoRoot)
+            .filter(
+                (worktree) =>
+                    !worktree.prunable && fs.existsSync(worktree.path),
+            )
+            .map((worktree) => path.resolve(worktree.path)),
     );
 
     const candidateCheckoutPaths = new Set<string>();

@@ -8,6 +8,7 @@ export type GitWorktree = {
     path: string;
     branch: string | null;
     head: string | null;
+    prunable: boolean;
 };
 
 function runGit(
@@ -82,6 +83,7 @@ export function listGitWorktrees(repoRoot = process.cwd()): GitWorktree[] {
                 path: path.resolve(line.slice("worktree ".length)),
                 branch: null,
                 head: null,
+                prunable: false,
             };
             continue;
         }
@@ -94,6 +96,8 @@ export function listGitWorktrees(repoRoot = process.cwd()): GitWorktree[] {
             current.branch = line.slice("branch ".length).trim();
         } else if (line.startsWith("HEAD ")) {
             current.head = line.slice("HEAD ".length).trim();
+        } else if (line.startsWith("prunable")) {
+            current.prunable = true;
         }
     }
 

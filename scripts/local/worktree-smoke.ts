@@ -1,6 +1,7 @@
 import path from "node:path";
 
 import {
+    findWorktreeByPath,
     isWorkingTreeDirty,
     normalizeWorktreeName,
     requireRepoRoot,
@@ -61,7 +62,8 @@ async function main(): Promise<void> {
         .some((arg) => !arg.startsWith("--"));
     const allowDirty =
         process.argv.includes("--allow-dirty") || isWorkingTreeDirty(repoRoot);
-    let created = false;
+    let availableForTeardown = false;
+    let createdByThisRun = false;
     let name = normalizeWorktreeName(requestedName) || requestedName;
     let targetPath = resolveWorktreeTargetPath(repoRoot, name);
 
@@ -91,11 +93,14 @@ async function main(): Promise<void> {
             }
 
             try {
+                const worktreeAlreadyExisted =
+                    findWorktreeByPath(repoRoot, targetPath) !== null;
                 runOrThrow({
                     cmd: createArgs,
                     cwd: repoRoot,
                 });
-                created = true;
+                availableForTeardown = true;
+                createdByThisRun = !worktreeAlreadyExisted;
                 break;
             } catch (error) {
                 const message =
@@ -114,7 +119,7 @@ async function main(): Promise<void> {
             }
         }
 
-        if (!created) {
+        if (!availableForTeardown) {
             throw new Error("Failed to create a smoke worktree.");
         }
 
@@ -145,12 +150,16 @@ async function main(): Promise<void> {
             );
         }
     } finally {
-        if (created) {
+        if (createdByThisRun) {
             runOrThrow({
                 cmd: ["bun", "run", "worktree:remove", "--", name, "--force"],
                 cwd: repoRoot,
                 allowFailure: true,
             });
+        } else if (availableForTeardown) {
+            console.log(
+                "Smoke used an existing worktree; skipping teardown to avoid deleting a pre-existing checkout.",
+            );
         }
         runOrThrow({
             cmd: ["bun", "run", "worktree:gc", "--", "--dry-run"],
