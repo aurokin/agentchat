@@ -2,7 +2,10 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { loadHostConfig } from "./lib/hostConfig.ts";
-import { deriveLaneStateRoot, loadLocalManifest } from "./lib/manifest.ts";
+import {
+    laneStateRootsForCheckout,
+    tryLoadLocalManifest,
+} from "./lib/manifest.ts";
 import type { LocalManifest } from "./lib/model.ts";
 import {
     stopManagedServices,
@@ -37,25 +40,11 @@ function cleanupLaneState(
     checkoutPath: string,
     manifest: LocalManifest | null,
 ): void {
-    const roots = new Set<string>([deriveLaneStateRoot(checkoutPath)]);
-    if (manifest) {
-        roots.add(path.dirname(manifest.xdgStateHome));
-    }
-    for (const laneStateRoot of roots) {
+    for (const laneStateRoot of laneStateRootsForCheckout(
+        checkoutPath,
+        manifest,
+    )) {
         fs.rmSync(laneStateRoot, { recursive: true, force: true });
-    }
-}
-
-function tryLoadLocalManifest(checkoutPath: string): LocalManifest | null {
-    try {
-        return loadLocalManifest(checkoutPath);
-    } catch (error) {
-        console.warn(
-            error instanceof Error
-                ? `Ignoring invalid manifest during worktree removal: ${error.message}`
-                : "Ignoring invalid manifest during worktree removal.",
-        );
-        return null;
     }
 }
 
@@ -88,7 +77,16 @@ async function main(): Promise<void> {
         updateProcessRegistry((registry) =>
             removeManagedServicesForCheckout(registry, targetPath),
         );
-        cleanupLaneState(targetPath, tryLoadLocalManifest(targetPath));
+        cleanupLaneState(
+            targetPath,
+            tryLoadLocalManifest(targetPath, {
+                onError: (error) => {
+                    console.warn(
+                        `Ignoring invalid manifest during worktree removal: ${error.message}`,
+                    );
+                },
+            }),
+        );
 
         console.log(
             "No git worktree was registered for this path; removed wrapper-managed state only.",
@@ -108,7 +106,13 @@ async function main(): Promise<void> {
         return;
     }
 
-    const manifest = tryLoadLocalManifest(targetPath);
+    const manifest = tryLoadLocalManifest(targetPath, {
+        onError: (error) => {
+            console.warn(
+                `Ignoring invalid manifest during worktree removal: ${error.message}`,
+            );
+        },
+    });
     if (manifest) {
         await stopManagedServices(manifest);
     } else {

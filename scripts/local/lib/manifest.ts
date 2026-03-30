@@ -59,6 +59,20 @@ export function loadLocalManifest(
     return value;
 }
 
+export function tryLoadLocalManifest(
+    checkoutPath = process.cwd(),
+    params?: { onError?: (error: Error) => void },
+): LocalManifest | null {
+    try {
+        return loadLocalManifest(checkoutPath);
+    } catch (error) {
+        if (error instanceof Error) {
+            params?.onError?.(error);
+        }
+        return null;
+    }
+}
+
 export function saveLocalManifest(manifest: LocalManifest): void {
     writeJson(resolveManifestPath(manifest.checkoutPath), {
         ...manifest,
@@ -94,6 +108,17 @@ export function deriveLaneStateRoot(checkoutPath: string): string {
         "lanes",
         deriveLaneId(checkoutPath),
     );
+}
+
+export function laneStateRootsForCheckout(
+    checkoutPath: string,
+    manifest: LocalManifest | null = null,
+): string[] {
+    const roots = new Set<string>([deriveLaneStateRoot(checkoutPath)]);
+    if (manifest) {
+        roots.add(path.dirname(manifest.xdgStateHome));
+    }
+    return [...roots];
 }
 
 export function buildDevManifest(params: {

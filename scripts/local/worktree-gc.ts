@@ -2,7 +2,10 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { loadHostConfig } from "./lib/hostConfig.ts";
-import { deriveLaneStateRoot, loadLocalManifest } from "./lib/manifest.ts";
+import {
+    laneStateRootsForCheckout,
+    tryLoadLocalManifest,
+} from "./lib/manifest.ts";
 import { stopManagedServicesForCheckoutPath } from "./lib/processes.ts";
 import {
     loadPortLeases,
@@ -19,21 +22,12 @@ import {
     resolveWorktreeParent,
 } from "./lib/worktrees.ts";
 
-function tryLoadLocalManifest(checkoutPath: string) {
+function safeRealpath(absPath: string): string {
     try {
-        return loadLocalManifest(checkoutPath);
+        return fs.realpathSync.native(absPath);
     } catch {
-        return null;
+        return path.resolve(absPath);
     }
-}
-
-function laneStateRootsForCheckout(checkoutPath: string): string[] {
-    const roots = new Set<string>([deriveLaneStateRoot(checkoutPath)]);
-    const manifest = tryLoadLocalManifest(checkoutPath);
-    if (manifest) {
-        roots.add(path.dirname(manifest.xdgStateHome));
-    }
-    return [...roots];
 }
 
 function isManagedSiblingWorktreePath(params: {
@@ -56,15 +50,11 @@ function isManagedSiblingWorktreePath(params: {
     }
 
     const rawGitDir = pointer.slice("gitdir:".length).trim();
-    const resolvedGitDir = path.resolve(params.checkoutPath, rawGitDir);
-    const normalizedWorktreesDir = path.join(
-        params.repoGitWorktreesDir,
-        path.sep,
+    const resolvedGitDir = safeRealpath(
+        path.resolve(params.checkoutPath, rawGitDir),
     );
-    return (
-        resolvedGitDir === params.repoGitWorktreesDir ||
-        resolvedGitDir.startsWith(normalizedWorktreesDir)
-    );
+    const expectedWorktreesDir = safeRealpath(params.repoGitWorktreesDir);
+    return path.dirname(resolvedGitDir) === expectedWorktreesDir;
 }
 
 function isStaleManagedCheckoutPath(params: {
@@ -101,14 +91,20 @@ async function main(): Promise<void> {
     );
     const hostConfig = loadHostConfig();
     const stableCheckoutPath = path.resolve(hostConfig.stableCheckoutPath);
+    const gitWorktrees = listGitWorktrees(repoRoot);
     const activeWorktreePaths = new Set(
-        listGitWorktrees(repoRoot)
+        gitWorktrees
             .filter(
                 (worktree) =>
                     !worktree.prunable && fs.existsSync(worktree.path),
             )
             .map((worktree) => path.resolve(worktree.path)),
     );
+    if (!activeWorktreePaths.has(path.resolve(repoRoot))) {
+        throw new Error(
+            "Refusing to run worktree GC because the current checkout is not present in git worktree state.",
+        );
+    }
 
     const candidateCheckoutPaths = new Set<string>();
     for (const lease of loadPortLeases().leases) {
@@ -140,7 +136,10 @@ async function main(): Promise<void> {
     }
 
     for (const checkoutPath of staleCheckoutPaths) {
-        const laneRoots = laneStateRootsForCheckout(checkoutPath);
+        const laneRoots = laneStateRootsForCheckout(
+            checkoutPath,
+            tryLoadLocalManifest(checkoutPath),
+        );
         if (dryRun) {
             console.log(`Would clean checkout: ${checkoutPath}`);
             for (const laneRoot of laneRoots) {

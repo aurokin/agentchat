@@ -1,6 +1,10 @@
 import fs from "node:fs";
 
-import { deriveLaneStateRoot, loadLocalManifest } from "./lib/manifest.ts";
+import {
+    laneStateRootsForCheckout,
+    loadLocalManifest,
+    tryLoadLocalManifest,
+} from "./lib/manifest.ts";
 import {
     removeLeasesForCheckout,
     removeManagedServicesForCheckout,
@@ -70,10 +74,16 @@ function cleanupFailedWorktreeState(targetPath: string): void {
     updateProcessRegistry((registry) =>
         removeManagedServicesForCheckout(registry, targetPath),
     );
-    fs.rmSync(deriveLaneStateRoot(targetPath), {
-        recursive: true,
-        force: true,
-    });
+    const manifest = tryLoadLocalManifest(targetPath);
+    for (const laneStateRoot of laneStateRootsForCheckout(
+        targetPath,
+        manifest,
+    )) {
+        fs.rmSync(laneStateRoot, {
+            recursive: true,
+            force: true,
+        });
+    }
 }
 
 function runDoctorSummary(targetPath: string): {

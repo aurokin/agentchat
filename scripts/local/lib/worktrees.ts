@@ -134,7 +134,9 @@ export function normalizeWorktreeName(rawName: string): string {
         return "";
     }
 
-    const normalized = sanitizeLabel(trimmed)
+    // Normalize path-like feature labels such as "feature/x/y" deliberately.
+    const slashNormalized = trimmed.replace(/[\\/]+/g, "-");
+    const normalized = sanitizeLabel(slashNormalized)
         .replace(/-+/g, "-")
         .replace(/^[.-]+|[.-]+$/g, "");
     if (!normalized || normalized === "." || normalized === "..") {

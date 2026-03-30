@@ -1,4 +1,5 @@
 import path from "node:path";
+import { spawn } from "node:child_process";
 
 import {
     findWorktreeByPath,
@@ -39,6 +40,96 @@ function runOrThrow(params: {
     };
 }
 
+async function runOrThrowWithTimeout(params: {
+    cmd: string[];
+    cwd: string;
+    timeoutMs: number;
+    allowFailure?: boolean;
+}): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+    return await new Promise((resolve, reject) => {
+        const child = spawn(params.cmd[0] ?? "", params.cmd.slice(1), {
+            cwd: params.cwd,
+            env: process.env,
+            stdio: ["ignore", "pipe", "pipe"],
+        });
+
+        let stdout = "";
+        let stderr = "";
+        let timedOut = false;
+        let settled = false;
+
+        child.stdout?.on("data", (chunk: Buffer | string) => {
+            const text = chunk.toString();
+            stdout += text;
+            process.stdout.write(text);
+        });
+        child.stderr?.on("data", (chunk: Buffer | string) => {
+            const text = chunk.toString();
+            stderr += text;
+            process.stderr.write(text);
+        });
+
+        const finalize = (
+            error: Error | null,
+            exitCode = 0,
+            signal: NodeJS.Signals | null = null,
+        ) => {
+            if (settled) {
+                return;
+            }
+            settled = true;
+            clearTimeout(timeoutId);
+            if (error) {
+                reject(error);
+                return;
+            }
+            if (timedOut) {
+                reject(
+                    new Error(
+                        `Command timed out after ${params.timeoutMs}ms: ${params.cmd.join(" ")}`,
+                    ),
+                );
+                return;
+            }
+            if (!params.allowFailure && (exitCode !== 0 || signal)) {
+                reject(
+                    new Error(
+                        [
+                            `Command failed: ${params.cmd.join(" ")}`,
+                            stdout.trim(),
+                            stderr.trim(),
+                        ]
+                            .filter(Boolean)
+                            .join("\n"),
+                    ),
+                );
+                return;
+            }
+            resolve({
+                stdout,
+                stderr,
+                exitCode,
+            });
+        };
+
+        const timeoutId = setTimeout(() => {
+            timedOut = true;
+            child.kill("SIGTERM");
+            setTimeout(() => {
+                if (!settled) {
+                    child.kill("SIGKILL");
+                }
+            }, 2000).unref();
+        }, params.timeoutMs);
+        timeoutId.unref();
+
+        child.once("error", (error) => finalize(error));
+        child.once("close", (code, signal) =>
+            finalize(null, code ?? 0, signal),
+        );
+    });
+}
+
 function smokeName(): string {
     const explicit = process.argv.slice(2).find((arg) => !arg.startsWith("--"));
     if (explicit) {
@@ -62,6 +153,11 @@ async function main(): Promise<void> {
         .some((arg) => !arg.startsWith("--"));
     const allowDirty =
         process.argv.includes("--allow-dirty") || isWorkingTreeDirty(repoRoot);
+    if (allowDirty) {
+        console.log(
+            "Worktree lifecycle smoke is allowing a dirty source checkout.",
+        );
+    }
     let availableForTeardown = false;
     let createdByThisRun = false;
     let name = normalizeWorktreeName(requestedName) || requestedName;
@@ -85,11 +181,6 @@ async function main(): Promise<void> {
             const createArgs = ["bun", "run", "worktree:create", "--", name];
             if (allowDirty) {
                 createArgs.push("--allow-dirty");
-            }
-            if (allowDirty) {
-                console.log(
-                    "Worktree lifecycle smoke is allowing a dirty source checkout.",
-                );
             }
 
             try {
@@ -136,9 +227,10 @@ async function main(): Promise<void> {
         const doctorOk = doctor.exitCode === 0;
 
         if (doctorOk) {
-            runOrThrow({
+            await runOrThrowWithTimeout({
                 cmd: ["bun", "run", "dev"],
                 cwd: targetPath,
+                timeoutMs: 30_000,
             });
             runOrThrow({
                 cmd: ["bun", "run", "stop"],
