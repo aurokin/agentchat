@@ -8,7 +8,10 @@ export type GitWorktree = {
     path: string;
     branch: string | null;
     head: string | null;
+    prunable: boolean;
 };
+
+const SAFE_WORKTREE_NAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
 
 function runGit(
     args: string[],
@@ -33,6 +36,16 @@ export function requireRepoRoot(cwd = process.cwd()): string {
         throw new Error(result.stderr.trim() || "Failed to resolve repo root.");
     }
     return result.stdout.trim();
+}
+
+export function resolveGitCommonDir(repoRoot = process.cwd()): string {
+    const result = runGit(["rev-parse", "--git-common-dir"], repoRoot);
+    if (result.exitCode !== 0) {
+        throw new Error(
+            result.stderr.trim() || "Failed to resolve git common dir.",
+        );
+    }
+    return path.resolve(repoRoot, result.stdout.trim());
 }
 
 export function isWorkingTreeDirty(repoRoot: string): boolean {
@@ -72,6 +85,7 @@ export function listGitWorktrees(repoRoot = process.cwd()): GitWorktree[] {
                 path: path.resolve(line.slice("worktree ".length)),
                 branch: null,
                 head: null,
+                prunable: false,
             };
             continue;
         }
@@ -84,6 +98,8 @@ export function listGitWorktrees(repoRoot = process.cwd()): GitWorktree[] {
             current.branch = line.slice("branch ".length).trim();
         } else if (line.startsWith("HEAD ")) {
             current.head = line.slice("HEAD ".length).trim();
+        } else if (line.startsWith("prunable")) {
+            current.prunable = true;
         }
     }
 
@@ -104,21 +120,48 @@ export function resolveWorktreeTargetPath(
     return path.join(resolveWorktreeParent(repoRoot), worktreeName);
 }
 
+export function isSiblingWorktreePath(
+    checkoutPath: string,
+    worktreeParent: string,
+): boolean {
+    return (
+        path.dirname(path.resolve(checkoutPath)) ===
+        path.resolve(worktreeParent)
+    );
+}
+
 export function validateWorktreeName(rawName: string): string {
-    const name = rawName.trim();
-    if (!name) {
+    const normalized = normalizeWorktreeName(rawName);
+    if (!normalized) {
         throw new Error(
             "Missing worktree name. Usage: bun run worktree:create -- <name>",
         );
     }
+    return normalized;
+}
 
-    if (sanitizeLabel(name) !== name || name.includes(path.sep)) {
-        throw new Error(
-            "Worktree names must use only letters, numbers, dots, underscores, and dashes.",
-        );
+export function normalizeWorktreeName(rawName: string): string {
+    const trimmed = rawName.trim();
+    if (!trimmed) {
+        return "";
+    }
+    if (
+        SAFE_WORKTREE_NAME_PATTERN.test(trimmed) &&
+        trimmed !== "." &&
+        trimmed !== ".."
+    ) {
+        return trimmed;
     }
 
-    return name;
+    // Normalize path-like feature labels such as "feature/x/y" deliberately.
+    const slashNormalized = trimmed.replace(/[\\/]+/g, "-");
+    const normalized = sanitizeLabel(slashNormalized)
+        .replace(/-+/g, "-")
+        .replace(/^[.-]+|[.-]+$/g, "");
+    if (!normalized || normalized === "." || normalized === "..") {
+        return "";
+    }
+    return normalized;
 }
 
 export function ensureSafeWorktreeTarget(targetPath: string): void {

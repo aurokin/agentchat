@@ -1,19 +1,36 @@
-import { loadLocalManifest } from "./lib/manifest.ts";
+import fs from "node:fs";
+
+import {
+    laneStateRootsForCheckout,
+    loadLocalManifest,
+    tryLoadLocalManifest,
+} from "./lib/manifest.ts";
+import {
+    removeLeasesForCheckout,
+    removeManagedServicesForCheckout,
+    updatePortLeases,
+    updateProcessRegistry,
+} from "./lib/registry.ts";
 import {
     assertPathAvailable,
     branchExists,
     ensureSafeWorktreeTarget,
     findWorktreeByPath,
     isWorkingTreeDirty,
+    normalizeWorktreeName,
     requireRepoRoot,
     resolveWorktreeTargetPath,
     spawnOrThrow,
     validateWorktreeName,
 } from "./lib/worktrees.ts";
 
-function worktreeNameArg(): string {
+function worktreeNameArg(): { input: string; name: string } {
     const args = process.argv.slice(2).filter((arg) => !arg.startsWith("--"));
-    return validateWorktreeName(args[0] ?? "");
+    const input = args[0] ?? "";
+    return {
+        input,
+        name: validateWorktreeName(input),
+    };
 }
 
 function createWorktree(params: {
@@ -52,9 +69,76 @@ function createWorktree(params: {
     return { created: true, branchAlreadyExisted };
 }
 
+function cleanupFailedWorktreeState(targetPath: string): void {
+    updatePortLeases((leases) => removeLeasesForCheckout(leases, targetPath));
+    updateProcessRegistry((registry) =>
+        removeManagedServicesForCheckout(registry, targetPath),
+    );
+    const manifest = tryLoadLocalManifest(targetPath);
+    for (const laneStateRoot of laneStateRootsForCheckout(
+        targetPath,
+        manifest,
+    )) {
+        fs.rmSync(laneStateRoot, {
+            recursive: true,
+            force: true,
+        });
+    }
+}
+
+function runDoctorSummary(targetPath: string): {
+    ok: boolean;
+    summary: string;
+} {
+    const proc = Bun.spawnSync(["bun", "run", "doctor", "--", "--json"], {
+        cwd: targetPath,
+        stdout: "pipe",
+        stderr: "pipe",
+    });
+    const stdout = proc.stdout.toString().trim();
+    const stderr = proc.stderr.toString().trim();
+
+    if (!stdout) {
+        return {
+            ok: proc.exitCode === 0,
+            summary:
+                stderr ||
+                "Doctor produced no output. Run bun run doctor inside the worktree.",
+        };
+    }
+
+    try {
+        const report = JSON.parse(stdout) as {
+            ok?: boolean;
+            checks?: Array<{ ok: boolean; label: string; detail: string }>;
+        };
+        const failingChecks =
+            report.checks
+                ?.filter((check) => !check.ok)
+                .map((check) => `${check.label}: ${check.detail}`) ?? [];
+        if (report.ok) {
+            return { ok: true, summary: "ok" };
+        }
+        return {
+            ok: false,
+            summary:
+                failingChecks[0] ??
+                stderr ??
+                "issues found. Run bun run doctor inside the worktree.",
+        };
+    } catch {
+        return {
+            ok: proc.exitCode === 0,
+            summary:
+                stderr ||
+                "Could not parse doctor output. Run bun run doctor inside the worktree.",
+        };
+    }
+}
+
 async function main(): Promise<void> {
     const repoRoot = requireRepoRoot();
-    const worktreeName = worktreeNameArg();
+    const { input: requestedName, name: worktreeName } = worktreeNameArg();
     const targetPath = resolveWorktreeTargetPath(repoRoot, worktreeName);
     ensureSafeWorktreeTarget(targetPath);
 
@@ -105,16 +189,28 @@ async function main(): Promise<void> {
                 });
             }
         }
+        if (created) {
+            cleanupFailedWorktreeState(targetPath);
+        }
         throw error;
     }
 
     const manifest = loadLocalManifest(targetPath);
+    const doctor = runDoctorSummary(targetPath);
 
     console.log(
         created
             ? "Worktree created."
             : "Worktree already existed; bootstrap refreshed.",
     );
+    if (
+        requestedName.trim() &&
+        normalizeWorktreeName(requestedName) !== requestedName.trim()
+    ) {
+        console.log(
+            `Normalized worktree name: ${requestedName.trim()} -> ${worktreeName}`,
+        );
+    }
     console.log(`Name: ${worktreeName}`);
     console.log(`Path: ${targetPath}`);
     if (manifest) {
@@ -122,6 +218,9 @@ async function main(): Promise<void> {
         console.log(`Web URL: ${manifest.webUrl}`);
         console.log(`Server URL: ${manifest.serverUrl}`);
     }
+    console.log(
+        `Doctor: ${doctor.ok ? "ok" : `needs attention (${doctor.summary})`}`,
+    );
     if (branchAlreadyExisted) {
         console.log(
             "Note: this worktree reused an existing branch name, so it checked out that branch's current commit instead of cloning the source checkout's latest HEAD.",
@@ -131,7 +230,9 @@ async function main(): Promise<void> {
     console.log(`- cd ${targetPath}`);
     console.log("- bun run status");
     console.log("- bun run doctor");
-    console.log("- bun run dev");
+    console.log(
+        doctor.ok ? "- bun run dev" : "- fix doctor issues before bun run dev",
+    );
     console.log(`- bun run worktree:remove -- ${worktreeName}`);
     console.log(`Manifest: ${targetPath}/.agentchat/local/manifest.json`);
 }

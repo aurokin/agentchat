@@ -55,6 +55,7 @@
         "test:manual:web-browser-confidence": "bun scripts/testing/browser-confidence.ts --mode full",
         "test:manual:web-lan-confidence": "bun scripts/testing/web-lan-confidence.ts",
         "test:manual:web-operator-smoke": "bun scripts/testing/browser-operator-smoke.ts",
+        "test:manual:worktree-lifecycle": "bun scripts/local/worktree-smoke.ts",
         "test:manual:runtime-confidence": "bun run doctor:server && bun run test:manual:live-runtime-smoke && bun run test:manual:live-runtime-multi-client && bun run test:manual:live-runtime-multi-agent && bun run test:manual:live-runtime-interrupt && bun run test:manual:config-reload-smoke",
         "convex:env": "bun scripts/env/convex-env.ts",
         "convex:gen-secrets": "bun scripts/env/convex-secrets.ts",
@@ -100,7 +101,8 @@
         "legacy:dev:all": "concurrently -k -n convex,server,web,mobile -c green,yellow,blue,magenta \"bun run --cwd packages/convex dev\" \"bun run --cwd apps/server dev\" \"bun run --cwd apps/web dev\" \"bun run --cwd apps/mobile dev-client\"",
         "stop": "bun scripts/local/stop.ts",
         "worktree:create": "bun scripts/local/worktree-create.ts",
-        "worktree:remove": "bun scripts/local/worktree-remove.ts"
+        "worktree:remove": "bun scripts/local/worktree-remove.ts",
+        "worktree:gc": "bun scripts/local/worktree-gc.ts"
     },
     "devDependencies": {
         "@types/bun": "latest",

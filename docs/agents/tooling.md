@@ -17,6 +17,8 @@ For checkout-local setup, use the repo-level wrapper commands first:
 - `bun run stop`
 - `bun run worktree:create -- <name>`
 - `bun run worktree:remove -- <name>`
+- `bun run worktree:gc`
+- `bun run test:manual:worktree-lifecycle`
 
 Agents should not begin by hand-editing:
 
@@ -35,7 +37,7 @@ The current stable host install is live behind local Caddy on `https://bront.hom
 The repo now also includes manual-only GitHub Actions guardrails:
 
 - `.github/workflows/manual-wrapper-guardrails.yml`
-- `.github/workflows/manual-host-guardrails.yml`
+- `.github/workflows/host-guardrails-manual.yml`
 
 Those workflows are intentionally `workflow_dispatch` only for now. Treat them as explicit confidence tools, not as always-on CI.
 
@@ -47,6 +49,9 @@ Current stable host helpers include:
 
 `bun run worktree:create -- <name>` creates a sibling checkout under the repo parent. It refuses to run from a dirty source checkout unless `--allow-dirty` is passed, because git worktrees only contain committed refs.
 If a worktree name already has a Git branch behind it, reusing that name checks out the branch at its current commit. Agents should treat that as a Git gotcha, not as a wrapper bug.
+If a sibling worktree is removed outside the wrapper flow, `bun run worktree:gc` is the safe cleanup path for reclaiming stale wrapper-managed leases, process entries, and lane-state directories. Add `-- --dry-run` when you want to inspect what would be cleaned first.
+`worktree:gc` only targets missing or abandoned sibling worktrees managed by this repo. It does not touch the stable checkout or unrelated standalone clones.
+`worktree:remove` removes the worktree checkout and wrapper-managed state, but it intentionally does not delete the branch name.
 
 Legacy process launchers remain available temporarily for flows still outside the wrapper surface, but they are no longer the authoritative setup path:
 

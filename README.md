@@ -93,10 +93,28 @@ bun run worktree:create -- <name>
 `worktree:create` refuses to run from a dirty source checkout by default, because uncommitted changes are not transferred into a git worktree. Commit or stash first, or use `--allow-dirty` only when you intentionally want the new worktree to start from `HEAD` without local changes.
 If you reuse an existing worktree name, Git will attach the worktree to that branch's current commit instead of cloning the source checkout's latest `HEAD`.
 
-Then start the wrapper-owned dev runtime for this checkout:
+Then switch into that worktree checkout:
+
+```bash
+cd ../<name>
+```
+
+Then start the wrapper-owned dev runtime for that checkout:
 
 ```bash
 bun run dev
+```
+
+If a disposable worktree was deleted or drifted outside the wrapper flow, reclaim stale wrapper-managed state with:
+
+```bash
+bun run worktree:gc
+```
+
+For an explicit manual lifecycle confidence pass:
+
+```bash
+bun run test:manual:worktree-lifecycle
 ```
 
 The local wrapper commands are now the authoritative setup path for checkout-local env/config generation.
@@ -106,7 +124,7 @@ Helpful references:
 
 - `docs/local-modes.md` for the wrapper-first local workflow, including worktree lifecycle wrappers and stable host scripts
 - `docs/local_environment_setup_checklist.md` for host-level layout, stable host-script setup, migration, and advanced manual setup
-- `.github/workflows/manual-wrapper-guardrails.yml` and `.github/workflows/manual-host-guardrails.yml` for manual-only GitHub guardrail runs that exercise the wrapper and stable-host scaffolding without enabling automatic checks yet
+- `.github/workflows/manual-wrapper-guardrails.yml` and `.github/workflows/host-guardrails-manual.yml` for manual-only GitHub guardrail runs that exercise the wrapper and stable-host scaffolding without enabling automatic checks yet
 - `bun run doctor:server` for a deliberate runtime readiness check against the generated server config
 - `bun run setup:test-agent-config` only when you intentionally want the dedicated test fixtures, followed by `bun run bootstrap --adopt`
 

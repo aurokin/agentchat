@@ -100,7 +100,7 @@ The current stable host installation is expected to run from a dedicated checkou
 Manual GitHub guardrail workflows are also checked in now:
 
 - `.github/workflows/manual-wrapper-guardrails.yml`
-- `.github/workflows/manual-host-guardrails.yml`
+- `.github/workflows/host-guardrails-manual.yml`
 
 They remain `workflow_dispatch` only for now, so they can be used as explicit confidence runs without becoming automatic required checks yet.
 
