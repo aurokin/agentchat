@@ -145,6 +145,10 @@ function isPortCollisionError(message: string): boolean {
     );
 }
 
+function toError(error: unknown, fallbackMessage: string): Error {
+    return error instanceof Error ? error : new Error(fallbackMessage);
+}
+
 async function main(): Promise<void> {
     const repoRoot = requireRepoRoot();
     const requestedName = smokeName();
@@ -162,6 +166,7 @@ async function main(): Promise<void> {
     let createdByThisRun = false;
     let name = normalizeWorktreeName(requestedName) || requestedName;
     let targetPath = resolveWorktreeTargetPath(repoRoot, name);
+    let failure: Error | null = null;
 
     try {
         const maxAttempts = process.argv
@@ -241,13 +246,29 @@ async function main(): Promise<void> {
                 "Doctor reported issues in the smoke worktree; skipped dev/stop and continued teardown.",
             );
         }
+    } catch (error) {
+        failure = toError(error, "Worktree lifecycle smoke failed.");
     } finally {
+        let teardownFailure: Error | null = null;
         if (createdByThisRun) {
-            runOrThrow({
-                cmd: ["bun", "run", "worktree:remove", "--", name, "--force"],
-                cwd: repoRoot,
-                allowFailure: true,
-            });
+            try {
+                runOrThrow({
+                    cmd: [
+                        "bun",
+                        "run",
+                        "worktree:remove",
+                        "--",
+                        name,
+                        "--force",
+                    ],
+                    cwd: repoRoot,
+                });
+            } catch (error) {
+                teardownFailure = toError(
+                    error,
+                    "Failed to tear down the smoke worktree.",
+                );
+            }
         } else if (availableForTeardown) {
             console.log(
                 "Smoke used an existing worktree; skipping teardown to avoid deleting a pre-existing checkout.",
@@ -258,6 +279,19 @@ async function main(): Promise<void> {
             cwd: repoRoot,
             allowFailure: true,
         });
+
+        if (teardownFailure) {
+            if (failure) {
+                throw new AggregateError(
+                    [failure, teardownFailure],
+                    "Worktree lifecycle smoke failed and teardown also failed.",
+                );
+            }
+            throw teardownFailure;
+        }
+        if (failure) {
+            throw failure;
+        }
     }
 
     console.log("Worktree lifecycle smoke complete.");

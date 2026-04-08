@@ -16,6 +16,7 @@ import {
     updateProcessRegistry,
 } from "./lib/registry.ts";
 import {
+    isSiblingWorktreePath,
     listGitWorktrees,
     requireRepoRoot,
     resolveGitCommonDir,
@@ -35,7 +36,9 @@ function isManagedSiblingWorktreePath(params: {
     worktreeParent: string;
     repoGitWorktreesDir: string;
 }): boolean {
-    if (path.dirname(params.checkoutPath) !== params.worktreeParent) {
+    if (
+        !isSiblingWorktreePath(params.checkoutPath, params.worktreeParent)
+    ) {
         return false;
     }
 
@@ -69,6 +72,11 @@ function isStaleManagedCheckoutPath(params: {
         return false;
     }
     if (params.activeWorktreePaths.has(resolvedCheckoutPath)) {
+        return false;
+    }
+    if (
+        !isSiblingWorktreePath(resolvedCheckoutPath, params.worktreeParent)
+    ) {
         return false;
     }
     if (!fs.existsSync(resolvedCheckoutPath)) {

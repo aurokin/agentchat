@@ -11,6 +11,8 @@ export type GitWorktree = {
     prunable: boolean;
 };
 
+const SAFE_WORKTREE_NAME_PATTERN = /^[a-zA-Z0-9._-]+$/;
+
 function runGit(
     args: string[],
     cwd = process.cwd(),
@@ -118,6 +120,16 @@ export function resolveWorktreeTargetPath(
     return path.join(resolveWorktreeParent(repoRoot), worktreeName);
 }
 
+export function isSiblingWorktreePath(
+    checkoutPath: string,
+    worktreeParent: string,
+): boolean {
+    return (
+        path.dirname(path.resolve(checkoutPath)) ===
+        path.resolve(worktreeParent)
+    );
+}
+
 export function validateWorktreeName(rawName: string): string {
     const normalized = normalizeWorktreeName(rawName);
     if (!normalized) {
@@ -132,6 +144,13 @@ export function normalizeWorktreeName(rawName: string): string {
     const trimmed = rawName.trim();
     if (!trimmed) {
         return "";
+    }
+    if (
+        SAFE_WORKTREE_NAME_PATTERN.test(trimmed) &&
+        trimmed !== "." &&
+        trimmed !== ".."
+    ) {
+        return trimmed;
     }
 
     // Normalize path-like feature labels such as "feature/x/y" deliberately.
