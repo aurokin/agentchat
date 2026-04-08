@@ -27,6 +27,38 @@ import {
     writeJson,
 } from "./util.ts";
 
+const MANAGED_LANE_STATE_PARENT = path.join(
+    os.homedir(),
+    ".local",
+    "state",
+    "agentchat",
+    "lanes",
+);
+
+function resolveManagedLaneStateRoot(
+    xdgStateHome: string,
+): string | null {
+    if (!path.isAbsolute(xdgStateHome)) {
+        return null;
+    }
+
+    const resolvedXdgStateHome = path.resolve(xdgStateHome);
+    if (path.basename(resolvedXdgStateHome) !== "xdg") {
+        return null;
+    }
+
+    const laneStateRoot = path.dirname(resolvedXdgStateHome);
+    const managedLaneStateParent = path.resolve(MANAGED_LANE_STATE_PARENT);
+    if (
+        laneStateRoot === managedLaneStateParent ||
+        !laneStateRoot.startsWith(`${managedLaneStateParent}${path.sep}`)
+    ) {
+        return null;
+    }
+
+    return laneStateRoot;
+}
+
 export function resolveManifestPath(checkoutPath = process.cwd()): string {
     return path.join(checkoutPath, LOCAL_MANIFEST_PATH);
 }
@@ -46,6 +78,7 @@ export function loadLocalManifest(
         typeof value.checkoutPath !== "string" ||
         typeof value.webPort !== "number" ||
         typeof value.serverPort !== "number" ||
+        typeof value.xdgStateHome !== "string" ||
         !isRecord(value.generatedFiles) ||
         typeof value.generatedFiles.webEnvPath !== "string" ||
         typeof value.generatedFiles.serverEnvPath !== "string" ||
@@ -55,6 +88,11 @@ export function loadLocalManifest(
         !isRecord(value.managedEnv.server)
     ) {
         throw new Error(`Invalid local manifest at ${manifestPath}.`);
+    }
+    if (!resolveManagedLaneStateRoot(value.xdgStateHome)) {
+        throw new Error(
+            `Invalid local manifest at ${manifestPath}: xdgStateHome must resolve inside ${MANAGED_LANE_STATE_PARENT}.`,
+        );
     }
     return value;
 }
@@ -116,7 +154,12 @@ export function laneStateRootsForCheckout(
 ): string[] {
     const roots = new Set<string>([deriveLaneStateRoot(checkoutPath)]);
     if (manifest) {
-        roots.add(path.dirname(manifest.xdgStateHome));
+        const manifestLaneStateRoot = resolveManagedLaneStateRoot(
+            manifest.xdgStateHome,
+        );
+        if (manifestLaneStateRoot) {
+            roots.add(manifestLaneStateRoot);
+        }
     }
     return [...roots];
 }
