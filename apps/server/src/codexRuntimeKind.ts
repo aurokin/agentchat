@@ -300,6 +300,23 @@ function normalizeLiveModels(
                             return true;
                         },
                     ) ?? [];
+            const defaultVariant =
+                typeof item.defaultReasoningEffort === "string"
+                    ? mapCodexEffortToVariant(item.defaultReasoningEffort)
+                    : null;
+            const defaultVariantId =
+                defaultVariant &&
+                variants.some((variant) => variant.id === defaultVariant.id)
+                    ? defaultVariant.id
+                    : null;
+            const providerMetadata: Record<
+                string,
+                string | number | boolean | null
+            > = {};
+            if (typeof item.defaultReasoningEffort === "string") {
+                providerMetadata.defaultReasoningEffort =
+                    item.defaultReasoningEffort;
+            }
 
             return {
                 id: item.id!,
@@ -310,6 +327,8 @@ function normalizeLiveModels(
                         : item.id!,
                 supportsReasoning: variants.length > 0,
                 variants,
+                defaultVariantId,
+                providerMetadata,
             };
         });
 }

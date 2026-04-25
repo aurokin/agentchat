@@ -108,6 +108,7 @@ describe("CodexModelCatalog", () => {
                         { reasoningEffort: "medium" },
                         { reasoningEffort: "high" },
                     ],
+                    defaultReasoningEffort: "medium",
                 },
             ],
             nextCursor: null,
@@ -149,9 +150,60 @@ describe("CodexModelCatalog", () => {
                         { id: "medium", label: "Medium" },
                         { id: "high", label: "High" },
                     ],
+                    defaultVariantId: "medium",
+                    providerMetadata: {
+                        defaultReasoningEffort: "medium",
+                    },
                 },
             ],
         });
+    });
+
+    test("passes through GPT-5.4 mini, GPT-5.5, and unknown live model ids", async () => {
+        const request = mock(async () => ({
+            data: [
+                {
+                    id: "gpt-5.4-mini",
+                    displayName: "GPT-5.4 Mini",
+                    hidden: false,
+                },
+                {
+                    id: "gpt-5.5",
+                    displayName: "GPT-5.5",
+                    hidden: false,
+                },
+                {
+                    id: "future-model-2026-04-25",
+                    hidden: false,
+                },
+            ],
+            nextCursor: null,
+        }));
+
+        const catalog = new CodexModelCatalog({
+            getConfig: () => createConfig(),
+            createClient: () => ({
+                initialize: async () => undefined,
+                request,
+                onNotification: () => undefined,
+                onExit: () => undefined,
+                stop: async () => undefined,
+            }),
+        });
+
+        const result = await catalog.getProviderModels("codex-main");
+
+        expect(result?.models.map((model) => model.id)).toEqual([
+            "gpt-5.4-mini",
+            "gpt-5.5",
+            "future-model-2026-04-25",
+        ]);
+        expect(result?.models).toContainEqual(
+            expect.objectContaining({
+                id: "future-model-2026-04-25",
+                label: "future-model-2026-04-25",
+            }),
+        );
     });
 
     test("fetches model metadata from v2 agent runtime providers", async () => {
@@ -220,6 +272,105 @@ describe("CodexModelCatalog", () => {
         now += 31_000;
         await catalog.getProviderModels("codex-main");
 
+        expect(request).toHaveBeenCalledTimes(2);
+    });
+
+    test("scopes the in-memory cache to provider runtime configuration", async () => {
+        let config = createConfig();
+        let requestCount = 0;
+        const request = mock(async () => {
+            requestCount += 1;
+            return {
+                data: [
+                    {
+                        id: `live-model-${requestCount}`,
+                        displayName: `Live Model ${requestCount}`,
+                        hidden: false,
+                        supportedReasoningEfforts: [],
+                    },
+                ],
+                nextCursor: null,
+            };
+        });
+
+        const catalog = new CodexModelCatalog({
+            getConfig: () => config,
+            now: () => Date.UTC(2026, 2, 13, 12, 0, 0),
+            createClient: () => ({
+                initialize: async () => undefined,
+                request,
+                onNotification: () => undefined,
+                onExit: () => undefined,
+                stop: async () => undefined,
+            }),
+        });
+
+        await expect(
+            catalog.getProviderModels("codex-main"),
+        ).resolves.toMatchObject({
+            models: [{ id: "live-model-1" }],
+        });
+        await expect(
+            catalog.getProviderModels("codex-main"),
+        ).resolves.toMatchObject({
+            models: [{ id: "live-model-1" }],
+        });
+
+        config = createConfig();
+        config.providers[0]!.codex.command = "codex-next";
+
+        await expect(
+            catalog.getProviderModels("codex-main"),
+        ).resolves.toMatchObject({
+            models: [{ id: "live-model-2" }],
+        });
+        expect(request).toHaveBeenCalledTimes(2);
+    });
+
+    test("scopes v2 agent runtime model cache to inline runtime configuration", async () => {
+        let config = createV2Config();
+        let requestCount = 0;
+        const request = mock(async () => {
+            requestCount += 1;
+            return {
+                data: [
+                    {
+                        id: `agent-runtime-model-${requestCount}`,
+                        displayName: `Agent Runtime Model ${requestCount}`,
+                        hidden: false,
+                        supportedReasoningEfforts: [],
+                    },
+                ],
+                nextCursor: null,
+            };
+        });
+
+        const catalog = new CodexModelCatalog({
+            getConfig: () => config,
+            now: () => Date.UTC(2026, 2, 13, 12, 0, 0),
+            createClient: () => ({
+                initialize: async () => undefined,
+                request,
+                onNotification: () => undefined,
+                onExit: () => undefined,
+                stop: async () => undefined,
+            }),
+        });
+
+        await expect(
+            catalog.getProviderModels("codex-main"),
+        ).resolves.toMatchObject({
+            models: [{ id: "agent-runtime-model-1" }],
+        });
+
+        config = createV2Config();
+        config.agents[0]!.runtime!.cwd = "/srv/codex-next";
+
+        await expect(
+            catalog.getProviderModels("codex-main"),
+        ).resolves.toMatchObject({
+            models: [{ id: "agent-runtime-model-2" }],
+        });
         expect(request).toHaveBeenCalledTimes(2);
     });
 
@@ -324,6 +475,7 @@ describe("CodexModelCatalog", () => {
                                 { reasoningEffort: "xhigh" },
                                 { reasoningEffort: "xhigh" },
                             ],
+                            defaultReasoningEffort: "medium",
                         },
                     ],
                     nextCursor: "page-2",
@@ -382,12 +534,18 @@ describe("CodexModelCatalog", () => {
                     { id: "low", label: "Low" },
                     { id: "xhigh", label: "X-High" },
                 ],
+                defaultVariantId: null,
+                providerMetadata: {
+                    defaultReasoningEffort: "medium",
+                },
             },
             {
                 id: "gpt-5.4-codex-spark",
                 label: "gpt-5.4-codex-spark",
                 supportsReasoning: false,
                 variants: [],
+                defaultVariantId: null,
+                providerMetadata: {},
             },
         ]);
     });

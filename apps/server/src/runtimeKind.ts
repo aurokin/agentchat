@@ -95,6 +95,8 @@ export type ProviderModelCatalogEntry = {
         id: string;
         label: string;
     }>;
+    defaultVariantId?: string | null;
+    providerMetadata?: Record<string, string | number | boolean | null>;
 };
 
 export type RuntimeKind = {

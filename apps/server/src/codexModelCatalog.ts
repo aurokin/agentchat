@@ -43,6 +43,8 @@ function buildFallbackModels(provider: ProviderConfig): ProviderModelsPayload {
                         id: variant.id,
                         label: variant.label,
                     })),
+                defaultVariantId: null,
+                providerMetadata: {},
             })),
     };
 }
@@ -73,6 +75,39 @@ function toBootstrapAgent(provider: ProviderConfig): AgentConfig {
         sortOrder: 0,
         workspaceMode: "shared",
     };
+}
+
+function sortRecordEntries(record: Record<string, string>) {
+    return Object.fromEntries(
+        Object.entries(record).sort(([left], [right]) =>
+            left.localeCompare(right),
+        ),
+    );
+}
+
+function getProviderModelCacheKey(provider: ProviderConfig): string {
+    return JSON.stringify({
+        providerId: provider.id,
+        kind: provider.kind,
+        modelCacheTtlSeconds: provider.modelCacheTtlSeconds,
+        codex: {
+            command: provider.codex.command,
+            args: provider.codex.args,
+            baseEnv: sortRecordEntries(provider.codex.baseEnv),
+            cwd: provider.codex.cwd ?? null,
+        },
+        fallbackModels: provider.models.map((model) => ({
+            id: model.id,
+            label: model.label,
+            enabled: model.enabled,
+            supportsReasoning: model.supportsReasoning,
+            variants: model.variants.map((variant) => ({
+                id: variant.id,
+                label: variant.label,
+                enabled: variant.enabled,
+            })),
+        })),
+    });
 }
 
 export class CodexModelCatalog {
@@ -107,7 +142,8 @@ export class CodexModelCatalog {
         }
 
         const now = this.now();
-        const cached = this.cache.get(provider.id);
+        const cacheKey = getProviderModelCacheKey(provider);
+        const cached = this.cache.get(cacheKey);
         if (cached && cached.expiresAtEpochMs > now) {
             return {
                 providerId: cached.providerId,
@@ -131,7 +167,7 @@ export class CodexModelCatalog {
                 expiresAtEpochMs,
                 models: liveModels,
             };
-            this.cache.set(provider.id, payload);
+            this.cache.set(cacheKey, payload);
             return {
                 providerId: payload.providerId,
                 fetchedAt: payload.fetchedAt,
