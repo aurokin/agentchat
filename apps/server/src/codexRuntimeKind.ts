@@ -9,8 +9,11 @@ import type {
     ProviderModelCatalogEntry,
     RuntimeKind,
     RuntimeKindEvent,
+    RuntimeKindLifecycleResult,
     RuntimeKindSession,
     RuntimeOpenThreadParams,
+    RuntimeProviderEvent,
+    RuntimeProviderEventMetadata,
     RuntimeStartTurnParams,
 } from "./runtimeKind.ts";
 
@@ -92,43 +95,155 @@ function getAgentReasoningText(
 
 function normalizeNotification(
     notification: JsonRpcNotification,
-): RuntimeKindEvent | null {
+): RuntimeKindEvent[] {
     if (notification.method === "codex/event/agent_reasoning") {
         const text = getAgentReasoningText(notification.params);
-        return text ? { type: "reasoning", text } : null;
+        return text ? [{ type: "reasoning", text }] : [];
     }
 
     if (notification.method === "item/agentMessage/delta") {
         const delta = notification.params?.delta;
         return typeof delta === "string"
-            ? { type: "assistant_delta", delta }
-            : null;
+            ? [{ type: "assistant_delta", delta }]
+            : [];
     }
 
     if (notification.method === "turn/aborted") {
-        return { type: "turn_aborted" };
+        return [
+            {
+                type: "provider_event",
+                event: createCodexProviderEvent({
+                    eventType: "codex.turn.aborted",
+                    phase: "completion",
+                    summary: "Codex turn aborted.",
+                    metadata: {},
+                }),
+            },
+            { type: "turn_aborted" },
+        ];
     }
 
     if (notification.method !== "turn/completed") {
-        return null;
+        return [];
     }
 
     const turn = notification.params?.turn as
         | { status?: unknown; error?: { message?: unknown } }
         | undefined;
     const status = turn?.status;
+    const completionEvent: RuntimeKindEvent = {
+        type: "provider_event",
+        event: createCodexCompletionEvent(notification.params),
+    };
     if (status === "completed" || status === "interrupted") {
-        return { type: "turn_completed", status };
+        return [completionEvent, { type: "turn_completed", status }];
     }
 
+    return [
+        completionEvent,
+        {
+            type: "turn_completed",
+            status: "errored",
+            errorMessage:
+                typeof turn?.error?.message === "string"
+                    ? turn.error.message
+                    : "Codex run failed",
+        },
+    ];
+}
+
+function createCodexProviderEvent(params: {
+    eventType: string;
+    phase: RuntimeProviderEvent["phase"];
+    summary: string;
+    metadata: Record<string, RuntimeProviderEventMetadata>;
+}): RuntimeProviderEvent {
     return {
-        type: "turn_completed",
-        status: "errored",
-        errorMessage:
-            typeof turn?.error?.message === "string"
-                ? turn.error.message
-                : "Codex run failed",
+        id: crypto.randomUUID(),
+        providerKind: "codex",
+        eventType: params.eventType,
+        phase: params.phase,
+        summary: params.summary,
+        stable: true,
+        metadata: params.metadata,
     };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function pickString(
+    source: Record<string, unknown> | null,
+    keys: string[],
+): string | null {
+    if (!source) {
+        return null;
+    }
+
+    for (const key of keys) {
+        const value = source[key];
+        if (typeof value === "string" && value.trim().length > 0) {
+            return value;
+        }
+    }
+    return null;
+}
+
+function pickUsageMetadata(
+    source: Record<string, unknown> | null,
+): Record<string, RuntimeProviderEventMetadata> {
+    const usage = source?.usage ?? source?.tokenUsage ?? source?.token_usage;
+    if (!isRecord(usage)) {
+        return {};
+    }
+
+    const metadata: Record<string, RuntimeProviderEventMetadata> = {};
+    for (const [key, value] of Object.entries(usage)) {
+        if (
+            typeof value === "number" ||
+            typeof value === "string" ||
+            typeof value === "boolean" ||
+            value === null
+        ) {
+            metadata[key] = value;
+        }
+    }
+    return metadata;
+}
+
+function createCodexCompletionEvent(
+    params: Record<string, unknown> | undefined,
+): RuntimeProviderEvent {
+    const turn = isRecord(params?.turn) ? params.turn : null;
+    const status = pickString(turn, ["status"]) ?? "unknown";
+    const metadata: Record<string, RuntimeProviderEventMetadata> = {
+        status,
+        ...pickUsageMetadata(turn),
+    };
+    const model = pickString(turn, ["model", "modelId", "model_id"]);
+    const turnId = pickString(turn, ["id", "turnId", "turn_id"]);
+    if (model) {
+        metadata.model = model;
+    }
+    if (turnId) {
+        metadata.turnId = turnId;
+    }
+
+    const errorMessage =
+        isRecord(turn?.error) && typeof turn.error.message === "string"
+            ? turn.error.message
+            : null;
+    if (errorMessage) {
+        metadata.errorMessage = errorMessage;
+    }
+
+    return createCodexProviderEvent({
+        eventType: "codex.turn.completed",
+        phase: "completion",
+        summary: `Codex turn completed with status ${status}.`,
+        metadata,
+    });
 }
 
 function toTitleCase(value: string): string {
@@ -202,13 +317,25 @@ function normalizeLiveModels(
 class CodexRuntimeKindSession implements RuntimeKindSession {
     constructor(private readonly client: CodexClient) {}
 
-    async initialize(): Promise<void> {
+    async initialize(): Promise<RuntimeKindLifecycleResult> {
         await this.client.initialize();
+        return {
+            providerEvents: [
+                createCodexProviderEvent({
+                    eventType: "codex.initialized",
+                    phase: "initialization",
+                    summary: "Codex runtime initialized.",
+                    metadata: {},
+                }),
+            ],
+        };
     }
 
     async openThread(
         params: RuntimeOpenThreadParams,
-    ): Promise<{ threadId: string; isNew: boolean }> {
+    ): Promise<
+        RuntimeKindLifecycleResult & { threadId: string; isNew: boolean }
+    > {
         const threadOpenParams = {
             model: params.modelId,
             cwd: params.cwd,
@@ -236,6 +363,17 @@ class CodexRuntimeKindSession implements RuntimeKindSession {
                 return {
                     threadId: extractThreadId(threadResult),
                     isNew: false,
+                    providerEvents: [
+                        createCodexProviderEvent({
+                            eventType: "codex.thread.resumed",
+                            phase: "thread",
+                            summary: "Codex thread resumed.",
+                            metadata: {
+                                threadId: extractThreadId(threadResult),
+                                requestedModel: params.modelId,
+                            },
+                        }),
+                    ],
                 };
             } catch (error) {
                 if (!isRecoverableThreadResumeError(error)) {
@@ -254,12 +392,23 @@ class CodexRuntimeKindSession implements RuntimeKindSession {
         return {
             threadId: extractThreadId(threadResult),
             isNew: true,
+            providerEvents: [
+                createCodexProviderEvent({
+                    eventType: "codex.thread.started",
+                    phase: "thread",
+                    summary: "Codex thread started.",
+                    metadata: {
+                        threadId: extractThreadId(threadResult),
+                        requestedModel: params.modelId,
+                    },
+                }),
+            ],
         };
     }
 
     async startTurn(
         params: RuntimeStartTurnParams,
-    ): Promise<{ turnId: string }> {
+    ): Promise<RuntimeKindLifecycleResult & { turnId: string }> {
         const turnResult = await this.client.request("turn/start", {
             threadId: params.threadId,
             input: [{ type: "text", text: params.inputText }],
@@ -272,7 +421,23 @@ class CodexRuntimeKindSession implements RuntimeKindSession {
             effort: resolveCodexEffort(params.variantId),
             personality: "pragmatic",
         });
-        return { turnId: extractTurnId(turnResult) };
+        const turnId = extractTurnId(turnResult);
+        return {
+            turnId,
+            providerEvents: [
+                createCodexProviderEvent({
+                    eventType: "codex.turn.started",
+                    phase: "turn",
+                    summary: "Codex turn started.",
+                    metadata: {
+                        turnId,
+                        threadId: params.threadId,
+                        requestedModel: params.modelId,
+                        effort: resolveCodexEffort(params.variantId),
+                    },
+                }),
+            ],
+        };
     }
 
     async interruptTurn(params: {
@@ -284,8 +449,7 @@ class CodexRuntimeKindSession implements RuntimeKindSession {
 
     onEvent(handler: (event: RuntimeKindEvent) => void): void {
         this.client.onNotification((notification) => {
-            const event = normalizeNotification(notification);
-            if (event) {
+            for (const event of normalizeNotification(notification)) {
                 handler(event);
             }
         });

@@ -1138,6 +1138,65 @@ export const recoverStaleRun = internalMutation({
     },
 });
 
+export const providerEvent = internalMutation({
+    args: {
+        chatId: v.id("chats"),
+        userId: v.id("users"),
+        agentId: v.string(),
+        conversationLocalId: v.string(),
+        externalRunId: v.string(),
+        sequence: v.number(),
+        provider: v.string(),
+        providerKind: v.string(),
+        eventId: v.string(),
+        eventType: v.string(),
+        phase: v.string(),
+        summary: v.string(),
+        stable: v.boolean(),
+        metadataJson: v.string(),
+        occurredAt: v.number(),
+    },
+    handler: async (ctx, args) => {
+        const chat = await findCurrentChatByConversationId(ctx, {
+            userId: args.userId,
+            agentId: args.agentId,
+            conversationLocalId: args.conversationLocalId,
+            chatId: args.chatId,
+        });
+        if (!chat) {
+            return;
+        }
+
+        const run = await getRunByExternalId(ctx, args.externalRunId);
+        if (!run) {
+            throw new Error("Run not found");
+        }
+        if (run.chatId !== chat._id || run.provider !== args.provider) {
+            return;
+        }
+
+        await appendRunEvent(ctx, {
+            runId: run._id,
+            chatId: chat._id,
+            userId: args.userId,
+            sequence: args.sequence,
+            kind: "provider_status",
+            messageId: null,
+            data: JSON.stringify({
+                provider: args.provider,
+                providerKind: args.providerKind,
+                eventId: args.eventId,
+                eventType: args.eventType,
+                phase: args.phase,
+                summary: args.summary,
+                stable: args.stable,
+                metadata: args.metadataJson,
+            }),
+            createdAt: args.occurredAt,
+        });
+    },
+});
+
 /**
  * Returns one page of chat agentId+userId+localId tuples. Used by the server
  * for sandbox workspace reconciliation (pruning orphaned directories).

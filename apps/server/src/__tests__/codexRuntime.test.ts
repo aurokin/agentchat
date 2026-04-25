@@ -271,6 +271,7 @@ function createPersistence(
         runFailedCalls: [] as Array<Record<string, unknown>>,
         runInterruptedCalls: [] as Array<Record<string, unknown>>,
         recoverStaleRunCalls: [] as Array<Record<string, unknown>>,
+        providerEventCalls: [] as Array<Record<string, unknown>>,
         async readRuntimeBinding(payload: {
             userId: string;
             agentId: string;
@@ -324,6 +325,9 @@ function createPersistence(
         },
         async recoverStaleRun(payload: Record<string, unknown>) {
             this.recoverStaleRunCalls.push(payload);
+        },
+        async providerEvent(payload: Record<string, unknown>) {
+            this.providerEventCalls.push(payload);
         },
     };
 }
@@ -538,6 +542,74 @@ describe("CodexRuntimeManager", () => {
                 }
             ).effort,
         ).toBe("high");
+    });
+
+    test("persists sanitized Codex provider metadata events", async () => {
+        const config = createConfig();
+        const persistence = createPersistence(null);
+        const fakeClient = new FakeCodexClient({ autoComplete: false });
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: () => fakeClient,
+        });
+
+        const sendPromise = manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => {},
+        });
+
+        await waitFor(() =>
+            fakeClient.requests.some(
+                (request) => request.method === "turn/start",
+            ),
+        );
+        fakeClient.emit({
+            method: "turn/completed",
+            params: {
+                turn: {
+                    id: "turn-1",
+                    status: "completed",
+                    model: "gpt-5.3-codex",
+                    usage: {
+                        inputTokens: 12,
+                        outputTokens: 3,
+                    },
+                },
+            },
+        });
+        await sendPromise;
+        await waitFor(() => persistence.providerEventCalls.length >= 4);
+
+        expect(
+            persistence.providerEventCalls.map((event) => event.eventType),
+        ).toEqual([
+            "codex.initialized",
+            "codex.thread.started",
+            "codex.turn.started",
+            "codex.turn.completed",
+        ]);
+        expect(persistence.providerEventCalls[0]).toMatchObject({
+            conversationLocalId: "chat-1",
+            externalRunId: expect.any(String),
+            provider: "codex-default",
+            providerKind: "codex",
+            phase: "initialization",
+            stable: true,
+        });
+        expect(
+            JSON.parse(
+                persistence.providerEventCalls[3]!.metadataJson as string,
+            ),
+        ).toMatchObject({
+            status: "completed",
+            model: "gpt-5.3-codex",
+            turnId: "turn-1",
+            inputTokens: 12,
+            outputTokens: 3,
+        });
     });
 
     test("starts Codex runtimes from v2 agent runtime config", async () => {

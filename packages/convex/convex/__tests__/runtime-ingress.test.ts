@@ -5,6 +5,7 @@ import {
     listAllChatLocalIds,
     messageDelta,
     messageStarted,
+    providerEvent,
     readRuntimeBinding,
     recoverStaleRun,
     runCompleted,
@@ -21,6 +22,95 @@ function runHandler(handler: HandlerExport, ctx: unknown, args: unknown) {
 }
 
 describe("runtime ingress", () => {
+    test("providerEvent appends sanitized provider metadata to run events", async () => {
+        const insert = mock(async () => "runEvents:1");
+        const chatCollect = mock(async () => [
+            {
+                _id: "chats:1",
+                userId: "users:test",
+                agentId: "agent-1",
+                localId: "chat-1",
+            },
+        ]);
+        const runUnique = mock(async () => ({
+            _id: "runs:1",
+            chatId: "chats:1",
+            userId: "users:test",
+            externalId: "run:test",
+            provider: "codex-default",
+            status: "running",
+        }));
+        const query = mock((table: string) => {
+            if (table === "chats") {
+                return {
+                    withIndex: mock(() => ({
+                        collect: chatCollect,
+                    })),
+                };
+            }
+
+            return {
+                withIndex: mock(() => ({
+                    unique: runUnique,
+                })),
+            };
+        });
+        const ctx = {
+            db: {
+                query,
+                insert,
+            },
+        };
+
+        await expect(
+            runHandler(providerEvent as unknown as HandlerExport, ctx, {
+                chatId: "chats:1",
+                userId: "users:test",
+                agentId: "agent-1",
+                conversationLocalId: "chat-1",
+                externalRunId: "run:test",
+                sequence: 3,
+                provider: "codex-default",
+                providerKind: "codex",
+                eventId: "event-1",
+                eventType: "codex.turn.completed",
+                phase: "completion",
+                summary: "Codex turn completed with status completed.",
+                stable: true,
+                metadataJson: JSON.stringify({
+                    status: "completed",
+                    inputTokens: 12,
+                }),
+                occurredAt: 123,
+            }),
+        ).resolves.toBeUndefined();
+
+        expect(insert).toHaveBeenCalledWith("run_events", {
+            runId: "runs:1",
+            chatId: "chats:1",
+            userId: "users:test",
+            sequence: 3,
+            kind: "provider_status",
+            messageId: null,
+            textDelta: null,
+            errorMessage: null,
+            data: JSON.stringify({
+                provider: "codex-default",
+                providerKind: "codex",
+                eventId: "event-1",
+                eventType: "codex.turn.completed",
+                phase: "completion",
+                summary: "Codex turn completed with status completed.",
+                stable: true,
+                metadata: JSON.stringify({
+                    status: "completed",
+                    inputTokens: 12,
+                }),
+            }),
+            createdAt: 123,
+        });
+    });
+
     test("runtimeBinding no-ops when the conversation no longer exists", async () => {
         const insert = mock(async () => undefined);
         const patch = mock(async () => undefined);
@@ -711,7 +801,8 @@ describe("runtime ingress", () => {
                           localId: "chat-1",
                       },
                   ]
-                : []);
+                : [],
+        );
         const legacyCollect = mock(async () => []);
         const withIndex = mock((indexName: string) =>
             indexName === "by_userId_and_agentId_and_localId"

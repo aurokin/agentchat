@@ -35,8 +35,7 @@ describe("runtime ingress http", () => {
 
         expect(response.status).toBe(400);
         await expect(response.json()).resolves.toEqual({
-            error:
-                "ArgumentValidationError: Object is missing required field `agentId`.",
+            error: "ArgumentValidationError: Object is missing required field `agentId`.",
         });
     });
 
@@ -49,8 +48,7 @@ describe("runtime ingress http", () => {
 
         expect(response.status).toBe(400);
         await expect(response.json()).resolves.toEqual({
-            error:
-                "ArgumentValidationError: Object is missing required field `agentId`.",
+            error: "ArgumentValidationError: Object is missing required field `agentId`.",
         });
     });
 

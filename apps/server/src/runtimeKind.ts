@@ -2,6 +2,37 @@ import type { AgentConfig, ProviderConfig } from "./config.ts";
 
 export type RuntimeKindId = "codex";
 
+export type RuntimeProviderEventPhase =
+    | "initialization"
+    | "thread"
+    | "turn"
+    | "usage"
+    | "model"
+    | "completion"
+    | "diagnostic";
+
+export type RuntimeProviderEventMetadata =
+    | string
+    | number
+    | boolean
+    | null
+    | RuntimeProviderEventMetadata[]
+    | { [key: string]: RuntimeProviderEventMetadata };
+
+export type RuntimeProviderEvent = {
+    id: string;
+    providerKind: RuntimeKindId;
+    eventType: string;
+    phase: RuntimeProviderEventPhase;
+    summary: string;
+    stable: boolean;
+    metadata: Record<string, RuntimeProviderEventMetadata>;
+};
+
+export type RuntimeKindLifecycleResult = {
+    providerEvents?: RuntimeProviderEvent[];
+};
+
 export type RuntimeKindEvent =
     | {
           type: "reasoning";
@@ -18,6 +49,10 @@ export type RuntimeKindEvent =
           type: "turn_completed";
           status: "completed" | "interrupted" | "errored";
           errorMessage?: string;
+      }
+    | {
+          type: "provider_event";
+          event: RuntimeProviderEvent;
       };
 
 export type RuntimeOpenThreadParams = {
@@ -37,11 +72,15 @@ export type RuntimeStartTurnParams = {
 };
 
 export type RuntimeKindSession = {
-    initialize(): Promise<void>;
+    initialize(): Promise<RuntimeKindLifecycleResult>;
     openThread(
         params: RuntimeOpenThreadParams,
-    ): Promise<{ threadId: string; isNew: boolean }>;
-    startTurn(params: RuntimeStartTurnParams): Promise<{ turnId: string }>;
+    ): Promise<
+        RuntimeKindLifecycleResult & { threadId: string; isNew: boolean }
+    >;
+    startTurn(
+        params: RuntimeStartTurnParams,
+    ): Promise<RuntimeKindLifecycleResult & { turnId: string }>;
     interruptTurn(params: { threadId: string; turnId: string }): Promise<void>;
     onEvent(handler: (event: RuntimeKindEvent) => void): void;
     onExit(handler: (error: Error) => void): void;

@@ -11,7 +11,9 @@ import {
 import type {
     RuntimeKind,
     RuntimeKindEvent,
+    RuntimeKindLifecycleResult,
     RuntimeKindSession,
+    RuntimeProviderEvent,
 } from "./runtimeKind.ts";
 import type {
     ConversationHistoryEntry,
@@ -63,6 +65,7 @@ type ConversationRuntime = {
     cwd: string;
     session: RuntimeKindSession;
     threadId: string;
+    pendingProviderEvents: RuntimeProviderEvent[];
     activeTurn: ActiveTurn | null;
     idleTimer: ReturnType<typeof setTimeout> | null;
     subscribers: Map<string, RuntimeSubscriber>;
@@ -559,6 +562,10 @@ export class CodexRuntimeManager {
 
                     activeTurn.turnId = turnResult.turnId;
                     runtime.modelId = params.command.payload.modelId;
+                    const providerEvents = [
+                        ...runtime.pendingProviderEvents.splice(0),
+                        ...(turnResult.providerEvents ?? []),
+                    ];
 
                     if (
                         this.runtimes.get(runtime.key) !== runtime ||
@@ -589,6 +596,14 @@ export class CodexRuntimeManager {
                             content: "",
                         }),
                     );
+
+                    for (const providerEvent of providerEvents) {
+                        this.recordProviderEvent(
+                            runtime,
+                            activeTurn,
+                            providerEvent,
+                        );
+                    }
 
                     const queuedEvents = activeTurn.queuedEvents.splice(0);
                     for (const queuedEvent of queuedEvents) {
@@ -1171,7 +1186,10 @@ export class CodexRuntimeManager {
                 agent: { ...resources.agent, rootPath: cwd },
             });
             initializationState.session = session;
-            await session.initialize();
+            const initializeResult = await session.initialize();
+            const pendingProviderEvents = [
+                ...(initializeResult.providerEvents ?? []),
+            ];
             await this.throwIfRuntimeInitializationCancelled({
                 initializationState,
                 session,
@@ -1217,7 +1235,7 @@ export class CodexRuntimeManager {
                 )
                     ? persistedBinding
                     : null;
-            const { threadId, isNew } = await this.openThread({
+            const openThreadResult = await this.openThread({
                 session,
                 provider: resources.provider,
                 bindingProviderId: resumableBinding?.provider ?? null,
@@ -1225,6 +1243,10 @@ export class CodexRuntimeManager {
                 modelId: params.command.payload.modelId,
                 cwd,
             });
+            const { threadId, isNew } = openThreadResult;
+            pendingProviderEvents.push(
+                ...(openThreadResult.providerEvents ?? []),
+            );
             await this.throwIfRuntimeInitializationCancelled({
                 initializationState,
                 session,
@@ -1266,6 +1288,7 @@ export class CodexRuntimeManager {
                 cwd,
                 session,
                 threadId,
+                pendingProviderEvents,
                 activeTurn: null,
                 idleTimer: null,
                 subscribers: new Map(),
@@ -1667,7 +1690,9 @@ export class CodexRuntimeManager {
         bindingThreadId: string | null;
         modelId: string;
         cwd: string;
-    }): Promise<{ threadId: string; isNew: boolean }> {
+    }): Promise<
+        RuntimeKindLifecycleResult & { threadId: string; isNew: boolean }
+    > {
         return await params.session.openThread({
             bindingProviderId: params.bindingProviderId,
             bindingThreadId: params.bindingThreadId,
@@ -1786,6 +1811,11 @@ export class CodexRuntimeManager {
         }
         if (activeTurn.pendingRunStartPersistence) {
             activeTurn.queuedEvents.push(event);
+            return;
+        }
+
+        if (event.type === "provider_event") {
+            this.recordProviderEvent(runtime, activeTurn, event.event);
             return;
         }
 
@@ -1911,6 +1941,41 @@ export class CodexRuntimeManager {
             finalStatus: "errored",
             errorMessage: event.errorMessage ?? "Runtime run failed",
         });
+    }
+
+    private recordProviderEvent(
+        runtime: ConversationRuntime,
+        activeTurn: ActiveTurn,
+        providerEvent: RuntimeProviderEvent,
+    ): void {
+        const sequence = activeTurn.nextSequence++;
+        const occurredAt = this.nextPersistenceTimestamp();
+        const metadataJson = JSON.stringify(providerEvent.metadata);
+
+        void this.persistence
+            .providerEvent({
+                chatId: runtime.chatId,
+                userId: activeTurn.userId,
+                agentId: runtime.agentId,
+                conversationLocalId: runtime.conversationId,
+                externalRunId: activeTurn.runId,
+                sequence,
+                provider: runtime.provider.id,
+                providerKind: providerEvent.providerKind,
+                eventId: providerEvent.id,
+                eventType: providerEvent.eventType,
+                phase: providerEvent.phase,
+                summary: providerEvent.summary,
+                stable: providerEvent.stable,
+                metadataJson,
+                occurredAt,
+            })
+            .catch((error) => {
+                console.error(
+                    "[agentchat-server] failed to persist provider event",
+                    error,
+                );
+            });
     }
 
     private transitionStatusMessageToAssistantOutput(

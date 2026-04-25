@@ -16,6 +16,7 @@ const runtimeInternal = internal as unknown as {
         runInterrupted: any;
         runFailed: any;
         recoverStaleRun: any;
+        providerEvent: any;
         runtimeBinding: any;
         readRuntimeBinding: any;
         listAllChatLocalIds: any;
@@ -151,6 +152,10 @@ runtimeRoute({
 runtimeRoute({
     path: "/runtime/run-stale",
     mutation: runtimeInternal.runtimeIngress.recoverStaleRun,
+});
+runtimeRoute({
+    path: "/runtime/provider-event",
+    mutation: runtimeInternal.runtimeIngress.providerEvent,
 });
 runtimeRoute({
     path: "/runtime/runtime-binding",

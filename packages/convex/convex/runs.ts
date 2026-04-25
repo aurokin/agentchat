@@ -49,6 +49,7 @@ type RunEventSummary = {
         | "provider_status";
     textDelta: string | null;
     errorMessage: string | null;
+    data: string | null;
     messageLocalId: string | null;
     createdAt: number;
 };
@@ -144,6 +145,7 @@ export const listEventsByExternalId = query({
                 kind: event.kind,
                 textDelta: event.textDelta,
                 errorMessage: event.errorMessage,
+                data: event.data,
                 messageLocalId: message?.localId ?? null,
                 createdAt: event.createdAt,
             });
