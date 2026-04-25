@@ -713,7 +713,7 @@ describe("CodexRuntimeManager", () => {
                 stopError,
             ]);
             expect(consoleErrorCalls).toContainEqual([
-                "[agentchat-server] failed to stop Codex client during failed runtime initialization cleanup",
+                "[agentchat-server] failed to stop runtime session during failed runtime initialization cleanup",
                 stopError,
             ]);
         } finally {
@@ -1502,7 +1502,7 @@ describe("CodexRuntimeManager", () => {
                 provider: config.providers[0]!,
                 agent: config.agents[0]!,
                 cwd: config.agents[0]!.rootPath,
-                client: fakeClient,
+                session: fakeClient,
                 threadId: "thread-fresh",
                 activeTurn: null,
                 idleTimer: null,
@@ -1593,7 +1593,7 @@ describe("CodexRuntimeManager", () => {
                 provider: config.providers[0]!,
                 agent: config.agents[0]!,
                 cwd: config.agents[0]!.rootPath,
-                client: fakeClient,
+                session: fakeClient,
                 threadId: "thread-fresh",
                 activeTurn: null,
                 idleTimer: null,
@@ -1631,7 +1631,7 @@ describe("CodexRuntimeManager", () => {
                 ).runtimes.get(runtime.key as string),
             ).toBeUndefined();
             expect(consoleErrorCalls).toContainEqual([
-                "[agentchat-server] failed to stop Codex client during idle runtime expiration",
+                "[agentchat-server] failed to stop runtime session during idle runtime expiration",
                 stopError,
             ]);
         } finally {
@@ -1991,7 +1991,7 @@ describe("CodexRuntimeManager", () => {
                 secondClient.requests.map((request) => request.method),
             ).toEqual(["thread/start", "turn/start"]);
             expect(consoleErrorCalls).toContainEqual([
-                "[agentchat-server] failed to stop Codex client during runtime disposal",
+                "[agentchat-server] failed to stop runtime session during runtime disposal",
                 stopError,
             ]);
         } finally {
@@ -3253,7 +3253,7 @@ describe("CodexRuntimeManager", () => {
                 },
             },
             idleTimer: null,
-            client,
+            session: client,
         });
 
         expect(existsSync(workspacePath)).toBe(true);
@@ -3334,7 +3334,7 @@ describe("CodexRuntimeManager", () => {
             agentId: "agent-1",
             activeTurn: null,
             idleTimer: null,
-            client,
+            session: client,
         });
 
         expect(existsSync(workspacePath)).toBe(true);
@@ -3440,7 +3440,7 @@ describe("CodexRuntimeManager", () => {
             activeTurn: null,
             idleTimer: null,
             subscribers: new Map(),
-            client: new FakeCodexClient(),
+            session: new FakeCodexClient(),
         });
 
         config.agents[0] = {
@@ -3567,7 +3567,7 @@ describe("CodexRuntimeManager", () => {
                             pendingRuntimeInitializations: Map<
                                 string,
                                 {
-                                    client: FakeCodexClient | null;
+                                    session: unknown;
                                 }
                             >;
                         }
@@ -3577,7 +3577,7 @@ describe("CodexRuntimeManager", () => {
                     ][0];
                     return (
                         pendingInitializations.size === 1 &&
-                        pendingInitialization?.client === client
+                        pendingInitialization?.session !== null
                     );
                 })(),
         );
@@ -3723,7 +3723,7 @@ describe("CodexRuntimeManager", () => {
                 }
             ).pendingRuntimeInitializations.set(key, {
                 cancelReason: null,
-                client,
+                session: client,
                 promise: new Promise(() => undefined),
             });
 
@@ -3740,7 +3740,7 @@ describe("CodexRuntimeManager", () => {
 
             expect(client.stopped).toBe(true);
             expect(consoleErrorCalls).toContainEqual([
-                "[agentchat-server] failed to stop Codex client during pending runtime initialization cancellation",
+                "[agentchat-server] failed to stop runtime session during pending runtime initialization cancellation",
                 stopError,
             ]);
         } finally {
@@ -3802,7 +3802,7 @@ describe("CodexRuntimeManager", () => {
                             pendingRuntimeInitializations: Map<
                                 string,
                                 {
-                                    client: FakeCodexClient | null;
+                                    session: unknown;
                                 }
                             >;
                         }
@@ -3812,7 +3812,7 @@ describe("CodexRuntimeManager", () => {
                     ][0];
                     return (
                         pendingInitializations.size === 1 &&
-                        pendingInitialization?.client === client
+                        pendingInitialization?.session !== null
                     );
                 })(),
         );

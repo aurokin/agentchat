@@ -1,33 +1,10 @@
 import { getProviderConfig } from "./config.ts";
 import type { AgentConfig, AgentchatConfig, ProviderConfig } from "./config.ts";
-import {
-    CodexAppServerClient,
-    type CodexClient,
-    type CreateCodexClient,
-} from "./codexAppServerClient.ts";
+import type { CreateCodexClient } from "./codexAppServerClient.ts";
+import { CodexRuntimeKind } from "./codexRuntimeKind.ts";
+import type { ProviderModelCatalogEntry, RuntimeKind } from "./runtimeKind.ts";
 
-type CodexModelListResponse = {
-    data?: Array<{
-        id?: string;
-        displayName?: string;
-        hidden?: boolean;
-        supportedReasoningEfforts?: Array<{
-            reasoningEffort?: string;
-        }>;
-        defaultReasoningEffort?: string;
-    }>;
-    nextCursor?: string | null;
-};
-
-export type ProviderModelCatalogEntry = {
-    id: string;
-    label: string;
-    supportsReasoning: boolean;
-    variants: Array<{
-        id: string;
-        label: string;
-    }>;
-};
+export type { ProviderModelCatalogEntry };
 
 type ProviderModelsPayload = {
     providerId: string;
@@ -48,32 +25,6 @@ type CachedProviderModels = ProviderModelsPayload & {
 };
 
 const EMPTY_CATALOG_ERROR = "Codex model catalog returned no visible models.";
-
-function toTitleCase(value: string): string {
-    return value
-        .split(/[-_]/g)
-        .filter(Boolean)
-        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-        .join(" ");
-}
-
-function mapCodexEffortToVariant(
-    effort: string,
-): { id: string; label: string } | null {
-    if (effort === "none") {
-        return null;
-    }
-
-    switch (effort) {
-        case "xhigh":
-            return { id: effort, label: "X-High" };
-        default:
-            return {
-                id: effort,
-                label: toTitleCase(effort),
-            };
-    }
-}
 
 function buildFallbackModels(provider: ProviderConfig): ProviderModelsPayload {
     return {
@@ -124,63 +75,22 @@ function toBootstrapAgent(provider: ProviderConfig): AgentConfig {
     };
 }
 
-function normalizeLiveModels(
-    result: CodexModelListResponse,
-): ProviderModelCatalogEntry[] {
-    const items = result.data ?? [];
-
-    return items
-        .filter((item) => item.hidden !== true && typeof item.id === "string")
-        .map((item) => {
-            const seenVariantIds = new Set<string>();
-            const variants =
-                item.supportedReasoningEfforts
-                    ?.map((effortOption) =>
-                        mapCodexEffortToVariant(
-                            effortOption.reasoningEffort ?? "",
-                        ),
-                    )
-                    .filter(
-                        (variant): variant is { id: string; label: string } => {
-                            if (!variant) {
-                                return false;
-                            }
-                            if (seenVariantIds.has(variant.id)) {
-                                return false;
-                            }
-                            seenVariantIds.add(variant.id);
-                            return true;
-                        },
-                    ) ?? [];
-
-            return {
-                id: item.id!,
-                label:
-                    typeof item.displayName === "string" &&
-                    item.displayName.length > 0
-                        ? item.displayName
-                        : item.id!,
-                supportsReasoning: variants.length > 0,
-                variants,
-            };
-        });
-}
-
 export class CodexModelCatalog {
     private readonly getConfig: () => AgentchatConfig;
-    private readonly createClient: CreateCodexClient;
+    private readonly runtimeKind: RuntimeKind;
     private readonly now: () => number;
     private readonly cache = new Map<string, CachedProviderModels>();
 
     constructor(params: {
         getConfig: () => AgentchatConfig;
         createClient?: CreateCodexClient;
+        runtimeKind?: RuntimeKind;
         now?: () => number;
     }) {
         this.getConfig = params.getConfig;
-        this.createClient =
-            params.createClient ??
-            ((clientParams) => new CodexAppServerClient(clientParams));
+        this.runtimeKind =
+            params.runtimeKind ??
+            new CodexRuntimeKind({ createClient: params.createClient });
         this.now = params.now ?? (() => Date.now());
     }
 
@@ -280,31 +190,9 @@ export class CodexModelCatalog {
     private async fetchLiveModels(
         provider: ProviderConfig,
     ): Promise<ProviderModelCatalogEntry[]> {
-        const client = this.createClient({
+        return await this.runtimeKind.listModels({
             provider,
             agent: toBootstrapAgent(provider),
         });
-
-        try {
-            await client.initialize();
-
-            const items: ProviderModelCatalogEntry[] = [];
-            let cursor: string | null = null;
-
-            do {
-                const result = (await client.request("model/list", {
-                    limit: 100,
-                    cursor,
-                    includeHidden: false,
-                })) as CodexModelListResponse;
-
-                items.push(...normalizeLiveModels(result));
-                cursor = result.nextCursor ?? null;
-            } while (cursor);
-
-            return items;
-        } finally {
-            await client.stop();
-        }
     }
 }

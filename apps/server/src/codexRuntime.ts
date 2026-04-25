@@ -3,12 +3,16 @@ import path from "node:path";
 import { getProviderConfig } from "./config.ts";
 import type { AgentchatConfig, AgentConfig, ProviderConfig } from "./config.ts";
 import { canonicalizePathForComparison } from "./pathComparison.ts";
+import { type CreateCodexClient } from "./codexAppServerClient.ts";
 import {
-    CodexAppServerClient,
-    type CodexClient,
-    type CreateCodexClient,
-    type JsonRpcNotification,
-} from "./codexAppServerClient.ts";
+    CodexRuntimeKind,
+    isRecoverableThreadResumeError,
+} from "./codexRuntimeKind.ts";
+import type {
+    RuntimeKind,
+    RuntimeKindEvent,
+    RuntimeKindSession,
+} from "./runtimeKind.ts";
 import type {
     ConversationHistoryEntry,
     ConversationSendCommand,
@@ -42,7 +46,7 @@ type ActiveTurn = {
     inFlightDeltaFlush: Promise<void> | null;
     pendingRunStartPersistence: Promise<void> | null;
     pendingMessageStartPersistence: Promise<void> | null;
-    queuedNotifications: JsonRpcNotification[];
+    queuedEvents: RuntimeKindEvent[];
     reject: (error: Error) => void;
     resolve: () => void;
 };
@@ -57,7 +61,7 @@ type ConversationRuntime = {
     provider: ProviderConfig;
     agent: AgentConfig;
     cwd: string;
-    client: CodexClient;
+    session: RuntimeKindSession;
     threadId: string;
     activeTurn: ActiveTurn | null;
     idleTimer: ReturnType<typeof setTimeout> | null;
@@ -92,7 +96,7 @@ type RuntimeKeyParts = {
 
 type PendingRuntimeInitialization = {
     cancelReason: Error | null;
-    client: CodexClient | null;
+    session: RuntimeKindSession | null;
     promise: Promise<{ runtime: ConversationRuntime; isNew: boolean }>;
 };
 
@@ -232,28 +236,6 @@ function mergeRuntimeSubscribers(
     return merged;
 }
 
-function extractThreadId(result: unknown): string {
-    const threadId = (result as { thread?: { id?: unknown } })?.thread?.id;
-    invariant(typeof threadId === "string", "Codex thread id missing");
-    return threadId;
-}
-
-function extractTurnId(result: unknown): string {
-    const turnId = (result as { turn?: { id?: unknown } })?.turn?.id;
-    invariant(typeof turnId === "string", "Codex turn id missing");
-    return turnId;
-}
-
-const RECOVERABLE_THREAD_RESUME_ERROR_SNIPPETS = [
-    "not found",
-    "missing thread",
-    "no such thread",
-    "unknown thread",
-    "does not exist",
-    "no rollout found",
-    "is closing",
-];
-
 function isRecoverablePersistenceMissingResource(error: unknown): boolean {
     const message =
         error instanceof Error ? error.message : String(error ?? "");
@@ -263,14 +245,7 @@ function isRecoverablePersistenceMissingResource(error: unknown): boolean {
     );
 }
 
-export function isRecoverableThreadResumeError(error: unknown): boolean {
-    const message = (
-        error instanceof Error ? error.message : String(error)
-    ).toLowerCase();
-    return RECOVERABLE_THREAD_RESUME_ERROR_SNIPPETS.some((snippet) =>
-        message.includes(snippet),
-    );
-}
+export { isRecoverableThreadResumeError };
 
 export function buildInitialTurnText(
     history: ConversationHistoryEntry[],
@@ -300,32 +275,6 @@ export function buildInitialTurnText(
     ].join("\n\n");
 }
 
-function resolveCodexEffort(command: ConversationSendCommand): string {
-    return command.payload.variantId ?? "medium";
-}
-
-function getCodexEventMessage(
-    params: Record<string, unknown> | undefined,
-): Record<string, unknown> | null {
-    const message = params?.msg;
-    return message && typeof message === "object"
-        ? (message as Record<string, unknown>)
-        : null;
-}
-
-function getAgentReasoningText(
-    params: Record<string, unknown> | undefined,
-): string | null {
-    const message = getCodexEventMessage(params);
-    const text =
-        typeof message?.text === "string"
-            ? message.text
-            : typeof params?.text === "string"
-              ? params.text
-              : null;
-    return text?.trim() ? text.trim() : null;
-}
-
 export class CodexRuntimeManager {
     private readonly runtimes = new Map<string, ConversationRuntime>();
     private readonly pendingSubscriptions = new Map<
@@ -340,7 +289,7 @@ export class CodexRuntimeManager {
     >();
     private readonly getConfig: () => AgentchatConfig;
     private readonly persistence: RuntimePersistenceClient;
-    private readonly createClient: CreateCodexClient;
+    private readonly runtimeKind: RuntimeKind;
     private readonly workspaceManager: WorkspaceManager | null;
     private readonly pendingRuntimeDeleteWaitMs: number;
     private lastPersistenceTimestamp = 0;
@@ -349,14 +298,15 @@ export class CodexRuntimeManager {
         getConfig: () => AgentchatConfig;
         persistence: RuntimePersistenceClient;
         createClient?: CreateCodexClient;
+        runtimeKind?: RuntimeKind;
         workspaceManager?: WorkspaceManager;
         pendingRuntimeDeleteWaitMs?: number;
     }) {
         this.getConfig = params.getConfig;
         this.persistence = params.persistence;
-        this.createClient =
-            params.createClient ??
-            ((clientParams) => new CodexAppServerClient(clientParams));
+        this.runtimeKind =
+            params.runtimeKind ??
+            new CodexRuntimeKind({ createClient: params.createClient });
         this.workspaceManager = params.workspaceManager ?? null;
         this.pendingRuntimeDeleteWaitMs =
             params.pendingRuntimeDeleteWaitMs ?? PENDING_RUNTIME_DELETE_WAIT_MS;
@@ -546,7 +496,7 @@ export class CodexRuntimeManager {
                 inFlightDeltaFlush: null,
                 pendingRunStartPersistence: null,
                 pendingMessageStartPersistence: null,
-                queuedNotifications: [],
+                queuedEvents: [],
                 reject,
                 resolve,
             };
@@ -599,23 +549,15 @@ export class CodexRuntimeManager {
                           )
                         : params.command.payload.content;
 
-                    const turnResult = await runtime.client.request(
-                        "turn/start",
-                        {
-                            threadId: runtime.threadId,
-                            input: [{ type: "text", text: inputText }],
-                            cwd: runtime.cwd,
-                            approvalPolicy: "never",
-                            sandboxPolicy: {
-                                type: "dangerFullAccess",
-                            },
-                            model: params.command.payload.modelId,
-                            effort: resolveCodexEffort(params.command),
-                            personality: "pragmatic",
-                        },
-                    );
+                    const turnResult = await runtime.session.startTurn({
+                        threadId: runtime.threadId,
+                        inputText,
+                        cwd: runtime.cwd,
+                        modelId: params.command.payload.modelId,
+                        variantId: params.command.payload.variantId ?? null,
+                    });
 
-                    activeTurn.turnId = extractTurnId(turnResult);
+                    activeTurn.turnId = turnResult.turnId;
                     runtime.modelId = params.command.payload.modelId;
 
                     if (
@@ -648,10 +590,9 @@ export class CodexRuntimeManager {
                         }),
                     );
 
-                    const queuedNotifications =
-                        activeTurn.queuedNotifications.splice(0);
-                    for (const queuedNotification of queuedNotifications) {
-                        this.handleNotification(runtime, queuedNotification);
+                    const queuedEvents = activeTurn.queuedEvents.splice(0);
+                    for (const queuedEvent of queuedEvents) {
+                        this.handleRuntimeEvent(runtime, queuedEvent);
                     }
                 } catch (error) {
                     const errorMessage =
@@ -660,7 +601,7 @@ export class CodexRuntimeManager {
                             : "Failed to start Codex turn";
                     if (runtime.activeTurn?.turnId) {
                         try {
-                            await runtime.client.request("turn/interrupt", {
+                            await runtime.session.interruptTurn({
                                 threadId: runtime.threadId,
                                 turnId: runtime.activeTurn.turnId,
                             });
@@ -677,7 +618,7 @@ export class CodexRuntimeManager {
                     const failedTurn = runtime.activeTurn;
                     runtime.activeTurn = null;
                     if (failedTurn) {
-                        failedTurn.queuedNotifications.length = 0;
+                        failedTurn.queuedEvents.length = 0;
                         try {
                             await this.persistence.runFailed({
                                 chatId: runtime.chatId,
@@ -774,7 +715,7 @@ export class CodexRuntimeManager {
             return;
         }
 
-        await runtime.client.request("turn/interrupt", {
+        await runtime.session.interruptTurn({
             threadId: runtime.threadId,
             turnId: runtime.activeTurn.turnId,
         });
@@ -1092,7 +1033,7 @@ export class CodexRuntimeManager {
         }
         const initializationState: PendingRuntimeInitialization = {
             cancelReason: null,
-            client: null,
+            session: null,
             promise: Promise.resolve(null as never),
         };
         const initialization = this.initializeRuntime(
@@ -1135,7 +1076,14 @@ export class CodexRuntimeManager {
             });
         let shouldResetConversationState = false;
         if (existing) {
-            if (shouldRecycleRuntime(existing, resources, desiredCwd)) {
+            if (
+                shouldRecycleRuntime(
+                    existing,
+                    resources,
+                    desiredCwd,
+                    this.runtimeKind,
+                )
+            ) {
                 if (existing.activeTurn) {
                     return { runtime: existing, isNew: false };
                 }
@@ -1188,7 +1136,7 @@ export class CodexRuntimeManager {
         }
 
         let cwd = resources.agent.rootPath;
-        let client: CodexClient | null = null;
+        let session: RuntimeKindSession | null = null;
         let cleanupWorkspaceOnFailure = false;
         try {
             const workspaceState = this.workspaceManager
@@ -1206,7 +1154,7 @@ export class CodexRuntimeManager {
             cleanupWorkspaceOnFailure = workspaceState.cleanupOnFailure;
             await this.throwIfRuntimeInitializationCancelled({
                 initializationState,
-                client: null,
+                session: null,
                 agent: resources.agent,
                 userId: params.userId,
                 conversationId: params.command.payload.conversationId,
@@ -1218,15 +1166,15 @@ export class CodexRuntimeManager {
                 cwd,
             );
 
-            client = this.createClient({
+            session = this.runtimeKind.createSession({
                 provider: resources.provider,
                 agent: { ...resources.agent, rootPath: cwd },
             });
-            initializationState.client = client;
-            await client.initialize();
+            initializationState.session = session;
+            await session.initialize();
             await this.throwIfRuntimeInitializationCancelled({
                 initializationState,
-                client,
+                session,
                 agent: resources.agent,
                 userId: params.userId,
                 conversationId: params.command.payload.conversationId,
@@ -1246,7 +1194,7 @@ export class CodexRuntimeManager {
             });
             await this.throwIfRuntimeInitializationCancelled({
                 initializationState,
-                client,
+                session,
                 agent: resources.agent,
                 userId: params.userId,
                 conversationId: params.command.payload.conversationId,
@@ -1270,15 +1218,16 @@ export class CodexRuntimeManager {
                     ? persistedBinding
                     : null;
             const { threadId, isNew } = await this.openThread({
-                client,
-                resources,
-                binding: resumableBinding,
+                session,
+                provider: resources.provider,
+                bindingProviderId: resumableBinding?.provider ?? null,
+                bindingThreadId: resumableBinding?.providerThreadId ?? null,
                 modelId: params.command.payload.modelId,
                 cwd,
             });
             await this.throwIfRuntimeInitializationCancelled({
                 initializationState,
-                client,
+                session,
                 agent: resources.agent,
                 userId: params.userId,
                 conversationId: params.command.payload.conversationId,
@@ -1315,7 +1264,7 @@ export class CodexRuntimeManager {
                 provider: resources.provider,
                 agent: resources.agent,
                 cwd,
-                client,
+                session,
                 threadId,
                 activeTurn: null,
                 idleTimer: null,
@@ -1336,16 +1285,16 @@ export class CodexRuntimeManager {
                 );
             }
 
-            client.onNotification((notification) => {
-                this.handleNotification(runtime, notification);
+            session.onEvent((event) => {
+                this.handleRuntimeEvent(runtime, event);
             });
-            client.onExit((error) => {
+            session.onExit((error) => {
                 this.handleRuntimeExit(runtime, error);
             });
 
             await this.throwIfRuntimeInitializationCancelled({
                 initializationState,
-                client,
+                session,
                 agent: resources.agent,
                 userId: params.userId,
                 conversationId: params.command.payload.conversationId,
@@ -1361,7 +1310,7 @@ export class CodexRuntimeManager {
                     userId: params.userId,
                     conversationId: params.command.payload.conversationId,
                     cwd,
-                    client,
+                    session,
                     cleanupWorkspace: cleanupWorkspaceOnFailure,
                 });
             }
@@ -1371,7 +1320,7 @@ export class CodexRuntimeManager {
 
     private async throwIfRuntimeInitializationCancelled(params: {
         initializationState: PendingRuntimeInitialization;
-        client: CodexClient | null;
+        session: RuntimeKindSession | null;
         agent: AgentConfig;
         userId: string;
         conversationId: string;
@@ -1383,9 +1332,9 @@ export class CodexRuntimeManager {
             return;
         }
 
-        if (params.client) {
-            await this.stopClientSafely(
-                params.client,
+        if (params.session) {
+            await this.stopSessionSafely(
+                params.session,
                 "canceled runtime initialization",
             );
         }
@@ -1414,24 +1363,24 @@ export class CodexRuntimeManager {
         }
 
         pendingInitialization.cancelReason ??= reason;
-        if (pendingInitialization.client) {
-            void this.stopClientSafely(
-                pendingInitialization.client,
+        if (pendingInitialization.session) {
+            void this.stopSessionSafely(
+                pendingInitialization.session,
                 "pending runtime initialization cancellation",
             );
         }
         return pendingInitialization;
     }
 
-    private async stopClientSafely(
-        client: CodexClient,
+    private async stopSessionSafely(
+        session: RuntimeKindSession,
         reason: string,
     ): Promise<void> {
         try {
-            await client.stop();
+            await session.stop();
         } catch (error) {
             console.error(
-                `[agentchat-server] failed to stop Codex client during ${reason}`,
+                `[agentchat-server] failed to stop runtime session during ${reason}`,
                 error,
             );
         }
@@ -1455,12 +1404,12 @@ export class CodexRuntimeManager {
         userId: string;
         conversationId: string;
         cwd: string;
-        client: CodexClient | null;
+        session: RuntimeKindSession | null;
         cleanupWorkspace: boolean;
     }): Promise<void> {
-        if (params.client) {
-            await this.stopClientSafely(
-                params.client,
+        if (params.session) {
+            await this.stopSessionSafely(
+                params.session,
                 "failed runtime initialization cleanup",
             );
         }
@@ -1712,59 +1661,20 @@ export class CodexRuntimeManager {
     }
 
     private async openThread(params: {
-        client: CodexClient;
-        resources: ResolvedRuntimeResources;
-        binding: PersistedRuntimeBinding | null;
+        session: RuntimeKindSession;
+        provider: ProviderConfig;
+        bindingProviderId: string | null;
+        bindingThreadId: string | null;
         modelId: string;
-        cwd?: string;
+        cwd: string;
     }): Promise<{ threadId: string; isNew: boolean }> {
-        const threadOpenParams = {
-            model: params.modelId,
-            cwd: params.cwd ?? params.resources.agent.rootPath,
-            approvalPolicy: "never",
-            sandbox: "danger-full-access",
-            personality: "pragmatic",
-            experimentalRawEvents: false,
-            persistExtendedHistory: true,
-        };
-
-        const persistedThreadId =
-            params.binding?.provider === params.resources.provider.id
-                ? params.binding.providerThreadId
-                : null;
-
-        if (persistedThreadId) {
-            try {
-                const threadResult = await params.client.request(
-                    "thread/resume",
-                    {
-                        ...threadOpenParams,
-                        threadId: persistedThreadId,
-                    },
-                );
-                return {
-                    threadId: extractThreadId(threadResult),
-                    isNew: false,
-                };
-            } catch (error) {
-                if (!isRecoverableThreadResumeError(error)) {
-                    await this.stopClientSafely(
-                        params.client,
-                        "non-recoverable thread resume cleanup",
-                    );
-                    throw error;
-                }
-            }
-        }
-
-        const threadResult = await params.client.request(
-            "thread/start",
-            threadOpenParams,
-        );
-        return {
-            threadId: extractThreadId(threadResult),
-            isNew: true,
-        };
+        return await params.session.openThread({
+            bindingProviderId: params.bindingProviderId,
+            bindingThreadId: params.bindingThreadId,
+            providerId: params.provider.id,
+            modelId: params.modelId,
+            cwd: params.cwd,
+        });
     }
 
     private handleRuntimeExit(
@@ -1866,25 +1776,20 @@ export class CodexRuntimeManager {
         this.runtimes.delete(runtime.key);
     }
 
-    private handleNotification(
+    private handleRuntimeEvent(
         runtime: ConversationRuntime,
-        notification: JsonRpcNotification,
+        event: RuntimeKindEvent,
     ): void {
         const activeTurn = runtime.activeTurn;
-        if (!activeTurn || typeof notification.method !== "string") {
+        if (!activeTurn) {
             return;
         }
         if (activeTurn.pendingRunStartPersistence) {
-            activeTurn.queuedNotifications.push(notification);
+            activeTurn.queuedEvents.push(event);
             return;
         }
 
-        if (notification.method === "codex/event/agent_reasoning") {
-            const description = getAgentReasoningText(notification.params);
-            if (!description) {
-                return;
-            }
-
+        if (event.type === "reasoning") {
             if (activeTurn.currentMessageIndex !== 0) {
                 return;
             }
@@ -1899,7 +1804,7 @@ export class CodexRuntimeManager {
                 return;
             }
 
-            const delta = isFirstStatusChunk ? description : `\n${description}`;
+            const delta = isFirstStatusChunk ? event.text : `\n${event.text}`;
 
             if (isFirstStatusChunk) {
                 activeTurn.currentMessageKind = "assistant_status";
@@ -1911,7 +1816,7 @@ export class CodexRuntimeManager {
                         messageId: activeTurn.currentMessageId,
                         messageIndex: activeTurn.currentMessageIndex,
                         kind: activeTurn.currentMessageKind,
-                        content: description,
+                        content: event.text,
                     }),
                 );
             } else {
@@ -1928,8 +1833,8 @@ export class CodexRuntimeManager {
             }
 
             if (isFirstStatusChunk) {
-                activeTurn.text = description;
-                activeTurn.lastPersistedContent = description;
+                activeTurn.text = event.text;
+                activeTurn.lastPersistedContent = event.text;
             }
 
             void this.persistence
@@ -1956,12 +1861,7 @@ export class CodexRuntimeManager {
             return;
         }
 
-        if (notification.method === "item/agentMessage/delta") {
-            const delta = notification.params?.delta;
-            if (typeof delta !== "string") {
-                return;
-            }
-
+        if (event.type === "assistant_delta") {
             if (activeTurn.currentMessageKind === "assistant_status") {
                 this.transitionStatusMessageToAssistantOutput(
                     runtime,
@@ -1969,12 +1869,12 @@ export class CodexRuntimeManager {
                 );
             }
 
-            activeTurn.text += delta;
+            activeTurn.text += event.delta;
             this.emitToSubscribers(
                 runtime,
                 createRuntimeServerEvent(runtime, "message.delta", {
                     messageId: activeTurn.currentMessageId,
-                    delta,
+                    delta: event.delta,
                     content: activeTurn.text,
                 }),
             );
@@ -1982,34 +1882,25 @@ export class CodexRuntimeManager {
             return;
         }
 
-        if (notification.method === "turn/aborted") {
+        if (event.type === "turn_aborted") {
             void this.finalizeTurn(runtime, activeTurn, {
                 finalStatus: "interrupted",
             });
             return;
         }
 
-        if (notification.method !== "turn/completed") {
+        if (event.type !== "turn_completed") {
             return;
         }
 
-        const turn = notification.params?.turn as
-            | { status?: unknown; error?: { message?: unknown } }
-            | undefined;
-        const status = turn?.status;
-        const errorMessage =
-            typeof turn?.error?.message === "string"
-                ? turn.error.message
-                : "Codex run failed";
-
-        if (status === "completed") {
+        if (event.status === "completed") {
             void this.finalizeTurn(runtime, activeTurn, {
                 finalStatus: "completed",
             });
             return;
         }
 
-        if (status === "interrupted") {
+        if (event.status === "interrupted") {
             void this.finalizeTurn(runtime, activeTurn, {
                 finalStatus: "interrupted",
             });
@@ -2018,7 +1909,7 @@ export class CodexRuntimeManager {
 
         void this.finalizeTurn(runtime, activeTurn, {
             finalStatus: "errored",
-            errorMessage,
+            errorMessage: event.errorMessage ?? "Runtime run failed",
         });
     }
 
@@ -2295,8 +2186,8 @@ export class CodexRuntimeManager {
                         );
                     });
                 this.runtimes.delete(runtime.key);
-                await this.stopClientSafely(
-                    runtime.client,
+                await this.stopSessionSafely(
+                    runtime.session,
                     "idle runtime expiration",
                 );
             })();
@@ -2390,7 +2281,7 @@ export class CodexRuntimeManager {
         ) {
             this.runtimes.delete(runtime.key);
         }
-        await this.stopClientSafely(runtime.client, "runtime disposal");
+        await this.stopSessionSafely(runtime.session, "runtime disposal");
     }
 }
 
@@ -2430,6 +2321,7 @@ function shouldRecycleRuntime(
     runtime: ConversationRuntime,
     resources: ResolvedRuntimeResources,
     desiredCwd: string,
+    runtimeKind: RuntimeKind,
 ): boolean {
     if (runtime.agent.id !== resources.agent.id) {
         return true;
@@ -2448,13 +2340,9 @@ function shouldRecycleRuntime(
         return true;
     }
 
-    return (
-        runtime.provider.codex.command !== resources.provider.codex.command ||
-        JSON.stringify(runtime.provider.codex.args) !==
-            JSON.stringify(resources.provider.codex.args) ||
-        JSON.stringify(runtime.provider.codex.baseEnv) !==
-            JSON.stringify(resources.provider.codex.baseEnv) ||
-        runtime.provider.codex.cwd !== resources.provider.codex.cwd
+    return runtimeKind.shouldRecycleProvider(
+        runtime.provider,
+        resources.provider,
     );
 }
 
