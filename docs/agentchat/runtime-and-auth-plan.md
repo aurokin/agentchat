@@ -14,7 +14,7 @@ Use the other docs for adjacent detail:
 
 Agentchat uses a backend-owned runtime model.
 
-- `apps/server` owns live provider execution, websocket fanout, and transient in-memory recovery state.
+- `apps/server` owns live runtime execution, websocket fanout, and transient in-memory recovery state.
 - Convex owns durable identity, conversations, messages, runs, run events, and runtime bindings.
 - Web and mobile are observers and input surfaces, not execution owners.
 
@@ -30,7 +30,7 @@ Current runtime behavior:
 
 ## Auth
 
-Agentchat uses provider-oriented auth.
+Agentchat uses deployment-selected auth providers.
 
 Current auth providers:
 

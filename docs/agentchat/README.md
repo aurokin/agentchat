@@ -1,35 +1,37 @@
 # Agentchat Architecture And Direction
 
-This directory is the canonical reference for the current Agentchat product and architecture.
+This directory is the canonical product and architecture reference for
+Agentchat. It exists for humans and agents: use it to understand the active
+self-hosted, agent-centric direction and to avoid rebuilding old hosted-product
+assumptions.
 
-It exists for both humans and agents:
+## Read In Order
 
-- Humans should use it to understand the product direction, architecture, and delivery plan.
-- Agents should use it to avoid rebuilding old hosted-product assumptions into the current system.
+1. [Vision](./vision.md)
+2. [Product Rules](./product-rules.md)
+3. [Architecture V1](./architecture-v1.md)
+4. [Roadmap](./roadmap.md)
+5. [Harness Engineering](./harness-engineering.md)
 
-## Read First
+## Operating The System
 
-- [Vision](./vision.md)
-- [Product Rules](./product-rules.md)
-- [Architecture V1](./architecture-v1.md)
-- [Roadmap](./roadmap.md)
+- [Local Modes](../local-modes.md) - wrapper-first local workflow, worktrees, generated config, and stable host modes.
+- [Operator Guide](./operator-guide.md) - repo-local setup for Codex-backed agents.
+- [Stable Host Runbook](./stable-host-runbook.md) - protected host lifecycle.
+- [Testing Plan](./testing-plan.md) - confidence layers and manual runtime checks.
+- [Manual QA Checklist](./manual-qa-checklist.md) - deliberate human validation.
 
-## Implementation Specs
+## Implementation Contracts
 
-- [Local Modes](../local-modes.md)
 - [Server Config Spec](./server-config-spec.md)
-- [Operator Guide](./operator-guide.md)
-- [Stable Host Runbook](./stable-host-runbook.md)
 - [Convex Spec](./convex-spec.md)
 - [Backend API Spec](./backend-api-spec.md)
 - [Codex Runtime Spec](./codex-runtime-spec.md)
 - [Runtime And Auth Plan](./runtime-and-auth-plan.md)
-- [Testing Plan](./testing-plan.md)
-- [Manual QA Checklist](./manual-qa-checklist.md)
 - [Mobile Follow-Up](./mobile-followup.md)
 - [Mobile Integration Testing](./mobile-integration-testing.md)
 
-## Multi-Runtime Specs
+## Planned Runtime Work
 
 - [Provider-Agent Merge Plan](../../plans/provider-agent-merge-plan.md)
 - [Pi Runtime Spec](./pi-runtime-spec.md)
@@ -40,11 +42,13 @@ It exists for both humans and agents:
 
 These docs describe the active Agentchat direction:
 
-- Self-hosted and open source
-- Convex-managed access through provider-oriented Google and local-user auth
-- Conversations stored in Convex
-- An instance-local backend server
-- A runtime abstraction currently focused on Codex, with Pi, OpenCode, and Claude Code planned
-- Agent-centric UX where conversations are bound to the selected agent
+- Self-hosted and open source.
+- Agent-centric UX where conversations are bound to the selected agent.
+- Convex-managed access through Google and local-user auth modes.
+- Conversations, runs, and runtime bindings stored in Convex.
+- An instance-local backend server that owns runtime sessions.
+- Codex as the current active runtime.
+- Pi, OpenCode, and Claude Code as planned runtime implementations.
 
-If another document elsewhere in the repo conflicts with these docs, treat this directory as the source of truth.
+If another document conflicts with this directory, treat this directory as the
+source of truth and update the stale document.

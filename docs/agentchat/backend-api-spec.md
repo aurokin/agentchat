@@ -6,8 +6,8 @@ This spec defines the client-facing HTTP and WebSocket API provided by `apps/ser
 
 The backend server is responsible for:
 
-- exposing server-managed agents and providers
-- opening and resuming provider runtimes
+- exposing server-managed agents and runtime metadata
+- opening and resuming runtime sessions
 - streaming normalized events to clients
 - interrupting in-flight runs
 
@@ -17,7 +17,7 @@ The backend does not replace Convex as the primary data store.
 
 Use a hybrid transport:
 
-- HTTP for bootstrap and provider metadata
+- HTTP for bootstrap and runtime metadata
 - one WebSocket connection per active access user for live runtime actions and events
 
 Important rule:
@@ -30,7 +30,7 @@ Important rule:
 
 - the client authenticates with Convex as a concrete user
 - today that user comes from Google auth or local auth
-- the active product model is provider-oriented Google plus local-user auth, not a shared default-user mode
+- the active product model is deployment-selected Google or local-user auth, not a shared default-user mode
 
 ### Client To Backend
 
@@ -68,7 +68,7 @@ Returns:
 Notes:
 
 - no conversation history is returned here because Convex owns persistent data access
-- `auth` should be treated as provider-oriented metadata, not a raw mode flag
+- `auth` should be treated as deployment metadata, not a raw mode flag
 
 ### `GET /api/providers/:providerId/models`
 
@@ -170,7 +170,7 @@ Payload:
 
 Purpose:
 
-- send a user message and start or resume the provider runtime if needed
+- send a user message and start or resume the runtime session if needed
 
 Payload:
 

@@ -144,7 +144,7 @@ Current persisted kinds include:
 
 Purpose:
 
-- recoverable provider-runtime metadata for one conversation
+- recoverable runtime metadata for one conversation
 
 Current binding data includes:
 
@@ -163,7 +163,7 @@ Current binding data includes:
 Important constraint:
 
 - only recoverable runtime state belongs here
-- live provider handles and live socket state stay in `apps/server`
+- live runtime handles and live socket state stay in `apps/server`
 
 ## Main Client-Facing Surfaces
 
@@ -188,4 +188,4 @@ Current client-facing Convex surfaces include:
 - run events
 - runtime bindings
 
-That keeps provider-runtime persistence server-owned while keeping Convex as the durable source of truth.
+That keeps runtime persistence server-owned while keeping Convex as the durable source of truth.

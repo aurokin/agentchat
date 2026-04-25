@@ -24,8 +24,8 @@ This document records user-facing rules and product decisions that should remain
 - Users can have multiple concurrent conversations with the same agent.
 - Users can have active runs in multiple conversations at the same time.
 - Users can have active runs under multiple agents at the same time.
-- Selecting an agent can open or create an empty conversation shell, but it must not start a provider runtime session by itself.
-- A provider runtime session is created or resumed only when the user sends the first message in that conversation.
+- Selecting an agent can open or create an empty conversation shell, but it must not start a runtime session by itself.
+- A runtime session is created or resumed only when the user sends the first message in that conversation.
 
 ## Model And Variant Selection
 
@@ -55,7 +55,7 @@ This document records user-facing rules and product decisions that should remain
 - Multiple clients for the same user must be able to observe the same run concurrently.
 - Web and mobile must be treated as equivalent subscribers to backend-owned runtime state.
 - Concurrent activity from one user must not block or interfere with another user on the same instance.
-- The application assumes automatic approval mode for provider actions in v1.
+- The application assumes automatic approval mode for runtime actions in v1.
 - Auto-approve is a project requirement for the current scope, not a temporary UI default.
 
 ## Data Rules

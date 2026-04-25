@@ -214,7 +214,7 @@ Coverage targets:
 
 - agent selection
 - conversation creation
-- provider/model/variant selection
+- agent-scoped model/variant selection
 - send/stream/interruption
 - refresh and reconnect recovery
 - terminal-state control recovery so completed or interrupted runs restore the send button and clear stale stop affordances
@@ -318,7 +318,7 @@ Current manual confidence command:
 - `bun run test:manual:web-operator-smoke`
 
 This runs live Convex codegen, the server doctor, and the targeted server and web confidence suites without turning them into always-on checks.
-It also runs the targeted mobile confidence suite for agent selection, provider/model/variant state, and runtime recovery helpers.
+It also runs the targeted mobile confidence suite for agent selection, model/variant state, and runtime recovery helpers.
 
 ## Priority Order
 
@@ -326,4 +326,4 @@ It also runs the targeted mobile confidence suite for agent selection, provider/
 2. Web browser confidence and operator hot-reload checks in local-auth mode
 3. Server integration coverage around websocket, persistence, and resume
 4. Mobile manual parity checks against the same fixtures
-5. Revisit provider-specific fixtures only after Codex is highly confident end to end
+5. Revisit runtime-specific fixtures only after Codex is highly confident end to end

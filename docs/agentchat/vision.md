@@ -4,14 +4,14 @@
 
 Agentchat is a self-hosted, open source application that connects users to coding agents running on infrastructure owned by the instance operator.
 
-An agent is an operator-defined workspace on the server with a configured provider runtime. Users do not bring their own provider credentials. Users sign in, select an agent, and talk to it through conversations that are stored in Convex.
+An agent is an operator-defined workspace on the server with an inline runtime configuration. Users do not bring their own runtime or provider credentials. Users sign in, select an agent, and talk to it through conversations that are stored in Convex.
 
 ## Product Shape
 
-- The instance operator configures providers and agents on the server.
+- The instance operator configures agents and their runtime details on the server.
 - Users select an agent first, then work inside conversations bound to that agent.
 - The app supports multiple conversations per agent per user.
-- The backend server owns runtime communication with providers such as Codex.
+- The backend server owns runtime communication with Codex now and additional runtime kinds later.
 - Convex owns auth, user identity, conversations, messages, and persisted runtime metadata.
 
 ## Principles

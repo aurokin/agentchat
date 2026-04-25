@@ -1,5 +1,7 @@
 # Tooling And Tests
 
+For the full confidence ladder, read [Harness Engineering](../agentchat/harness-engineering.md). This page is the command reference agents should use while working.
+
 ## Package Manager
 
 - Use Bun for installs and scripts: `bun install`, `bun run <script>`.

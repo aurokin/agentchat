@@ -8,7 +8,7 @@ Use adjacent docs for detail:
 - [Runtime And Auth Plan](./runtime-and-auth-plan.md) for current runtime and auth behavior
 - [Convex Spec](./convex-spec.md) for persisted data and function surfaces
 - [Backend API Spec](./backend-api-spec.md) for `apps/server` HTTP and WebSocket behavior
-- [Codex Runtime Spec](./codex-runtime-spec.md) for provider-runtime specifics
+- [Codex Runtime Spec](./codex-runtime-spec.md) for Codex runtime specifics
 
 ## Core Components
 
@@ -41,10 +41,10 @@ Responsibilities:
 
 Responsibilities:
 
-- load server-managed auth, provider, and agent configuration
+- load server-managed auth, agent, and runtime configuration
 - validate backend tokens
-- resolve agents and providers against the latest valid server config
-- start, resume, interrupt, and expire provider runtimes
+- resolve agents against the latest valid server config
+- start, resume, interrupt, and expire runtime sessions
 - stream normalized runtime events over WebSocket
 - persist normalized runtime state back into Convex
 - keep transient live-runtime state in memory
@@ -91,7 +91,7 @@ Current runtime behavior:
 ### Before First Message
 
 1. The user signs in through Convex.
-2. The client loads visible agents and provider metadata from `apps/server`.
+2. The client loads visible agents and model metadata from `apps/server`.
 3. The user selects an agent.
 4. The user creates or opens a conversation for that agent.
 5. The user may choose model and variant while the conversation is still unlocked.
@@ -101,7 +101,7 @@ Current runtime behavior:
 1. The user sends the first message.
 2. The conversation locks its model and variant.
 3. `apps/server` resolves the latest valid agent config and its inline runtime.
-4. `apps/server` starts or resumes the provider runtime.
+4. `apps/server` starts or resumes the runtime session.
 5. `apps/server` streams normalized events to subscribed clients.
 6. `apps/server` persists normalized runtime state into Convex.
 
@@ -127,7 +127,7 @@ Current runtime behavior:
 
 ### Stored In Backend Memory
 
-- live provider processes or sessions
+- live runtime processes or sessions
 - WebSocket subscriber bookkeeping
 - in-flight stream buffering
 - transient reconnect and recovery state
