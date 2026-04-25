@@ -5,6 +5,11 @@ import type {
     ConfigStoreStatus,
     ProviderConfig,
 } from "./config.ts";
+import {
+    getAgentProviderConfigs,
+    getProviderConfig,
+    getProviderConfigs,
+} from "./config.ts";
 import type { CodexModelCatalog } from "./codexModelCatalog.ts";
 import {
     getConfigDiagnostics,
@@ -102,8 +107,19 @@ function toAgentSummary(agent: AgentConfig) {
     };
 }
 
-function getVisibleProviders(config: AgentchatConfig) {
-    return config.providers.filter((provider) => provider.enabled);
+function getVisibleProviders(config: AgentchatConfig, username: string | null) {
+    const visibleAgents = getVisibleAgents(config, username);
+    const visibleProviderIds = new Set(
+        visibleAgents.flatMap((agent) =>
+            getAgentProviderConfigs(config, agent)
+                .filter((provider) => provider.enabled)
+                .map((provider) => provider.id),
+        ),
+    );
+
+    return getProviderConfigs(config).filter(
+        (provider) => provider.enabled && visibleProviderIds.has(provider.id),
+    );
 }
 
 function resolveAgent(
@@ -120,9 +136,18 @@ function resolveProvider(
     config: AgentchatConfig,
     providerId: string,
 ): ProviderConfig | null {
+    const provider = getProviderConfig(config, providerId);
+    return provider?.enabled ? provider : null;
+}
+
+function resolveVisibleProvider(
+    config: AgentchatConfig,
+    providerId: string,
+    username: string | null,
+): ProviderConfig | null {
     return (
-        config.providers.find(
-            (provider) => provider.id === providerId && provider.enabled,
+        getVisibleProviders(config, username).find(
+            (provider) => provider.id === providerId,
         ) ?? null
     );
 }
@@ -136,9 +161,8 @@ function getAgentOptions(config: AgentchatConfig, agentId: string) {
         return null;
     }
 
-    const providers = agent.providerIds
-        .map((providerId) => resolveProvider(config, providerId))
-        .filter((provider): provider is ProviderConfig => provider !== null)
+    const providers = getAgentProviderConfigs(config, agent)
+        .filter((provider) => provider.enabled)
         .map((provider) => ({
             id: provider.id,
             kind: provider.kind,
@@ -263,7 +287,9 @@ export function createFetchHandler(deps: HandlerDependencies) {
                             : null,
                     providers: config.auth.providers.map(toAuthProviderSummary),
                 },
-                providers: getVisibleProviders(config).map(toProviderSummary),
+                providers: getVisibleProviders(config, username).map(
+                    toProviderSummary,
+                ),
                 agents: getVisibleAgents(config, username).map((agent) => {
                     const resolvedDefaults = resolveAgentDefaults(
                         config,
@@ -289,6 +315,19 @@ export function createFetchHandler(deps: HandlerDependencies) {
         );
         if (request.method === "GET" && providerModelsMatch) {
             const providerId = decodeURIComponent(providerModelsMatch[1] ?? "");
+            const modelsUsername = await tryGetUsernameFromRequest(request);
+            const visibleProvider = resolveVisibleProvider(
+                config,
+                providerId,
+                modelsUsername,
+            );
+            if (!visibleProvider) {
+                return jsonResponse(
+                    request,
+                    { error: "Provider not found" },
+                    { status: 404 },
+                );
+            }
             const result =
                 (await deps.modelCatalog?.getProviderModels(providerId)) ??
                 getProviderModelsFallback(config, providerId);

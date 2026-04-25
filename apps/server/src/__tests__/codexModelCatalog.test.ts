@@ -57,6 +57,43 @@ function createConfig(): AgentchatConfig {
     };
 }
 
+function createV2Config(): AgentchatConfig {
+    const config = createConfig();
+    const provider = config.providers[0]!;
+    config.providers = [];
+    config.agents = [
+        {
+            id: "agent-main",
+            name: "Main Agent",
+            enabled: true,
+            defaultVisible: true,
+            visibilityOverrides: [],
+            rootPath: "/srv/codex",
+            providerIds: [provider.id],
+            defaultProviderId: provider.id,
+            runtime: {
+                id: provider.id,
+                kind: provider.kind,
+                label: provider.label,
+                enabled: provider.enabled,
+                idleTtlSeconds: provider.idleTtlSeconds,
+                modelCacheTtlSeconds: provider.modelCacheTtlSeconds,
+                models: provider.models,
+                command: provider.codex.command,
+                args: provider.codex.args,
+                baseEnv: provider.codex.baseEnv,
+                cwd: provider.codex.cwd,
+            },
+            modelAllowlist: [],
+            variantAllowlist: [],
+            tags: [],
+            sortOrder: 0,
+            workspaceMode: "shared",
+        },
+    ];
+    return config;
+}
+
 describe("CodexModelCatalog", () => {
     test("fetches live model metadata and normalizes reasoning efforts", async () => {
         const initialize = mock(async () => undefined);
@@ -114,6 +151,37 @@ describe("CodexModelCatalog", () => {
                     ],
                 },
             ],
+        });
+    });
+
+    test("fetches model metadata from v2 agent runtime providers", async () => {
+        const request = mock(async () => ({
+            data: [
+                {
+                    id: "gpt-5.4",
+                    displayName: "GPT-5.4",
+                    hidden: false,
+                },
+            ],
+            nextCursor: null,
+        }));
+
+        const catalog = new CodexModelCatalog({
+            getConfig: () => createV2Config(),
+            createClient: () => ({
+                initialize: async () => undefined,
+                request,
+                onNotification: () => undefined,
+                onExit: () => undefined,
+                stop: async () => undefined,
+            }),
+        });
+
+        const result = await catalog.getProviderModels("codex-main");
+
+        expect(result).toMatchObject({
+            providerId: "codex-main",
+            models: [{ id: "gpt-5.4", label: "GPT-5.4" }],
         });
     });
 

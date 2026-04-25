@@ -100,6 +100,20 @@ const CodexProviderSchema = z.object({
     }),
 });
 
+const CodexAgentRuntimeSchema = z.object({
+    id: z.string().min(1).optional(),
+    kind: z.literal("codex"),
+    label: z.string().min(1).default("Codex"),
+    enabled: z.boolean().default(true),
+    idleTtlSeconds: z.number().int().positive().default(900),
+    modelCacheTtlSeconds: z.number().int().positive().default(300),
+    models: z.array(ProviderModelSchema).default([]),
+    command: z.string().min(1),
+    args: z.array(z.string()).default([]),
+    baseEnv: z.record(z.string(), z.string()).default({}),
+    cwd: z.string().min(1).optional(),
+});
+
 const AgentSchema = z
     .object({
         id: z.string().min(1),
@@ -108,8 +122,9 @@ const AgentSchema = z
         avatar: z.union([z.string(), z.null()]).optional(),
         enabled: z.boolean(),
         rootPath: z.string().min(1),
-        providerIds: z.array(z.string().min(1)).min(1),
-        defaultProviderId: z.string().min(1),
+        providerIds: z.array(z.string().min(1)).default([]),
+        defaultProviderId: z.string().min(1).optional(),
+        runtime: CodexAgentRuntimeSchema.optional(),
         defaultModel: z.string().min(1).optional(),
         defaultVariant: z.string().min(1).optional(),
         defaultVisible: z.boolean().default(true),
@@ -140,10 +155,17 @@ const AgentSchema = z
             });
         }
 
-        if (!agent.providerIds.includes(agent.defaultProviderId)) {
+        if (!agent.runtime && agent.providerIds.length === 0) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
-                message: `Agent '${agent.id}' defaultProviderId must exist in providerIds.`,
+                message: `Agent '${agent.id}' must define either runtime or providerIds.`,
+            });
+        }
+
+        if (agent.runtime?.cwd && !path.isAbsolute(agent.runtime.cwd)) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: `Agent '${agent.id}' runtime.cwd must be absolute.`,
             });
         }
     });
@@ -154,7 +176,7 @@ const AgentchatConfigInputSchema = z
         auth: ProviderAuthConfigSchema,
         stateId: z.string().min(1).optional(),
         sandboxRoot: z.string().min(1).optional(),
-        providers: z.array(CodexProviderSchema),
+        providers: z.array(CodexProviderSchema).default([]),
         agents: z.array(AgentSchema),
     })
     .superRefine((config, ctx) => {
@@ -188,6 +210,7 @@ const AgentchatConfigInputSchema = z
         );
 
         const agentIds = new Set<string>();
+        const agentRuntimeProviderIds = new Set<string>();
         for (const agent of config.agents) {
             if (agentIds.has(agent.id)) {
                 ctx.addIssue({
@@ -197,7 +220,52 @@ const AgentchatConfigInputSchema = z
             }
             agentIds.add(agent.id);
 
-            for (const providerId of agent.providerIds) {
+            const runtimeProviderId = agent.runtime
+                ? getAgentRuntimeProviderId(agent)
+                : null;
+            if (runtimeProviderId && providerIds.has(runtimeProviderId)) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: `Agent '${agent.id}' runtime id '${runtimeProviderId}' conflicts with a top-level provider id.`,
+                });
+            }
+            if (
+                runtimeProviderId &&
+                agentRuntimeProviderIds.has(runtimeProviderId)
+            ) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: `Duplicate agent runtime provider id '${runtimeProviderId}'.`,
+                });
+            }
+            if (runtimeProviderId) {
+                agentRuntimeProviderIds.add(runtimeProviderId);
+            }
+
+            const effectiveProviderIds = runtimeProviderId
+                ? [
+                      runtimeProviderId,
+                      ...agent.providerIds.filter(
+                          (providerId) => providerId !== runtimeProviderId,
+                      ),
+                  ]
+                : agent.providerIds;
+            const effectiveDefaultProviderId =
+                agent.defaultProviderId ?? runtimeProviderId;
+            if (
+                effectiveDefaultProviderId &&
+                !effectiveProviderIds.includes(effectiveDefaultProviderId)
+            ) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: `Agent '${agent.id}' defaultProviderId must exist in providerIds.`,
+                });
+            }
+
+            for (const providerId of effectiveProviderIds) {
+                if (providerId === runtimeProviderId) {
+                    continue;
+                }
                 if (!providerIds.has(providerId)) {
                     ctx.addIssue({
                         code: z.ZodIssueCode.custom,
@@ -220,17 +288,26 @@ const AgentchatConfigInputSchema = z
 
 export type AuthProviderConfig = z.infer<typeof AuthProviderSchema>;
 export type AuthConfig = z.infer<typeof ProviderAuthConfigSchema>;
+type AgentConfigInput = z.infer<typeof AgentSchema>;
+export type ProviderConfig = z.infer<typeof CodexProviderSchema>;
+export type AgentRuntimeConfig = z.infer<typeof CodexAgentRuntimeSchema>;
+export type AgentConfig = Omit<
+    AgentConfigInput,
+    "providerIds" | "defaultProviderId"
+> & {
+    providerIds: string[];
+    defaultProviderId: string;
+};
 export type AgentchatConfig = Omit<
     z.infer<typeof AgentchatConfigInputSchema>,
-    "auth" | "sandboxRoot" | "stateId"
+    "agents" | "auth" | "sandboxRoot" | "stateId"
 > & {
+    agents: AgentConfig[];
     auth: AuthConfig;
     stateId?: string;
     sandboxRoot: string;
     instanceKey: string;
 };
-export type AgentConfig = AgentchatConfig["agents"][number];
-export type ProviderConfig = AgentchatConfig["providers"][number];
 export type ConfigStoreStatus = {
     loadedAt: number;
     lastReloadAttemptAt: number | null;
@@ -250,6 +327,75 @@ export function resolveDefaultConfigPath(): string {
 }
 
 const DEFAULT_SANDBOX_ROOT = path.join(os.homedir(), ".agentchat", "sandboxes");
+
+function getFallbackAgentRuntimeProviderId(agentId: string): string {
+    return `${agentId}-runtime`;
+}
+
+export function getAgentRuntimeProviderId(
+    agent: Pick<AgentConfigInput, "id" | "runtime">,
+): string | null {
+    if (!agent.runtime) {
+        return null;
+    }
+    return agent.runtime.id ?? getFallbackAgentRuntimeProviderId(agent.id);
+}
+
+export function agentRuntimeToProvider(
+    agent: Pick<AgentConfig, "enabled" | "id" | "runtime">,
+): ProviderConfig | null {
+    if (!agent.enabled || !agent.runtime) {
+        return null;
+    }
+
+    return {
+        id: agent.runtime.id ?? getFallbackAgentRuntimeProviderId(agent.id),
+        kind: agent.runtime.kind,
+        label: agent.runtime.label,
+        enabled: agent.runtime.enabled,
+        idleTtlSeconds: agent.runtime.idleTtlSeconds,
+        modelCacheTtlSeconds: agent.runtime.modelCacheTtlSeconds,
+        models: agent.runtime.models,
+        codex: {
+            command: agent.runtime.command,
+            args: agent.runtime.args,
+            baseEnv: agent.runtime.baseEnv,
+            cwd: agent.runtime.cwd,
+        },
+    };
+}
+
+export function getProviderConfigs(
+    config: Pick<AgentchatConfig, "providers" | "agents">,
+): ProviderConfig[] {
+    const runtimeProviders = config.agents
+        .map(agentRuntimeToProvider)
+        .filter((provider): provider is ProviderConfig => provider !== null);
+    return [...config.providers, ...runtimeProviders];
+}
+
+export function getProviderConfig(
+    config: Pick<AgentchatConfig, "providers" | "agents">,
+    providerId: string,
+): ProviderConfig | null {
+    return (
+        getProviderConfigs(config).find(
+            (provider) => provider.id === providerId,
+        ) ?? null
+    );
+}
+
+export function getAgentProviderConfigs(
+    config: Pick<AgentchatConfig, "providers" | "agents">,
+    agent: Pick<AgentConfig, "providerIds" | "runtime">,
+): ProviderConfig[] {
+    const providersById = new Map(
+        getProviderConfigs(config).map((provider) => [provider.id, provider]),
+    );
+    return agent.providerIds
+        .map((providerId) => providersById.get(providerId) ?? null)
+        .filter((provider): provider is ProviderConfig => provider !== null);
+}
 
 function getDefaultStateRuntimeBackendIdentity(): string | null {
     const siteUrl = process.env.AGENTCHAT_CONVEX_SITE_URL?.trim();
@@ -282,7 +428,24 @@ function buildDefaultStateIdSeed(
                 hasCwd: Boolean(provider.codex.cwd),
             },
         })),
-        agents: parsed.agents.map(({ rootPath, ...agent }) => agent),
+        agents: parsed.agents.map(({ rootPath, ...agent }) => ({
+            ...agent,
+            runtime: agent.runtime
+                ? {
+                      id: getAgentRuntimeProviderId(agent),
+                      kind: agent.runtime.kind,
+                      label: agent.runtime.label,
+                      enabled: agent.runtime.enabled,
+                      idleTtlSeconds: agent.runtime.idleTtlSeconds,
+                      modelCacheTtlSeconds: agent.runtime.modelCacheTtlSeconds,
+                      models: agent.runtime.models,
+                      command: agent.runtime.command,
+                      args: agent.runtime.args,
+                      baseEnvKeys: Object.keys(agent.runtime.baseEnv).sort(),
+                      hasCwd: Boolean(agent.runtime.cwd),
+                  }
+                : undefined,
+        })),
     });
 }
 
@@ -320,8 +483,27 @@ function normalizeParsedConfig(
         ...rest
     } = parsed;
     const sandboxRoot = rawSandboxRoot ?? DEFAULT_SANDBOX_ROOT;
+    const agents: AgentConfig[] = rest.agents.map((agent) => {
+        const runtimeProviderId = getAgentRuntimeProviderId(agent);
+        const providerIds = runtimeProviderId
+            ? [
+                  runtimeProviderId,
+                  ...agent.providerIds.filter(
+                      (providerId) => providerId !== runtimeProviderId,
+                  ),
+              ]
+            : agent.providerIds;
+        const defaultProviderId =
+            agent.defaultProviderId ?? providerIds[0] ?? "";
+        return {
+            ...agent,
+            providerIds,
+            defaultProviderId,
+        };
+    });
     return {
         ...rest,
+        agents,
         auth,
         stateId:
             rawStateId?.trim() ||

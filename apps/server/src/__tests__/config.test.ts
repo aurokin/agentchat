@@ -10,7 +10,12 @@ import {
 import os from "node:os";
 import path from "node:path";
 
-import { ConfigStore, loadConfigFile, parseConfig } from "../config.ts";
+import {
+    ConfigStore,
+    getProviderConfigs,
+    loadConfigFile,
+    parseConfig,
+} from "../config.ts";
 import { createFetchHandler } from "../http.ts";
 import { resolveDefaultInstanceKey } from "../serverState.ts";
 
@@ -46,10 +51,164 @@ function withMutedConfigReloadLogs<T>(run: () => T): T {
 describe("server config", () => {
     test("parses the example config", () => {
         expect(exampleConfig.version).toBe(1);
-        expect(exampleConfig.providers).toHaveLength(1);
+        expect(exampleConfig.providers).toHaveLength(0);
         expect(exampleConfig.agents).toHaveLength(1);
+        expect(exampleConfig.agents[0]?.providerIds).toEqual(["codex-main"]);
         expect(exampleConfig.agents[0]?.defaultProviderId).toBe("codex-main");
-        expect(exampleConfig.providers[0]?.models[0]?.id).toBe("gpt-5.4");
+        expect(exampleConfig.agents[0]?.runtime?.kind).toBe("codex");
+        expect(getProviderConfigs(exampleConfig)[0]?.models[0]?.id).toBe(
+            "gpt-5.4",
+        );
+    });
+
+    test("parses v2 agents without provider references", () => {
+        const config = parseConfig({
+            version: 1,
+            auth: {
+                defaultProviderId: "local-main",
+                providers: [
+                    {
+                        id: "local-main",
+                        kind: "local",
+                        enabled: true,
+                        allowSignup: false,
+                    },
+                ],
+            },
+            agents: [
+                {
+                    id: "workspace",
+                    name: "Workspace",
+                    enabled: true,
+                    rootPath: "/srv/workspace",
+                    runtime: {
+                        kind: "codex",
+                        command: "codex",
+                        models: [
+                            {
+                                id: "gpt-5.4",
+                                label: "GPT-5.4",
+                                enabled: true,
+                                supportsReasoning: true,
+                                variants: [],
+                            },
+                        ],
+                    },
+                },
+            ],
+        });
+
+        expect(config.providers).toEqual([]);
+        expect(config.agents[0]?.providerIds).toEqual(["workspace-runtime"]);
+        expect(config.agents[0]?.defaultProviderId).toBe("workspace-runtime");
+        expect(getProviderConfigs(config)[0]).toMatchObject({
+            id: "workspace-runtime",
+            kind: "codex",
+            label: "Codex",
+            codex: {
+                command: "codex",
+            },
+        });
+    });
+
+    test("prefers inline runtime ids over legacy agent provider references", () => {
+        const config = parseConfig({
+            version: 1,
+            auth: {
+                defaultProviderId: "local-main",
+                providers: [
+                    {
+                        id: "local-main",
+                        kind: "local",
+                        enabled: true,
+                        allowSignup: false,
+                    },
+                ],
+            },
+            providers: [
+                {
+                    id: "legacy-codex",
+                    kind: "codex",
+                    label: "Legacy Codex",
+                    enabled: true,
+                    idleTtlSeconds: 900,
+                    modelCacheTtlSeconds: 300,
+                    models: [],
+                    codex: {
+                        command: "codex",
+                        args: ["app-server"],
+                        baseEnv: {},
+                    },
+                },
+            ],
+            agents: [
+                {
+                    id: "workspace",
+                    name: "Workspace",
+                    enabled: true,
+                    rootPath: "/srv/workspace",
+                    providerIds: ["legacy-codex"],
+                    defaultProviderId: "agent-codex",
+                    runtime: {
+                        id: "agent-codex",
+                        kind: "codex",
+                        command: "codex",
+                    },
+                },
+            ],
+        });
+
+        expect(config.agents[0]?.providerIds).toEqual([
+            "agent-codex",
+            "legacy-codex",
+        ]);
+        expect(config.agents[0]?.defaultProviderId).toBe("agent-codex");
+        expect(
+            getProviderConfigs(config).map((provider) => provider.id),
+        ).toEqual(["legacy-codex", "agent-codex"]);
+    });
+
+    test("rejects duplicate inline runtime provider ids", () => {
+        expect(() =>
+            parseConfig({
+                version: 1,
+                auth: {
+                    defaultProviderId: "local-main",
+                    providers: [
+                        {
+                            id: "local-main",
+                            kind: "local",
+                            enabled: true,
+                            allowSignup: false,
+                        },
+                    ],
+                },
+                agents: [
+                    {
+                        id: "workspace-a",
+                        name: "Workspace A",
+                        enabled: true,
+                        rootPath: "/srv/workspace-a",
+                        runtime: {
+                            id: "codex-main",
+                            kind: "codex",
+                            command: "codex",
+                        },
+                    },
+                    {
+                        id: "workspace-b",
+                        name: "Workspace B",
+                        enabled: true,
+                        rootPath: "/srv/workspace-b",
+                        runtime: {
+                            id: "codex-main",
+                            kind: "codex",
+                            command: "codex",
+                        },
+                    },
+                ],
+            }),
+        ).toThrow("Duplicate agent runtime provider id 'codex-main'.");
     });
 
     test("keeps the default state id stable across checkout relocations", () => {
@@ -110,6 +269,63 @@ describe("server config", () => {
                     ...releaseBConfig,
                     agents: releaseBAgents,
                     providers: releaseBProviders,
+                }),
+            );
+
+            expect(loadConfigFile(releaseAPath).stateId).toBe(
+                loadConfigFile(releaseBPath).stateId,
+            );
+            expect(loadConfigFile(releaseAPath).instanceKey).not.toBe(
+                loadConfigFile(releaseBPath).instanceKey,
+            );
+        } finally {
+            rmSync(releaseADir, { recursive: true, force: true });
+            rmSync(releaseBDir, { recursive: true, force: true });
+        }
+    });
+
+    test("keeps the default state id stable across inline runtime cwd relocations", () => {
+        const releaseADir = mkdtempSync(
+            path.join(os.tmpdir(), "runtime-release-a-"),
+        );
+        const releaseBDir = mkdtempSync(
+            path.join(os.tmpdir(), "runtime-release-b-"),
+        );
+        const releaseAPath = path.join(releaseADir, "agentchat.config.json");
+        const releaseBPath = path.join(releaseBDir, "agentchat.config.json");
+        const releaseAConfig = JSON.parse(
+            readFileSync(exampleConfigPath, "utf8"),
+        ) as Record<string, unknown>;
+        const releaseBConfig = JSON.parse(
+            readFileSync(exampleConfigPath, "utf8"),
+        ) as Record<string, unknown>;
+
+        const mapAgents = (
+            config: Record<string, unknown>,
+            releasePath: string,
+        ) =>
+            (config.agents as Array<Record<string, unknown>>).map((agent) => ({
+                ...agent,
+                rootPath: path.join(releasePath, "agent-root"),
+                runtime: {
+                    ...(agent.runtime as Record<string, unknown>),
+                    cwd: releasePath,
+                },
+            }));
+
+        try {
+            writeFileSync(
+                releaseAPath,
+                JSON.stringify({
+                    ...releaseAConfig,
+                    agents: mapAgents(releaseAConfig, "/srv/releases/a"),
+                }),
+            );
+            writeFileSync(
+                releaseBPath,
+                JSON.stringify({
+                    ...releaseBConfig,
+                    agents: mapAgents(releaseBConfig, "/srv/releases/b"),
                 }),
             );
 

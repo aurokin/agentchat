@@ -7,7 +7,7 @@ This spec defines the operator-managed configuration file loaded by `apps/server
 The file is intended to be edited by humans. It configures:
 
 - global auth behavior
-- globally configured providers
+- agent-owned runtime behavior
 - globally visible agents
 
 Agent visibility is controlled per-agent via `defaultVisible` and `visibilityOverrides`.
@@ -26,11 +26,11 @@ Future support for YAML or TOML is allowed, but JSON is the only format specifie
 
 ```json
 {
-  "version": 1,
-  "sandboxRoot": "/data/agentchat/sandboxes",
-  "auth": {},
-  "providers": [],
-  "agents": []
+    "version": 1,
+    "sandboxRoot": "/data/agentchat/sandboxes",
+    "auth": {},
+    "providers": [],
+    "agents": []
 }
 ```
 
@@ -48,11 +48,12 @@ This field is only meaningful when at least one agent uses `workspaceMode: "copy
 
 - The file must validate fully before it is used.
 - If a reload fails validation, the server keeps using the last known good config.
-- Provider ids must be unique.
+- Top-level provider ids and agent runtime ids must be unique.
 - Agent ids must be unique.
-- Agents may only reference provider ids that exist.
+- New agents should define `runtime` inline and do not need `providerIds` or `defaultProviderId`.
+- Legacy agents may still reference top-level provider ids during migration.
 - Paths must be absolute after resolution.
-- Disabled providers or agents remain in config state but are not offered to users.
+- Disabled runtimes, legacy providers, or agents remain in config state but are not offered to users.
 
 ## Reload Behavior
 
@@ -71,15 +72,15 @@ Preferred auth shape:
 
 ```json
 {
-  "defaultProviderId": "local-main",
-  "providers": [
-    {
-      "id": "local-main",
-      "kind": "local",
-      "enabled": true,
-      "allowSignup": false
-    }
-  ]
+    "defaultProviderId": "local-main",
+    "providers": [
+        {
+            "id": "local-main",
+            "kind": "local",
+            "enabled": true,
+            "allowSignup": false
+        }
+    ]
 }
 ```
 
@@ -87,110 +88,113 @@ Google provider shape:
 
 ```json
 {
-  "defaultProviderId": "google-main",
-  "providers": [
-    {
-      "id": "google-main",
-      "kind": "google",
-      "enabled": true,
-      "allowlistMode": "email",
-      "allowedEmails": ["user@example.com"],
-      "allowedDomains": [],
-      "googleHostedDomain": null
-    }
-  ]
+    "defaultProviderId": "google-main",
+    "providers": [
+        {
+            "id": "google-main",
+            "kind": "google",
+            "enabled": true,
+            "allowlistMode": "email",
+            "allowedEmails": ["user@example.com"],
+            "allowedDomains": [],
+            "googleHostedDomain": null
+        }
+    ]
 }
 ```
 
 Fields:
 
 - `defaultProviderId`
-  - required
-  - must reference an enabled auth provider
+    - required
+    - must reference an enabled auth provider
 - `providers`
-  - required
-  - array of auth providers
+    - required
+    - array of auth providers
 - `providers[].id`
-  - stable auth provider id
+    - stable auth provider id
 - `providers[].kind`
-  - current values: `"google"` or `"local"`
+    - current values: `"google"` or `"local"`
 - `providers[].enabled`
-  - boolean
+    - boolean
 - `providers[].allowSignup`
-  - required only for local providers
-  - boolean
-  - first slice should normally keep this `false` and rely on operator-seeded users
+    - required only for local providers
+    - boolean
+    - first slice should normally keep this `false` and rely on operator-seeded users
 - `providers[].allowlistMode`
-  - required only for Google providers
-  - current allowed value: `"email"`
+    - required only for Google providers
+    - current allowed value: `"email"`
 - `providers[].allowedEmails`
-  - required only for Google providers
-  - array of exact email strings
+    - required only for Google providers
+    - array of exact email strings
 - `providers[].allowedDomains`
-  - reserved for later
+    - reserved for later
 - `providers[].googleHostedDomain`
-  - optional string or `null`
+    - optional string or `null`
 
 V1 decision:
 
 - in Google mode, instance access is granted only if the signed-in email is present in `allowedEmails`
 - in local mode, Convex Auth owns password verification and every successful login maps to one concrete `users` row
 
-## `providers`
+## `providers` Legacy Compatibility
 
 Purpose:
 
-- define the globally available runtime providers
+- bridge older installs that still define globally available runtime providers
+
+New config should keep this array empty and put runtime configuration under each agent. The server still accepts top-level Codex providers so existing installs can migrate without losing work.
 
 Example:
 
 ```json
 {
-  "id": "codex-main",
-  "kind": "codex",
-  "label": "Codex Main",
-  "enabled": true,
-  "idleTtlSeconds": 900,
-  "modelCacheTtlSeconds": 300,
-  "codex": {
-    "command": "codex",
-    "args": ["app-server"],
-    "baseEnv": {},
-    "cwd": "/srv/agentchat"
-  }
+    "id": "codex-main",
+    "kind": "codex",
+    "label": "Codex Main",
+    "enabled": true,
+    "idleTtlSeconds": 900,
+    "modelCacheTtlSeconds": 300,
+    "codex": {
+        "command": "codex",
+        "args": ["app-server"],
+        "baseEnv": {},
+        "cwd": "/srv/agentchat"
+    }
 }
 ```
 
 Required fields:
 
 - `id`
-  - stable provider id
+    - stable provider id
 - `kind`
-  - v1 allowed value: `"codex"`
+    - v1 allowed value: `"codex"`
 - `label`
-  - operator-facing display name
+    - operator-facing display name
 - `enabled`
-  - boolean
+    - boolean
 - `idleTtlSeconds`
-  - how long an idle conversation runtime may stay warm
+    - how long an idle conversation runtime may stay warm
 - `modelCacheTtlSeconds`
-  - TTL for cached model and variant metadata
+    - TTL for cached model and variant metadata
 
 Provider-specific fields for Codex:
 
 - `codex.command`
-  - binary name or absolute path
+    - binary name or absolute path
 - `codex.args`
-  - optional extra CLI args
+    - optional extra CLI args
 - `codex.baseEnv`
-  - optional environment overrides
+    - optional environment overrides
 - `codex.cwd`
-  - optional default working directory for provider startup
+    - optional default working directory for provider startup
 
 Notes:
 
 - Secrets should not be embedded in the config file if they can live in environment variables instead.
-- Providers are defined once globally and referenced by agents.
+- Prefer agent-owned `runtime` config for new or edited agents.
+- Legacy providers are still surfaced through the same bootstrap and model endpoints until migration removes the compatibility path.
 
 ## `agents`
 
@@ -202,64 +206,92 @@ Example:
 
 ```json
 {
-  "id": "marketing-site",
-  "name": "Marketing Site",
-  "description": "Public website repository",
-  "avatar": "/avatars/marketing-site.png",
-  "enabled": true,
-  "defaultVisible": true,
-  "visibilityOverrides": [],
-  "rootPath": "/srv/repos/marketing-site",
-  "providerIds": ["codex-main"],
-  "defaultProviderId": "codex-main",
-  "defaultModel": "gpt-5.3-codex",
-  "defaultVariant": "balanced",
-  "modelAllowlist": [],
-  "variantAllowlist": [],
-  "tags": ["web", "nextjs"],
-  "sortOrder": 10
+    "id": "marketing-site",
+    "name": "Marketing Site",
+    "description": "Public website repository",
+    "avatar": "/avatars/marketing-site.png",
+    "enabled": true,
+    "defaultVisible": true,
+    "visibilityOverrides": [],
+    "rootPath": "/srv/repos/marketing-site",
+    "runtime": {
+        "id": "codex-main",
+        "kind": "codex",
+        "label": "Codex Main",
+        "enabled": true,
+        "idleTtlSeconds": 900,
+        "modelCacheTtlSeconds": 300,
+        "models": [
+            {
+                "id": "gpt-5.4",
+                "label": "GPT-5.4",
+                "enabled": true,
+                "supportsReasoning": true,
+                "variants": [
+                    { "id": "low", "label": "Low", "enabled": true },
+                    { "id": "medium", "label": "Medium", "enabled": true }
+                ]
+            }
+        ],
+        "command": "codex",
+        "args": ["app-server"],
+        "baseEnv": {},
+        "cwd": "/srv/agentchat"
+    },
+    "defaultModel": "gpt-5.3-codex",
+    "defaultVariant": "balanced",
+    "modelAllowlist": [],
+    "variantAllowlist": [],
+    "tags": ["web", "nextjs"],
+    "sortOrder": 10
 }
 ```
 
 Required fields:
 
 - `id`
-  - stable agent id
+    - stable agent id
 - `name`
-  - user-facing name
+    - user-facing name
 - `enabled`
-  - boolean
+    - boolean
 - `rootPath`
-  - absolute path to the workspace the provider should operate against
-- `providerIds`
-  - ordered list of allowed provider ids
-- `defaultProviderId`
-  - must exist inside `providerIds`
+    - absolute path to the workspace the provider should operate against
+- `runtime`
+    - required for v2 agents unless using the legacy top-level provider bridge
+    - current allowed value for `runtime.kind`: `"codex"`
+    - owns the command, environment, model metadata, cache TTL, and idle TTL for the agent
 
 Optional fields:
 
 - `description`
 - `avatar`
-  - URL or absolute file path
+    - URL or absolute file path
 - `defaultVisible`
-  - boolean, defaults to `true`
-  - controls whether the agent appears in the agent list by default
+    - boolean, defaults to `true`
+    - controls whether the agent appears in the agent list by default
 - `visibilityOverrides`
-  - array of usernames (local) or emails (Google) that get the **opposite** of `defaultVisible`
-  - if `defaultVisible: false`, listed users CAN see the agent
-  - if `defaultVisible: true`, listed users CANNOT see the agent
-  - defaults to `[]`
+    - array of usernames (local) or emails (Google) that get the **opposite** of `defaultVisible`
+    - if `defaultVisible: false`, listed users CAN see the agent
+    - if `defaultVisible: true`, listed users CANNOT see the agent
+    - defaults to `[]`
 - `defaultModel`
 - `defaultVariant`
+- `providerIds`
+    - legacy bridge only
+    - ordered list of allowed top-level provider ids
+- `defaultProviderId`
+    - legacy bridge only
+    - must exist inside `providerIds`
 - `modelAllowlist`
-  - empty means provider default availability
+    - empty means provider default availability
 - `variantAllowlist`
-  - empty means provider default availability
+    - empty means provider default availability
 - `tags`
 - `sortOrder`
 - `workspaceMode`
-  - `"shared"` (default) — the provider operates directly against `rootPath`
-  - `"copy-on-conversation"` — the server copies `rootPath` into a per-conversation sandbox under `sandboxRoot` on first message; the copy is deleted when the conversation is deleted
+    - `"shared"` (default) — the provider operates directly against `rootPath`
+    - `"copy-on-conversation"` — the server copies `rootPath` into a per-conversation sandbox under `sandboxRoot` on first message; the copy is deleted when the conversation is deleted
 
 Visibility behavior:
 
@@ -274,7 +306,7 @@ Visibility behavior:
 When the backend exposes options to a client:
 
 1. Start with the provider's live model catalog.
-2. Apply agent-level provider filtering.
+2. Apply the agent runtime or legacy provider bridge.
 3. Apply `modelAllowlist` if present.
 4. Apply `variantAllowlist` if present.
 5. Return normalized provider, model, and variant options to the client.

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import { createBackendSessionToken } from "../../../../packages/shared/src/core/backend-token";
 import { createFetchHandler } from "../http.ts";
 import type { AgentchatConfig } from "../config.ts";
 
@@ -139,6 +140,50 @@ function createConfig(): AgentchatConfig {
     };
 }
 
+function createV2Config(): AgentchatConfig {
+    const config = createConfig();
+    const provider = config.providers[0]!;
+    config.providers = [];
+    config.agents = [config.agents[0]!];
+    config.agents[0] = {
+        ...config.agents[0]!,
+        providerIds: [provider.id],
+        defaultProviderId: provider.id,
+        runtime: {
+            id: provider.id,
+            kind: provider.kind,
+            label: provider.label,
+            enabled: provider.enabled,
+            idleTtlSeconds: provider.idleTtlSeconds,
+            modelCacheTtlSeconds: provider.modelCacheTtlSeconds,
+            models: provider.models,
+            command: provider.codex.command,
+            args: provider.codex.args,
+            baseEnv: provider.codex.baseEnv,
+            cwd: provider.codex.cwd,
+        },
+    };
+    return config;
+}
+
+async function createAuthRequest(url: string, email: string): Promise<Request> {
+    const token = await createBackendSessionToken({
+        claims: {
+            sub: email,
+            userId: `users:${email}`,
+            email,
+            iat: Math.floor(Date.now() / 1000),
+            exp: Math.floor(Date.now() / 1000) + 60,
+        },
+        secret: "test-secret",
+    });
+    return new Request(url, {
+        headers: {
+            Authorization: `Bearer ${token}`,
+        },
+    });
+}
+
 describe("createFetchHandler", () => {
     test("excludes defaultVisible:false agents from unauthenticated bootstrap", async () => {
         const config = createConfig();
@@ -182,6 +227,151 @@ describe("createFetchHandler", () => {
                 defaultVariant: "balanced",
             },
         ]);
+    });
+
+    test("serves bootstrap, agent options, and models from v2 agent runtime config", async () => {
+        const fetchHandler = createFetchHandler({
+            getConfig: () => createV2Config(),
+        });
+
+        const bootstrapResponse = await fetchHandler(
+            new Request("http://localhost:3030/api/bootstrap"),
+        );
+        const bootstrap = (await bootstrapResponse.json()) as {
+            providers: Array<{ id: string }>;
+            agents: Array<{
+                id: string;
+                providerIds: string[];
+                defaultProviderId: string | null;
+            }>;
+        };
+
+        expect(bootstrapResponse.status).toBe(200);
+        expect(bootstrap.providers).toMatchObject([{ id: "codex-main" }]);
+        expect(bootstrap.agents).toMatchObject([
+            {
+                id: "agent-visible",
+                providerIds: ["codex-main"],
+                defaultProviderId: "codex-main",
+            },
+        ]);
+
+        const optionsResponse = await fetchHandler(
+            new Request(
+                "http://localhost:3030/api/agents/agent-visible/options",
+            ),
+        );
+        const options = (await optionsResponse.json()) as {
+            allowedProviders: Array<{ id: string }>;
+            defaultProviderId: string | null;
+        };
+        expect(optionsResponse.status).toBe(200);
+        expect(options.allowedProviders).toMatchObject([{ id: "codex-main" }]);
+        expect(options.defaultProviderId).toBe("codex-main");
+
+        const modelsResponse = await fetchHandler(
+            new Request(
+                "http://localhost:3030/api/providers/codex-main/models",
+            ),
+        );
+        const models = (await modelsResponse.json()) as {
+            providerId: string;
+            models: Array<{ id: string }>;
+        };
+        expect(modelsResponse.status).toBe(200);
+        expect(models.providerId).toBe("codex-main");
+        expect(models.models).toMatchObject([{ id: "gpt-5.3-codex" }]);
+    });
+
+    test("does not expose disabled v2 agent runtimes through provider endpoints", async () => {
+        const config = createV2Config();
+        config.agents[0]!.enabled = false;
+        const fetchHandler = createFetchHandler({
+            getConfig: () => config,
+        });
+
+        const bootstrapResponse = await fetchHandler(
+            new Request("http://localhost:3030/api/bootstrap"),
+        );
+        const bootstrap = (await bootstrapResponse.json()) as {
+            providers: Array<{ id: string }>;
+            agents: Array<{ id: string }>;
+        };
+        expect(bootstrapResponse.status).toBe(200);
+        expect(bootstrap.providers).toEqual([]);
+        expect(bootstrap.agents).toEqual([]);
+
+        const modelsResponse = await fetchHandler(
+            new Request(
+                "http://localhost:3030/api/providers/codex-main/models",
+            ),
+        );
+        expect(modelsResponse.status).toBe(404);
+    });
+
+    test("does not expose hidden v2 agent runtimes to users who cannot see the agent", async () => {
+        const config = createV2Config();
+        config.agents[0]!.defaultVisible = false;
+        config.agents[0]!.visibilityOverrides = ["operator@example.com"];
+        const fetchHandler = createFetchHandler({
+            getConfig: () => config,
+        });
+
+        const anonymousBootstrapResponse = await fetchHandler(
+            new Request("http://localhost:3030/api/bootstrap"),
+        );
+        const anonymousBootstrap =
+            (await anonymousBootstrapResponse.json()) as {
+                providers: Array<{ id: string }>;
+                agents: Array<{ id: string }>;
+            };
+        expect(anonymousBootstrapResponse.status).toBe(200);
+        expect(anonymousBootstrap.providers).toEqual([]);
+        expect(anonymousBootstrap.agents).toEqual([]);
+
+        const anonymousModelsResponse = await fetchHandler(
+            new Request(
+                "http://localhost:3030/api/providers/codex-main/models",
+            ),
+        );
+        expect(anonymousModelsResponse.status).toBe(404);
+
+        const originalBackendSecret = process.env.BACKEND_TOKEN_SECRET;
+        process.env.BACKEND_TOKEN_SECRET = "test-secret";
+        try {
+            const operatorBootstrapResponse = await fetchHandler(
+                await createAuthRequest(
+                    "http://localhost:3030/api/bootstrap",
+                    "operator@example.com",
+                ),
+            );
+            const operatorBootstrap =
+                (await operatorBootstrapResponse.json()) as {
+                    providers: Array<{ id: string }>;
+                    agents: Array<{ id: string }>;
+                };
+            expect(operatorBootstrapResponse.status).toBe(200);
+            expect(operatorBootstrap.providers).toMatchObject([
+                { id: "codex-main" },
+            ]);
+            expect(operatorBootstrap.agents).toMatchObject([
+                { id: "agent-visible" },
+            ]);
+
+            const operatorModelsResponse = await fetchHandler(
+                await createAuthRequest(
+                    "http://localhost:3030/api/providers/codex-main/models",
+                    "operator@example.com",
+                ),
+            );
+            expect(operatorModelsResponse.status).toBe(200);
+        } finally {
+            if (originalBackendSecret === undefined) {
+                delete process.env.BACKEND_TOKEN_SECRET;
+            } else {
+                process.env.BACKEND_TOKEN_SECRET = originalBackendSecret;
+            }
+        }
     });
 
     test("reports local auth provider metadata in bootstrap", async () => {

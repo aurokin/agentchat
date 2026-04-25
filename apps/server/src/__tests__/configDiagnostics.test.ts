@@ -122,6 +122,31 @@ function createConfig(): AgentchatConfig {
     };
 }
 
+function createV2Config(): AgentchatConfig {
+    const config = createConfig();
+    const provider = config.providers[0]!;
+    config.providers = [];
+    config.agents[0] = {
+        ...config.agents[0]!,
+        providerIds: [provider.id],
+        defaultProviderId: provider.id,
+        runtime: {
+            id: provider.id,
+            kind: provider.kind,
+            label: provider.label,
+            enabled: provider.enabled,
+            idleTtlSeconds: provider.idleTtlSeconds,
+            modelCacheTtlSeconds: provider.modelCacheTtlSeconds,
+            models: provider.models,
+            command: provider.codex.command,
+            args: provider.codex.args,
+            baseEnv: provider.codex.baseEnv,
+            cwd: provider.codex.cwd,
+        },
+    };
+    return config;
+}
+
 afterEach(() => {
     for (const tempRoot of tempRoots.splice(0)) {
         rmSync(tempRoot, { force: true, recursive: true });
@@ -197,6 +222,43 @@ describe("configDiagnostics", () => {
             defaultProviderId: "codex-main",
             defaultModel: "gpt-5.3-codex",
             defaultVariant: "fast",
+        });
+    });
+
+    test("resolves diagnostics through v2 agent runtime providers", () => {
+        const config = createV2Config();
+        const agent = config.agents[0]!;
+
+        expect(resolveAgentDefaults(config, agent)).toMatchObject({
+            defaultProviderId: "codex-main",
+            defaultModel: "gpt-5.3-codex",
+            defaultVariant: "balanced",
+        });
+
+        const diagnostics = getConfigDiagnostics(config);
+        expect(diagnostics.providers).toMatchObject([
+            { id: "codex-main", ready: true },
+        ]);
+        expect(diagnostics.agents).toMatchObject([
+            {
+                id: "agent-main",
+                availableProviderIds: ["codex-main"],
+                resolvedDefaultProviderId: "codex-main",
+            },
+        ]);
+    });
+
+    test("does not count disabled v2 agent runtimes as providers", () => {
+        const config = createV2Config();
+        config.agents[0]!.enabled = false;
+
+        const diagnostics = getConfigDiagnostics(config);
+
+        expect(diagnostics.providers).toEqual([]);
+        expect(diagnostics.summary).toMatchObject({
+            enabledProviderCount: 0,
+            readyProviderCount: 0,
+            enabledAgentCount: 0,
         });
     });
 

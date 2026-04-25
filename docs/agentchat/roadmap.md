@@ -62,9 +62,9 @@ See [Provider-Agent Merge Plan](../../plans/provider-agent-merge-plan.md) for fu
 
 Key outcomes:
 
-- the top-level `providers[]` config array is removed
+- new config keeps the top-level `providers[]` array empty and uses an explicit migration bridge for existing provider-based installs
 - each agent gets an inline `runtime` block with a `kind` discriminator
-- `providerIds` and `defaultProviderId` are removed from agent config
+- `providerIds` and `defaultProviderId` are no longer required for v2 agent operation
 - model and variant selection remain user-facing, sourced from the agent's runtime
 - a `KindRuntime` interface is extracted from the current `CodexRuntimeManager`
 - config version bumps to `2` during transition

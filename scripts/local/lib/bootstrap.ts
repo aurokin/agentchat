@@ -167,8 +167,41 @@ function buildDefaultServerConfig(
     ) as Record<string, unknown>;
     const providers =
         (example.providers as Array<Record<string, unknown>> | undefined) ?? [];
-    const providerId =
-        typeof providers[0]?.id === "string" ? providers[0].id : "codex-main";
+    const exampleAgents =
+        (example.agents as Array<Record<string, unknown>> | undefined) ?? [];
+    const exampleRuntime =
+        typeof exampleAgents[0]?.runtime === "object" &&
+        exampleAgents[0].runtime !== null
+            ? (exampleAgents[0].runtime as Record<string, unknown>)
+            : null;
+    const legacyProvider = providers[0];
+    const runtime =
+        exampleRuntime ??
+        (legacyProvider
+            ? {
+                  id: legacyProvider.id,
+                  kind: legacyProvider.kind,
+                  label: legacyProvider.label,
+                  enabled: legacyProvider.enabled,
+                  idleTtlSeconds: legacyProvider.idleTtlSeconds,
+                  modelCacheTtlSeconds: legacyProvider.modelCacheTtlSeconds,
+                  models: legacyProvider.models,
+                  ...((legacyProvider.codex as
+                      | Record<string, unknown>
+                      | undefined) ?? {}),
+              }
+            : {
+                  id: "codex-main",
+                  kind: "codex",
+                  label: "Codex Main",
+                  enabled: true,
+                  idleTtlSeconds: 900,
+                  modelCacheTtlSeconds: 300,
+                  models: [],
+                  command: "codex",
+                  args: ["app-server"],
+                  baseEnv: {},
+              });
 
     return {
         ...example,
@@ -183,13 +216,7 @@ function buildDefaultServerConfig(
                 },
             ],
         },
-        providers: providers.map((provider) => ({
-            ...provider,
-            codex: {
-                ...(provider.codex as Record<string, unknown>),
-                cwd: checkoutPath,
-            },
-        })),
+        providers: [],
         agents: [
             {
                 id: "current-checkout",
@@ -201,8 +228,10 @@ function buildDefaultServerConfig(
                 defaultVisible: true,
                 visibilityOverrides: [],
                 rootPath: checkoutPath,
-                providerIds: [providerId],
-                defaultProviderId: providerId,
+                runtime: {
+                    ...runtime,
+                    cwd: checkoutPath,
+                },
                 defaultModel: "gpt-5.4",
                 defaultVariant: "low",
                 modelAllowlist: [],

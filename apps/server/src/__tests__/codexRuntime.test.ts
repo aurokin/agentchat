@@ -100,6 +100,29 @@ function createConfig(): AgentchatConfig {
     };
 }
 
+function createV2Config(): AgentchatConfig {
+    const config = createConfig();
+    const provider = config.providers[0]!;
+    config.providers = [];
+    config.agents[0] = {
+        ...config.agents[0]!,
+        runtime: {
+            id: provider.id,
+            kind: provider.kind,
+            label: provider.label,
+            enabled: provider.enabled,
+            idleTtlSeconds: provider.idleTtlSeconds,
+            modelCacheTtlSeconds: provider.modelCacheTtlSeconds,
+            models: provider.models,
+            command: provider.codex.command,
+            args: provider.codex.args,
+            baseEnv: provider.codex.baseEnv,
+            cwd: provider.codex.cwd,
+        },
+    };
+    return config;
+}
+
 function runtimeKey(
     workspaceMode: "shared" | "copy-on-conversation",
     userId = "user-1",
@@ -515,6 +538,33 @@ describe("CodexRuntimeManager", () => {
                 }
             ).effort,
         ).toBe("high");
+    });
+
+    test("starts Codex runtimes from v2 agent runtime config", async () => {
+        const config = createV2Config();
+        const persistence = createPersistence(null);
+        const fakeClient = new FakeCodexClient();
+        let createdProviderId = "";
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: (params) => {
+                createdProviderId = params.provider.id;
+                return fakeClient;
+            },
+        });
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => {},
+        });
+
+        expect(createdProviderId).toBe("codex-default");
+        expect(fakeClient.requests.map((request) => request.method)).toContain(
+            "turn/start",
+        );
     });
 
     test("falls back to thread/start when resume hits a recoverable error", async () => {

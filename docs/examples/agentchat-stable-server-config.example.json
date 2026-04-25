@@ -14,47 +14,7 @@
             }
         ]
     },
-    "providers": [
-        {
-            "id": "codex-main",
-            "kind": "codex",
-            "label": "Codex Main",
-            "enabled": true,
-            "idleTtlSeconds": 900,
-            "modelCacheTtlSeconds": 300,
-            "models": [
-                {
-                    "id": "gpt-5.4",
-                    "label": "GPT-5.4",
-                    "enabled": true,
-                    "supportsReasoning": true,
-                    "variants": [
-                        {
-                            "id": "low",
-                            "label": "Low",
-                            "enabled": true
-                        },
-                        {
-                            "id": "medium",
-                            "label": "Medium",
-                            "enabled": true
-                        },
-                        {
-                            "id": "high",
-                            "label": "High",
-                            "enabled": true
-                        }
-                    ]
-                }
-            ],
-            "codex": {
-                "command": "codex",
-                "args": ["app-server"],
-                "baseEnv": {},
-                "cwd": "/absolute/path/to/workspace/root"
-            }
-        }
-    ],
+    "providers": [],
     "agents": [
         {
             "id": "primary-workspace",
@@ -65,8 +25,43 @@
             "defaultVisible": true,
             "visibilityOverrides": [],
             "rootPath": "/absolute/path/to/workspace/root",
-            "providerIds": ["codex-main"],
-            "defaultProviderId": "codex-main",
+            "runtime": {
+                "id": "codex-main",
+                "kind": "codex",
+                "label": "Codex Main",
+                "enabled": true,
+                "idleTtlSeconds": 900,
+                "modelCacheTtlSeconds": 300,
+                "models": [
+                    {
+                        "id": "gpt-5.4",
+                        "label": "GPT-5.4",
+                        "enabled": true,
+                        "supportsReasoning": true,
+                        "variants": [
+                            {
+                                "id": "low",
+                                "label": "Low",
+                                "enabled": true
+                            },
+                            {
+                                "id": "medium",
+                                "label": "Medium",
+                                "enabled": true
+                            },
+                            {
+                                "id": "high",
+                                "label": "High",
+                                "enabled": true
+                            }
+                        ]
+                    }
+                ],
+                "command": "codex",
+                "args": ["app-server"],
+                "baseEnv": {},
+                "cwd": "/absolute/path/to/workspace/root"
+            },
             "defaultModel": "gpt-5.4",
             "defaultVariant": "medium",
             "modelAllowlist": [],

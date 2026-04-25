@@ -1,5 +1,6 @@
 import path from "node:path";
 
+import { getProviderConfig } from "./config.ts";
 import type { AgentchatConfig, AgentConfig, ProviderConfig } from "./config.ts";
 import { canonicalizePathForComparison } from "./pathComparison.ts";
 import {
@@ -2404,11 +2405,8 @@ function resolveRuntimeResources(
         ) ?? null;
     invariant(agent, "Agent is not available.");
 
-    const provider =
-        config.providers.find(
-            (candidate) =>
-                candidate.id === agent.defaultProviderId && candidate.enabled,
-        ) ?? null;
+    const resolvedProvider = getProviderConfig(config, agent.defaultProviderId);
+    const provider = resolvedProvider?.enabled ? resolvedProvider : null;
     invariant(provider, "Provider is not available.");
 
     const model =

@@ -1,3 +1,4 @@
+import { getProviderConfig } from "./config.ts";
 import type { AgentConfig, AgentchatConfig, ProviderConfig } from "./config.ts";
 import {
     CodexAppServerClient,
@@ -186,10 +187,11 @@ export class CodexModelCatalog {
     async getProviderModels(
         providerId: string,
     ): Promise<ProviderModelsPayload | null> {
-        const provider =
-            this.getConfig().providers.find(
-                (candidate) => candidate.id === providerId && candidate.enabled,
-            ) ?? null;
+        const resolvedProvider = getProviderConfig(
+            this.getConfig(),
+            providerId,
+        );
+        const provider = resolvedProvider?.enabled ? resolvedProvider : null;
         if (!provider) {
             return null;
         }
@@ -238,10 +240,11 @@ export class CodexModelCatalog {
     async probeProviderModels(
         providerId: string,
     ): Promise<ProviderModelsProbe> {
-        const provider =
-            this.getConfig().providers.find(
-                (candidate) => candidate.id === providerId && candidate.enabled,
-            ) ?? null;
+        const resolvedProvider = getProviderConfig(
+            this.getConfig(),
+            providerId,
+        );
+        const provider = resolvedProvider?.enabled ? resolvedProvider : null;
         if (!provider) {
             return {
                 providerId,

@@ -1,7 +1,13 @@
 import { existsSync, lstatSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 
-import type { AgentConfig, AgentchatConfig, ProviderConfig } from "./config.ts";
+import {
+    getAgentProviderConfigs,
+    getProviderConfigs,
+    type AgentConfig,
+    type AgentchatConfig,
+    type ProviderConfig,
+} from "./config.ts";
 
 const SYMLINK_SCAN_CACHE_TTL_MS = 30_000;
 const SYMLINK_SCAN_CACHE_MAX_ENTRIES = 128;
@@ -196,7 +202,7 @@ function getCachedFirstSymlinkInTree(rootPath: string): string | null {
 }
 
 export function getEnabledProviders(config: AgentchatConfig): ProviderConfig[] {
-    return config.providers.filter((provider) => provider.enabled);
+    return getProviderConfigs(config).filter((provider) => provider.enabled);
 }
 
 export function getAvailableProvidersForAgent(
@@ -207,10 +213,8 @@ export function getAvailableProvidersForAgent(
         getEnabledProviders(config).map((provider) => provider.id),
     );
 
-    return config.providers.filter(
-        (provider) =>
-            enabledProviderIds.has(provider.id) &&
-            agent.providerIds.includes(provider.id),
+    return getAgentProviderConfigs(config, agent).filter((provider) =>
+        enabledProviderIds.has(provider.id),
     );
 }
 
@@ -419,7 +423,7 @@ export function getAgentDiagnostics(
 export function getConfigDiagnostics(
     config: AgentchatConfig,
 ): ConfigDiagnostics {
-    const providers = config.providers.map(getProviderDiagnostics);
+    const providers = getProviderConfigs(config).map(getProviderDiagnostics);
     const agents = config.agents.map((agent) =>
         getAgentDiagnostics(config, agent),
     );

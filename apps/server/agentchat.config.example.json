@@ -14,80 +14,7 @@
             }
         ]
     },
-    "providers": [
-        {
-            "id": "codex-main",
-            "kind": "codex",
-            "label": "Codex Main",
-            "enabled": true,
-            "idleTtlSeconds": 900,
-            "modelCacheTtlSeconds": 300,
-            "models": [
-                {
-                    "id": "gpt-5.4",
-                    "label": "GPT-5.4",
-                    "enabled": true,
-                    "supportsReasoning": true,
-                    "variants": [
-                        {
-                            "id": "low",
-                            "label": "Low",
-                            "enabled": true
-                        },
-                        {
-                            "id": "medium",
-                            "label": "Medium",
-                            "enabled": true
-                        },
-                        {
-                            "id": "high",
-                            "label": "High",
-                            "enabled": true
-                        },
-                        {
-                            "id": "xhigh",
-                            "label": "X-High",
-                            "enabled": true
-                        }
-                    ]
-                },
-                {
-                    "id": "gpt-5.3-codex-spark",
-                    "label": "GPT-5.3 Codex Spark",
-                    "enabled": true,
-                    "supportsReasoning": true,
-                    "variants": [
-                        {
-                            "id": "low",
-                            "label": "Low",
-                            "enabled": true
-                        },
-                        {
-                            "id": "medium",
-                            "label": "Medium",
-                            "enabled": true
-                        },
-                        {
-                            "id": "high",
-                            "label": "High",
-                            "enabled": true
-                        },
-                        {
-                            "id": "xhigh",
-                            "label": "X-High",
-                            "enabled": true
-                        }
-                    ]
-                }
-            ],
-            "codex": {
-                "command": "codex",
-                "args": ["app-server"],
-                "baseEnv": {},
-                "cwd": "/srv/agentchat"
-            }
-        }
-    ],
+    "providers": [],
     "agents": [
         {
             "id": "example-agent",
@@ -98,8 +25,76 @@
             "defaultVisible": true,
             "visibilityOverrides": [],
             "rootPath": "/srv/repos/example-agent",
-            "providerIds": ["codex-main"],
-            "defaultProviderId": "codex-main",
+            "runtime": {
+                "id": "codex-main",
+                "kind": "codex",
+                "label": "Codex Main",
+                "enabled": true,
+                "idleTtlSeconds": 900,
+                "modelCacheTtlSeconds": 300,
+                "models": [
+                    {
+                        "id": "gpt-5.4",
+                        "label": "GPT-5.4",
+                        "enabled": true,
+                        "supportsReasoning": true,
+                        "variants": [
+                            {
+                                "id": "low",
+                                "label": "Low",
+                                "enabled": true
+                            },
+                            {
+                                "id": "medium",
+                                "label": "Medium",
+                                "enabled": true
+                            },
+                            {
+                                "id": "high",
+                                "label": "High",
+                                "enabled": true
+                            },
+                            {
+                                "id": "xhigh",
+                                "label": "X-High",
+                                "enabled": true
+                            }
+                        ]
+                    },
+                    {
+                        "id": "gpt-5.3-codex-spark",
+                        "label": "GPT-5.3 Codex Spark",
+                        "enabled": true,
+                        "supportsReasoning": true,
+                        "variants": [
+                            {
+                                "id": "low",
+                                "label": "Low",
+                                "enabled": true
+                            },
+                            {
+                                "id": "medium",
+                                "label": "Medium",
+                                "enabled": true
+                            },
+                            {
+                                "id": "high",
+                                "label": "High",
+                                "enabled": true
+                            },
+                            {
+                                "id": "xhigh",
+                                "label": "X-High",
+                                "enabled": true
+                            }
+                        ]
+                    }
+                ],
+                "command": "codex",
+                "args": ["app-server"],
+                "baseEnv": {},
+                "cwd": "/srv/agentchat"
+            },
             "defaultModel": "gpt-5.4",
             "defaultVariant": "low",
             "modelAllowlist": [],
