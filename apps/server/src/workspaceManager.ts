@@ -48,6 +48,7 @@ const STALE_CREATING_WORKSPACE_TTL_MS = 30 * 60_000;
 const FILE_LOCK_STALE_MS = 5_000;
 const FILE_LOCK_WAIT_MS = 5_000;
 const FILE_LOCK_POLL_MS = 10;
+const COPIED_WORKSPACE_MODE = "copy-on-conversation";
 
 type WorkspaceMetadata = {
     sourceRootPath: string;
@@ -145,8 +146,10 @@ export function getWorkspaceActiveKey(params: {
     agentId: string;
     userId: string;
     conversationId: string;
+    workspaceMode?: "copy-on-conversation";
 }): string {
     return getWorkspaceActiveKeyFromSegments({
+        workspaceMode: params.workspaceMode ?? COPIED_WORKSPACE_MODE,
         sandboxRoot: params.sandboxRoot,
         agentIdSegment: params.agentId,
         userIdSegment: getSandboxUserPathSegment(params.userId),
@@ -157,12 +160,14 @@ export function getWorkspaceActiveKey(params: {
 }
 
 export function getWorkspaceActiveKeyFromSegments(params: {
+    workspaceMode?: "copy-on-conversation";
     sandboxRoot: string;
     agentIdSegment: string;
     userIdSegment: string;
     conversationIdSegment: string;
 }): string {
     return JSON.stringify([
+        params.workspaceMode ?? COPIED_WORKSPACE_MODE,
         canonicalizePathForComparison(params.sandboxRoot),
         params.agentIdSegment,
         params.userIdSegment,

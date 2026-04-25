@@ -786,8 +786,8 @@ export class CodexRuntimeManager {
     }
 
     /**
-     * Returns composite agentId:userId:conversationId keys for live copied
-     * workspaces that should be preserved during reconciliation.
+     * Returns composite workspace-mode:sandboxRoot:agentId:userId:conversationId
+     * keys for live copied workspaces that should be preserved during reconciliation.
      */
     getActiveConversationKeys(): Set<string> {
         const keys = new Set<string>();

@@ -4,6 +4,7 @@ import {
     mkdirSync,
     mkdtempSync,
     readdirSync,
+    realpathSync,
     rmSync,
     symlinkSync,
     utimesSync,
@@ -19,6 +20,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import {
     getSandboxRootsRegistryPath,
     getWorkspaceActiveKey,
+    getWorkspaceActiveKeyFromSegments,
     getWorkspaceMetadataRootPath,
     WorkspaceManager,
 } from "../workspaceManager.ts";
@@ -27,7 +29,7 @@ import type { AgentchatConfig, AgentConfig } from "../config.ts";
 const tempRoots: string[] = [];
 
 function makeTempDir(name: string): string {
-    const dir = mkdtempSync(path.join(tmpdir(), `${name}-`));
+    const dir = realpathSync(mkdtempSync(path.join(tmpdir(), `${name}-`)));
     tempRoots.push(dir);
     return dir;
 }
@@ -1584,6 +1586,48 @@ new WorkspaceManager({
     });
 
     describe("reconcile", () => {
+        test("active keys explicitly include copied workspace mode and scoped identity", () => {
+            const sandboxRoot = makeTempDir("sandbox");
+            const base = {
+                sandboxRoot,
+                agentId: "agent-a",
+                userId: "user-1",
+                conversationId: "chat-1",
+            };
+
+            expect(JSON.parse(getWorkspaceActiveKey(base))).toEqual([
+                "copy-on-conversation",
+                sandboxRoot,
+                "agent-a",
+                "user-1",
+                "chat-1",
+            ]);
+            expect(getWorkspaceActiveKey(base)).toBe(
+                getWorkspaceActiveKeyFromSegments({
+                    workspaceMode: "copy-on-conversation",
+                    sandboxRoot,
+                    agentIdSegment: "agent-a",
+                    userIdSegment: "user-1",
+                    conversationIdSegment: "chat-1",
+                }),
+            );
+            expect(getWorkspaceActiveKey(base)).not.toBe(
+                getWorkspaceActiveKey({ ...base, userId: "user-2" }),
+            );
+            expect(getWorkspaceActiveKey(base)).not.toBe(
+                getWorkspaceActiveKey({ ...base, agentId: "agent-b" }),
+            );
+            expect(getWorkspaceActiveKey(base)).not.toBe(
+                getWorkspaceActiveKey({ ...base, conversationId: "chat-2" }),
+            );
+            expect(getWorkspaceActiveKey(base)).not.toBe(
+                getWorkspaceActiveKey({
+                    ...base,
+                    sandboxRoot: "/tmp/other-sandbox",
+                }),
+            );
+        });
+
         test("removes sandbox directories not in the active set", async () => {
             const sandboxRoot = makeTempDir("sandbox");
             const rootPath = makeTempDir("agent-root");
