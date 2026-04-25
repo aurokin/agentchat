@@ -80,6 +80,15 @@ type RuntimeWorkspaceIdentity = {
     workspaceCwd: string;
 };
 
+type RuntimeWorkspaceMode = RuntimeWorkspaceIdentity["workspaceMode"];
+
+type RuntimeKeyParts = {
+    workspaceMode: RuntimeWorkspaceMode | null;
+    userId: string;
+    agentId: string;
+    conversationId: string;
+};
+
 type PendingRuntimeInitialization = {
     cancelReason: Error | null;
     client: CodexClient | null;
@@ -98,39 +107,84 @@ function getRuntimeKey(
     userId: string,
     agentId: string,
     conversationId: string,
+    workspaceMode: RuntimeWorkspaceMode,
 ): string {
-    return JSON.stringify([userId, agentId, conversationId]);
+    return JSON.stringify([workspaceMode, userId, agentId, conversationId]);
+}
+
+function parseRuntimeKey(runtimeKey: string): RuntimeKeyParts | null {
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(runtimeKey);
+    } catch {
+        return null;
+    }
+
+    if (!Array.isArray(parsed)) {
+        return null;
+    }
+
+    if (parsed.length === 4) {
+        const [workspaceMode, userId, agentId, conversationId] = parsed;
+        if (
+            (workspaceMode !== "shared" &&
+                workspaceMode !== "copy-on-conversation") ||
+            typeof userId !== "string" ||
+            typeof agentId !== "string" ||
+            typeof conversationId !== "string"
+        ) {
+            return null;
+        }
+
+        return {
+            workspaceMode,
+            userId,
+            agentId,
+            conversationId,
+        };
+    }
+
+    if (parsed.length === 3) {
+        const [userId, agentId, conversationId] = parsed;
+        if (
+            typeof userId !== "string" ||
+            typeof agentId !== "string" ||
+            typeof conversationId !== "string"
+        ) {
+            return null;
+        }
+
+        return {
+            workspaceMode: null,
+            userId,
+            agentId,
+            conversationId,
+        };
+    }
+
+    return null;
 }
 
 function runtimeKeyMatchesConversation(params: {
     runtimeKey: string;
+    userId?: string;
     conversationId: string;
     agentId?: string;
 }): boolean {
-    let parsed: unknown;
-    try {
-        parsed = JSON.parse(params.runtimeKey);
-    } catch {
+    const parsed = parseRuntimeKey(params.runtimeKey);
+    if (!parsed) {
         return false;
     }
 
-    if (!Array.isArray(parsed) || parsed.length !== 3) {
+    if (params.userId !== undefined && parsed.userId !== params.userId) {
         return false;
     }
 
-    const [, keyAgentId, keyConversationId] = parsed;
-    if (
-        typeof keyAgentId !== "string" ||
-        typeof keyConversationId !== "string"
-    ) {
+    if (parsed.conversationId !== params.conversationId) {
         return false;
     }
 
-    if (keyConversationId !== params.conversationId) {
-        return false;
-    }
-
-    return params.agentId === undefined || keyAgentId === params.agentId;
+    return params.agentId === undefined || parsed.agentId === params.agentId;
 }
 
 function createServerEvent(
@@ -312,6 +366,142 @@ export class CodexRuntimeManager {
         const nextTimestamp = Math.max(now, this.lastPersistenceTimestamp + 1);
         this.lastPersistenceTimestamp = nextTimestamp;
         return nextTimestamp;
+    }
+
+    private getRuntimeKeyForConfiguredAgent(params: {
+        userId: string;
+        agentId: string;
+        conversationId: string;
+    }): string {
+        const workspaceMode =
+            this.getConfig().agents.find((agent) => agent.id === params.agentId)
+                ?.workspaceMode ?? "shared";
+        return getRuntimeKey(
+            params.userId,
+            params.agentId,
+            params.conversationId,
+            workspaceMode,
+        );
+    }
+
+    private findRuntimeForConversation(params: {
+        userId: string;
+        agentId: string;
+        conversationId: string;
+    }): ConversationRuntime | null {
+        for (const runtime of this.runtimes.values()) {
+            if (
+                runtime.userId === params.userId &&
+                runtime.agentId === params.agentId &&
+                runtime.conversationId === params.conversationId
+            ) {
+                return runtime;
+            }
+        }
+
+        return null;
+    }
+
+    private findPendingRuntimeInitializationForConversation(params: {
+        userId: string;
+        agentId: string;
+        conversationId: string;
+    }): PendingRuntimeInitialization | null {
+        for (const [key, pendingInitialization] of this
+            .pendingRuntimeInitializations) {
+            if (
+                runtimeKeyMatchesConversation({
+                    runtimeKey: key,
+                    userId: params.userId,
+                    agentId: params.agentId,
+                    conversationId: params.conversationId,
+                })
+            ) {
+                return pendingInitialization;
+            }
+        }
+
+        return null;
+    }
+
+    private getRuntimeKeysForConversation(params: {
+        userId: string;
+        agentId: string;
+        conversationId: string;
+    }): string[] {
+        const keys = new Set<string>([
+            this.getRuntimeKeyForConfiguredAgent(params),
+        ]);
+        for (const key of this.runtimes.keys()) {
+            if (
+                runtimeKeyMatchesConversation({
+                    runtimeKey: key,
+                    userId: params.userId,
+                    agentId: params.agentId,
+                    conversationId: params.conversationId,
+                })
+            ) {
+                keys.add(key);
+            }
+        }
+        for (const key of this.pendingRuntimeInitializations.keys()) {
+            if (
+                runtimeKeyMatchesConversation({
+                    runtimeKey: key,
+                    userId: params.userId,
+                    agentId: params.agentId,
+                    conversationId: params.conversationId,
+                })
+            ) {
+                keys.add(key);
+            }
+        }
+        for (const key of this.pendingSubscriptions.keys()) {
+            if (
+                runtimeKeyMatchesConversation({
+                    runtimeKey: key,
+                    userId: params.userId,
+                    agentId: params.agentId,
+                    conversationId: params.conversationId,
+                })
+            ) {
+                keys.add(key);
+            }
+        }
+
+        return [...keys];
+    }
+
+    private drainPendingSubscriptionsForConversation(params: {
+        runtimeKey: string;
+        userId: string;
+        agentId: string;
+        conversationId: string;
+    }): Map<string, RuntimeSubscriber> {
+        let subscribers =
+            this.pendingSubscriptions.get(params.runtimeKey) ?? new Map();
+        this.pendingSubscriptions.delete(params.runtimeKey);
+
+        for (const [key, pendingSubscribers] of this.pendingSubscriptions) {
+            if (
+                !runtimeKeyMatchesConversation({
+                    runtimeKey: key,
+                    userId: params.userId,
+                    agentId: params.agentId,
+                    conversationId: params.conversationId,
+                })
+            ) {
+                continue;
+            }
+
+            subscribers = mergeRuntimeSubscribers(
+                subscribers,
+                pendingSubscribers,
+            );
+            this.pendingSubscriptions.delete(key);
+        }
+
+        return subscribers;
     }
 
     async sendMessage(params: {
@@ -578,9 +768,7 @@ export class CodexRuntimeManager {
         conversationId: string;
         agentId: string;
     }): Promise<void> {
-        const runtime = this.runtimes.get(
-            getRuntimeKey(params.userId, params.agentId, params.conversationId),
-        );
+        const runtime = this.findRuntimeForConversation(params);
         if (!runtime?.activeTurn?.turnId) {
             return;
         }
@@ -619,39 +807,44 @@ export class CodexRuntimeManager {
             return;
         }
 
-        // If there's a live runtime, verify the agentId matches before tearing down
-        const key = getRuntimeKey(
-            params.userId,
-            params.agentId,
-            params.conversationId,
-        );
-        const pendingInitialization =
-            this.pendingRuntimeInitializations.get(key);
-        this.cancelPendingRuntimeInitialization(
-            key,
-            new Error("Conversation deleted during runtime initialization."),
-        );
-        const runtime = this.runtimes.get(key);
-        const shouldTearDownRuntime =
-            runtime?.agentId === params.agentId || !runtime;
-        if (runtime && !shouldTearDownRuntime) {
-            console.warn(
-                `[agentchat-server] conversation.delete: agentId mismatch (runtime=${runtime.agentId}, request=${params.agentId}); skipping runtime teardown but continuing workspace deletion`,
+        // Tear down every live or initializing runtime for this conversation,
+        // including runtimes keyed under a previous workspace mode.
+        const keys = this.getRuntimeKeysForConversation(params);
+        const pendingInitializations = keys
+            .map((key) => this.pendingRuntimeInitializations.get(key) ?? null)
+            .filter(
+                (
+                    pendingInitialization,
+                ): pendingInitialization is PendingRuntimeInitialization =>
+                    pendingInitialization !== null,
+            );
+        for (const key of keys) {
+            this.cancelPendingRuntimeInitialization(
+                key,
+                new Error(
+                    "Conversation deleted during runtime initialization.",
+                ),
             );
         }
+        const runtimes = keys
+            .map((key) => this.runtimes.get(key) ?? null)
+            .filter(
+                (runtime): runtime is ConversationRuntime => runtime !== null,
+            );
+        const runtime = runtimes[0] ?? null;
 
         // Tear down any active runtime for this conversation
-        if (runtime && shouldTearDownRuntime) {
-            await this.disposeRuntime(runtime, {
+        for (const runtimeToDispose of runtimes) {
+            await this.disposeRuntime(runtimeToDispose, {
                 removeFromMap: true,
                 reason: new Error("Conversation deleted during active turn."),
             });
+            this.pendingSubscriptions.delete(runtimeToDispose.key);
+        }
+        for (const key of keys) {
             this.pendingSubscriptions.delete(key);
         }
-        if (!runtime) {
-            this.pendingSubscriptions.delete(key);
-        }
-        if (pendingInitialization) {
+        for (const pendingInitialization of pendingInitializations) {
             const settled = await this.waitForPendingRuntimeInitialization(
                 pendingInitialization,
             );
@@ -722,12 +915,9 @@ export class CodexRuntimeManager {
         if (this.closedSubscribers.has(params.subscriberId)) {
             return;
         }
-        const key = getRuntimeKey(
-            params.userId,
-            params.agentId,
-            params.conversationId,
-        );
-        const runtime = this.runtimes.get(key);
+        const key = this.getRuntimeKeyForConfiguredAgent(params);
+        const runtime =
+            this.runtimes.get(key) ?? this.findRuntimeForConversation(params);
         if (!runtime) {
             this.addPendingSubscription(
                 key,
@@ -885,11 +1075,17 @@ export class CodexRuntimeManager {
         const resources = resolveRuntimeResources(config, params.command);
         const key = getRuntimeKey(
             params.userId,
-            params.command.payload.agentId,
+            resources.agent.id,
             params.command.payload.conversationId,
+            resources.agent.workspaceMode,
         );
         const pendingInitialization =
-            this.pendingRuntimeInitializations.get(key);
+            this.pendingRuntimeInitializations.get(key) ??
+            this.findPendingRuntimeInitializationForConversation({
+                userId: params.userId,
+                agentId: resources.agent.id,
+                conversationId: params.command.payload.conversationId,
+            });
         if (pendingInitialization) {
             return await pendingInitialization.promise;
         }
@@ -902,6 +1098,7 @@ export class CodexRuntimeManager {
             params,
             key,
             initializationState,
+            resources,
         );
         initializationState.promise = initialization;
         this.pendingRuntimeInitializations.set(key, initializationState);
@@ -920,26 +1117,38 @@ export class CodexRuntimeManager {
         },
         key: string,
         initializationState: PendingRuntimeInitialization,
+        resources: ResolvedRuntimeResources,
     ): Promise<{ runtime: ConversationRuntime; isNew: boolean }> {
-        const config = this.getConfig();
-        const resources = resolveRuntimeResources(config, params.command);
         const desiredCwd = getDesiredRuntimeCwd({
             workspaceManager: this.workspaceManager,
             agent: resources.agent,
             userId: params.userId,
             conversationId: params.command.payload.conversationId,
         });
-        const existing = this.runtimes.get(key);
+        const existing =
+            this.runtimes.get(key) ??
+            this.findRuntimeForConversation({
+                userId: params.userId,
+                agentId: resources.agent.id,
+                conversationId: params.command.payload.conversationId,
+            });
         let shouldResetConversationState = false;
         if (existing) {
             if (shouldRecycleRuntime(existing, resources, desiredCwd)) {
                 if (existing.activeTurn) {
                     return { runtime: existing, isNew: false };
                 }
-                const recycledSubscribers = mergeRuntimeSubscribers(
+                let recycledSubscribers = mergeRuntimeSubscribers(
                     this.pendingSubscriptions.get(key) ?? new Map(),
                     existing.subscribers,
                 );
+                if (existing.key !== key) {
+                    recycledSubscribers = mergeRuntimeSubscribers(
+                        recycledSubscribers,
+                        this.pendingSubscriptions.get(existing.key),
+                    );
+                    this.pendingSubscriptions.delete(existing.key);
+                }
                 if (recycledSubscribers.size > 0) {
                     this.pendingSubscriptions.set(key, recycledSubscribers);
                 }
@@ -1112,13 +1321,18 @@ export class CodexRuntimeManager {
                 subscribers: new Map(),
             };
 
-            const pendingSubscribers = this.pendingSubscriptions.get(key);
-            if (pendingSubscribers) {
+            const pendingSubscribers =
+                this.drainPendingSubscriptionsForConversation({
+                    runtimeKey: key,
+                    userId: params.userId,
+                    agentId: resources.agent.id,
+                    conversationId: params.command.payload.conversationId,
+                });
+            if (pendingSubscribers.size > 0) {
                 runtime.subscribers = mergeRuntimeSubscribers(
                     runtime.subscribers,
                     pendingSubscribers,
                 );
-                this.pendingSubscriptions.delete(key);
             }
 
             client.onNotification((notification) => {

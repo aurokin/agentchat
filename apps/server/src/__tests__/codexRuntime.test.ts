@@ -100,6 +100,15 @@ function createConfig(): AgentchatConfig {
     };
 }
 
+function runtimeKey(
+    workspaceMode: "shared" | "copy-on-conversation",
+    userId = "user-1",
+    agentId = "agent-1",
+    conversationId = "chat-1",
+): string {
+    return JSON.stringify([workspaceMode, userId, agentId, conversationId]);
+}
+
 type FakeClientOptions = {
     resumeError?: Error;
     resumedThreadId?: string;
@@ -2290,8 +2299,7 @@ describe("CodexRuntimeManager", () => {
                             { activeTurn: Record<string, unknown> | null }
                         >;
                     }
-                ).runtimes.get(JSON.stringify(["user-1", "agent-1", "chat-1"]))
-                    ?.activeTurn !== null,
+                ).runtimes.get(runtimeKey("shared"))?.activeTurn !== null,
         );
 
         const currentAgent = config.agents[0];
@@ -2323,8 +2331,7 @@ describe("CodexRuntimeManager", () => {
                         { activeTurn: Record<string, unknown> | null }
                     >;
                 }
-            ).runtimes.get(JSON.stringify(["user-1", "agent-1", "chat-1"]))
-                ?.activeTurn,
+            ).runtimes.get(runtimeKey("shared"))?.activeTurn,
         ).not.toBeNull();
 
         clients[0]?.emit({
@@ -2336,6 +2343,252 @@ describe("CodexRuntimeManager", () => {
             },
         });
         await firstSendPromise;
+    });
+
+    test("moves idle runtimes to a workspace-mode scoped key when mode changes", async () => {
+        const sandboxRoot = makeTempDir("sandbox");
+        const rootPath = makeTempDir("agent-root");
+        writeFileSync(path.join(rootPath, "README.md"), "workspace");
+
+        const config = createConfig();
+        config.sandboxRoot = sandboxRoot;
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath,
+            workspaceMode: "shared",
+        };
+
+        const workspaceManager = createWorkspaceManager(() => config);
+        const clients: FakeCodexClient[] = [];
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: createPersistence(
+                null,
+            ) as unknown as RuntimePersistenceClient,
+            workspaceManager,
+            createClient: () => {
+                const client = new FakeCodexClient();
+                clients.push(client);
+                return client;
+            },
+        });
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        expect(
+            (
+                manager as unknown as {
+                    runtimes: Map<string, unknown>;
+                }
+            ).runtimes.has(runtimeKey("shared")),
+        ).toBe(true);
+
+        config.agents[0] = {
+            ...config.agents[0]!,
+            workspaceMode: "copy-on-conversation",
+        };
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        const runtimes = (
+            manager as unknown as {
+                runtimes: Map<string, unknown>;
+            }
+        ).runtimes;
+        expect(runtimes.has(runtimeKey("shared"))).toBe(false);
+        expect(runtimes.has(runtimeKey("copy-on-conversation"))).toBe(true);
+        expect(clients).toHaveLength(2);
+        expect(clients[0]?.stopped).toBe(true);
+    });
+
+    test("does not start a parallel runtime when workspace mode changes during initialization", async () => {
+        const sandboxRoot = makeTempDir("sandbox");
+        const rootPath = makeTempDir("agent-root");
+        writeFileSync(path.join(rootPath, "README.md"), "workspace");
+
+        const config = createConfig();
+        config.sandboxRoot = sandboxRoot;
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath,
+            workspaceMode: "shared",
+        };
+
+        const workspaceManager = createWorkspaceManager(() => config);
+        const clients: FakeCodexClient[] = [];
+        let releaseInitialization!: () => void;
+        const initializationGate = new Promise<void>((resolve) => {
+            releaseInitialization = resolve;
+        });
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: createPersistence(
+                null,
+            ) as unknown as RuntimePersistenceClient,
+            workspaceManager,
+            createClient: () => {
+                const client = new FakeCodexClient({
+                    autoComplete: false,
+                    initializePromise: initializationGate,
+                });
+                clients.push(client);
+                return client;
+            },
+        });
+
+        const firstSendPromise = manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+        await Bun.sleep(0);
+
+        config.agents[0] = {
+            ...config.agents[0]!,
+            workspaceMode: "copy-on-conversation",
+        };
+
+        const secondSendError = manager
+            .sendMessage({
+                userId: "user-1",
+                subscriberId: "socket-2",
+                command: createCommand(),
+                sendEvent: () => undefined,
+            })
+            .then(
+                () => null,
+                (error) =>
+                    error instanceof Error ? error.message : String(error),
+            );
+
+        await Bun.sleep(0);
+        expect(clients).toHaveLength(1);
+
+        releaseInitialization();
+        await Bun.sleep(0);
+        expect(await secondSendError).toBe(
+            "Conversation already has an active run.",
+        );
+        expect(clients).toHaveLength(1);
+
+        clients[0]?.emit({
+            method: "turn/completed",
+            params: {
+                turn: {
+                    status: "completed",
+                },
+            },
+        });
+        await firstSendPromise;
+    });
+
+    test("attaches pending subscribers added after workspace mode changes during initialization", async () => {
+        const sandboxRoot = makeTempDir("sandbox");
+        const rootPath = makeTempDir("agent-root");
+        writeFileSync(path.join(rootPath, "README.md"), "workspace");
+
+        const config = createConfig();
+        config.sandboxRoot = sandboxRoot;
+        config.agents[0] = {
+            ...config.agents[0]!,
+            rootPath,
+            workspaceMode: "shared",
+        };
+
+        const workspaceManager = createWorkspaceManager(() => config);
+        const clients: FakeCodexClient[] = [];
+        let releaseInitialization!: () => void;
+        const initializationGate = new Promise<void>((resolve) => {
+            releaseInitialization = resolve;
+        });
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: createPersistence(
+                null,
+            ) as unknown as RuntimePersistenceClient,
+            workspaceManager,
+            createClient: () => {
+                const client = new FakeCodexClient({
+                    autoComplete: false,
+                    initializePromise: initializationGate,
+                });
+                clients.push(client);
+                return client;
+            },
+        });
+        const subscriberEvents: ServerEvent[] = [];
+
+        const sendPromise = manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+        await Bun.sleep(0);
+
+        config.agents[0] = {
+            ...config.agents[0]!,
+            workspaceMode: "copy-on-conversation",
+        };
+
+        await manager.subscribe({
+            userId: "user-1",
+            conversationId: "chat-1",
+            agentId: "agent-1",
+            subscriberId: "socket-2",
+            sendEvent: (event) => {
+                subscriberEvents.push(event);
+            },
+        });
+
+        expect(
+            (
+                manager as unknown as {
+                    pendingSubscriptions: Map<string, Map<string, unknown>>;
+                }
+            ).pendingSubscriptions.size,
+        ).toBe(1);
+
+        releaseInitialization();
+        await Bun.sleep(0);
+
+        expect(
+            (
+                manager as unknown as {
+                    pendingSubscriptions: Map<string, Map<string, unknown>>;
+                }
+            ).pendingSubscriptions.size,
+        ).toBe(0);
+        expect(subscriberEvents).toContainEqual(
+            expect.objectContaining({
+                type: "run.started",
+                payload: expect.objectContaining({
+                    agentId: "agent-1",
+                    conversationId: "chat-1",
+                }),
+            }),
+        );
+
+        clients[0]?.emit({
+            method: "turn/completed",
+            params: {
+                turn: {
+                    status: "completed",
+                },
+            },
+        });
+        await sendPromise;
     });
 
     test("rebuilds copied workspaces when the agent rootPath changes in config", async () => {
@@ -3346,11 +3599,7 @@ describe("CodexRuntimeManager", () => {
             createClient: () => client,
         });
         const command = createCommand();
-        const runtimeKey = JSON.stringify([
-            "user-1",
-            command.payload.agentId,
-            command.payload.conversationId,
-        ]);
+        const activeRuntimeKey = runtimeKey("copy-on-conversation");
         const originalOnExit = client.onExit.bind(client);
         client.onExit = (handler: (error: Error) => void) => {
             originalOnExit(handler);
@@ -3362,7 +3611,7 @@ describe("CodexRuntimeManager", () => {
                     ) => unknown;
                 }
             ).cancelPendingRuntimeInitialization(
-                runtimeKey,
+                activeRuntimeKey,
                 new Error(
                     "Conversation deleted during runtime initialization.",
                 ),
