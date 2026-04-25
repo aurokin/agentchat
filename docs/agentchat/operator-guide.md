@@ -47,13 +47,13 @@ For each agent, decide:
 Each agent has a `workspaceMode` setting:
 
 - `"shared"` (default) — the provider operates directly against `rootPath`. All conversations for this agent share the same directory. This is the original behavior.
-- `"copy-on-conversation"` — on first message, the server copies `rootPath` into a per-conversation sandbox under `sandboxRoot`. Each conversation gets its own isolated directory. The copy is deleted when the conversation is deleted.
+- `"copy-on-conversation"` — on first message, the server copies `rootPath` into a per-user, per-conversation sandbox under `sandboxRoot`. Each user/conversation pair gets its own isolated directory. The copy is deleted when the conversation is deleted.
 
 Use `"shared"` when all users should see the same workspace state. Use `"copy-on-conversation"` when each conversation needs an isolated copy of the codebase.
 
 `"copy-on-conversation"` roots must not contain symlinks. Agentchat copies those trees into managed sandboxes and now fails fast in `doctor:server` when a copy-on-conversation root still depends on symlinked files or directories.
 
-The top-level `sandboxRoot` config field controls where copies are stored. It defaults to `~/.agentchat/sandboxes`. The directory structure is `<sandboxRoot>/<agentId>/<conversationId>/`.
+The top-level `sandboxRoot` config field controls where copies are stored. It defaults to `~/.agentchat/sandboxes`. The directory structure is `<sandboxRoot>/<agentId>/<userId>/<conversationId>/`, with filesystem-unsafe user and conversation ids encoded before they are used as path segments.
 
 Sandbox cleanup happens in two ways:
 
@@ -180,6 +180,8 @@ Wrapper-first local preparation:
 bun run status
 bun run doctor
 ```
+
+`bun run doctor` validates wrapper readiness for the current checkout. It exits non-zero until the wrapper has a usable Convex cloud URL and Convex site URL; if bootstrap reports `Convex mode: unconfigured`, complete the Convex setup in [local_environment_setup_checklist.md](../local_environment_setup_checklist.md) or treat the failure as an expected environment gap for non-runtime script work.
 
 Wrapper-owned launcher for the current checkout web/server stack:
 

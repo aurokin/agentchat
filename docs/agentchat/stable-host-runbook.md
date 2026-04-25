@@ -10,6 +10,8 @@ Current host model:
 - current LAN HTTPS entrypoint `https://bront.home.arpa:4043`
 - dormant public-hostname metadata available in `~/.config/agentchat/config.json` for future cutover planning
 
+The stable checkout is intentionally a host-managed snapshot, not a normal day-to-day branch checkout. `scripts/host/install-stable.sh` clones from the operator's source checkout when needed, fetches the selected source commit, and checks out `FETCH_HEAD` detached. `scripts/host/update-stable.sh` and `scripts/host/rollback-stable.sh` repeat that detached-checkout flow. Do not treat the stable checkout's local `origin` or detached state as the source of truth; use the host scripts from the operator checkout to install, update, roll back, and render stable runtime files.
+
 ## Core Commands
 
 Install or refresh the stable checkout:
