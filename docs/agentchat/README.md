@@ -21,6 +21,10 @@ assumptions.
 - [Testing Plan](./testing-plan.md) - confidence layers and manual runtime checks.
 - [Manual QA Checklist](./manual-qa-checklist.md) - deliberate human validation.
 
+## Cleanup Sweep Evidence
+
+- [Branch Reconciliation Inventory](./branch-reconciliation-inventory.md) - AUR-115 inventory for stale runtime/worktree branches.
+
 ## Implementation Contracts
 
 - [Server Config Spec](./server-config-spec.md)
