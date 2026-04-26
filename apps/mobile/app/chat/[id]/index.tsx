@@ -485,15 +485,19 @@ export default function ChatScreen(): ReactElement {
                 return;
             }
 
-            await updateMessage({
-                ...existingMessage,
-                content: params.content,
-                contextContent: params.content,
-                status: params.status,
-                runId: params.runId,
-                updatedAt: Date.now(),
-                completedAt: params.status === "streaming" ? null : Date.now(),
-            }, currentChatAgentId);
+            await updateMessage(
+                {
+                    ...existingMessage,
+                    content: params.content,
+                    contextContent: params.content,
+                    status: params.status,
+                    runId: params.runId,
+                    updatedAt: Date.now(),
+                    completedAt:
+                        params.status === "streaming" ? null : Date.now(),
+                },
+                currentChatAgentId,
+            );
         },
         [currentChatAgentId, updateMessage],
     );

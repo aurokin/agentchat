@@ -26,6 +26,7 @@ assumptions.
 
 - [Branch Reconciliation Inventory](./branch-reconciliation-inventory.md) - AUR-115 inventory for stale runtime/worktree branches.
 - [Runtime Foundation Reconciliation Status](./reconciliation-status.md) - AUR-124 final docs and Linear reconciliation handoff.
+- [Final Runtime Foundation Verification](./final-runtime-foundation-verification.md) - AUR-125 verification gate result and residual risks.
 
 ## Implementation Contracts
 

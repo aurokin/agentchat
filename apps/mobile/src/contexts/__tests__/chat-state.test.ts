@@ -11,9 +11,7 @@ import type { ConversationRuntimeBindingSummary } from "@/lib/types";
 import type { Message } from "@shared/core/types";
 
 describe("chat state helpers", () => {
-    const createMessage = (
-        overrides: Partial<Message> = {},
-    ): Message => ({
+    const createMessage = (overrides: Partial<Message> = {}): Message => ({
         id: "message-1",
         sessionId: "chat-1",
         role: "assistant",

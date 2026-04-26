@@ -12,6 +12,7 @@ import path from "node:path";
 import { afterEach, describe, expect, test } from "bun:test";
 
 import type { AgentchatConfig } from "../config.ts";
+import type { JsonRpcNotification } from "../codexAppServerClient.ts";
 import type { RuntimePersistenceClient } from "../runtimePersistence.ts";
 import type { ServerEvent } from "../socketProtocol.ts";
 import { WorkspaceManager } from "../workspaceManager.ts";
@@ -149,7 +150,9 @@ class FakeCodexClient {
     readonly requests: Array<{ method: string; params: unknown }> = [];
     readonly options: FakeClientOptions;
     stopped = false;
-    private notificationHandler: ((notification: any) => void) | null = null;
+    private notificationHandler:
+        | ((notification: JsonRpcNotification) => void)
+        | null = null;
     private exitHandler: ((error: Error) => void) | null = null;
 
     constructor(options: FakeClientOptions = {}) {
@@ -214,7 +217,7 @@ class FakeCodexClient {
         throw new Error(`Unexpected request: ${method}`);
     }
 
-    onNotification(handler: (notification: any) => void): void {
+    onNotification(handler: (notification: JsonRpcNotification) => void): void {
         this.notificationHandler = handler;
     }
 
@@ -230,7 +233,7 @@ class FakeCodexClient {
         }
     }
 
-    emit(notification: unknown): void {
+    emit(notification: JsonRpcNotification): void {
         this.notificationHandler?.(notification);
     }
 

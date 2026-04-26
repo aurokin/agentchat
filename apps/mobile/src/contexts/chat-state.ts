@@ -66,16 +66,15 @@ export function patchScopedMessage(
         >;
     },
 ): Record<string, Message[]> {
-    const scopedChatKey = getScopedChatStateKey(
-        params.chatId,
-        params.agentId,
-    );
+    const scopedChatKey = getScopedChatStateKey(params.chatId, params.agentId);
     const chatMessages = state[scopedChatKey] || [];
 
     return {
         ...state,
         [scopedChatKey]: chatMessages.map((message) =>
-            message.id === params.id ? { ...message, ...params.updates } : message,
+            message.id === params.id
+                ? { ...message, ...params.updates }
+                : message,
         ),
     };
 }

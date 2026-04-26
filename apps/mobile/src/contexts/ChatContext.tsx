@@ -79,14 +79,8 @@ interface ChatContextValue {
     addMessage: (
         message: Omit<Message, "createdAt" | "id"> & { id?: string },
     ) => Promise<Message>;
-    insertMessage: (
-        message: Message,
-        agentId?: string | null,
-    ) => void;
-    updateMessage: (
-        message: Message,
-        agentId?: string | null,
-    ) => Promise<void>;
+    insertMessage: (message: Message, agentId?: string | null) => void;
+    updateMessage: (message: Message, agentId?: string | null) => Promise<void>;
     patchMessage: (
         id: string,
         chatId: string,
@@ -858,7 +852,11 @@ export function ChatProvider({
             updates: Partial<
                 Pick<
                     Message,
-                    "content" | "contextContent" | "reasoning" | "status" | "kind"
+                    | "content"
+                    | "contextContent"
+                    | "reasoning"
+                    | "status"
+                    | "kind"
                 >
             >,
             agentId?: string | null,
