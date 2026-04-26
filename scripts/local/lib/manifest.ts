@@ -35,9 +35,7 @@ const MANAGED_LANE_STATE_PARENT = path.join(
     "lanes",
 );
 
-function resolveManagedLaneStateRoot(
-    xdgStateHome: string,
-): string | null {
+function resolveManagedLaneStateRoot(xdgStateHome: string): string | null {
     if (!path.isAbsolute(xdgStateHome)) {
         return null;
     }
@@ -112,10 +110,22 @@ export function tryLoadLocalManifest(
 }
 
 export function saveLocalManifest(manifest: LocalManifest): void {
-    writeJson(resolveManifestPath(manifest.checkoutPath), {
+    const manifestPath = resolveManifestPath(manifest.checkoutPath);
+    const current = readJsonIfExists<LocalManifest>(manifestPath);
+    const next = {
         ...manifest,
         updatedAt: nowIso(),
-    });
+    };
+
+    if (current) {
+        const { updatedAt: _currentUpdatedAt, ...currentStable } = current;
+        const { updatedAt: _nextUpdatedAt, ...nextStable } = next;
+        if (JSON.stringify(currentStable) === JSON.stringify(nextStable)) {
+            return;
+        }
+    }
+
+    writeJson(manifestPath, next);
 }
 
 export function deriveLanePorts(checkoutPath: string): {

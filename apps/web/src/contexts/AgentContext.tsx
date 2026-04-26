@@ -35,6 +35,8 @@ const convexApi = api as typeof api & {
     };
 };
 
+export type BootstrapAuthState = "none" | "anonymous" | "authenticated";
+
 interface AgentContextType {
     agents: BootstrapAgent[];
     authProviderId: string | null;
@@ -46,6 +48,7 @@ interface AgentContextType {
     loadingAgents: boolean;
     loadingAgentOptions: boolean;
     bootstrap: BootstrapResponse | null;
+    bootstrapAuthState: BootstrapAuthState;
     bootstrapIssue: AgentchatServerIssue | null;
     agentOptionsIssue: AgentchatServerIssue | null;
     setSelectedAgentId: (agentId: string) => void;
@@ -56,6 +59,8 @@ const AgentContext = createContext<AgentContextType | null>(null);
 
 export function AgentProvider({ children }: { children: React.ReactNode }) {
     const [bootstrap, setBootstrap] = useState<BootstrapResponse | null>(null);
+    const [bootstrapAuthState, setBootstrapAuthState] =
+        useState<BootstrapAuthState>("none");
     const [selectedAgentOptions, setSelectedAgentOptions] =
         useState<AgentOptionsResponse | null>(null);
     const [selectedAgentId, setSelectedAgentIdState] = useState<string | null>(
@@ -70,14 +75,33 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
 
     const { isAuthenticated } = useConvexAuth();
     const issueBackendToken = useActionSafe(convexApi.backendTokens.issue);
+    const bootstrapRef = useRef<BootstrapResponse | null>(null);
+    const bootstrapAuthStateRef = useRef<BootstrapAuthState>("none");
     const backendTokenRef = useRef<string | null>(null);
+    const isAuthenticatedRef = useRef(isAuthenticated);
+    isAuthenticatedRef.current = isAuthenticated;
 
     const refreshBootstrap = useCallback(async (token?: string | null) => {
+        const nextBootstrapAuthState: BootstrapAuthState = token
+            ? "authenticated"
+            : "anonymous";
+
         setLoadingAgents(true);
         try {
             const nextBootstrap = await fetchBootstrap(token);
+            if (
+                nextBootstrapAuthState === "anonymous" &&
+                (bootstrapAuthStateRef.current === "authenticated" ||
+                    isAuthenticatedRef.current)
+            ) {
+                return;
+            }
+
             setBootstrapIssue(null);
+            bootstrapRef.current = nextBootstrap;
+            bootstrapAuthStateRef.current = nextBootstrapAuthState;
             setBootstrap(nextBootstrap);
+            setBootstrapAuthState(nextBootstrapAuthState);
 
             const nextSelectedAgentId = resolveSelectedAgentId({
                 agents: nextBootstrap.agents,
@@ -91,6 +115,14 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
                 storage.clearSelectedAgentId();
             }
         } catch (error) {
+            if (
+                nextBootstrapAuthState === "anonymous" &&
+                (bootstrapAuthStateRef.current === "authenticated" ||
+                    isAuthenticatedRef.current)
+            ) {
+                return;
+            }
+
             console.error("Failed to load Agentchat bootstrap:", error);
             setBootstrapIssue(
                 toAgentchatServerIssue({
@@ -98,7 +130,12 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
                     error,
                 }),
             );
-            setBootstrap({
+
+            if (bootstrapRef.current) {
+                return;
+            }
+
+            const fallbackBootstrap: BootstrapResponse = {
                 auth: {
                     defaultProviderId: "google-main",
                     requiresLogin: true,
@@ -121,13 +158,59 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
                 },
                 agents: [],
                 providers: [],
-            });
+            };
+            bootstrapRef.current = fallbackBootstrap;
+            bootstrapAuthStateRef.current = "anonymous";
+            setBootstrap(fallbackBootstrap);
+            setBootstrapAuthState("anonymous");
             setSelectedAgentIdState(null);
             storage.clearSelectedAgentId();
         } finally {
             setLoadingAgents(false);
         }
     }, []);
+
+    const refreshAuthenticatedBootstrap = useCallback(
+        async (shouldCancel: () => boolean = () => false) => {
+            try {
+                const result = await issueBackendToken({} as any);
+                if (shouldCancel()) return;
+
+                const token = (result as any)?.token;
+                if (!token) {
+                    throw new Error(
+                        "Backend token response did not include a token.",
+                    );
+                }
+
+                backendTokenRef.current = token;
+                await refreshBootstrap(token);
+            } catch (error) {
+                if (shouldCancel()) return;
+                console.error(
+                    "Failed to issue backend token for bootstrap:",
+                    error,
+                );
+                setBootstrapIssue(
+                    toAgentchatServerIssue({
+                        scope: "bootstrap",
+                        error,
+                    }),
+                );
+            }
+        },
+        [issueBackendToken, refreshBootstrap],
+    );
+
+    const refreshBootstrapForCurrentAuth = useCallback(async () => {
+        if (!isAuthenticated) {
+            backendTokenRef.current = null;
+            await refreshBootstrap();
+            return;
+        }
+
+        await refreshAuthenticatedBootstrap();
+    }, [isAuthenticated, refreshAuthenticatedBootstrap, refreshBootstrap]);
 
     // Initial unauthenticated bootstrap (for auth config / login page)
     useEffect(() => {
@@ -139,24 +222,12 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
         if (!isAuthenticated) return;
 
         let cancelled = false;
-        void (async () => {
-            try {
-                const result = await issueBackendToken({} as any);
-                if (cancelled || !result) return;
-                backendTokenRef.current = (result as any).token;
-                await refreshBootstrap((result as any).token);
-            } catch (error) {
-                console.error(
-                    "Failed to issue backend token for bootstrap:",
-                    error,
-                );
-            }
-        })();
+        void refreshAuthenticatedBootstrap(() => cancelled);
 
         return () => {
             cancelled = true;
         };
-    }, [isAuthenticated, issueBackendToken, refreshBootstrap]);
+    }, [isAuthenticated, refreshAuthenticatedBootstrap]);
 
     const setSelectedAgentId = useCallback(
         (agentId: string) => {
@@ -232,11 +303,11 @@ export function AgentProvider({ children }: { children: React.ReactNode }) {
                 loadingAgents,
                 loadingAgentOptions,
                 bootstrap,
+                bootstrapAuthState,
                 bootstrapIssue,
                 agentOptionsIssue,
                 setSelectedAgentId,
-                refreshBootstrap: () =>
-                    refreshBootstrap(backendTokenRef.current),
+                refreshBootstrap: refreshBootstrapForCurrentAuth,
             }}
         >
             {children}

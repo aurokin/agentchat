@@ -32,19 +32,24 @@ export function readJsonIfExists<T>(absPath: string): T | null {
     }
 }
 
-function writeFileAtomically(absPath: string, value: string): void {
+function writeFileAtomically(absPath: string, value: string): boolean {
     ensureDir(path.dirname(absPath));
+    if (fs.existsSync(absPath) && fs.readFileSync(absPath, "utf8") === value) {
+        return false;
+    }
+
     const tempPath = `${absPath}.${process.pid}.${Date.now()}.tmp`;
     fs.writeFileSync(tempPath, value, "utf8");
     fs.renameSync(tempPath, absPath);
+    return true;
 }
 
-export function writeJson(absPath: string, value: unknown): void {
-    writeFileAtomically(absPath, `${JSON.stringify(value, null, 4)}\n`);
+export function writeJson(absPath: string, value: unknown): boolean {
+    return writeFileAtomically(absPath, `${JSON.stringify(value, null, 4)}\n`);
 }
 
-export function writeText(absPath: string, value: string): void {
-    writeFileAtomically(absPath, value);
+export function writeText(absPath: string, value: string): boolean {
+    return writeFileAtomically(absPath, value);
 }
 
 export function hashShort(value: string): string {

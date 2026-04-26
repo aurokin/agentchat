@@ -10,6 +10,7 @@ import {
     laneStateRootsForCheckout,
     loadLocalManifest,
     resolveManifestPath,
+    saveLocalManifest,
     tryLoadLocalManifest,
 } from "../local/lib/manifest.ts";
 import type { LocalManifest } from "../local/lib/model.ts";
@@ -83,6 +84,43 @@ describe("loadLocalManifest", () => {
         ).toBeNull();
         expect(errors).toHaveLength(1);
         expect(errors[0]).toContain("xdgStateHome must resolve inside");
+    });
+});
+
+describe("saveLocalManifest", () => {
+    test("does not rewrite an unchanged manifest just to bump updatedAt", () => {
+        const checkoutPath = createCheckoutPath();
+        const manifest = createManifest(checkoutPath);
+
+        saveLocalManifest(manifest);
+        const manifestPath = resolveManifestPath(checkoutPath);
+        const firstStat = fs.statSync(manifestPath);
+
+        saveLocalManifest(manifest);
+        const secondStat = fs.statSync(manifestPath);
+
+        expect(secondStat.ino).toBe(firstStat.ino);
+        expect(secondStat.mtimeMs).toBe(firstStat.mtimeMs);
+    });
+
+    test("rewrites the manifest when substantive values change", () => {
+        const checkoutPath = createCheckoutPath();
+        const manifest = createManifest(checkoutPath);
+
+        saveLocalManifest(manifest);
+        const manifestPath = resolveManifestPath(checkoutPath);
+        const firstStat = fs.statSync(manifestPath);
+
+        saveLocalManifest({
+            ...manifest,
+            webPort: manifest.webPort + 1,
+        });
+        const secondStat = fs.statSync(manifestPath);
+
+        expect(secondStat.ino).not.toBe(firstStat.ino);
+        expect(loadLocalManifest(checkoutPath)?.webPort).toBe(
+            manifest.webPort + 1,
+        );
     });
 });
 

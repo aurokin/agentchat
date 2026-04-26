@@ -133,6 +133,14 @@ If you want to discard drifted local files and regenerate them from the current 
 bun run bootstrap --force
 ```
 
+`bootstrap` is idempotent for unchanged generated files. This matters while
+`next dev` is running: replacing `apps/web/.env.local` with identical content
+still looks like an environment change to Next and can trigger a full browser
+reload, which drops unsent chat input. A clean `bun run bootstrap` should leave
+the inode and mtime of `apps/web/.env.local`, `apps/server/.env.local`,
+`apps/server/agentchat.config.json`, and `.agentchat/local/manifest.json`
+unchanged unless the rendered content actually changed.
+
 ## Current First-Slice Limits
 
 This repo intentionally supports only this minimal topology right now:

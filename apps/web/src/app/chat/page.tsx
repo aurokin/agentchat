@@ -11,6 +11,13 @@ import { useIsConvexAvailable } from "@/contexts/ConvexProvider";
 import { useSettings } from "@/contexts/SettingsContext";
 import { OperatorNotice } from "@/components/chat/OperatorNotice";
 import { BackgroundRuntimeSubscriptions } from "@/components/chat/BackgroundRuntimeSubscriptions";
+import {
+    canMarkAuthenticatedShellRendered,
+    shouldShowFullPageBootstrapIssue,
+    shouldRenderAuthenticatedShell,
+    shouldResetAuthenticatedShellRendered,
+    shouldShowInitialChatLoader,
+} from "./page-state";
 
 export default function ChatPage() {
     const { chats, loading, selectChat, currentChat } = useChat();
@@ -21,6 +28,8 @@ export default function ChatPage() {
         bootstrapIssue,
         agentOptionsIssue,
         refreshBootstrap,
+        bootstrap,
+        bootstrapAuthState,
     } = useAgent();
     const { modelsIssue, refreshModels } = useSettings();
     const isConvexAvailable = useIsConvexAvailable();
@@ -33,7 +42,28 @@ export default function ChatPage() {
         null,
     );
     const [isLocalSigningIn, setIsLocalSigningIn] = useState(false);
+    const [hasRenderedAuthenticatedShell, setHasRenderedAuthenticatedShell] =
+        useState(false);
     const hasAccess = isConvexAvailable && isAuthenticated;
+    const hasAuthenticatedBootstrap = bootstrapAuthState === "authenticated";
+    const showInitialLoader = shouldShowInitialChatLoader({
+        isAuthLoading,
+        loadingAgents,
+        hasBootstrap: bootstrap !== null,
+        hasAuthenticatedBootstrap,
+        hasAccess,
+        hasBootstrapIssue: bootstrapIssue !== null,
+        hasRenderedAuthenticatedShell,
+    });
+    const renderAuthenticatedShell = shouldRenderAuthenticatedShell({
+        hasAccess,
+        hasRenderedAuthenticatedShell,
+        isAuthLoading,
+    });
+    const showFullPageBootstrapIssue = shouldShowFullPageBootstrapIssue({
+        hasBootstrapIssue: bootstrapIssue !== null,
+        hasRenderedAuthenticatedShell,
+    });
 
     const handleLocalSignIn = async () => {
         if (!signIn) {
@@ -111,7 +141,38 @@ export default function ChatPage() {
         selectChat,
     ]);
 
-    if (isAuthLoading || loadingAgents) {
+    useEffect(() => {
+        if (
+            shouldResetAuthenticatedShellRendered({
+                hasAccess,
+                hasRenderedAuthenticatedShell,
+                isAuthLoading,
+            })
+        ) {
+            setHasRenderedAuthenticatedShell(false);
+            return;
+        }
+
+        if (
+            canMarkAuthenticatedShellRendered({
+                hasAccess,
+                hasAuthenticatedBootstrap,
+                hasBootstrapIssue: bootstrapIssue !== null,
+                showInitialLoader,
+            })
+        ) {
+            setHasRenderedAuthenticatedShell(true);
+        }
+    }, [
+        bootstrapIssue,
+        hasAccess,
+        hasAuthenticatedBootstrap,
+        hasRenderedAuthenticatedShell,
+        isAuthLoading,
+        showInitialLoader,
+    ]);
+
+    if (showInitialLoader) {
         return (
             <div className="flex h-dvh items-center justify-center bg-background">
                 <Loader2 size={24} className="animate-spin text-primary" />
@@ -119,7 +180,7 @@ export default function ChatPage() {
         );
     }
 
-    if (bootstrapIssue) {
+    if (showFullPageBootstrapIssue && bootstrapIssue) {
         return (
             <div className="flex h-dvh items-center justify-center bg-background px-6">
                 <div className="w-full max-w-2xl space-y-4">
@@ -138,7 +199,7 @@ export default function ChatPage() {
         );
     }
 
-    if (!isConvexAvailable || !hasAccess) {
+    if (!isConvexAvailable || !renderAuthenticatedShell) {
         return (
             <div className="flex h-dvh items-center justify-center bg-background px-6">
                 <div className="w-full max-w-md border border-border bg-background-elevated p-8 text-center">
@@ -209,9 +270,17 @@ export default function ChatPage() {
     return (
         <div className="relative h-dvh">
             <BackgroundRuntimeSubscriptions />
-            {(agentOptionsIssue || modelsIssue) && (
+            {(bootstrapIssue || agentOptionsIssue || modelsIssue) && (
                 <div className="pointer-events-none absolute inset-x-0 top-4 z-20 mx-auto w-full max-w-3xl px-4">
                     <div className="pointer-events-auto space-y-3">
+                        {bootstrapIssue ? (
+                            <OperatorNotice
+                                issue={bootstrapIssue}
+                                actionLabel="Retry bootstrap"
+                                onAction={() => void refreshBootstrap()}
+                                tone="warning"
+                            />
+                        ) : null}
                         {agentOptionsIssue ? (
                             <OperatorNotice
                                 issue={agentOptionsIssue}
