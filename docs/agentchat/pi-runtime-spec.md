@@ -6,6 +6,13 @@ This spec defines how `apps/server` should manage Pi as a runtime adapter.
 
 Pi refers to the `@mariozechner/pi-coding-agent` and `@mariozechner/pi-agent-core` packages. Pi is an AI agent toolkit with a built-in coding agent, multi-provider LLM abstraction, and an RPC subprocess mode that maps closely to the existing Codex app-server integration pattern.
 
+Current planning note: Pi may be implemented either through direct stdin/stdout
+RPC or through an ACP adapter such as `pi-acp`. The first implementation route
+should be chosen after the shared runtime contract, transport substrate, and ACP
+foundation exist. See
+[Runtime Protocol Expansion Plan](./runtime-protocol-expansion-plan.md) and
+[ACP Runtime Spec](./acp-runtime-spec.md).
+
 ## Upstream Reference
 
 Source: `~/code/pi-mono-upstream`

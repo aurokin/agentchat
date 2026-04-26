@@ -13,6 +13,7 @@ assumptions.
 4. [Roadmap](./roadmap.md)
 5. [Harness Engineering](./harness-engineering.md)
 6. [Runtime Foundation Reconciliation Status](./reconciliation-status.md)
+7. [Runtime Protocol Expansion Plan](./runtime-protocol-expansion-plan.md)
 
 ## Operating The System
 
@@ -34,12 +35,15 @@ assumptions.
 - [Convex Spec](./convex-spec.md)
 - [Backend API Spec](./backend-api-spec.md)
 - [Codex Runtime Spec](./codex-runtime-spec.md)
+- [Runtime Kind Contract](./runtime-kind-contract.md)
 - [Runtime And Auth Plan](./runtime-and-auth-plan.md)
 - [Mobile Follow-Up](./mobile-followup.md)
 - [Mobile Integration Testing](./mobile-integration-testing.md)
 
 ## Planned Runtime Work
 
+- [Runtime Protocol Expansion Plan](./runtime-protocol-expansion-plan.md)
+- [ACP Runtime Spec](./acp-runtime-spec.md)
 - [Pi Runtime Spec](./pi-runtime-spec.md)
 - [OpenCode Runtime Spec](./opencode-runtime-spec.md)
 - [Claude Code Runtime Spec](./claude-code-runtime-spec.md)
@@ -60,7 +64,9 @@ These docs describe the active Agentchat direction:
 - Codex as the current active runtime.
 - Agent-owned inline runtime config for new agents, with top-level runtime
   providers retained as a compatibility bridge.
-- Pi, OpenCode, and Claude Code as planned runtime implementations.
+- Runtime protocol expansion is abstraction-first: harden the runtime contract
+  and transports before adding Claude Code and ACP tracers.
+- Pi, OpenCode, Claude Code, and ACP-backed agents as planned runtime paths.
 
 If another document conflicts with this directory, treat this directory as the
 source of truth and update the stale document.

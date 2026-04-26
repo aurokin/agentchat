@@ -30,6 +30,8 @@ Current runtime behavior:
 - new Codex agents can define runtime behavior inline on the agent
 - legacy top-level provider config remains as a compatibility bridge for older installs
 - `KindRuntime` is the runtime-kind boundary; Codex is the active implementation
+- the next runtime phase should harden the shared runtime contract and
+  transport substrate before adding Claude Code or ACP adapters
 
 ## Auth
 
@@ -66,5 +68,8 @@ The remaining work in this area is hardening and polish, not a model migration.
 - keep operator diagnostics explicit when config, environment, or model discovery degrade
 - keep mobile and web aligned as clients of the same runtime model
 - keep workspace-level activity and recovery UX polished without reintroducing client-owned runtime assumptions
-- add Pi, OpenCode, Claude Code, ACP clients, and approval UI only as separate
-  follow-up work on top of the current runtime foundation
+- execute the Runtime Protocol Expansion plan: contract v2, transport
+  substrate, ACP foundation, Claude Code tracer, then ACP adapter tracer
+- add Pi and OpenCode through the shared substrate rather than as bespoke
+  product paths
+- keep approval UI as separate deferred work

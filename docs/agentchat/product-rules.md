@@ -57,6 +57,9 @@ This document records user-facing rules and product decisions that should remain
 - Concurrent activity from one user must not block or interfere with another user on the same instance.
 - The application assumes automatic approval mode for runtime actions in v1.
 - Auto-approve is a project requirement for the current scope, not a temporary UI default.
+- Runtime protocol work, including Claude Code and ACP, must preserve the same
+  agent-centric product boundary: protocol details are operator configuration,
+  not user-facing selectors.
 
 ## Data Rules
 
@@ -71,5 +74,5 @@ This document records user-facing rules and product decisions that should remain
 - Conversation branching
 - Approval UX beyond auto-approve
 - Admin interface for managing agents
-- Pi, OpenCode, and Claude Code runtime implementations
-- ACP-compatible clients
+- Full Pi and OpenCode runtime implementations
+- Broad ACP adapter coverage beyond the first tracer

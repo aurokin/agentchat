@@ -6,6 +6,20 @@ This spec defines how `apps/server` should manage Claude Code as a runtime adapt
 
 Claude Code is Anthropic's CLI coding agent. Unlike Codex, Pi, and OpenCode, Claude Code does not have a persistent server mode. Integration uses the CLI binary in print mode with session resumption, spawning a subprocess per turn.
 
+Implementation should follow the
+[Runtime Protocol Expansion Plan](./runtime-protocol-expansion-plan.md). Claude
+Code is a tracer on top of the shared runtime contract and JSONL subprocess
+transport, not the abstraction that should define the contract by itself.
+
+Prerequisites:
+
+- [Runtime Kind Contract](./runtime-kind-contract.md) supports per-turn
+  subprocess runtimes and generic session bindings.
+- Shared transport helpers can spawn a subprocess, parse JSONL stdout, capture
+  stderr, handle cancellation, and enforce timeouts.
+- Provider artifact persistence remains available for Claude stream-json
+  metadata.
+
 ## Why Claude Code
 
 - Users with a Claude Max or Pro subscription can use Claude Code at no additional API cost. This is the primary value proposition.
@@ -29,6 +43,10 @@ This means:
 One `claude` subprocess per turn, not per conversation.
 
 This is fundamentally different from Codex, Pi, and OpenCode where a persistent process handles multiple turns. With Claude Code, each turn spawns a fresh process that resumes the session via `--session-id`.
+
+This difference must stay adapter-specific. Product code should depend on the
+shared prompt-turn contract rather than checking for Claude Code lifecycle
+details.
 
 ## Protocol
 

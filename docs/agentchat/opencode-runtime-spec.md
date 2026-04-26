@@ -6,6 +6,13 @@ This spec defines how `apps/server` should manage OpenCode as a runtime adapter.
 
 OpenCode is an open-source, provider-agnostic AI coding agent with a full HTTP REST API server mode designed for programmatic integration.
 
+Current planning note: OpenCode may be implemented through its direct HTTP API
+or through ACP if the ACP path becomes the better first tracer. The route should
+be chosen after the shared runtime contract, transport substrate, and ACP
+foundation exist. See
+[Runtime Protocol Expansion Plan](./runtime-protocol-expansion-plan.md) and
+[ACP Runtime Spec](./acp-runtime-spec.md).
+
 ## Upstream Reference
 
 Source: `~/code/opencode-upstream`

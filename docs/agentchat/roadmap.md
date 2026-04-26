@@ -15,6 +15,7 @@ Agentchat already has:
   top-level provider config remains as a compatibility bridge
 - a `KindRuntime` interface with Codex as the active implementation
 - a passive Codex provider metadata/event lane for diagnostics and replay
+- a first structured provider artifact lane for Codex runtime items
 - hardened model catalog behavior for GPT-5.4 mini, GPT-5.5, and future live
   model discovery
 - user-scoped local auth with seeded fixtures such as `smoke_1` and `smoke_2`
@@ -86,30 +87,57 @@ the final cleanup-sweep handoff. The older
 [Provider-Agent Merge Plan](../../plans/provider-agent-merge-plan.md) is now
 historical context, not the active task list.
 
-## Next Phase: Multi-Runtime Support
+## Next Phase: Runtime Protocol Expansion
 
 After the foundation verification gate, Agentchat can add runtime kinds beyond
-Codex.
+Codex. This should proceed abstraction-first rather than starting with a direct
+Claude-only implementation.
 
-Planned runtimes in priority order:
+The next phase is tracked by the Runtime Protocol Expansion milestone and
+[Runtime Protocol Expansion Plan](./runtime-protocol-expansion-plan.md).
 
-### 1. Pi (stdin/stdout RPC)
+Execution order:
 
-Pi is an AI agent toolkit with a built-in coding agent and multi-provider LLM support. Its RPC mode over stdin/stdout is nearly identical to the existing Codex app-server pattern. This is the lowest-friction addition.
+1. Replan Linear and docs so implementation work follows the same graph.
+2. Harden [Runtime Kind Contract](./runtime-kind-contract.md) so runtime
+   execution is modeled as session-bound prompt turns with normalized updates
+   and provider artifacts.
+3. Add reusable runtime transports: JSON-RPC stdio, JSONL subprocess streams,
+   process lifecycle helpers, cancellation, stderr, exit, and timeout handling.
+4. Add [ACP Runtime Spec](./acp-runtime-spec.md) foundation for ACP
+   initialization, sessions, prompt turns, updates, cancellation, and
+   permission request handling.
+5. Implement the Claude Code runtime tracer.
+6. Implement the first ACP adapter tracer.
 
-See [Pi Runtime Spec](./pi-runtime-spec.md).
+### Claude Code Tracer
 
-### 2. OpenCode (HTTP REST API)
-
-OpenCode is an open-source, provider-agnostic coding agent with a dedicated HTTP server mode. It introduces a different transport (HTTP vs pipes) but has a well-documented API with a generated SDK.
-
-See [OpenCode Runtime Spec](./opencode-runtime-spec.md).
-
-### 3. Claude Code (subprocess per turn)
-
-Claude Code is Anthropic's CLI coding agent. Users with a Claude subscription can use it at no additional API cost. Integration uses the CLI binary in print mode with session resumption. This is the least clean integration but the most attractive for users already paying for a Claude subscription.
+Claude Code is Anthropic's CLI coding agent. Users with a Claude subscription
+can use it at no additional API cost. Integration uses the CLI binary in print
+mode with session resumption. It should be implemented after the runtime
+contract and JSONL subprocess transport exist.
 
 See [Claude Code Runtime Spec](./claude-code-runtime-spec.md).
+
+### ACP Adapter Tracer
+
+ACP is now part of the active runtime protocol plan. It should be implemented as
+a generic protocol foundation before choosing the first concrete ACP-compatible
+adapter, likely `pi-acp` unless OpenCode ACP is a better first tracer when the
+foundation is ready.
+
+See [ACP Runtime Spec](./acp-runtime-spec.md).
+
+### Pi And OpenCode Follow-Ups
+
+Pi and OpenCode remain planned runtime paths, but their first implementation
+route should be chosen after the shared substrate exists.
+
+- Pi can be direct stdin/stdout RPC or ACP-backed.
+- OpenCode can be direct HTTP streaming or ACP-backed.
+
+See [Pi Runtime Spec](./pi-runtime-spec.md) and
+[OpenCode Runtime Spec](./opencode-runtime-spec.md).
 
 ## Deferred Work
 
@@ -117,7 +145,6 @@ These remain intentionally out of scope for the current and next phases:
 
 - admin UI for provider and agent management
 - approval flows beyond auto-approve
-- ACP-compatible clients
 - conversation branching and forking
 - hosted-product concerns such as billing or analytics
 - attachments
