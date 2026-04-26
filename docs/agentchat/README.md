@@ -36,6 +36,7 @@ assumptions.
 - [Backend API Spec](./backend-api-spec.md)
 - [Codex Runtime Spec](./codex-runtime-spec.md)
 - [Runtime Kind Contract](./runtime-kind-contract.md)
+- [Runtime Abstraction Pressure Log](./runtime-abstraction-pressure-log.md)
 - [Runtime And Auth Plan](./runtime-and-auth-plan.md)
 - [Mobile Follow-Up](./mobile-followup.md)
 - [Mobile Integration Testing](./mobile-integration-testing.md)
@@ -65,7 +66,9 @@ These docs describe the active Agentchat direction:
 - Agent-owned inline runtime config for new agents, with top-level runtime
   providers retained as a compatibility bridge.
 - Runtime protocol expansion is abstraction-first: harden the runtime contract
-  and transports before adding Claude Code and ACP tracers.
+  and transports before adding Claude Code and ACP tracers, while using the
+  pressure log to preserve protocol fidelity until the abstraction is
+  re-evaluated.
 - Pi, OpenCode, Claude Code, and ACP-backed agents as planned runtime paths.
 
 If another document conflicts with this directory, treat this directory as the

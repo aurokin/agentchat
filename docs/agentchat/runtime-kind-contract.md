@@ -4,8 +4,32 @@ This document describes the target contract for runtime kinds as Agentchat
 moves beyond Codex.
 
 The current implementation has a `KindRuntime` boundary with Codex behind it.
-The next contract revision should preserve current Codex behavior while making
-room for Claude Code, ACP agents, Pi, and OpenCode.
+The next contract revision should preserve current Codex behavior while adding
+only the stable seams needed before Claude Code and ACP exist.
+
+## Thin Scaffold Rule
+
+The contract should start as a thin scaffold, not a predicted final
+abstraction.
+
+Abstract only the seams that are already stable:
+
+- runtime capabilities
+- lifecycle categories
+- normalized update vocabulary
+- provider artifact semantics
+- transport boundaries
+
+Do not guess adapter-specific persistence, recovery, or protocol state before
+real Claude Code and ACP implementations prove what they need. Provider
+artifacts and adapter-local code are acceptable when they preserve protocol
+fidelity better than a premature shared abstraction.
+
+When an adapter exposes behavior that does not fit this contract, record it in
+[Runtime Abstraction Pressure Log](./runtime-abstraction-pressure-log.md). The
+Runtime Abstraction Retrospective should decide later whether that behavior
+belongs in the shared contract, persistence schema, transport substrate, or the
+adapter itself.
 
 ## Product Boundary
 
@@ -52,24 +76,29 @@ about without protocol-specific branches:
 
 ## Binding Metadata
 
-Runtime bindings should be generic enough for more than Codex thread ids.
+Runtime bindings eventually need to be generic enough for more than Codex
+thread ids, but AUR-140 should not speculate beyond proven needs.
 
-Common fields:
+Known common fields:
 
 - runtime kind
 - runtime config id
 - status
 - active run id
 - provider thread id when applicable
-- provider session id when applicable
 - provider resume token when applicable
-- adapter metadata as bounded structured data
 - last error and last event timestamp
 - workspace identity metadata
 
+Likely future fields, to be validated by Claude Code and ACP:
+
+- provider session id
+- adapter metadata as bounded structured data
+
 Specific adapters should not need schema changes for every small provider
-detail. Use bounded adapter metadata for runtime-owned values that are required
-for recovery but not meaningful to the product model.
+detail, but new generic fields should be earned by real adapter pressure. Use
+bounded provider artifacts or adapter-local handling until the retrospective
+decides a field belongs in the shared persistence model.
 
 ## Normalized Updates
 
@@ -91,6 +120,10 @@ Runtime kinds should map provider output into normalized update categories:
 Only normalized events should reach WebSocket subscribers. Provider-native
 details belong in internal provider artifacts unless there is a deliberate UI
 feature for them.
+
+Normalized updates must not hide fidelity loss. If a provider feature can only
+be represented by dropping important information, keep the important details in
+provider artifacts and add a pressure-log entry.
 
 ## Transport Independence
 
@@ -118,4 +151,3 @@ Codex remains the regression anchor. Any contract revision must preserve:
 - model catalog behavior
 - provider artifact persistence
 - scoped runtime identity and workspace isolation
-

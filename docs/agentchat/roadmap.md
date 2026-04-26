@@ -99,9 +99,10 @@ The next phase is tracked by the Runtime Protocol Expansion milestone and
 Execution order:
 
 1. Replan Linear and docs so implementation work follows the same graph.
-2. Harden [Runtime Kind Contract](./runtime-kind-contract.md) so runtime
+2. Harden [Runtime Kind Contract](./runtime-kind-contract.md) as a thin
+   scaffold so runtime
    execution is modeled as session-bound prompt turns with normalized updates
-   and provider artifacts.
+   and provider artifacts without guessing Claude/ACP-specific details.
 3. Add reusable runtime transports: JSON-RPC stdio, JSONL subprocess streams,
    process lifecycle helpers, cancellation, stderr, exit, and timeout handling.
 4. Add [ACP Runtime Spec](./acp-runtime-spec.md) foundation for ACP
@@ -109,6 +110,8 @@ Execution order:
    permission request handling.
 5. Implement the Claude Code runtime tracer.
 6. Implement the first ACP adapter tracer.
+7. Run the Runtime Abstraction Retrospective using
+   [Runtime Abstraction Pressure Log](./runtime-abstraction-pressure-log.md).
 
 ### Claude Code Tracer
 

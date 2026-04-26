@@ -7,6 +7,12 @@ This spec describes how Agentchat should support Agent Client Protocol runtimes.
 ACP should be treated as a runtime protocol family behind agent-owned runtime
 config. It should not be exposed as a user-facing provider choice.
 
+ACP should also pressure-test the thin runtime contract. If ACP exposes session,
+permission, plan, tool, or cancellation behavior that does not fit the current
+contract, record it in
+[Runtime Abstraction Pressure Log](./runtime-abstraction-pressure-log.md)
+instead of forcing a lossy abstraction.
+
 ## Protocol Summary
 
 ACP is a JSON-RPC protocol for editor/client to agent communication. The
@@ -105,4 +111,3 @@ It should not attempt to support every ACP-compatible runtime.
 - no approval UI
 - no remote ACP transport requirement for the first tracer
 - no hosted-product assumptions
-

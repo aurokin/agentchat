@@ -10,6 +10,10 @@ Implementation should follow the
 [Runtime Protocol Expansion Plan](./runtime-protocol-expansion-plan.md). Claude
 Code is a tracer on top of the shared runtime contract and JSONL subprocess
 transport, not the abstraction that should define the contract by itself.
+If Claude Code exposes capabilities that do not fit the thin scaffold, record
+them in
+[Runtime Abstraction Pressure Log](./runtime-abstraction-pressure-log.md)
+instead of flattening away protocol fidelity.
 
 Prerequisites:
 
