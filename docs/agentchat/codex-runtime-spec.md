@@ -2,7 +2,8 @@
 
 ## Purpose
 
-This spec defines how `apps/server` should manage Codex as the first provider adapter behind the generic provider layer.
+This spec defines how `apps/server` should manage Codex as the first
+`KindRuntime` implementation behind agent-owned runtime config.
 
 ## Runtime Unit
 
@@ -45,7 +46,7 @@ Recommended runtime states:
 Each live conversation runtime should keep:
 
 - `conversationId`
-- `providerId`
+- runtime/provider bridge id
 - `agentId`
 - `rootPath`
 - `processHandle`
@@ -80,7 +81,7 @@ This state lives in Convex.
 When a conversation needs a runtime:
 
 1. load the current agent config from server config
-2. confirm the agent and provider are enabled
+2. confirm the agent and its runtime/provider bridge are enabled
 3. read the runtime binding from Convex if one exists
 4. start a new Codex app-server process
 5. initialize the process
@@ -134,7 +135,7 @@ V1 should lean on Codex for the model catalog.
 Recommended behavior:
 
 - fetch model metadata from Codex through the provider adapter
-- cache it for the provider's configured model cache TTL
+- cache it for the runtime's configured model cache TTL
 - normalize the response into Agentchat provider, model, and variant options
 - apply agent-level filtering before returning options to clients
 
@@ -189,7 +190,7 @@ Distinguish between:
 - recoverable resume failure
 - process startup failure
 - invalid model selection
-- disabled provider
+- disabled runtime/provider bridge
 - disabled agent
 - interrupted run
 - provider protocol error
@@ -200,8 +201,8 @@ Recoverable resume failure should fall back to a fresh thread start.
 
 The implementation should support:
 
-- per-provider idle TTL
-- per-provider model cache TTL
+- per-runtime idle TTL
+- per-runtime model cache TTL
 - one active run per conversation
 - multiple active conversation runtimes per user
 - bounded reconnect and retry behavior
@@ -212,7 +213,7 @@ Each run should log enough information to debug runtime issues:
 
 - conversation id
 - user subject or email
-- provider id
+- runtime/provider bridge id
 - agent id
 - provider thread id
 - provider turn id
@@ -223,7 +224,10 @@ Each run should log enough information to debug runtime issues:
 
 This lifecycle spec is written so other runtimes can fit alongside Codex.
 
-Planned runtimes: Pi, OpenCode, Claude Code. See the [Provider-Agent Merge Plan](../../plans/provider-agent-merge-plan.md) for how the config model evolves, and the individual runtime specs for protocol details.
+Planned runtimes: Pi, OpenCode, Claude Code. See
+[Runtime Foundation Reconciliation Status](./reconciliation-status.md) for the
+current foundation handoff and the individual runtime specs for protocol
+details.
 
 To preserve compatibility:
 

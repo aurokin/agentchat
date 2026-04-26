@@ -21,8 +21,9 @@ Agentchat is organized around the system that is already in progress:
 - Convex-owned auth, conversations, runs, and runtime bindings.
 - `apps/server` as the runtime layer that owns live agent sessions.
 - Codex as the active runtime.
+- Agent-owned inline runtime config for new Codex agents, with legacy provider
+  config retained only as a compatibility bridge.
 - Pi, OpenCode, and Claude Code as planned runtime implementations.
-- Provider-agent merge work tracked in [plans/provider-agent-merge-plan.md](plans/provider-agent-merge-plan.md).
 
 The runtime is an implementation detail of an agent. Avoid rebuilding hosted
 product assumptions, billing, analytics, attachments, or browser-local product

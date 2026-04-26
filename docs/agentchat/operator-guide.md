@@ -37,7 +37,7 @@ For each agent, decide:
 
 - display name
 - absolute `rootPath`
-- default provider
+- runtime configuration
 - default model
 - default variant
 - workspace mode
@@ -155,11 +155,11 @@ bun run doctor:server
 This checks:
 
 - required local runtime env readiness for `apps/server`
-- configured provider and agent readiness
+- configured runtime/provider bridge and agent readiness
 - missing directories
 - disabled default fallback situations
-- live Codex model access for each enabled provider
-- soft-degraded Codex model discovery, including providers that answer `model/list` but return no visible models
+- live Codex model access for each enabled runtime/provider bridge
+- soft-degraded Codex model discovery, including runtime/provider bridges that answer `model/list` but return no visible models
 
 For machine-readable output:
 
@@ -314,7 +314,8 @@ If `doctor:server` reports live Codex access failure:
 If the UI shows no agents:
 
 - verify the agent is enabled
-- verify the agent references at least one enabled provider
+- verify the agent defines an enabled inline runtime or references at least one
+  enabled legacy provider
 - if auth mode is `google`, verify the allowlisted Google account is the one you signed in with
 - if auth mode is `local`, verify `AGENTCHAT_AUTH_MODE=local` is set in the Convex runtime env and `smoke_1` can sign in
 
@@ -323,5 +324,5 @@ If the UI shows no agents:
 For this phase of Agentchat:
 
 - optimize for Codex confidence first
-- do not broaden implementation work toward other providers yet
+- do not broaden implementation work toward other runtime kinds yet
 - keep tests manually invoked, not automatic on push

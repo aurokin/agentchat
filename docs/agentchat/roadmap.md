@@ -11,11 +11,19 @@ Agentchat already has:
 - Convex-backed auth, conversations, messages, runs, run events, and runtime bindings
 - backend-token auth, websocket transport, streaming, interruption, and recovery
 - backend-owned runtime behavior across web, mobile, server, and Convex
+- agent-owned inline runtime config for new Codex agents, while legacy
+  top-level provider config remains as a compatibility bridge
+- a `KindRuntime` interface with Codex as the active implementation
+- a passive Codex provider metadata/event lane for diagnostics and replay
+- hardened model catalog behavior for GPT-5.4 mini, GPT-5.5, and future live
+  model discovery
 - user-scoped local auth with seeded fixtures such as `smoke_1` and `smoke_2`
 - multi-message assistant output with `message.started` support through server, Convex, web, and mobile
 - manual live runtime, browser, LAN, operator, and stale-resume confidence commands
 - targeted server, web, mobile, shared, and script coverage for the most failure-prone runtime and recovery paths
 - a wrapper-first local workflow for checkout bootstrap, status, doctor, dev, stop, and config inspection
+- idempotent wrapper writes for generated local runtime files so bootstrap does
+  not cause avoidable Next.js dev reloads
 - disposable worktree lifecycle helpers for parallel local development
 - a protected stable host install with shell-based lifecycle, smoke coverage, and systemd user-service support
 - LAN HTTPS for the stable host through local Caddy, plus dormant public-hostname scaffolding and manual-only GitHub guardrail workflows
@@ -54,24 +62,34 @@ Agentchat already has:
 - keep transcript structure driven by real runtime events when available
 - keep formatting cleanup separate from runtime event structure
 
-## Next Phase: Provider-Agent Merge
+## Runtime Foundation Status
 
-The current architecture separates providers and agents into distinct config-level concepts. This separation will be collapsed so that each agent carries its own runtime config inline. This change comes before any new runtime is added.
+The provider-agent merge foundation has landed on trunk in compatibility form.
+New or regenerated configs should keep `providers: []` and define
+`agents[].runtime` inline. Existing provider-based configs still load through
+the legacy bridge so operators do not lose work.
 
-See [Provider-Agent Merge Plan](../../plans/provider-agent-merge-plan.md) for full detail.
+The active implementation keeps the public API compatible while the internal
+resolution path is runtime-kind-ready:
 
-Key outcomes:
+- each new agent can carry an inline Codex runtime block
+- runtime ids are unique and hidden when the owning agent is disabled or not
+  visible to the current user
+- `KindRuntime` provides the runtime-kind boundary, with Codex implemented first
+- model discovery is scoped through the selected agent/runtime and falls back to
+  configured metadata under degraded Codex model discovery
+- provider terminology still appears in compatibility fields and endpoints until
+  the public API is migrated in a later cleanup
 
-- new config keeps the top-level `providers[]` array empty and uses an explicit migration bridge for existing provider-based installs
-- each agent gets an inline `runtime` block with a `kind` discriminator
-- `providerIds` and `defaultProviderId` are no longer required for v2 agent operation
-- model and variant selection remain user-facing, sourced from the agent's runtime
-- a `KindRuntime` interface is extracted from the current `CodexRuntimeManager`
-- config version bumps to `2` during transition
+See [Runtime Foundation Reconciliation Status](./reconciliation-status.md) for
+the final cleanup-sweep handoff. The older
+[Provider-Agent Merge Plan](../../plans/provider-agent-merge-plan.md) is now
+historical context, not the active task list.
 
 ## Next Phase: Multi-Runtime Support
 
-After the provider-agent merge, Agentchat will support multiple runtime kinds beyond Codex.
+After the foundation verification gate, Agentchat can add runtime kinds beyond
+Codex.
 
 Planned runtimes in priority order:
 
@@ -99,6 +117,7 @@ These remain intentionally out of scope for the current and next phases:
 
 - admin UI for provider and agent management
 - approval flows beyond auto-approve
+- ACP-compatible clients
 - conversation branching and forking
 - hosted-product concerns such as billing or analytics
 - attachments

@@ -47,7 +47,8 @@ Current user record responsibilities:
 
 Important constraint:
 
-- Agentchat does not persist per-user default provider, model, or variant state in Convex
+- Agentchat does not persist per-user default runtime/provider bridge, model, or
+  variant state in Convex
 
 ### `chats`
 

@@ -9,18 +9,21 @@ The file is intended to be edited by humans. It configures:
 - global auth behavior
 - agent-owned runtime behavior
 - globally visible agents
+- legacy top-level runtime providers for older installs
 
 Agent visibility is controlled per-agent via `defaultVisible` and `visibilityOverrides`.
 
 ## File Format
 
-V1 uses a single top-level JSON file:
+The current compatibility format uses a single top-level JSON file:
 
 - filename: `agentchat.config.json`
 - encoding: UTF-8
 - location: alongside the deployed server app or provided by a `--config` flag
 
-Future support for YAML or TOML is allowed, but JSON is the only format specified for v1.
+Future support for YAML or TOML is allowed, but JSON is the only specified
+format. The file still uses `version: 1` while supporting v2-style
+`agents[].runtime` blocks.
 
 ## Top-Level Shape
 
@@ -143,7 +146,11 @@ Purpose:
 
 - bridge older installs that still define globally available runtime providers
 
-New config should keep this array empty and put runtime configuration under each agent. The server still accepts top-level Codex providers so existing installs can migrate without losing work.
+New config should keep this array empty and put runtime configuration under each
+agent. The server still accepts top-level Codex providers so existing installs
+can migrate without losing work. These legacy providers are still exposed
+through compatibility API fields, but users should not select providers as a
+product concept.
 
 Example:
 
@@ -258,7 +265,7 @@ Required fields:
 - `rootPath`
     - absolute path to the workspace the provider should operate against
 - `runtime`
-    - required for v2 agents unless using the legacy top-level provider bridge
+    - required for new agents unless using the legacy top-level provider bridge
     - current allowed value for `runtime.kind`: `"codex"`
     - owns the command, environment, model metadata, cache TTL, and idle TTL for the agent
 
@@ -313,8 +320,10 @@ When the backend exposes options to a client:
 
 ## Config Change Rules
 
-- If an agent changes its default provider, model, or variant, new draft conversations should see the new defaults.
-- Existing conversations must continue to use their stored provider, model, and variant if already chosen.
+- If an agent changes its default runtime/provider bridge, model, or variant,
+  new draft conversations should see the new defaults.
+- Existing conversations must continue to use their stored runtime/provider
+  bridge, model, and variant if already chosen.
 - Existing conversations still resolve the latest agent config for things like enabled state and root path.
 - If a provider or agent is disabled, the backend should reject new runs and expose a normalized unavailable error.
 

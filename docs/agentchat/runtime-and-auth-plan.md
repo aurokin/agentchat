@@ -27,6 +27,9 @@ Current runtime behavior:
 - one user can have active runs in multiple conversations and multiple agents at the same time
 - reconnecting clients recover from backend memory plus Convex persistence rather than restarting execution
 - per-thread runtime activity and per-agent activity counts are derived from backend-owned state, not per-client inference
+- new Codex agents can define runtime behavior inline on the agent
+- legacy top-level provider config remains as a compatibility bridge for older installs
+- `KindRuntime` is the runtime-kind boundary; Codex is the active implementation
 
 ## Auth
 
@@ -63,3 +66,5 @@ The remaining work in this area is hardening and polish, not a model migration.
 - keep operator diagnostics explicit when config, environment, or model discovery degrade
 - keep mobile and web aligned as clients of the same runtime model
 - keep workspace-level activity and recovery UX polished without reintroducing client-owned runtime assumptions
+- add Pi, OpenCode, Claude Code, ACP clients, and approval UI only as separate
+  follow-up work on top of the current runtime foundation

@@ -1,8 +1,18 @@
 # Provider-Agent Merge Plan
 
+Status: historical plan. Current trunk supports agent-owned inline Codex
+runtime config, keeps top-level providers as a compatibility bridge, and has a
+`KindRuntime` boundary with Codex implemented first. Use
+[Runtime Foundation Reconciliation Status](../docs/agentchat/reconciliation-status.md)
+for the current handoff. The remaining parts of this plan are public API and
+persistence cleanup, not a prerequisite for new documentation.
+
 ## Motivation
 
-The current architecture separates providers and agents into distinct config-level concepts. Agents reference providers via `providerIds[]` and `defaultProviderId`, and providers are defined in a top-level `providers[]` array.
+At the time this plan was written, the architecture separated providers and
+agents into distinct config-level concepts. Agents referenced providers via
+`providerIds[]` and `defaultProviderId`, and providers were defined in a
+top-level `providers[]` array.
 
 This separation assumed providers would be shared resources that multiple agents tap into. In practice, every runtime we plan to support (Codex, Pi, OpenCode, Claude Code) owns its own LLM connection internally. The provider is not a shared resource. It is an implementation detail of how each agent runtime talks to models.
 

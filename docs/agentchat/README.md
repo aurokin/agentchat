@@ -12,6 +12,7 @@ assumptions.
 3. [Architecture V1](./architecture-v1.md)
 4. [Roadmap](./roadmap.md)
 5. [Harness Engineering](./harness-engineering.md)
+6. [Runtime Foundation Reconciliation Status](./reconciliation-status.md)
 
 ## Operating The System
 
@@ -24,6 +25,7 @@ assumptions.
 ## Cleanup Sweep Evidence
 
 - [Branch Reconciliation Inventory](./branch-reconciliation-inventory.md) - AUR-115 inventory for stale runtime/worktree branches.
+- [Runtime Foundation Reconciliation Status](./reconciliation-status.md) - AUR-124 final docs and Linear reconciliation handoff.
 
 ## Implementation Contracts
 
@@ -37,10 +39,13 @@ assumptions.
 
 ## Planned Runtime Work
 
-- [Provider-Agent Merge Plan](../../plans/provider-agent-merge-plan.md)
 - [Pi Runtime Spec](./pi-runtime-spec.md)
 - [OpenCode Runtime Spec](./opencode-runtime-spec.md)
 - [Claude Code Runtime Spec](./claude-code-runtime-spec.md)
+
+## Historical Plans
+
+- [Provider-Agent Merge Plan](../../plans/provider-agent-merge-plan.md) - historical plan; trunk now supports agent-owned inline runtime config with a legacy provider bridge.
 
 ## Scope
 
@@ -52,6 +57,8 @@ These docs describe the active Agentchat direction:
 - Conversations, runs, and runtime bindings stored in Convex.
 - An instance-local backend server that owns runtime sessions.
 - Codex as the current active runtime.
+- Agent-owned inline runtime config for new agents, with top-level runtime
+  providers retained as a compatibility bridge.
 - Pi, OpenCode, and Claude Code as planned runtime implementations.
 
 If another document conflicts with this directory, treat this directory as the

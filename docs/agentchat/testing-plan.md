@@ -63,7 +63,8 @@ Examples:
 
 - run `bun run --cwd packages/convex codegen`
 - run `bun run doctor:server`
-    - confirm it reports live Codex model access for each enabled provider
+    - confirm it reports live Codex model access for each enabled
+      runtime/provider bridge
 - sign in with Google if auth provider kind is `google`
 - sign in with a seeded user like `smoke_1` if auth provider kind is `local`
 - run `bun run test:manual:local-auth-separation` when local auth is active

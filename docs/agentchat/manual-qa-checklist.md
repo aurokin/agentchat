@@ -21,7 +21,9 @@ For the command inventory and current scripted confidence flow, use:
 - the web app is running
 - if auth mode is `google`, the selected Google account is allowlisted
 - if auth provider kind is `local`, a seeded user such as `smoke_1` can sign in successfully
-- `bun run doctor:server` reports the configured Codex provider and target agents as ready, and shows live Codex model access for each enabled provider
+- `bun run doctor:server` reports configured Codex runtime/provider bridge
+  readiness for the target agents, and shows live Codex model access for each
+  enabled runtime/provider bridge
 - the relevant scripted confidence commands from [Testing Plan](./testing-plan.md) have already completed
 
 ## 1. Smoke
@@ -81,7 +83,7 @@ Use `~/agents/agentchat_test/workspace`.
 
 ## 7. Config Change Handling
 
-- Disable an agent or provider in `agentchat.config.json`
+- Disable an agent or runtime/provider bridge in `agentchat.config.json`
 - Refresh `/api/diagnostics` or rerun `bun run doctor:server`
 - Confirm the UI adapts safely
 - Confirm broken or removed resources do not produce silent failures

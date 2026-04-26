@@ -71,3 +71,5 @@ This document records user-facing rules and product decisions that should remain
 - Conversation branching
 - Approval UX beyond auto-approve
 - Admin interface for managing agents
+- Pi, OpenCode, and Claude Code runtime implementations
+- ACP-compatible clients

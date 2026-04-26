@@ -67,7 +67,10 @@ Responsibilities:
 - translate runtime events into Agentchat runtime events
 - expose normalized model and variant metadata to the backend
 
-Each runtime kind manages its own LLM provider connections internally. The runtime is an implementation detail of the agent, not a separate user-facing concept. See [Provider-Agent Merge Plan](../../plans/provider-agent-merge-plan.md) for the transition from the current provider-agent separation to the merged model.
+Each runtime kind manages its own LLM provider connections internally. The
+runtime is an implementation detail of the agent, not a separate user-facing
+concept. New agents should define their runtime inline in agent config; legacy
+top-level providers remain only as a compatibility bridge.
 
 ## Runtime Model
 
@@ -141,3 +144,5 @@ Current runtime behavior:
 - the runtime kind is fixed by the agent and never changes for a conversation
 - operator config changes still apply because the backend resolves the latest valid config on each run
 - the product model stays runtime-agnostic through the `KindRuntime` interface
+- compatibility provider ids may still appear in backend payloads and persisted
+  runtime bindings until the public API migration removes those legacy names

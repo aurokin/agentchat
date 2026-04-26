@@ -13,6 +13,11 @@ The backend server is responsible for:
 
 The backend does not replace Convex as the primary data store.
 
+Current API note: provider-shaped fields and routes remain as compatibility
+surfaces while new config is agent-owned and runtime-kind-ready. The product
+model should still treat runtime/provider as an implementation detail of the
+selected agent.
+
 ## Transport Model
 
 Use a hybrid transport:
@@ -62,7 +67,7 @@ Returns:
 
 - auth provider summary for the active instance access path
 - visible agents
-- provider summaries
+- visible provider summaries for compatibility model fetching
 - currently supported capabilities
 
 Notes:
@@ -74,7 +79,8 @@ Notes:
 
 Purpose:
 
-- return cached normalized model and variant availability for one provider
+- return cached normalized model and variant availability for one compatibility
+  provider id
 
 Returns:
 
@@ -85,19 +91,21 @@ Returns:
 
 Notes:
 
-- the backend fetches and caches these from Codex
+- the backend fetches and caches these through the selected runtime kind
 - agent-specific filtering happens server-side before the payload is returned
+- hidden or disabled inline runtimes are not exposed through this endpoint
 
 ### `GET /api/agents/:agentId/options`
 
 Purpose:
 
-- return effective provider, model, and variant options for one agent after applying config filtering
+- return effective runtime/provider bridge, model, and variant options for one
+  agent after applying config filtering
 
 Returns:
 
-- allowed providers
-- default provider
+- allowed compatibility providers
+- default compatibility provider id
 - effective model list
 - effective variant list
 
@@ -220,7 +228,7 @@ Notes:
 
 Purpose:
 
-- force a refresh of provider model metadata
+- force a refresh of compatibility provider model metadata
 
 Payload:
 
@@ -302,7 +310,7 @@ Example `message.delta` payload:
 ## Backend Responsibilities On `conversation.send`
 
 1. validate the user owns the conversation
-2. ensure the conversation has provider, model, and variant selected
+2. ensure the conversation has a runtime/provider bridge, model, and variant selected
 3. create or resume the runtime for that conversation
 4. create a run record
 5. start streaming normalized events
