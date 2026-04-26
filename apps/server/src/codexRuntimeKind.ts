@@ -8,6 +8,7 @@ import {
 import type {
     ProviderModelCatalogEntry,
     RuntimeKind,
+    RuntimeKindCapabilities,
     RuntimeKindEvent,
     RuntimeKindLifecycleResult,
     RuntimeKindSession,
@@ -39,6 +40,24 @@ const RECOVERABLE_THREAD_RESUME_ERROR_SNIPPETS = [
     "no rollout found",
     "is closing",
 ];
+
+export const CODEX_RUNTIME_CAPABILITIES = {
+    lifecycleModel: "persistent-session",
+    modelCatalogSource: "live",
+    resumability: ["thread-id"],
+    cancellation: ["cooperative-command"],
+    approval: "auto-approve",
+    artifacts: [
+        "lifecycle",
+        "usage",
+        "reasoning",
+        "command",
+        "diff",
+        "model",
+        "diagnostic",
+    ],
+    workspace: ["shared-root", "copy-on-conversation"],
+} as const satisfies RuntimeKindCapabilities;
 
 function invariant(condition: unknown, message: string): asserts condition {
     if (!condition) {
@@ -705,6 +724,7 @@ class CodexRuntimeKindSession implements RuntimeKindSession {
 
 export class CodexRuntimeKind implements RuntimeKind {
     readonly kind = "codex";
+    readonly capabilities = CODEX_RUNTIME_CAPABILITIES;
     private readonly createClient: CreateCodexClient;
 
     constructor(params: { createClient?: CreateCodexClient } = {}) {

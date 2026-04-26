@@ -30,7 +30,9 @@ function hasIntentFilter(activity, actionName) {
 function makeSendIntentFilter(actionName, mimeTypes) {
     return {
         action: [{ $: { "android:name": actionName } }],
-        category: [{ $: { "android:name": "android.intent.category.DEFAULT" } }],
+        category: [
+            { $: { "android:name": "android.intent.category.DEFAULT" } },
+        ],
         data: mimeTypes.map((mimeType) => ({
             $: { "android:mimeType": mimeType },
         })),
@@ -85,7 +87,11 @@ function withShareIntentMainActivity(config) {
             contents = ensureImport(contents, "import android.content.Intent");
             contents = ensureImport(contents, "import android.net.Uri");
 
-            if (!contents.includes("setIntent(mapShareIntentToDeepLink(intent))")) {
+            if (
+                !contents.includes(
+                    "setIntent(mapShareIntentToDeepLink(intent))",
+                )
+            ) {
                 contents = contents.replace(
                     "    super.onCreate(null)",
                     [

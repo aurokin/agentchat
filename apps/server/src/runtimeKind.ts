@@ -2,6 +2,59 @@ import type { AgentConfig, ProviderConfig } from "./config.ts";
 
 export type RuntimeKindId = "codex";
 
+export type RuntimeLifecycleModel =
+    | "persistent-session"
+    | "per-turn-subprocess"
+    | "external-server";
+
+export type RuntimeModelCatalogSource =
+    | "live"
+    | "static"
+    | "configured"
+    | "hybrid";
+
+export type RuntimeResumabilityStyle =
+    | "thread-id"
+    | "session-id"
+    | "resume-token"
+    | "provider-storage"
+    | "none";
+
+export type RuntimeCancellationStyle =
+    | "cooperative-command"
+    | "process-signal"
+    | "http-abort"
+    | "unsupported";
+
+export type RuntimeApprovalBehavior =
+    | "auto-approve"
+    | "auto-deny"
+    | "unsupported";
+
+export type RuntimeArtifactCategory =
+    | "lifecycle"
+    | "usage"
+    | "reasoning"
+    | "tool"
+    | "command"
+    | "diff"
+    | "plan"
+    | "review"
+    | "model"
+    | "diagnostic";
+
+export type RuntimeWorkspaceBehavior = "shared-root" | "copy-on-conversation";
+
+export type RuntimeKindCapabilities = {
+    lifecycleModel: RuntimeLifecycleModel;
+    modelCatalogSource: RuntimeModelCatalogSource;
+    resumability: readonly RuntimeResumabilityStyle[];
+    cancellation: readonly RuntimeCancellationStyle[];
+    approval: RuntimeApprovalBehavior;
+    artifacts: readonly RuntimeArtifactCategory[];
+    workspace: readonly RuntimeWorkspaceBehavior[];
+};
+
 export type RuntimeProviderEventPhase =
     | "initialization"
     | "thread"
@@ -29,6 +82,45 @@ export type RuntimeProviderEvent = {
     stable: boolean;
     metadata: Record<string, RuntimeProviderEventMetadata>;
 };
+
+export type RuntimeNormalizedUpdateCategory =
+    | "assistant-text-delta"
+    | "assistant-status"
+    | "reasoning"
+    | "tool-call-started"
+    | "tool-call-updated"
+    | "tool-call-completed"
+    | "command-output"
+    | "file-diff"
+    | "plan-update"
+    | "review-artifact"
+    | "approval-requested"
+    | "permission-resolved"
+    | "user-input-requested"
+    | "turn-completed"
+    | "turn-cancelled"
+    | "turn-failed"
+    | "provider-artifact";
+
+export const RUNTIME_NORMALIZED_UPDATE_CATEGORIES = [
+    "assistant-text-delta",
+    "assistant-status",
+    "reasoning",
+    "tool-call-started",
+    "tool-call-updated",
+    "tool-call-completed",
+    "command-output",
+    "file-diff",
+    "plan-update",
+    "review-artifact",
+    "approval-requested",
+    "permission-resolved",
+    "user-input-requested",
+    "turn-completed",
+    "turn-cancelled",
+    "turn-failed",
+    "provider-artifact",
+] as const satisfies readonly RuntimeNormalizedUpdateCategory[];
 
 export type RuntimeKindLifecycleResult = {
     providerEvents?: RuntimeProviderEvent[];
@@ -102,6 +194,7 @@ export type ProviderModelCatalogEntry = {
 
 export type RuntimeKind = {
     kind: RuntimeKindId;
+    capabilities: RuntimeKindCapabilities;
     createSession(params: {
         provider: ProviderConfig;
         agent: AgentConfig;

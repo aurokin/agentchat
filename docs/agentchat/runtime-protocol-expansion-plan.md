@@ -79,10 +79,10 @@ Add only the stable contract seams before adding another runtime kind.
 
 Expected outcomes:
 
-- generic runtime capabilities
+- `RuntimeKindCapabilities` declarations for implemented runtime behavior
 - support for persistent and per-turn lifecycle models
-- normalized update vocabulary for text, status, tools, plans, diffs,
-  completion, cancellation, and failures
+- `RuntimeNormalizedUpdateCategory` vocabulary for text, status, tools,
+  plans, diffs, completion, cancellation, and failures
 - provider artifacts remain the high-fidelity escape hatch
 - Codex compatibility preserved
 

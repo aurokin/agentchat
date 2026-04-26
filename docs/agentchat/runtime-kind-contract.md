@@ -66,13 +66,18 @@ This is intentionally broader than a persistent process. A runtime may be:
 Each runtime kind should expose capabilities that product code can reason
 about without protocol-specific branches:
 
-- lifecycle model: persistent session, per-turn subprocess, external server
-- model catalog source: live, static, configured, or hybrid
-- resumability: thread id, session id, provider storage, or none
-- cancellation: cooperative command, notification, process signal, HTTP abort
-- provider artifacts: lifecycle, usage, reasoning, tool, diff, plan, review
-- approval behavior: auto-approve, auto-deny, unsupported
-- workspace behavior: shared root or copy-on-conversation cwd
+`RuntimeKindCapabilities` is the shared scaffold:
+
+- `lifecycleModel`: persistent session, per-turn subprocess, external server
+- `modelCatalogSource`: live, static, configured, or hybrid
+- `resumability`: thread id, session id, resume token, provider storage, or none
+- `cancellation`: cooperative command, process signal, HTTP abort, or unsupported
+- `approval`: auto-approve, auto-deny, or unsupported
+- `artifacts`: lifecycle, usage, reasoning, tool, command, diff, plan, review, model, diagnostic
+- `workspace`: shared root or copy-on-conversation cwd
+
+Codex currently advertises this scaffold through `CODEX_RUNTIME_CAPABILITIES`.
+Other runtime kinds should declare only capabilities they actually implement.
 
 ## Binding Metadata
 
@@ -104,18 +109,25 @@ decides a field belongs in the shared persistence model.
 
 Runtime kinds should map provider output into normalized update categories:
 
-- assistant text delta
-- assistant status or reasoning
-- tool call started/updated/completed
-- command output
-- file diff or patch artifact
-- plan update
-- review artifact
-- approval or permission request
-- user input request
-- turn completed
-- turn interrupted or cancelled
-- turn failed
+`RuntimeNormalizedUpdateCategory` is the shared vocabulary:
+
+- `assistant-text-delta`
+- `assistant-status`
+- `reasoning`
+- `tool-call-started`
+- `tool-call-updated`
+- `tool-call-completed`
+- `command-output`
+- `file-diff`
+- `plan-update`
+- `review-artifact`
+- `approval-requested`
+- `permission-resolved`
+- `user-input-requested`
+- `turn-completed`
+- `turn-cancelled`
+- `turn-failed`
+- `provider-artifact`
 
 Only normalized events should reach WebSocket subscribers. Provider-native
 details belong in internal provider artifacts unless there is a deliberate UI

@@ -21,6 +21,11 @@ import {
     CodexRuntimeManager,
     isRecoverableThreadResumeError,
 } from "../codexRuntime.ts";
+import {
+    CODEX_RUNTIME_CAPABILITIES,
+    CodexRuntimeKind,
+} from "../codexRuntimeKind.ts";
+import { RUNTIME_NORMALIZED_UPDATE_CATEGORIES } from "../runtimeKind.ts";
 
 const tempRoots: string[] = [];
 
@@ -399,6 +404,52 @@ function createCommand() {
 }
 
 describe("codex runtime helpers", () => {
+    test("declares the thin runtime contract scaffold", () => {
+        const runtimeKind = new CodexRuntimeKind({
+            createClient: () => new FakeCodexClient(),
+        });
+
+        expect(runtimeKind.kind).toBe("codex");
+        expect(runtimeKind.capabilities).toEqual(CODEX_RUNTIME_CAPABILITIES);
+        expect(runtimeKind.capabilities).toMatchObject({
+            lifecycleModel: "persistent-session",
+            modelCatalogSource: "live",
+            resumability: ["thread-id"],
+            cancellation: ["cooperative-command"],
+            approval: "auto-approve",
+            workspace: ["shared-root", "copy-on-conversation"],
+        });
+        expect(runtimeKind.capabilities.artifacts).toEqual(
+            expect.arrayContaining([
+                "lifecycle",
+                "usage",
+                "reasoning",
+                "command",
+                "diff",
+                "model",
+                "diagnostic",
+            ]),
+        );
+    });
+
+    test("exports the shared normalized update vocabulary", () => {
+        expect(RUNTIME_NORMALIZED_UPDATE_CATEGORIES).toEqual(
+            expect.arrayContaining([
+                "assistant-text-delta",
+                "assistant-status",
+                "tool-call-started",
+                "command-output",
+                "file-diff",
+                "plan-update",
+                "review-artifact",
+                "approval-requested",
+                "permission-resolved",
+                "turn-cancelled",
+                "provider-artifact",
+            ]),
+        );
+    });
+
     test("uses the raw message when there is no prior history", () => {
         expect(buildInitialTurnText([], "Fix the failing test")).toBe(
             "Fix the failing test",
