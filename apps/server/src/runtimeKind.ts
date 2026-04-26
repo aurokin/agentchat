@@ -9,6 +9,7 @@ export type RuntimeProviderEventPhase =
     | "usage"
     | "model"
     | "completion"
+    | "artifact"
     | "diagnostic";
 
 export type RuntimeProviderEventMetadata =

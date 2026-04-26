@@ -287,6 +287,16 @@ Notes:
 
 - approval and user-input events exist in the protocol even though v1 uses auto-approve and does not render special UI for them
 
+### Persisted Provider Status Events
+
+The backend may persist internal `provider_status` run events for runtime
+diagnostics and replay. These events can include bounded provider metadata such
+as Codex lifecycle state, completion usage, reasoning artifacts, command output,
+diff summaries, plans, or review artifacts.
+
+These records are not WebSocket events and are not rendered in the default
+frontend UI. Client-facing live events remain normalized product events.
+
 ## Event Semantics
 
 - events must be normalized product events, not raw provider payloads

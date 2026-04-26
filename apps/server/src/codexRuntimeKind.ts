@@ -93,12 +93,209 @@ function getAgentReasoningText(
     return text?.trim() ? text.trim() : null;
 }
 
+function getCodexMethodEventType(method: string): string {
+    const methodPath = method.startsWith("codex/event/")
+        ? method.slice("codex/event/".length)
+        : method;
+    return `codex.${methodPath
+        .replace(/([a-z0-9])([A-Z])/g, "$1.$2")
+        .replace(/[^a-zA-Z0-9]+/g, ".")
+        .replace(/^\.+|\.+$/g, "")
+        .toLowerCase()}`;
+}
+
+function getCodexArtifactKind(method: string): string {
+    const methodPath = method.startsWith("item/")
+        ? method.slice("item/".length)
+        : method.startsWith("codex/event/")
+          ? method.slice("codex/event/".length)
+          : method;
+    return methodPath
+        .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+        .replace(/[^a-zA-Z0-9]+/g, " ")
+        .trim()
+        .toLowerCase();
+}
+
+function sanitizeProviderMetadataValue(
+    value: unknown,
+    depth = 0,
+): RuntimeProviderEventMetadata | undefined {
+    if (value === null) {
+        return null;
+    }
+    if (
+        typeof value === "number" ||
+        typeof value === "boolean" ||
+        typeof value === "string"
+    ) {
+        if (typeof value !== "string" || value.length <= 16_000) {
+            return value;
+        }
+        return `${value.slice(0, 16_000)}... [truncated]`;
+    }
+    if (depth >= 4) {
+        return undefined;
+    }
+    if (Array.isArray(value)) {
+        const items = value
+            .slice(0, 50)
+            .map((item) => sanitizeProviderMetadataValue(item, depth + 1))
+            .filter((item): item is RuntimeProviderEventMetadata => {
+                return item !== undefined;
+            });
+        return items;
+    }
+    if (!isRecord(value)) {
+        return undefined;
+    }
+
+    const metadata: Record<string, RuntimeProviderEventMetadata> = {};
+    for (const [key, childValue] of Object.entries(value).slice(0, 50)) {
+        const sanitized = sanitizeProviderMetadataValue(childValue, depth + 1);
+        if (sanitized !== undefined) {
+            metadata[key] = sanitized;
+        }
+    }
+    return metadata;
+}
+
+function pickMetadataValue(
+    sources: Array<Record<string, unknown> | null>,
+    keys: string[],
+): RuntimeProviderEventMetadata | undefined {
+    for (const source of sources) {
+        if (!source) {
+            continue;
+        }
+        for (const key of keys) {
+            if (!(key in source)) {
+                continue;
+            }
+            const value = sanitizeProviderMetadataValue(source[key]);
+            if (value !== undefined) {
+                return value;
+            }
+        }
+    }
+    return undefined;
+}
+
+function addMetadataIfPresent(
+    metadata: Record<string, RuntimeProviderEventMetadata>,
+    targetKey: string,
+    sources: Array<Record<string, unknown> | null>,
+    sourceKeys: string[],
+): void {
+    const value = pickMetadataValue(sources, sourceKeys);
+    if (value !== undefined) {
+        metadata[targetKey] = value;
+    }
+}
+
+function createCodexArtifactMetadata(
+    method: string,
+    params: Record<string, unknown> | undefined,
+): Record<string, RuntimeProviderEventMetadata> {
+    const message = getCodexEventMessage(params);
+    const item = isRecord(params?.item) ? params.item : null;
+    const artifact = isRecord(params?.artifact) ? params.artifact : null;
+    const event = isRecord(params?.event) ? params.event : null;
+    const sources = [params ?? null, message, item, artifact, event];
+    const metadata: Record<string, RuntimeProviderEventMetadata> = {
+        method,
+        artifactKind: getCodexArtifactKind(method),
+    };
+
+    addMetadataIfPresent(metadata, "itemId", sources, [
+        "id",
+        "itemId",
+        "item_id",
+        "callId",
+        "call_id",
+    ]);
+    addMetadataIfPresent(metadata, "itemType", sources, [
+        "type",
+        "kind",
+        "itemType",
+        "item_type",
+    ]);
+    addMetadataIfPresent(metadata, "status", sources, ["status", "state"]);
+    addMetadataIfPresent(metadata, "title", sources, [
+        "title",
+        "summary",
+        "name",
+    ]);
+    addMetadataIfPresent(metadata, "text", sources, [
+        "text",
+        "content",
+        "message",
+        "reasoning",
+        "plan",
+        "review",
+    ]);
+    addMetadataIfPresent(metadata, "command", sources, [
+        "command",
+        "cmd",
+        "shellCommand",
+        "shell_command",
+    ]);
+    addMetadataIfPresent(metadata, "output", sources, [
+        "output",
+        "stdout",
+        "stderr",
+    ]);
+    addMetadataIfPresent(metadata, "diff", sources, ["diff", "patch"]);
+    addMetadataIfPresent(metadata, "exitCode", sources, [
+        "exitCode",
+        "exit_code",
+        "code",
+    ]);
+    addMetadataIfPresent(metadata, "cwd", sources, [
+        "cwd",
+        "workingDirectory",
+        "working_directory",
+    ]);
+    addMetadataIfPresent(metadata, "path", sources, [
+        "path",
+        "filePath",
+        "file_path",
+    ]);
+    addMetadataIfPresent(metadata, "files", sources, [
+        "files",
+        "paths",
+        "changes",
+    ]);
+
+    return metadata;
+}
+
+function createCodexArtifactEvent(
+    method: string,
+    params: Record<string, unknown> | undefined,
+): RuntimeProviderEvent {
+    const artifactKind = getCodexArtifactKind(method);
+    return createCodexProviderEvent({
+        eventType: getCodexMethodEventType(method),
+        phase: "artifact",
+        summary: `Codex ${artifactKind} artifact captured.`,
+        metadata: createCodexArtifactMetadata(method, params),
+    });
+}
+
 function normalizeNotification(
     notification: JsonRpcNotification,
 ): RuntimeKindEvent[] {
     if (notification.method === "codex/event/agent_reasoning") {
         const text = getAgentReasoningText(notification.params);
-        return text ? [{ type: "reasoning", text }] : [];
+        const artifactEvent: RuntimeKindEvent = {
+            type: "provider_event",
+            event: createCodexArtifactEvent(
+                notification.method,
+                notification.params,
+            ),
+        };
+        return text ? [artifactEvent, { type: "reasoning", text }] : [];
     }
 
     if (notification.method === "item/agentMessage/delta") {
@@ -106,6 +303,18 @@ function normalizeNotification(
         return typeof delta === "string"
             ? [{ type: "assistant_delta", delta }]
             : [];
+    }
+
+    if (notification.method?.startsWith("item/")) {
+        return [
+            {
+                type: "provider_event",
+                event: createCodexArtifactEvent(
+                    notification.method,
+                    notification.params,
+                ),
+            },
+        ];
     }
 
     if (notification.method === "turn/aborted") {

@@ -172,6 +172,23 @@ The Codex adapter should convert provider events into normalized events such as:
 
 Raw Codex event names should remain inside the adapter.
 
+### Provider Metadata Artifacts
+
+Codex lifecycle, completion, and structured item notifications are also
+persisted as internal `provider_status` run events. This lane is for replay,
+diagnostics, and future runtime parity; it is not a frontend rendering surface
+in v1.
+
+Captured artifacts include:
+
+- initialization, thread resume/start, turn start, and turn completion metadata
+- reasoning artifacts that also feed the normalized assistant status stream
+- structured item artifacts such as command output, diffs, plans, and reviews
+
+The adapter should store bounded structured metadata from stable Codex
+notifications, not raw provider payload passthrough. Assistant text deltas stay
+on the normalized `message.delta` stream.
+
 ## Approval Handling
 
 V1 assumes auto-approve.

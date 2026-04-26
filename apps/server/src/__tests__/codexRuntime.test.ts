@@ -615,6 +615,124 @@ describe("CodexRuntimeManager", () => {
         });
     });
 
+    test("persists structured Codex item artifacts as provider metadata", async () => {
+        const config = createConfig();
+        const persistence = createPersistence(null);
+        const fakeClient = new FakeCodexClient({ autoComplete: false });
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: () => fakeClient,
+        });
+
+        const sendPromise = manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => {},
+        });
+
+        await waitFor(() =>
+            fakeClient.requests.some(
+                (request) => request.method === "turn/start",
+            ),
+        );
+        fakeClient.emit({
+            method: "codex/event/agent_reasoning",
+            params: {
+                id: "reasoning-1",
+                msg: {
+                    type: "agent_reasoning",
+                    text: "I am checking the runtime boundary.",
+                },
+            },
+        });
+        fakeClient.emit({
+            method: "item/command/output",
+            params: {
+                item: {
+                    id: "cmd-1",
+                    type: "command_output",
+                    command: "bun test",
+                    output: "1 pass",
+                    exitCode: 0,
+                    cwd: "/tmp/project",
+                },
+            },
+        });
+        fakeClient.emit({
+            method: "item/diff/update",
+            params: {
+                item: {
+                    id: "diff-1",
+                    type: "diff",
+                    files: ["apps/server/src/codexRuntimeKind.ts"],
+                    diff: "@@ changed",
+                },
+            },
+        });
+        fakeClient.emit({
+            method: "turn/completed",
+            params: {
+                turn: {
+                    status: "completed",
+                },
+            },
+        });
+        await sendPromise;
+
+        await waitFor(() => persistence.providerEventCalls.length >= 7);
+
+        expect(
+            persistence.providerEventCalls.map((event) => event.eventType),
+        ).toEqual([
+            "codex.initialized",
+            "codex.thread.started",
+            "codex.turn.started",
+            "codex.agent.reasoning",
+            "codex.item.command.output",
+            "codex.item.diff.update",
+            "codex.turn.completed",
+        ]);
+        expect(
+            JSON.parse(
+                persistence.providerEventCalls[3]!.metadataJson as string,
+            ),
+        ).toMatchObject({
+            method: "codex/event/agent_reasoning",
+            artifactKind: "agent reasoning",
+            itemId: "reasoning-1",
+            itemType: "agent_reasoning",
+            text: "I am checking the runtime boundary.",
+        });
+        expect(
+            JSON.parse(
+                persistence.providerEventCalls[4]!.metadataJson as string,
+            ),
+        ).toMatchObject({
+            method: "item/command/output",
+            artifactKind: "command output",
+            itemId: "cmd-1",
+            itemType: "command_output",
+            command: "bun test",
+            output: "1 pass",
+            exitCode: 0,
+            cwd: "/tmp/project",
+        });
+        expect(
+            JSON.parse(
+                persistence.providerEventCalls[5]!.metadataJson as string,
+            ),
+        ).toMatchObject({
+            method: "item/diff/update",
+            artifactKind: "diff update",
+            itemId: "diff-1",
+            itemType: "diff",
+            files: ["apps/server/src/codexRuntimeKind.ts"],
+            diff: "@@ changed",
+        });
+    });
+
     test("starts Codex runtimes from v2 agent runtime config", async () => {
         const config = createV2Config();
         const persistence = createPersistence(null);
