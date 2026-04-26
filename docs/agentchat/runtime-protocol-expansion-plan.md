@@ -99,11 +99,14 @@ Add reusable transport pieces.
 
 Expected outcomes:
 
-- JSON-RPC stdio client for Codex-like and ACP-like protocols
-- JSONL subprocess stream parser for Claude Code-style output
-- shared process lifecycle, stderr, exit, timeout, and cancellation helpers
+- `JsonRpcStdioClient` for Codex-like and ACP-like protocols
+- `JsonlStreamParser` for Claude Code-style output
+- `ManagedRuntimeProcess` for shared process lifecycle, stderr, exit,
+  timeout, and cancellation handling
 - test fixtures for malformed JSON, partial lines, process exit, and
   interruption
+- Codex migrated onto the substrate without changing the public `CodexClient`
+  interface
 
 ### AUR-142 ACP Runtime Protocol Foundation
 

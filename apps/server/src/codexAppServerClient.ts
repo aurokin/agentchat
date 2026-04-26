@@ -1,20 +1,11 @@
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import readline from "node:readline";
-
 import type { AgentConfig, ProviderConfig } from "./config.ts";
+import {
+    JsonRpcStdioClient,
+    ManagedRuntimeProcess,
+    type RuntimeJsonRpcNotification,
+} from "./runtimeTransport.ts";
 
-type JsonRpcResponse = {
-    id?: number | string;
-    result?: unknown;
-    error?: {
-        message?: string;
-    };
-};
-
-export type JsonRpcNotification = {
-    method?: string;
-    params?: Record<string, unknown>;
-};
+export type JsonRpcNotification = RuntimeJsonRpcNotification;
 
 export type CodexClient = {
     initialize: () => Promise<void>;
@@ -31,32 +22,11 @@ export type CreateCodexClient = (params: {
     agent: AgentConfig;
 }) => CodexClient;
 
-function toJsonLine(value: unknown): string {
-    return `${JSON.stringify(value)}\n`;
-}
-
 export class CodexAppServerClient implements CodexClient {
     private static readonly DEFAULT_STOP_TIMEOUT_MS = 5_000;
 
-    private readonly child: ChildProcessWithoutNullStreams;
-    private readonly pending = new Map<
-        number,
-        {
-            resolve: (result: unknown) => void;
-            reject: (error: Error) => void;
-        }
-    >();
-    private nextId = 1;
-    private notificationHandler:
-        | ((notification: JsonRpcNotification) => void)
-        | null = null;
-    private exitHandler: ((error: Error) => void) | null = null;
-    private isStopping = false;
-    private hasExited = false;
-    private readonly exitPromise: Promise<void>;
-    private readonly resolveExitPromise: () => void;
-    private readonly stopTimeoutMs: number;
-    private stopPromise: Promise<void> | null = null;
+    private readonly process: ManagedRuntimeProcess;
+    private readonly rpc: JsonRpcStdioClient;
 
     constructor(params: {
         provider: ProviderConfig;
@@ -64,110 +34,40 @@ export class CodexAppServerClient implements CodexClient {
         stopTimeoutMs?: number;
     }) {
         const { provider } = params;
-        this.stopTimeoutMs =
-            params.stopTimeoutMs ??
-            CodexAppServerClient.DEFAULT_STOP_TIMEOUT_MS;
-        let resolveExitPromise!: () => void;
-        this.exitPromise = new Promise<void>((resolve) => {
-            resolveExitPromise = resolve;
-        });
-        this.resolveExitPromise = resolveExitPromise;
-        this.child = spawn(provider.codex.command, provider.codex.args, {
+        this.process = new ManagedRuntimeProcess({
+            command: provider.codex.command,
+            args: provider.codex.args,
             cwd: provider.codex.cwd ?? params.agent.rootPath,
             env: {
                 ...process.env,
                 ...provider.codex.baseEnv,
             },
-            stdio: "pipe",
-        });
-
-        const stdout = readline.createInterface({
-            input: this.child.stdout,
-            crlfDelay: Infinity,
-        });
-
-        stdout.on("line", (line) => {
-            if (!line.trim()) return;
-
-            let parsed: JsonRpcResponse | JsonRpcNotification;
-            try {
-                parsed = JSON.parse(line) as
-                    | JsonRpcResponse
-                    | JsonRpcNotification;
-            } catch (error) {
-                console.error("[agentchat-server] invalid codex JSON", error);
-                return;
-            }
-
-            if ("id" in parsed && parsed.id !== undefined) {
-                const response = parsed as JsonRpcResponse;
-                const requestId =
-                    typeof response.id === "number"
-                        ? response.id
-                        : Number.parseInt(String(response.id), 10);
-                const pending = this.pending.get(requestId);
-                if (!pending) return;
-                this.pending.delete(requestId);
-
-                if (response.error?.message) {
-                    pending.reject(new Error(response.error.message));
-                    return;
+            label: "Codex app-server",
+            stopTimeoutMs:
+                params.stopTimeoutMs ??
+                CodexAppServerClient.DEFAULT_STOP_TIMEOUT_MS,
+            onStderr: (chunk) => {
+                const text = chunk.trim();
+                if (text) {
+                    console.error(`[agentchat-server][codex] ${text}`);
                 }
-
-                pending.resolve(response.result);
-                return;
-            }
-
-            this.notificationHandler?.(parsed as JsonRpcNotification);
+            },
         });
-
-        this.child.stderr.on("data", (chunk) => {
-            const text = chunk.toString().trim();
-            if (text) {
-                console.error(`[agentchat-server][codex] ${text}`);
-            }
-        });
-
-        this.child.on("error", (error) => {
-            if (this.hasExited) {
-                return;
-            }
-            this.hasExited = true;
-            this.resolveExitPromise();
-            for (const [, pending] of this.pending) {
-                pending.reject(error);
-            }
-            this.pending.clear();
-            if (!this.isStopping) {
-                this.exitHandler?.(error);
-            }
-        });
-
-        this.child.on("exit", (code, signal) => {
-            if (this.hasExited) {
-                return;
-            }
-            this.hasExited = true;
-            this.resolveExitPromise();
-            const error = new Error(
-                `Codex app-server exited (${code ?? "null"} / ${signal ?? "null"})`,
-            );
-            for (const [, pending] of this.pending) {
-                pending.reject(error);
-            }
-            this.pending.clear();
-            if (!this.isStopping) {
-                this.exitHandler?.(error);
-            }
+        this.rpc = new JsonRpcStdioClient({
+            process: this.process,
+            label: "Codex app-server",
+            onParseError: ({ error }) => {
+                console.error("[agentchat-server] invalid codex JSON", error);
+            },
         });
     }
 
     onNotification(handler: (notification: JsonRpcNotification) => void): void {
-        this.notificationHandler = handler;
+        this.rpc.onNotification(handler);
     }
 
     onExit(handler: (error: Error) => void): void {
-        this.exitHandler = handler;
+        this.rpc.onExit(handler);
     }
 
     async initialize(): Promise<void> {
@@ -185,93 +85,14 @@ export class CodexAppServerClient implements CodexClient {
     }
 
     async request(method: string, params: unknown): Promise<unknown> {
-        const id = this.nextId++;
-
-        return await new Promise<unknown>((resolve, reject) => {
-            this.pending.set(id, { resolve, reject });
-            this.child.stdin.write(
-                toJsonLine({
-                    id,
-                    method,
-                    params,
-                }),
-            );
-        });
+        return await this.rpc.request(method, params);
     }
 
     private notify(method: string, params: unknown): void {
-        this.child.stdin.write(
-            toJsonLine({
-                method,
-                params,
-            }),
-        );
+        this.rpc.notify(method, params);
     }
 
     async stop(): Promise<void> {
-        if (this.stopPromise) {
-            return await this.stopPromise;
-        }
-
-        this.isStopping = true;
-        if (this.hasExited) {
-            return;
-        }
-
-        this.stopPromise = (async () => {
-            this.tryKill("SIGTERM");
-            if (await this.waitForExit(this.stopTimeoutMs)) {
-                return;
-            }
-
-            this.tryKill("SIGKILL");
-            if (await this.waitForExit(this.stopTimeoutMs)) {
-                return;
-            }
-
-            throw new Error(
-                `Codex app-server did not exit within ${this.stopTimeoutMs}ms after SIGTERM/SIGKILL`,
-            );
-        })();
-
-        try {
-            await this.stopPromise;
-        } finally {
-            this.stopPromise = null;
-        }
-    }
-
-    private tryKill(signal: NodeJS.Signals): void {
-        if (this.hasExited) {
-            return;
-        }
-
-        try {
-            this.child.kill(signal);
-        } catch (error) {
-            if (!this.hasExited) {
-                throw error;
-            }
-        }
-    }
-
-    private async waitForExit(timeoutMs: number): Promise<boolean> {
-        let timeoutId: ReturnType<typeof setTimeout> | null = null;
-
-        try {
-            return await Promise.race([
-                this.exitPromise.then(() => true),
-                new Promise<boolean>((resolve) => {
-                    timeoutId = setTimeout(() => {
-                        timeoutId = null;
-                        resolve(false);
-                    }, timeoutMs);
-                }),
-            ]);
-        } finally {
-            if (timeoutId) {
-                clearTimeout(timeoutId);
-            }
-        }
+        await this.process.stop();
     }
 }

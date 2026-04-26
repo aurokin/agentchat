@@ -143,16 +143,17 @@ Transport code should be separate from adapter semantics.
 
 Reusable transport pieces should include:
 
-- JSON-RPC stdio client
-- JSONL subprocess stream parser
-- process lifecycle and cancellation helpers
+- `JsonRpcStdioClient` for Codex-like and ACP-like JSON-RPC protocols
+- `JsonlStreamParser` for Claude Code-style stream-json output
+- `ManagedRuntimeProcess` for subprocess lifecycle and cancellation
 - timeout and exit handling
 - stderr capture
 - later HTTP streaming helpers for OpenCode if direct HTTP remains preferred
 
 The adapter should translate protocol messages into runtime updates. The
 transport should only move bytes, frame messages, and report process/stream
-health.
+health. `CodexAppServerClient` uses this substrate today while preserving the
+existing Codex client interface.
 
 ## Compatibility Rule
 
