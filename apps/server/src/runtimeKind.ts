@@ -1,6 +1,6 @@
 import type { AgentConfig, ProviderConfig } from "./config.ts";
 
-export type RuntimeKindId = "codex";
+export type RuntimeKindId = "codex" | "acp";
 
 export type RuntimeLifecycleModel =
     | "persistent-session"

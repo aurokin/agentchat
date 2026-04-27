@@ -16,7 +16,8 @@ export type RuntimeJsonRpcResponse = {
     id?: number | string;
     result?: unknown;
     error?: {
-        message?: string;
+        code: number;
+        message: string;
     };
 };
 
@@ -24,6 +25,22 @@ export type RuntimeJsonRpcNotification = {
     method?: string;
     params?: Record<string, unknown>;
 };
+
+export type RuntimeJsonRpcRequest = {
+    id: number | string;
+    method: string;
+    params?: unknown;
+};
+
+export class JsonRpcRequestError extends Error {
+    readonly code: number;
+
+    constructor(code: number, message: string) {
+        super(message);
+        this.name = "JsonRpcRequestError";
+        this.code = code;
+    }
+}
 
 export type JsonlParseError = {
     line: string;
@@ -263,6 +280,9 @@ export class JsonRpcStdioClient {
         | ((notification: RuntimeJsonRpcNotification) => void)
         | null = null;
     private exitHandler: ((error: Error) => void) | null = null;
+    private requestHandler:
+        | ((request: RuntimeJsonRpcRequest) => Promise<unknown> | unknown)
+        | null = null;
 
     constructor(params: {
         process: ManagedRuntimeProcess;
@@ -299,6 +319,12 @@ export class JsonRpcStdioClient {
         this.exitHandler = handler;
     }
 
+    onRequest(
+        handler: (request: RuntimeJsonRpcRequest) => Promise<unknown> | unknown,
+    ): void {
+        this.requestHandler = handler;
+    }
+
     async request(method: string, params: unknown): Promise<unknown> {
         const id = this.nextId++;
 
@@ -306,6 +332,7 @@ export class JsonRpcStdioClient {
             this.pending.set(id, { resolve, reject });
             this.process.stdin.write(
                 toJsonLine({
+                    jsonrpc: "2.0",
                     id,
                     method,
                     params,
@@ -317,6 +344,7 @@ export class JsonRpcStdioClient {
     notify(method: string, params: unknown): void {
         this.process.stdin.write(
             toJsonLine({
+                jsonrpc: "2.0",
                 method,
                 params,
             }),
@@ -329,12 +357,65 @@ export class JsonRpcStdioClient {
             return;
         }
 
+        if (
+            "id" in value &&
+            value.id !== undefined &&
+            typeof value.method === "string"
+        ) {
+            void this.handleRequest(value as RuntimeJsonRpcRequest);
+            return;
+        }
+
         if ("id" in value && value.id !== undefined) {
             this.handleResponse(value as RuntimeJsonRpcResponse);
             return;
         }
 
         this.notificationHandler?.(value as RuntimeJsonRpcNotification);
+    }
+
+    private async handleRequest(request: RuntimeJsonRpcRequest): Promise<void> {
+        if (!this.requestHandler) {
+            this.process.stdin.write(
+                toJsonLine({
+                    jsonrpc: "2.0",
+                    id: request.id,
+                    error: {
+                        code: -32601,
+                        message: `No handler registered for JSON-RPC request '${request.method}'.`,
+                    },
+                }),
+            );
+            return;
+        }
+
+        try {
+            const result = await this.requestHandler(request);
+            this.process.stdin.write(
+                toJsonLine({
+                    jsonrpc: "2.0",
+                    id: request.id,
+                    result,
+                }),
+            );
+        } catch (error) {
+            this.process.stdin.write(
+                toJsonLine({
+                    jsonrpc: "2.0",
+                    id: request.id,
+                    error: {
+                        code:
+                            error instanceof JsonRpcRequestError
+                                ? error.code
+                                : -32603,
+                        message:
+                            error instanceof Error
+                                ? error.message
+                                : String(error),
+                    },
+                }),
+            );
+        }
     }
 
     private handleResponse(response: RuntimeJsonRpcResponse): void {

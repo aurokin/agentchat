@@ -114,12 +114,15 @@ Implement the generic ACP protocol layer after the contract and substrate.
 
 Expected outcomes:
 
-- `initialize` and capability negotiation
-- `session/new` and `session/load`
-- `session/prompt`
-- `session/update`
-- `session/cancel`
-- text, plan, tool, permission, cancellation, stop reason, and error mapping
+- `AcpProtocolClient` for `initialize`, `session/new`, `session/load`,
+  `session/prompt`, `session/update`, `session/request_permission`, and
+  `session/cancel`
+- capability-gated `session/load`
+- provider artifact preservation for plans, tools, permission requests, stop
+  reasons, and unknown updates
+- conservative permission resolution with fail-closed default
+- pressure-log entries for ACP capabilities intentionally deferred until a
+  concrete adapter proves they belong in the shared contract
 
 ### AUR-10 Claude Code Runtime Tracer
 

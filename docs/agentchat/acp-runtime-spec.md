@@ -27,6 +27,14 @@ important lifecycle for Agentchat is:
 Local ACP agents generally use stdio transport. Remote transports are possible
 but less mature and should not be required for the first Agentchat tracer.
 
+Agentchat's ACP foundation lives in `apps/server/src/acpProtocol.ts`:
+
+- `AcpProtocolClient` wraps the shared `JsonRpcStdioClient`
+- `AcpProtocolClient.initialize` negotiates protocol version and capabilities
+- `newSession`, `loadSession`, `prompt`, and `cancel` map the core ACP methods
+- pure mapping helpers translate ACP updates/results into `RuntimeKindEvent`
+  and provider artifacts
+
 References:
 
 - https://agentclientprotocol.com/protocol/overview
@@ -48,9 +56,14 @@ The runtime binding stores the ACP session id plus bounded adapter metadata.
 2. Spawn the configured ACP agent process over stdio.
 3. Send `initialize`.
 4. Capture capabilities.
-5. If a compatible session id exists, call `session/load`.
+5. If a compatible session id exists and `agentCapabilities.loadSession` is
+   advertised, call `session/load`.
 6. Otherwise call `session/new`.
 7. Persist the ACP session id in the runtime binding.
+
+The foundation records newer ACP `session/resume` and `session/close`
+capabilities but does not promote them into Agentchat runtime bindings yet.
+Those behaviors should be validated by the first concrete ACP adapter tracer.
 
 ## Send Flow
 
@@ -62,6 +75,9 @@ The runtime binding stores the ACP session id plus bounded adapter metadata.
    requests, and stop reasons.
 6. Complete, interrupt, or fail the run from the prompt response.
 
+Unknown `session/update` variants must be preserved as provider artifacts
+rather than flattened into assistant text.
+
 ## Interrupt Flow
 
 1. Send `session/cancel`.
@@ -72,24 +88,25 @@ The runtime binding stores the ACP session id plus bounded adapter metadata.
 
 ## Event Mapping
 
-| ACP message | Agentchat mapping |
-|-------------|-------------------|
-| `session/update` agent message chunk | `message.delta` |
-| `session/update` plan | provider artifact and optional assistant status |
-| `session/update` tool call | provider artifact |
-| `session/update` tool call update | provider artifact |
-| `session/request_permission` | auto-resolved or failed closed in v1 |
-| `session/prompt` result `end_turn` | `run.completed` |
-| `session/prompt` result `cancelled` | `run.interrupted` |
-| `session/prompt` error | `run.failed` |
+| ACP message                          | Agentchat mapping                               |
+| ------------------------------------ | ----------------------------------------------- |
+| `session/update` agent message chunk | `message.delta`                                 |
+| `session/update` plan                | provider artifact and optional assistant status |
+| `session/update` tool call           | provider artifact                               |
+| `session/update` tool call update    | provider artifact                               |
+| `session/request_permission`         | auto-resolved or failed closed in v1            |
+| `session/prompt` result `end_turn`   | `run.completed`                                 |
+| `session/prompt` result `cancelled`  | `run.interrupted`                               |
+| `session/prompt` error               | `run.failed`                                    |
 
 ## Permission Requests
 
 Agentchat currently requires auto-approve runtime behavior and has no approval
 UI. ACP permission requests should therefore be handled conservatively:
 
-- auto-approve only where the adapter can preserve existing operator-approved
-  semantics
+- `AcpProtocolClient` defaults to fail-closed permission handling
+- auto-approve may select an explicit non-persistent allow option only when a
+  concrete adapter opts into that mode
 - auto-deny or fail closed where the permission request cannot be represented
   safely
 - persist the request and resolution as provider artifacts
