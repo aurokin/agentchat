@@ -60,6 +60,9 @@ function createConfig(): AgentchatConfig {
 function createV2Config(): AgentchatConfig {
     const config = createConfig();
     const provider = config.providers[0]!;
+    if (provider.kind !== "codex") {
+        throw new Error("Expected Codex provider.");
+    }
     config.providers = [];
     config.agents = [
         {
@@ -317,7 +320,11 @@ describe("CodexModelCatalog", () => {
         });
 
         config = createConfig();
-        config.providers[0]!.codex.command = "codex-next";
+        const provider = config.providers[0]!;
+        if (provider.kind !== "codex") {
+            throw new Error("Expected Codex provider.");
+        }
+        provider.codex.command = "codex-next";
 
         await expect(
             catalog.getProviderModels("codex-main"),

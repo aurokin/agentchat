@@ -3,6 +3,10 @@ import type { AgentConfig, AgentchatConfig, ProviderConfig } from "./config.ts";
 import type { CreateCodexClient } from "./codexAppServerClient.ts";
 import { CodexRuntimeKind } from "./codexRuntimeKind.ts";
 import type { ProviderModelCatalogEntry, RuntimeKind } from "./runtimeKind.ts";
+import {
+    RuntimeKindRegistry,
+    runtimeKindRegistryFromSingleKind,
+} from "./runtimeKindRegistry.ts";
 
 export type { ProviderModelCatalogEntry };
 
@@ -66,7 +70,10 @@ function toBootstrapAgent(provider: ProviderConfig): AgentConfig {
         enabled: true,
         defaultVisible: true,
         visibilityOverrides: [],
-        rootPath: provider.codex.cwd ?? process.cwd(),
+        rootPath:
+            provider.kind === "codex"
+                ? (provider.codex.cwd ?? process.cwd())
+                : (provider.claudeCode.cwd ?? process.cwd()),
         providerIds: [provider.id],
         defaultProviderId: provider.id,
         modelAllowlist: [],
@@ -90,12 +97,22 @@ function getProviderModelCacheKey(provider: ProviderConfig): string {
         providerId: provider.id,
         kind: provider.kind,
         modelCacheTtlSeconds: provider.modelCacheTtlSeconds,
-        codex: {
-            command: provider.codex.command,
-            args: provider.codex.args,
-            baseEnv: sortRecordEntries(provider.codex.baseEnv),
-            cwd: provider.codex.cwd ?? null,
-        },
+        runtime:
+            provider.kind === "codex"
+                ? {
+                      command: provider.codex.command,
+                      args: provider.codex.args,
+                      baseEnv: sortRecordEntries(provider.codex.baseEnv),
+                      cwd: provider.codex.cwd ?? null,
+                  }
+                : {
+                      command: provider.claudeCode.command,
+                      args: provider.claudeCode.args,
+                      baseEnv: sortRecordEntries(provider.claudeCode.baseEnv),
+                      cwd: provider.claudeCode.cwd ?? null,
+                      permissionMode: provider.claudeCode.permissionMode,
+                      timeoutMs: provider.claudeCode.timeoutMs ?? null,
+                  },
         fallbackModels: provider.models.map((model) => ({
             id: model.id,
             label: model.label,
@@ -112,7 +129,7 @@ function getProviderModelCacheKey(provider: ProviderConfig): string {
 
 export class CodexModelCatalog {
     private readonly getConfig: () => AgentchatConfig;
-    private readonly runtimeKind: RuntimeKind;
+    private readonly runtimeKinds: RuntimeKindRegistry;
     private readonly now: () => number;
     private readonly cache = new Map<string, CachedProviderModels>();
 
@@ -120,12 +137,21 @@ export class CodexModelCatalog {
         getConfig: () => AgentchatConfig;
         createClient?: CreateCodexClient;
         runtimeKind?: RuntimeKind;
+        runtimeKinds?: RuntimeKindRegistry;
         now?: () => number;
     }) {
         this.getConfig = params.getConfig;
-        this.runtimeKind =
-            params.runtimeKind ??
-            new CodexRuntimeKind({ createClient: params.createClient });
+        this.runtimeKinds =
+            params.runtimeKinds ??
+            (params.runtimeKind
+                ? runtimeKindRegistryFromSingleKind(params.runtimeKind)
+                : params.createClient
+                  ? new RuntimeKindRegistry([
+                        new CodexRuntimeKind({
+                            createClient: params.createClient,
+                        }),
+                    ])
+                  : RuntimeKindRegistry.default());
         this.now = params.now ?? (() => Date.now());
     }
 
@@ -226,7 +252,7 @@ export class CodexModelCatalog {
     private async fetchLiveModels(
         provider: ProviderConfig,
     ): Promise<ProviderModelCatalogEntry[]> {
-        return await this.runtimeKind.listModels({
+        return await this.runtimeKinds.get(provider.kind).listModels({
             provider,
             agent: toBootstrapAgent(provider),
         });

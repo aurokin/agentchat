@@ -111,6 +111,128 @@ describe("server config", () => {
         });
     });
 
+    test("parses inline Claude Code runtimes as agent-owned providers", () => {
+        const config = parseConfig({
+            version: 1,
+            auth: {
+                defaultProviderId: "local-main",
+                providers: [
+                    {
+                        id: "local-main",
+                        kind: "local",
+                        enabled: true,
+                        allowSignup: false,
+                    },
+                ],
+            },
+            agents: [
+                {
+                    id: "workspace",
+                    name: "Workspace",
+                    enabled: true,
+                    rootPath: "/srv/workspace",
+                    runtime: {
+                        id: "workspace-claude",
+                        kind: "claude-code",
+                        cwd: "/srv/workspace",
+                        permissionMode: "acceptEdits",
+                        models: [
+                            {
+                                id: "sonnet",
+                                label: "Claude Sonnet",
+                                enabled: true,
+                                supportsReasoning: false,
+                                variants: [],
+                            },
+                        ],
+                    },
+                },
+            ],
+        });
+
+        expect(config.agents[0]?.providerIds).toEqual(["workspace-claude"]);
+        expect(config.agents[0]?.defaultProviderId).toBe("workspace-claude");
+        expect(getProviderConfigs(config)[0]).toMatchObject({
+            id: "workspace-claude",
+            kind: "claude-code",
+            label: "Claude Code",
+            models: [
+                {
+                    id: "sonnet",
+                    variants: [],
+                },
+            ],
+            claudeCode: {
+                command: "claude",
+                cwd: "/srv/workspace",
+                permissionMode: "acceptEdits",
+            },
+        });
+    });
+
+    test("seeds static models for minimal Claude Code runtime configs", () => {
+        const config = parseConfig({
+            version: 1,
+            auth: {
+                defaultProviderId: "local-main",
+                providers: [
+                    {
+                        id: "local-main",
+                        kind: "local",
+                        enabled: true,
+                        allowSignup: false,
+                    },
+                ],
+            },
+            providers: [
+                {
+                    id: "claude-main",
+                    kind: "claude-code",
+                    label: "Claude Code",
+                    enabled: true,
+                    idleTtlSeconds: 900,
+                    modelCacheTtlSeconds: 300,
+                    claudeCode: {
+                        command: "claude",
+                        args: [],
+                        baseEnv: {},
+                    },
+                },
+            ],
+            agents: [
+                {
+                    id: "workspace",
+                    name: "Workspace",
+                    enabled: true,
+                    rootPath: "/srv/workspace",
+                    providerIds: ["claude-main"],
+                },
+                {
+                    id: "inline",
+                    name: "Inline",
+                    enabled: true,
+                    rootPath: "/srv/inline",
+                    runtime: {
+                        kind: "claude-code",
+                    },
+                },
+            ],
+        });
+
+        expect(config.providers[0]?.models.map((model) => model.id)).toEqual([
+            "sonnet",
+            "opus",
+        ]);
+        expect(
+            config.agents[1]?.runtime?.models.map((model) => model.id),
+        ).toEqual(["sonnet", "opus"]);
+        expect(
+            getProviderConfigs(config)
+                .find((provider) => provider.id === "inline-runtime")
+                ?.models.map((model) => model.id),
+        ).toEqual(["sonnet", "opus"]);
+    });
+
     test("prefers inline runtime ids over legacy agent provider references", () => {
         const config = parseConfig({
             version: 1,
@@ -166,6 +288,135 @@ describe("server config", () => {
         expect(
             getProviderConfigs(config).map((provider) => provider.id),
         ).toEqual(["legacy-codex", "agent-codex"]);
+    });
+
+    test("allows inline runtime default providers mixed with legacy providers", () => {
+        const config = parseConfig({
+            version: 1,
+            auth: {
+                defaultProviderId: "local-main",
+                providers: [
+                    {
+                        id: "local-main",
+                        kind: "local",
+                        enabled: true,
+                        allowSignup: false,
+                    },
+                ],
+            },
+            providers: [
+                {
+                    id: "legacy-codex",
+                    kind: "codex",
+                    label: "Legacy Codex",
+                    enabled: true,
+                    idleTtlSeconds: 900,
+                    modelCacheTtlSeconds: 300,
+                    models: [],
+                    codex: {
+                        command: "codex",
+                        args: ["app-server"],
+                        baseEnv: {},
+                    },
+                },
+            ],
+            agents: [
+                {
+                    id: "workspace",
+                    name: "Workspace",
+                    enabled: true,
+                    rootPath: "/srv/workspace",
+                    providerIds: ["legacy-codex"],
+                    defaultProviderId: "agent-claude",
+                    runtime: {
+                        id: "agent-claude",
+                        kind: "claude-code",
+                    },
+                },
+            ],
+        });
+
+        expect(config.agents[0]?.providerIds).toEqual([
+            "agent-claude",
+            "legacy-codex",
+        ]);
+        expect(config.agents[0]?.defaultProviderId).toBe("agent-claude");
+    });
+
+    test("rejects relative Claude Code runtime cwd values", () => {
+        expect(() =>
+            parseConfig({
+                version: 1,
+                auth: {
+                    defaultProviderId: "local-main",
+                    providers: [
+                        {
+                            id: "local-main",
+                            kind: "local",
+                            enabled: true,
+                            allowSignup: false,
+                        },
+                    ],
+                },
+                providers: [
+                    {
+                        id: "claude-main",
+                        kind: "claude-code",
+                        label: "Claude Code",
+                        enabled: true,
+                        idleTtlSeconds: 900,
+                        modelCacheTtlSeconds: 300,
+                        models: [],
+                        claudeCode: {
+                            command: "claude",
+                            args: [],
+                            baseEnv: {},
+                            cwd: "relative",
+                        },
+                    },
+                ],
+                agents: [
+                    {
+                        id: "workspace",
+                        name: "Workspace",
+                        enabled: true,
+                        rootPath: "/srv/workspace",
+                        providerIds: ["claude-main"],
+                    },
+                ],
+            }),
+        ).toThrow("Provider 'claude-main' claudeCode.cwd must be absolute.");
+    });
+
+    test("rejects relative inline Claude Code runtime cwd values", () => {
+        expect(() =>
+            parseConfig({
+                version: 1,
+                auth: {
+                    defaultProviderId: "local-main",
+                    providers: [
+                        {
+                            id: "local-main",
+                            kind: "local",
+                            enabled: true,
+                            allowSignup: false,
+                        },
+                    ],
+                },
+                agents: [
+                    {
+                        id: "workspace",
+                        name: "Workspace",
+                        enabled: true,
+                        rootPath: "/srv/workspace",
+                        runtime: {
+                            kind: "claude-code",
+                            cwd: "relative",
+                        },
+                    },
+                ],
+            }),
+        ).toThrow("Agent 'workspace' runtime.cwd must be absolute.");
     });
 
     test("rejects duplicate inline runtime provider ids", () => {

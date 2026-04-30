@@ -28,7 +28,8 @@ Prerequisites:
 
 - Users with a Claude Max or Pro subscription can use Claude Code at no additional API cost. This is the primary value proposition.
 - The `claude` binary authenticates via the user's `~/.claude/` credentials, not API keys.
-- Supports session persistence via `--session-id` and `--resume`.
+- Supports session persistence by passing the captured session id to
+  `--resume <sessionId>`.
 - Streaming structured output via `--output-format stream-json`.
 
 ## Critical Constraint: Subscription Only
@@ -46,7 +47,7 @@ This means:
 
 One `claude` subprocess per turn, not per conversation.
 
-This is fundamentally different from Codex, Pi, and OpenCode where a persistent process handles multiple turns. With Claude Code, each turn spawns a fresh process that resumes the session via `--session-id`.
+This is fundamentally different from Codex, Pi, and OpenCode where a persistent process handles multiple turns. With Claude Code, each turn spawns a fresh process that resumes the session via `--resume <sessionId>`.
 
 This difference must stay adapter-specific. Product code should depend on the
 shared prompt-turn contract rather than checking for Claude Code lifecycle
@@ -61,8 +62,8 @@ Claude Code's print mode emits newline-delimited JSON to stdout.
 ```bash
 claude --print \
   --output-format stream-json \
-  --session-id <sessionId> \
-  --resume \
+  --include-partial-messages \
+  --resume <sessionId> \
   --model <model> \
   --permission-mode <mode> \
   "user message"
@@ -72,17 +73,16 @@ Key flags:
 
 - `--print`: non-interactive mode, output to stdout.
 - `--output-format stream-json`: JSONL streaming output.
-- `--session-id <id>`: resume a specific session for conversation continuity.
-- `--resume`: continue from the last session state.
-- `--model <model>`: model selection (e.g., `claude-sonnet-4-6`, `claude-opus-4-6`).
-- `--permission-mode <mode>`: permission behavior (`auto`, `acceptEdits`, `bypassPermissions`, `plan`).
+- `--resume <sessionId>`: resume a specific session for conversation continuity.
+- `--model <model>`: model selection. Agentchat can use configured model ids or Claude Code aliases such as `sonnet` and `opus`.
+- `--permission-mode <mode>`: permission behavior (`acceptEdits`, `bypassPermissions`, `plan`, or omitted for Claude Code's default).
 - `--max-budget-usd <amount>`: optional cost cap per turn.
 - `--include-partial-messages`: include partial content blocks for real-time streaming.
 
 ### Stream Events (stdout)
 
 ```json
-{"type": "init", "session_id": "abc123", ...}
+{"type": "system", "subtype": "init", "session_id": "abc123", ...}
 {"type": "assistant", "message": {"content": [{"type": "text", "text": "partial..."}]}, ...}
 {"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "Read", "input": {...}}]}, ...}
 {"type": "tool_result", "content": "file contents...", ...}
@@ -93,13 +93,13 @@ Key flags:
 
 On the first turn of a conversation:
 
-1. Omit `--session-id` and `--resume`.
+1. Omit `--resume`.
 2. Capture the `session_id` from the `init` event.
 3. Store it in the runtime binding.
 
 On subsequent turns:
 
-1. Pass `--session-id <stored-id> --resume`.
+1. Pass `--resume <stored-id>`.
 2. Claude Code resumes context from its internal session storage.
 
 ## Lifecycle Model
@@ -136,8 +136,8 @@ There is no separate startup flow. The first `conversation.send` spawns the firs
 1. Check that no turn is already active for this conversation.
 2. Create a run.
 3. Build the CLI invocation:
-   - If session id exists: include `--session-id` and `--resume`.
-   - If no session id: omit them (first turn).
+    - If session id exists: include `--resume <sessionId>`.
+    - If no session id: omit them (first turn).
 4. Spawn the subprocess.
 5. Parse JSONL events from stdout.
 6. On `init` event: capture and store `session_id` if not already stored.
@@ -157,31 +157,27 @@ There is no separate startup flow. The first `conversation.send` spawns the firs
 
 ## Event Mapping
 
-| Claude Code Event | Agentchat Event |
-|-------------------|-----------------|
-| `init` | Internal (capture session id) |
-| `assistant` (text content) | `message.delta` |
-| `assistant` (tool_use content) | `message.delta` (tool use metadata) |
-| `tool_result` | `message.delta` (tool result metadata) |
-| `result` | `message.completed` + `run.completed` |
-| Process exit code 0 | `run.completed` |
-| Process exit non-zero | `run.failed` |
+| Claude Code Event                   | Agentchat Event                       |
+| ----------------------------------- | ------------------------------------- |
+| `system` / `init` with `session_id` | Internal (capture session id)         |
+| `assistant` (text content)          | `message.delta`                       |
+| `assistant` (tool_use content)      | Provider artifact                     |
+| `tool_result`                       | Provider artifact                     |
+| `result`                            | `message.completed` + `run.completed` |
+| Process exit code 0                 | `run.completed`                       |
+| Process exit non-zero               | `run.failed`                          |
 
 ## Model And Variant Handling
 
-Claude Code supports a small, static set of models:
-
-- `claude-opus-4-6`
-- `claude-sonnet-4-6`
-- `claude-haiku-4-5-20251001`
-
-And their dated variants as they are released.
-
 The model catalog for Claude Code should be:
 
-- Statically configured in the runtime spec or agent config.
+- Statically configured in the runtime adapter or agent config.
 - No dynamic model fetching needed.
 - `modelCacheTtlSeconds` still applies but the "fetch" is a no-op returning the static list.
+
+The current tracer exposes static fallback aliases for `sonnet` and `opus`, and
+prefers explicitly configured model ids when operators need exact Claude model
+names.
 
 Variants for Claude Code are limited. Claude Code does not expose a reasoning effort parameter in the same way Codex does. Possible variant mappings:
 
@@ -196,7 +192,7 @@ Claude Code manages its own session storage:
 
 - Sessions stored in `~/.claude/projects/<encoded-cwd>/`.
 - Session ids are opaque strings.
-- Context survives across subprocess invocations via `--session-id --resume`.
+- Context survives across subprocess invocations via `--resume <sessionId>`.
 - Claude Code handles its own context window management internally.
 
 The Agentchat adapter stores only the `sessionId` string in the runtime binding.
@@ -210,27 +206,31 @@ The Agentchat adapter stores only the `sessionId` string in the runtime binding.
 
 ## Configuration
 
-Agent runtime config for Claude Code:
+Inline agent runtime config for Claude Code:
 
 ```json
 {
-  "kind": "claude-code",
-  "modelCacheTtlSeconds": 300,
-  "claudeCode": {
+    "kind": "claude-code",
     "command": "claude",
     "args": [],
     "baseEnv": {},
-    "permissionMode": "auto"
-  }
+    "permissionMode": "auto",
+    "modelCacheTtlSeconds": 300
 }
 ```
 
 - `command`: binary name or absolute path to the `claude` CLI.
 - `args`: additional CLI arguments appended to every invocation.
 - `baseEnv`: environment overrides.
-- `permissionMode`: default permission mode (`auto`, `acceptEdits`, `bypassPermissions`, `plan`).
+- `permissionMode`: default permission mode. Agentchat maps `auto` to
+  `acceptEdits`, maps `dontAsk` to `bypassPermissions`, and lets the `plan`
+  variant override the configured permission mode.
 
-No `idleTtlSeconds` because there is no persistent process.
+Top-level provider config uses the same provider wrapper as other runtimes, with
+Claude-specific process settings under `claudeCode`.
+
+`idleTtlSeconds` remains in the shared provider shape but has no persistent
+process to expire for Claude Code.
 
 The agent's `rootPath` is passed as the working directory for the subprocess.
 
@@ -247,7 +247,7 @@ The agent's `rootPath` is passed as the working directory for the subprocess.
 Claude Code's CLI is a user-facing tool, not a documented embedding API:
 
 - The `--output-format stream-json` format may change between CLI versions.
-- The `--session-id` and `--resume` behavior may change.
+- The `--resume` behavior may change.
 - The set of available flags may change.
 
 Mitigations:

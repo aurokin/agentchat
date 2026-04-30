@@ -1,6 +1,6 @@
 import type { AgentConfig, ProviderConfig } from "./config.ts";
 
-export type RuntimeKindId = "codex" | "acp";
+export type RuntimeKindId = "codex" | "acp" | "claude-code";
 
 export type RuntimeLifecycleModel =
     | "persistent-session"
@@ -146,6 +146,11 @@ export type RuntimeKindEvent =
     | {
           type: "provider_event";
           event: RuntimeProviderEvent;
+      }
+    | {
+          type: "provider_identity_updated";
+          threadId: string;
+          providerEvents?: RuntimeProviderEvent[];
       };
 
 export type RuntimeOpenThreadParams = {

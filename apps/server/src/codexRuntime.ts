@@ -15,6 +15,10 @@ import type {
     RuntimeKindSession,
     RuntimeProviderEvent,
 } from "./runtimeKind.ts";
+import {
+    RuntimeKindRegistry,
+    runtimeKindRegistryFromSingleKind,
+} from "./runtimeKindRegistry.ts";
 import type {
     ConversationHistoryEntry,
     ConversationSendCommand,
@@ -292,7 +296,7 @@ export class CodexRuntimeManager {
     >();
     private readonly getConfig: () => AgentchatConfig;
     private readonly persistence: RuntimePersistenceClient;
-    private readonly runtimeKind: RuntimeKind;
+    private readonly runtimeKinds: RuntimeKindRegistry;
     private readonly workspaceManager: WorkspaceManager | null;
     private readonly pendingRuntimeDeleteWaitMs: number;
     private lastPersistenceTimestamp = 0;
@@ -302,14 +306,23 @@ export class CodexRuntimeManager {
         persistence: RuntimePersistenceClient;
         createClient?: CreateCodexClient;
         runtimeKind?: RuntimeKind;
+        runtimeKinds?: RuntimeKindRegistry;
         workspaceManager?: WorkspaceManager;
         pendingRuntimeDeleteWaitMs?: number;
     }) {
         this.getConfig = params.getConfig;
         this.persistence = params.persistence;
-        this.runtimeKind =
-            params.runtimeKind ??
-            new CodexRuntimeKind({ createClient: params.createClient });
+        this.runtimeKinds =
+            params.runtimeKinds ??
+            (params.runtimeKind
+                ? runtimeKindRegistryFromSingleKind(params.runtimeKind)
+                : params.createClient
+                  ? new RuntimeKindRegistry([
+                        new CodexRuntimeKind({
+                            createClient: params.createClient,
+                        }),
+                    ])
+                  : RuntimeKindRegistry.default());
         this.workspaceManager = params.workspaceManager ?? null;
         this.pendingRuntimeDeleteWaitMs =
             params.pendingRuntimeDeleteWaitMs ?? PENDING_RUNTIME_DELETE_WAIT_MS;
@@ -1096,7 +1109,7 @@ export class CodexRuntimeManager {
                     existing,
                     resources,
                     desiredCwd,
-                    this.runtimeKind,
+                    this.runtimeKinds.get(existing.provider.kind),
                 )
             ) {
                 if (existing.activeTurn) {
@@ -1181,10 +1194,12 @@ export class CodexRuntimeManager {
                 cwd,
             );
 
-            session = this.runtimeKind.createSession({
-                provider: resources.provider,
-                agent: { ...resources.agent, rootPath: cwd },
-            });
+            session = this.runtimeKinds
+                .get(resources.provider.kind)
+                .createSession({
+                    provider: resources.provider,
+                    agent: { ...resources.agent, rootPath: cwd },
+                });
             initializationState.session = session;
             const initializeResult = await session.initialize();
             const pendingProviderEvents = [
@@ -1814,6 +1829,40 @@ export class CodexRuntimeManager {
             return;
         }
 
+        if (event.type === "provider_identity_updated") {
+            runtime.threadId = event.threadId;
+            const updatedAt = this.nextPersistenceTimestamp();
+            void this.persistence
+                .runtimeBinding({
+                    chatId: runtime.chatId,
+                    userId: runtime.userId,
+                    agentId: runtime.agentId,
+                    conversationLocalId: runtime.conversationId,
+                    provider: runtime.provider.id,
+                    status: "active",
+                    providerThreadId: runtime.threadId,
+                    providerResumeToken: null,
+                    activeRunId: activeTurn.runId,
+                    lastError: null,
+                    lastEventAt: updatedAt,
+                    expiresAt: null,
+                    workspaceMode: runtime.agent.workspaceMode,
+                    workspaceRootPath: runtime.agent.rootPath,
+                    workspaceCwd: runtime.cwd,
+                    updatedAt,
+                })
+                .catch((error) => {
+                    console.error(
+                        "[agentchat-server] failed to persist runtime identity update",
+                        error,
+                    );
+                });
+            for (const providerEvent of event.providerEvents ?? []) {
+                this.recordProviderEvent(runtime, activeTurn, providerEvent);
+            }
+            return;
+        }
+
         if (event.type === "provider_event") {
             this.recordProviderEvent(runtime, activeTurn, event.event);
             return;
@@ -2093,24 +2142,25 @@ export class CodexRuntimeManager {
         const completedAt = this.nextPersistenceTimestamp();
 
         if (params.finalStatus === "completed") {
-            void this.persistence
-                .runCompleted({
-                    chatId: runtime.chatId,
-                    userId: activeTurn.userId,
-                    agentId: runtime.agentId,
-                    conversationLocalId: runtime.conversationId,
-                    assistantMessageLocalId: activeTurn.currentMessageId,
-                    externalRunId: activeTurn.runId,
-                    sequence,
-                    content: activeTurn.text,
-                    workspaceMode: runtime.agent.workspaceMode,
-                    workspaceRootPath: runtime.agent.rootPath,
-                    workspaceCwd: runtime.cwd,
-                    completedAt,
-                })
+            const runCompletedPersistence = this.persistence.runCompleted({
+                chatId: runtime.chatId,
+                userId: activeTurn.userId,
+                agentId: runtime.agentId,
+                conversationLocalId: runtime.conversationId,
+                assistantMessageLocalId: activeTurn.currentMessageId,
+                externalRunId: activeTurn.runId,
+                sequence,
+                content: activeTurn.text,
+                workspaceMode: runtime.agent.workspaceMode,
+                workspaceRootPath: runtime.agent.rootPath,
+                workspaceCwd: runtime.cwd,
+                completedAt,
+            });
+            void runCompletedPersistence
+                .then(() => this.persistIdleRuntimeBinding(runtime))
                 .catch((error) => {
                     console.error(
-                        "[agentchat-server] failed to persist run completion",
+                        "[agentchat-server] failed to persist completed run finalization",
                         error,
                     );
                 });
@@ -2128,24 +2178,25 @@ export class CodexRuntimeManager {
         }
 
         if (params.finalStatus === "interrupted") {
-            void this.persistence
-                .runInterrupted({
-                    chatId: runtime.chatId,
-                    userId: activeTurn.userId,
-                    agentId: runtime.agentId,
-                    conversationLocalId: runtime.conversationId,
-                    assistantMessageLocalId: activeTurn.currentMessageId,
-                    externalRunId: activeTurn.runId,
-                    sequence,
-                    content: activeTurn.text,
-                    workspaceMode: runtime.agent.workspaceMode,
-                    workspaceRootPath: runtime.agent.rootPath,
-                    workspaceCwd: runtime.cwd,
-                    completedAt,
-                })
+            const runInterruptedPersistence = this.persistence.runInterrupted({
+                chatId: runtime.chatId,
+                userId: activeTurn.userId,
+                agentId: runtime.agentId,
+                conversationLocalId: runtime.conversationId,
+                assistantMessageLocalId: activeTurn.currentMessageId,
+                externalRunId: activeTurn.runId,
+                sequence,
+                content: activeTurn.text,
+                workspaceMode: runtime.agent.workspaceMode,
+                workspaceRootPath: runtime.agent.rootPath,
+                workspaceCwd: runtime.cwd,
+                completedAt,
+            });
+            void runInterruptedPersistence
+                .then(() => this.persistIdleRuntimeBinding(runtime))
                 .catch((error) => {
                     console.error(
-                        "[agentchat-server] failed to persist interrupted run",
+                        "[agentchat-server] failed to persist interrupted run finalization",
                         error,
                     );
                 });
@@ -2168,25 +2219,26 @@ export class CodexRuntimeManager {
         );
         const errorMessage = params.errorMessage;
 
-        void this.persistence
-            .runFailed({
-                chatId: runtime.chatId,
-                userId: activeTurn.userId,
-                agentId: runtime.agentId,
-                conversationLocalId: runtime.conversationId,
-                assistantMessageLocalId: activeTurn.currentMessageId,
-                externalRunId: activeTurn.runId,
-                sequence,
-                content: activeTurn.text,
-                workspaceMode: runtime.agent.workspaceMode,
-                workspaceRootPath: runtime.agent.rootPath,
-                workspaceCwd: runtime.cwd,
-                completedAt,
-                errorMessage,
-            })
+        const runFailedPersistence = this.persistence.runFailed({
+            chatId: runtime.chatId,
+            userId: activeTurn.userId,
+            agentId: runtime.agentId,
+            conversationLocalId: runtime.conversationId,
+            assistantMessageLocalId: activeTurn.currentMessageId,
+            externalRunId: activeTurn.runId,
+            sequence,
+            content: activeTurn.text,
+            workspaceMode: runtime.agent.workspaceMode,
+            workspaceRootPath: runtime.agent.rootPath,
+            workspaceCwd: runtime.cwd,
+            completedAt,
+            errorMessage,
+        });
+        void runFailedPersistence
+            .then(() => this.persistIdleRuntimeBinding(runtime))
             .catch((error) => {
                 console.error(
-                    "[agentchat-server] failed to persist failed run",
+                    "[agentchat-server] failed to persist failed run finalization",
                     error,
                 );
             });
@@ -2203,6 +2255,34 @@ export class CodexRuntimeManager {
         this.releaseActiveTurnSubscribers(runtime);
         this.scheduleIdleExpiration(runtime);
         activeTurn.reject(new Error(errorMessage));
+    }
+
+    private async persistIdleRuntimeBinding(
+        runtime: ConversationRuntime,
+    ): Promise<void> {
+        if (this.runtimes.get(runtime.key) !== runtime || runtime.activeTurn) {
+            return;
+        }
+
+        const updatedAt = this.nextPersistenceTimestamp();
+        await this.persistence.runtimeBinding({
+            chatId: runtime.chatId,
+            userId: runtime.userId,
+            agentId: runtime.agentId,
+            conversationLocalId: runtime.conversationId,
+            provider: runtime.provider.id,
+            status: "idle",
+            providerThreadId: runtime.threadId,
+            providerResumeToken: null,
+            activeRunId: null,
+            lastError: null,
+            lastEventAt: updatedAt,
+            expiresAt: null,
+            workspaceMode: runtime.agent.workspaceMode,
+            workspaceRootPath: runtime.agent.rootPath,
+            workspaceCwd: runtime.cwd,
+            updatedAt,
+        });
     }
 
     private scheduleIdleExpiration(runtime: ConversationRuntime): void {
@@ -2402,6 +2482,10 @@ function shouldRecycleRuntime(
     }
 
     if (runtime.provider.id !== resources.provider.id) {
+        return true;
+    }
+
+    if (runtime.provider.kind !== resources.provider.kind) {
         return true;
     }
 

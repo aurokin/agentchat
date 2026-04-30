@@ -143,6 +143,9 @@ function createConfig(): AgentchatConfig {
 function createV2Config(): AgentchatConfig {
     const config = createConfig();
     const provider = config.providers[0]!;
+    if (provider.kind !== "codex") {
+        throw new Error("Expected Codex provider.");
+    }
     config.providers = [];
     config.agents = [config.agents[0]!];
     config.agents[0] = {
@@ -801,7 +804,11 @@ describe("createFetchHandler", () => {
                     allowSignup: true,
                 });
                 config.auth.providers[0]!.enabled = false;
-                config.providers[0]!.codex.cwd = "/missing/provider-cwd";
+                const provider = config.providers[0]!;
+                if (provider.kind !== "codex") {
+                    throw new Error("Expected Codex provider.");
+                }
+                provider.codex.cwd = "/missing/provider-cwd";
                 config.agents[0]!.rootPath = "/missing/visible-agent";
                 config.agents[2]!.rootPath = "/missing/fallback-agent";
                 return config;

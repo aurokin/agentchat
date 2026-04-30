@@ -62,6 +62,10 @@ export const PROVIDER_DIAGNOSTIC_ISSUES = {
     codexCwdMissing:
         "Configured codex.cwd does not exist or is not a directory.",
     codexCommandMissing: "Configured Codex command path does not exist.",
+    claudeCodeCwdMissing:
+        "Configured claudeCode.cwd does not exist or is not a directory.",
+    claudeCodeCommandMissing:
+        "Configured Claude Code command path does not exist.",
 } as const;
 
 export const AGENT_DIAGNOSTIC_ISSUES = {
@@ -332,15 +336,31 @@ export function getProviderDiagnostics(
         issues.push(PROVIDER_DIAGNOSTIC_ISSUES.noEnabledModels);
     }
 
-    if (provider.codex.cwd && !isExistingDirectory(provider.codex.cwd)) {
-        issues.push(PROVIDER_DIAGNOSTIC_ISSUES.codexCwdMissing);
-    }
+    if (provider.kind === "codex") {
+        if (provider.codex.cwd && !isExistingDirectory(provider.codex.cwd)) {
+            issues.push(PROVIDER_DIAGNOSTIC_ISSUES.codexCwdMissing);
+        }
 
-    if (
-        path.isAbsolute(provider.codex.command) &&
-        !existsSync(provider.codex.command)
-    ) {
-        issues.push(PROVIDER_DIAGNOSTIC_ISSUES.codexCommandMissing);
+        if (
+            path.isAbsolute(provider.codex.command) &&
+            !existsSync(provider.codex.command)
+        ) {
+            issues.push(PROVIDER_DIAGNOSTIC_ISSUES.codexCommandMissing);
+        }
+    } else if (provider.kind === "claude-code") {
+        if (
+            provider.claudeCode.cwd &&
+            !isExistingDirectory(provider.claudeCode.cwd)
+        ) {
+            issues.push(PROVIDER_DIAGNOSTIC_ISSUES.claudeCodeCwdMissing);
+        }
+
+        if (
+            path.isAbsolute(provider.claudeCode.command) &&
+            !existsSync(provider.claudeCode.command)
+        ) {
+            issues.push(PROVIDER_DIAGNOSTIC_ISSUES.claudeCodeCommandMissing);
+        }
     }
 
     return {

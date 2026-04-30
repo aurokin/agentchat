@@ -4,11 +4,11 @@ import {
     CodexAppServerClient,
     type CodexClient,
 } from "../codexAppServerClient.ts";
-import type { AgentConfig, ProviderConfig } from "../config.ts";
+import type { AgentConfig, CodexProviderConfig } from "../config.ts";
 
 const clients: CodexClient[] = [];
 
-function createProvider(args: string[]): ProviderConfig {
+function createProvider(args: string[]): CodexProviderConfig {
     return {
         id: "codex-test",
         kind: "codex",

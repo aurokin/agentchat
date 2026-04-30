@@ -84,14 +84,40 @@ const ProviderModelSchema = z.object({
     variants: z.array(ProviderVariantSchema).default([]),
 });
 
-const CodexProviderSchema = z.object({
+const DEFAULT_CLAUDE_CODE_PROVIDER_MODELS = [
+    {
+        id: "sonnet",
+        label: "Claude Sonnet",
+        enabled: true,
+        supportsReasoning: false,
+        variants: [
+            { id: "default", label: "Default", enabled: true },
+            { id: "plan", label: "Plan", enabled: true },
+        ],
+    },
+    {
+        id: "opus",
+        label: "Claude Opus",
+        enabled: true,
+        supportsReasoning: false,
+        variants: [
+            { id: "default", label: "Default", enabled: true },
+            { id: "plan", label: "Plan", enabled: true },
+        ],
+    },
+];
+
+const ProviderBaseSchema = z.object({
     id: z.string().min(1),
-    kind: z.literal("codex"),
     label: z.string().min(1),
     enabled: z.boolean(),
     idleTtlSeconds: z.number().int().positive(),
     modelCacheTtlSeconds: z.number().int().positive(),
     models: z.array(ProviderModelSchema).default([]),
+});
+
+const CodexProviderSchema = ProviderBaseSchema.extend({
+    kind: z.literal("codex"),
     codex: z.object({
         command: z.string().min(1),
         args: z.array(z.string()).default([]),
@@ -100,19 +126,74 @@ const CodexProviderSchema = z.object({
     }),
 });
 
-const CodexAgentRuntimeSchema = z.object({
+const ClaudeCodeProviderSchema = ProviderBaseSchema.extend({
+    kind: z.literal("claude-code"),
+    claudeCode: z.object({
+        command: z.string().min(1),
+        args: z.array(z.string()).default([]),
+        baseEnv: z.record(z.string(), z.string()),
+        cwd: z.string().min(1).optional(),
+        permissionMode: z
+            .enum([
+                "default",
+                "acceptEdits",
+                "plan",
+                "auto",
+                "dontAsk",
+                "bypassPermissions",
+            ])
+            .default("auto"),
+        timeoutMs: z.number().int().positive().optional(),
+    }),
+});
+
+const RuntimeProviderSchema = z.discriminatedUnion("kind", [
+    CodexProviderSchema,
+    ClaudeCodeProviderSchema,
+]);
+
+const AgentRuntimeBaseSchema = z.object({
     id: z.string().min(1).optional(),
-    kind: z.literal("codex"),
     label: z.string().min(1).default("Codex"),
     enabled: z.boolean().default(true),
     idleTtlSeconds: z.number().int().positive().default(900),
     modelCacheTtlSeconds: z.number().int().positive().default(300),
     models: z.array(ProviderModelSchema).default([]),
+});
+
+const CodexAgentRuntimeSchema = AgentRuntimeBaseSchema.extend({
+    kind: z.literal("codex"),
+    label: z.string().min(1).default("Codex"),
     command: z.string().min(1),
     args: z.array(z.string()).default([]),
     baseEnv: z.record(z.string(), z.string()).default({}),
     cwd: z.string().min(1).optional(),
 });
+
+const ClaudeCodeAgentRuntimeSchema = AgentRuntimeBaseSchema.extend({
+    kind: z.literal("claude-code"),
+    label: z.string().min(1).default("Claude Code"),
+    command: z.string().min(1).default("claude"),
+    args: z.array(z.string()).default([]),
+    baseEnv: z.record(z.string(), z.string()).default({}),
+    cwd: z.string().min(1).optional(),
+    permissionMode: z
+        .enum([
+            "default",
+            "acceptEdits",
+            "plan",
+            "auto",
+            "dontAsk",
+            "bypassPermissions",
+        ])
+        .default("auto"),
+    timeoutMs: z.number().int().positive().optional(),
+});
+
+const AgentRuntimeSchema = z.discriminatedUnion("kind", [
+    CodexAgentRuntimeSchema,
+    ClaudeCodeAgentRuntimeSchema,
+]);
 
 const AgentSchema = z
     .object({
@@ -124,7 +205,7 @@ const AgentSchema = z
         rootPath: z.string().min(1),
         providerIds: z.array(z.string().min(1)).default([]),
         defaultProviderId: z.string().min(1).optional(),
-        runtime: CodexAgentRuntimeSchema.optional(),
+        runtime: AgentRuntimeSchema.optional(),
         defaultModel: z.string().min(1).optional(),
         defaultVariant: z.string().min(1).optional(),
         defaultVisible: z.boolean().default(true),
@@ -176,7 +257,7 @@ const AgentchatConfigInputSchema = z
         auth: ProviderAuthConfigSchema,
         stateId: z.string().min(1).optional(),
         sandboxRoot: z.string().min(1).optional(),
-        providers: z.array(CodexProviderSchema).default([]),
+        providers: z.array(RuntimeProviderSchema).default([]),
         agents: z.array(AgentSchema),
     })
     .superRefine((config, ctx) => {
@@ -197,10 +278,24 @@ const AgentchatConfigInputSchema = z
             }
             providerIds.add(provider.id);
 
-            if (provider.codex.cwd && !path.isAbsolute(provider.codex.cwd)) {
+            if (
+                provider.kind === "codex" &&
+                provider.codex.cwd &&
+                !path.isAbsolute(provider.codex.cwd)
+            ) {
                 ctx.addIssue({
                     code: z.ZodIssueCode.custom,
                     message: `Provider '${provider.id}' codex.cwd must be absolute.`,
+                });
+            }
+            if (
+                provider.kind === "claude-code" &&
+                provider.claudeCode.cwd &&
+                !path.isAbsolute(provider.claudeCode.cwd)
+            ) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: `Provider '${provider.id}' claudeCode.cwd must be absolute.`,
                 });
             }
         }
@@ -289,8 +384,10 @@ const AgentchatConfigInputSchema = z
 export type AuthProviderConfig = z.infer<typeof AuthProviderSchema>;
 export type AuthConfig = z.infer<typeof ProviderAuthConfigSchema>;
 type AgentConfigInput = z.infer<typeof AgentSchema>;
-export type ProviderConfig = z.infer<typeof CodexProviderSchema>;
-export type AgentRuntimeConfig = z.infer<typeof CodexAgentRuntimeSchema>;
+export type CodexProviderConfig = z.infer<typeof CodexProviderSchema>;
+export type ClaudeCodeProviderConfig = z.infer<typeof ClaudeCodeProviderSchema>;
+export type ProviderConfig = z.infer<typeof RuntimeProviderSchema>;
+export type AgentRuntimeConfig = z.infer<typeof AgentRuntimeSchema>;
 export type AgentConfig = Omit<
     AgentConfigInput,
     "providerIds" | "defaultProviderId"
@@ -332,6 +429,40 @@ function getFallbackAgentRuntimeProviderId(agentId: string): string {
     return `${agentId}-runtime`;
 }
 
+function getDefaultClaudeCodeProviderModels(): Array<
+    z.infer<typeof ProviderModelSchema>
+> {
+    return structuredClone(DEFAULT_CLAUDE_CODE_PROVIDER_MODELS);
+}
+
+function seedRuntimeProviderModels(provider: ProviderConfig): ProviderConfig {
+    if (provider.kind !== "claude-code" || provider.models.length > 0) {
+        return provider;
+    }
+
+    return {
+        ...provider,
+        models: getDefaultClaudeCodeProviderModels(),
+    };
+}
+
+function seedAgentRuntimeModels(agent: AgentConfigInput): AgentConfigInput {
+    if (
+        agent.runtime?.kind !== "claude-code" ||
+        agent.runtime.models.length > 0
+    ) {
+        return agent;
+    }
+
+    return {
+        ...agent,
+        runtime: {
+            ...agent.runtime,
+            models: getDefaultClaudeCodeProviderModels(),
+        },
+    };
+}
+
 export function getAgentRuntimeProviderId(
     agent: Pick<AgentConfigInput, "id" | "runtime">,
 ): string | null {
@@ -348,19 +479,38 @@ export function agentRuntimeToProvider(
         return null;
     }
 
-    return {
+    const base = {
         id: agent.runtime.id ?? getFallbackAgentRuntimeProviderId(agent.id),
-        kind: agent.runtime.kind,
         label: agent.runtime.label,
         enabled: agent.runtime.enabled,
         idleTtlSeconds: agent.runtime.idleTtlSeconds,
         modelCacheTtlSeconds: agent.runtime.modelCacheTtlSeconds,
         models: agent.runtime.models,
-        codex: {
+    };
+
+    if (agent.runtime.kind === "codex") {
+        return {
+            ...base,
+            kind: "codex",
+            codex: {
+                command: agent.runtime.command,
+                args: agent.runtime.args,
+                baseEnv: agent.runtime.baseEnv,
+                cwd: agent.runtime.cwd,
+            },
+        };
+    }
+
+    return {
+        ...base,
+        kind: "claude-code",
+        claudeCode: {
             command: agent.runtime.command,
             args: agent.runtime.args,
             baseEnv: agent.runtime.baseEnv,
             cwd: agent.runtime.cwd,
+            permissionMode: agent.runtime.permissionMode,
+            timeoutMs: agent.runtime.timeoutMs,
         },
     };
 }
@@ -421,12 +571,27 @@ function buildDefaultStateIdSeed(
             idleTtlSeconds: provider.idleTtlSeconds,
             modelCacheTtlSeconds: provider.modelCacheTtlSeconds,
             models: provider.models,
-            codex: {
-                command: provider.codex.command,
-                args: provider.codex.args,
-                baseEnvKeys: Object.keys(provider.codex.baseEnv).sort(),
-                hasCwd: Boolean(provider.codex.cwd),
-            },
+            runtime:
+                provider.kind === "codex"
+                    ? {
+                          command: provider.codex.command,
+                          args: provider.codex.args,
+                          baseEnvKeys: Object.keys(
+                              provider.codex.baseEnv,
+                          ).sort(),
+                          hasCwd: Boolean(provider.codex.cwd),
+                      }
+                    : {
+                          command: provider.claudeCode.command,
+                          args: provider.claudeCode.args,
+                          baseEnvKeys: Object.keys(
+                              provider.claudeCode.baseEnv,
+                          ).sort(),
+                          hasCwd: Boolean(provider.claudeCode.cwd),
+                          permissionMode: provider.claudeCode.permissionMode,
+                          hasTimeoutMs:
+                              provider.claudeCode.timeoutMs !== undefined,
+                      },
         })),
         agents: parsed.agents.map(({ rootPath, ...agent }) => ({
             ...agent,
@@ -443,6 +608,13 @@ function buildDefaultStateIdSeed(
                       args: agent.runtime.args,
                       baseEnvKeys: Object.keys(agent.runtime.baseEnv).sort(),
                       hasCwd: Boolean(agent.runtime.cwd),
+                      ...(agent.runtime.kind === "claude-code"
+                          ? {
+                                permissionMode: agent.runtime.permissionMode,
+                                hasTimeoutMs:
+                                    agent.runtime.timeoutMs !== undefined,
+                            }
+                          : {}),
                   }
                 : undefined,
         })),
@@ -458,9 +630,14 @@ function buildDefaultInstanceKeySeed(
         ),
         providers: parsed.providers.map((provider) => ({
             id: provider.id,
-            codexCwd: provider.codex.cwd
-                ? canonicalizePathForComparison(provider.codex.cwd)
-                : null,
+            runtimeCwd:
+                provider.kind === "codex"
+                    ? provider.codex.cwd
+                        ? canonicalizePathForComparison(provider.codex.cwd)
+                        : null
+                    : provider.claudeCode.cwd
+                      ? canonicalizePathForComparison(provider.claudeCode.cwd)
+                      : null,
         })),
         agents: parsed.agents.map((agent) => ({
             id: agent.id,
@@ -483,7 +660,9 @@ function normalizeParsedConfig(
         ...rest
     } = parsed;
     const sandboxRoot = rawSandboxRoot ?? DEFAULT_SANDBOX_ROOT;
-    const agents: AgentConfig[] = rest.agents.map((agent) => {
+    const providers = rest.providers.map(seedRuntimeProviderModels);
+    const agents: AgentConfig[] = rest.agents.map((rawAgent) => {
+        const agent = seedAgentRuntimeModels(rawAgent);
         const runtimeProviderId = getAgentRuntimeProviderId(agent);
         const providerIds = runtimeProviderId
             ? [
@@ -503,6 +682,7 @@ function normalizeParsedConfig(
     });
     return {
         ...rest,
+        providers,
         agents,
         auth,
         stateId:

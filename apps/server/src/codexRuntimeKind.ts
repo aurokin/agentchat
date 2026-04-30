@@ -1,4 +1,8 @@
-import type { AgentConfig, ProviderConfig } from "./config.ts";
+import type {
+    AgentConfig,
+    CodexProviderConfig,
+    ProviderConfig,
+} from "./config.ts";
 import {
     CodexAppServerClient,
     type CodexClient,
@@ -63,6 +67,15 @@ function invariant(condition: unknown, message: string): asserts condition {
     if (!condition) {
         throw new Error(message);
     }
+}
+
+function assertCodexProvider(
+    provider: ProviderConfig,
+): asserts provider is CodexProviderConfig {
+    invariant(
+        provider.kind === "codex",
+        `Codex runtime received provider kind '${provider.kind}'.`,
+    );
 }
 
 function extractThreadId(result: unknown): string {
@@ -737,13 +750,21 @@ export class CodexRuntimeKind implements RuntimeKind {
         provider: ProviderConfig;
         agent: AgentConfig;
     }): RuntimeKindSession {
-        return new CodexRuntimeKindSession(this.createClient(params));
+        assertCodexProvider(params.provider);
+        return new CodexRuntimeKindSession(
+            this.createClient({
+                provider: params.provider,
+                agent: params.agent,
+            }),
+        );
     }
 
     shouldRecycleProvider(
         current: ProviderConfig,
         next: ProviderConfig,
     ): boolean {
+        assertCodexProvider(current);
+        assertCodexProvider(next);
         return (
             current.codex.command !== next.codex.command ||
             JSON.stringify(current.codex.args) !==
@@ -758,7 +779,11 @@ export class CodexRuntimeKind implements RuntimeKind {
         provider: ProviderConfig;
         agent: AgentConfig;
     }): Promise<ProviderModelCatalogEntry[]> {
-        const client = this.createClient(params);
+        assertCodexProvider(params.provider);
+        const client = this.createClient({
+            provider: params.provider,
+            agent: params.agent,
+        });
 
         try {
             await client.initialize();

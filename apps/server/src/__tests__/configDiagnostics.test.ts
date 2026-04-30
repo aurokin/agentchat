@@ -125,6 +125,9 @@ function createConfig(): AgentchatConfig {
 function createV2Config(): AgentchatConfig {
     const config = createConfig();
     const provider = config.providers[0]!;
+    if (provider.kind !== "codex") {
+        throw new Error("Expected Codex provider.");
+    }
     config.providers = [];
     config.agents[0] = {
         ...config.agents[0]!,
@@ -167,7 +170,11 @@ describe("configDiagnostics", () => {
 
     test("reports missing directories and disabled default provider fallbacks", () => {
         const config = createConfig();
-        config.providers[0]!.codex.cwd = "/missing/provider";
+        const provider = config.providers[0]!;
+        if (provider.kind !== "codex") {
+            throw new Error("Expected Codex provider.");
+        }
+        provider.codex.cwd = "/missing/provider";
         config.agents[0]!.rootPath = "/missing/agent";
         config.agents[0]!.defaultProviderId = "codex-disabled";
 

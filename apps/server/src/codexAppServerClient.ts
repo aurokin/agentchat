@@ -1,4 +1,4 @@
-import type { AgentConfig, ProviderConfig } from "./config.ts";
+import type { AgentConfig, CodexProviderConfig } from "./config.ts";
 import {
     JsonRpcStdioClient,
     ManagedRuntimeProcess,
@@ -18,7 +18,7 @@ export type CodexClient = {
 };
 
 export type CreateCodexClient = (params: {
-    provider: ProviderConfig;
+    provider: CodexProviderConfig;
     agent: AgentConfig;
 }) => CodexClient;
 
@@ -29,7 +29,7 @@ export class CodexAppServerClient implements CodexClient {
     private readonly rpc: JsonRpcStdioClient;
 
     constructor(params: {
-        provider: ProviderConfig;
+        provider: CodexProviderConfig;
         agent: AgentConfig;
         stopTimeoutMs?: number;
     }) {

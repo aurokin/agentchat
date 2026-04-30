@@ -55,6 +55,92 @@ change transport substrate / implement later / reject
 
 ## Open Entries
 
+### 2026-04-29 - Claude Code - Late Session Identity
+
+Linear issue:
+AUR-10
+
+Adapter:
+Claude Code runtime tracer
+
+Capability or protocol feature:
+Claude Code only reveals the durable `session_id` after the per-turn process
+starts streaming.
+
+Current fit:
+Awkward
+
+What we did:
+Opened first-turn conversations with a temporary adapter-local pending thread
+id, then emitted a provider identity update when the stream revealed
+`session_id`. The existing runtime binding stores that value in
+`providerThreadId`.
+
+Fidelity risk:
+`providerThreadId` now represents Codex thread ids and Claude session ids. That
+is functionally correct for resumption, but the field name hides a real
+protocol distinction.
+
+Follow-up:
+Change persistence/schema or promote a neutral provider session identity during
+AUR-143 if ACP adds the same pressure.
+
+### 2026-04-29 - Claude Code - Non-Text Stream Content
+
+Linear issue:
+AUR-10
+
+Adapter:
+Claude Code runtime tracer
+
+Capability or protocol feature:
+Claude Code stream-json can include tool use, tool result, usage, and unknown
+event payloads that are not assistant text.
+
+Current fit:
+Fits through provider artifacts
+
+What we did:
+Normalized text blocks into assistant deltas and preserved non-text or unknown
+stream events as Claude provider artifacts.
+
+Fidelity risk:
+Tool-specific UX remains unavailable until a shared tool/update contract is
+earned by multiple adapters.
+
+Follow-up:
+Keep adapter-specific unless AUR-35 and AUR-143 prove a shared tool event model
+is worth promoting.
+
+### 2026-04-29 - Claude Code - Interrupt Signal Semantics
+
+Linear issue:
+AUR-10
+
+Adapter:
+Claude Code runtime tracer
+
+Capability or protocol feature:
+The Claude spec prefers a graceful interrupt signal before harder process
+termination.
+
+Current fit:
+Awkward
+
+What we did:
+Used the shared `ManagedRuntimeProcess.stop()` behavior, which currently sends
+SIGTERM and escalates to SIGKILL. The tracer records interruption status through
+the normalized runtime event path.
+
+Fidelity risk:
+If Claude Code treats SIGINT differently from SIGTERM for session preservation
+or cleanup, current interruption may be less graceful than the native CLI
+expects.
+
+Follow-up:
+Change transport substrate if real CLI testing shows SIGINT is materially
+better for Claude Code or another adapter.
+
 ### 2026-04-26 - ACP - Session Resume And Close
 
 Linear issue:

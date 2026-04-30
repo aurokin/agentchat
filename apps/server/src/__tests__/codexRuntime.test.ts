@@ -11,7 +11,7 @@ import path from "node:path";
 
 import { afterEach, describe, expect, test } from "bun:test";
 
-import type { AgentchatConfig } from "../config.ts";
+import { parseConfig, type AgentchatConfig } from "../config.ts";
 import type { JsonRpcNotification } from "../codexAppServerClient.ts";
 import type { RuntimePersistenceClient } from "../runtimePersistence.ts";
 import type { ServerEvent } from "../socketProtocol.ts";
@@ -25,7 +25,17 @@ import {
     CODEX_RUNTIME_CAPABILITIES,
     CodexRuntimeKind,
 } from "../codexRuntimeKind.ts";
-import { RUNTIME_NORMALIZED_UPDATE_CATEGORIES } from "../runtimeKind.ts";
+import {
+    RUNTIME_NORMALIZED_UPDATE_CATEGORIES,
+    type ProviderModelCatalogEntry,
+    type RuntimeKind,
+    type RuntimeKindEvent,
+    type RuntimeKindLifecycleResult,
+    type RuntimeKindSession,
+    type RuntimeOpenThreadParams,
+    type RuntimeStartTurnParams,
+} from "../runtimeKind.ts";
+import { RuntimeKindRegistry } from "../runtimeKindRegistry.ts";
 
 const tempRoots: string[] = [];
 
@@ -109,6 +119,9 @@ function createConfig(): AgentchatConfig {
 function createV2Config(): AgentchatConfig {
     const config = createConfig();
     const provider = config.providers[0]!;
+    if (provider.kind !== "codex") {
+        throw new Error("Expected Codex provider.");
+    }
     config.providers = [];
     config.agents[0] = {
         ...config.agents[0]!,
@@ -244,6 +257,137 @@ class FakeCodexClient {
 
     emitExit(error: Error): void {
         this.exitHandler?.(error);
+    }
+}
+
+class IdentityUpdatingRuntimeSession implements RuntimeKindSession {
+    private eventHandler: ((event: RuntimeKindEvent) => void) | null = null;
+
+    async initialize(): Promise<RuntimeKindLifecycleResult> {
+        return {};
+    }
+
+    async openThread(
+        _params: RuntimeOpenThreadParams,
+    ): Promise<
+        RuntimeKindLifecycleResult & { threadId: string; isNew: boolean }
+    > {
+        return {
+            threadId: "provider-pending",
+            isNew: true,
+        };
+    }
+
+    async startTurn(
+        _params: RuntimeStartTurnParams,
+    ): Promise<RuntimeKindLifecycleResult & { turnId: string }> {
+        setTimeout(() => {
+            this.eventHandler?.({
+                type: "provider_identity_updated",
+                threadId: "provider-session-1",
+            });
+            this.eventHandler?.({
+                type: "turn_completed",
+                status: "completed",
+            });
+        }, 0);
+        return {
+            turnId: "turn-1",
+        };
+    }
+
+    async interruptTurn(): Promise<void> {}
+
+    onEvent(handler: (event: RuntimeKindEvent) => void): void {
+        this.eventHandler = handler;
+    }
+
+    onExit(): void {}
+
+    async stop(): Promise<void> {}
+}
+
+class IdentityUpdatingRuntimeKind implements RuntimeKind {
+    readonly kind = "codex";
+    readonly capabilities = CODEX_RUNTIME_CAPABILITIES;
+
+    createSession(): RuntimeKindSession {
+        return new IdentityUpdatingRuntimeSession();
+    }
+
+    shouldRecycleProvider(): boolean {
+        return false;
+    }
+
+    async listModels() {
+        return [];
+    }
+}
+
+class CompletingRuntimeSession implements RuntimeKindSession {
+    stopped = false;
+    private eventHandler: ((event: RuntimeKindEvent) => void) | null = null;
+
+    async initialize(): Promise<RuntimeKindLifecycleResult> {
+        return {};
+    }
+
+    async openThread(
+        _params: RuntimeOpenThreadParams,
+    ): Promise<
+        RuntimeKindLifecycleResult & { threadId: string; isNew: boolean }
+    > {
+        return {
+            threadId: crypto.randomUUID(),
+            isNew: true,
+        };
+    }
+
+    async startTurn(): Promise<
+        RuntimeKindLifecycleResult & { turnId: string }
+    > {
+        setTimeout(() => {
+            this.eventHandler?.({
+                type: "turn_completed",
+                status: "completed",
+            });
+        }, 0);
+        return {
+            turnId: crypto.randomUUID(),
+        };
+    }
+
+    async interruptTurn(): Promise<void> {}
+
+    onEvent(handler: (event: RuntimeKindEvent) => void): void {
+        this.eventHandler = handler;
+    }
+
+    onExit(): void {}
+
+    async stop(): Promise<void> {
+        this.stopped = true;
+    }
+}
+
+class CompletingRuntimeKind implements RuntimeKind {
+    readonly capabilities = CODEX_RUNTIME_CAPABILITIES;
+    readonly sessions: CompletingRuntimeSession[] = [];
+
+    constructor(readonly kind: RuntimeKind["kind"]) {}
+
+    createSession(): RuntimeKindSession {
+        const session = new CompletingRuntimeSession();
+        this.sessions.push(session);
+        return session;
+    }
+
+    shouldRecycleProvider(): boolean {
+        return false;
+    }
+
+    async listModels(): Promise<ProviderModelCatalogEntry[]> {
+        return [];
     }
 }
 
@@ -811,6 +955,54 @@ describe("CodexRuntimeManager", () => {
         );
     });
 
+    test("starts minimal Claude runtimes with seeded static models", async () => {
+        const config = parseConfig({
+            version: 1,
+            auth: {
+                defaultProviderId: "local-main",
+                providers: [
+                    {
+                        id: "local-main",
+                        kind: "local",
+                        enabled: true,
+                        allowSignup: false,
+                    },
+                ],
+            },
+            agents: [
+                {
+                    id: "workspace",
+                    name: "Workspace",
+                    enabled: true,
+                    rootPath: "/srv/workspace",
+                    runtime: {
+                        kind: "claude-code",
+                    },
+                },
+            ],
+        });
+        const claudeKind = new CompletingRuntimeKind("claude-code");
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: createPersistence(
+                null,
+            ) as unknown as RuntimePersistenceClient,
+            runtimeKinds: new RuntimeKindRegistry([claudeKind]),
+        });
+        const command = createCommand();
+        command.payload.agentId = "workspace";
+        command.payload.modelId = "sonnet";
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command,
+            sendEvent: () => undefined,
+        });
+
+        expect(claudeKind.sessions).toHaveLength(1);
+    });
+
     test("falls back to thread/start when resume hits a recoverable error", async () => {
         const config = createConfig();
         const persistence = createPersistence({
@@ -1148,6 +1340,47 @@ describe("CodexRuntimeManager", () => {
             },
         });
         await sendPromise;
+    });
+
+    test("persists provider identity updates emitted after a run starts", async () => {
+        const config = createConfig();
+        const persistence = createPersistence(null);
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            runtimeKind: new IdentityUpdatingRuntimeKind(),
+        });
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+        await waitFor(
+            () =>
+                persistence.runtimeBindingCalls.at(-1)?.status === "idle" &&
+                persistence.runtimeBindingCalls.at(-1)?.providerThreadId ===
+                    "provider-session-1",
+        );
+
+        expect(persistence.runStartedCalls[0]).toMatchObject({
+            providerThreadId: "provider-pending",
+        });
+        expect(persistence.runtimeBindingCalls).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    providerThreadId: "provider-session-1",
+                    status: "active",
+                    activeRunId: expect.any(String),
+                }),
+            ]),
+        );
+        expect(persistence.runtimeBindingCalls.at(-1)).toMatchObject({
+            providerThreadId: "provider-session-1",
+            status: "idle",
+            activeRunId: null,
+        });
     });
 
     test("keeps the sending subscriber attached after explicit unsubscribe until the run settles", async () => {
@@ -2429,6 +2662,57 @@ describe("CodexRuntimeManager", () => {
         expect(clients).toHaveLength(2);
         expect(clients[0]?.stopped).toBe(true);
         expect(clients[1]?.stopped).toBe(false);
+    });
+
+    test("recycles an idle runtime before comparing provider configs across kind changes", async () => {
+        const config = createConfig();
+        const codexKind = new CompletingRuntimeKind("codex");
+        const claudeKind = new CompletingRuntimeKind("claude-code");
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: createPersistence(
+                null,
+            ) as unknown as RuntimePersistenceClient,
+            runtimeKinds: new RuntimeKindRegistry([codexKind, claudeKind]),
+        });
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        const currentProvider = config.providers[0];
+        if (!currentProvider || currentProvider.kind !== "codex") {
+            throw new Error("Expected Codex provider.");
+        }
+        config.providers[0] = {
+            id: currentProvider.id,
+            kind: "claude-code",
+            label: "Claude Code",
+            enabled: true,
+            idleTtlSeconds: currentProvider.idleTtlSeconds,
+            modelCacheTtlSeconds: currentProvider.modelCacheTtlSeconds,
+            models: currentProvider.models,
+            claudeCode: {
+                command: "claude",
+                args: [],
+                baseEnv: {},
+                permissionMode: "auto",
+            },
+        };
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        expect(codexKind.sessions).toHaveLength(1);
+        expect(codexKind.sessions[0]?.stopped).toBe(true);
+        expect(claudeKind.sessions).toHaveLength(1);
     });
 
     test("preserves existing subscribers when recycling an idle runtime", async () => {
