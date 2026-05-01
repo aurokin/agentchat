@@ -48,7 +48,10 @@ The first ACP implementation should use one ACP agent process per active
 conversation unless a specific target proves that process-per-agent
 multiplexing is safer.
 
-The runtime binding stores the ACP session id plus bounded adapter metadata.
+The runtime binding stores the ACP session id. Current storage uses the
+compatibility `providerThreadId` field; the runtime-kind contract treats that
+field semantically as provider conversation identity until a future schema
+migration justifies a neutral name.
 
 ## Startup Flow
 
@@ -58,12 +61,15 @@ The runtime binding stores the ACP session id plus bounded adapter metadata.
 4. Capture capabilities.
 5. If a compatible session id exists and `agentCapabilities.loadSession` is
    advertised, call `session/load`.
-6. Otherwise call `session/new`.
-7. Persist the ACP session id in the runtime binding.
+6. If `session/load` fails because the persisted provider identity is stale or
+   pruned, record a provider artifact and call `session/new`.
+7. Otherwise call `session/new`.
+8. Persist the ACP session id in the runtime binding.
 
 The foundation records newer ACP `session/resume` and `session/close`
 capabilities but does not promote them into Agentchat runtime bindings yet.
-Those behaviors should be validated by the first concrete ACP adapter tracer.
+AUR-143 explicitly defers those semantics until a concrete ACP target needs
+them.
 
 ## Send Flow
 
@@ -85,6 +91,9 @@ rather than flattened into assistant text.
 3. Wait for the prompt response to return a cancellation stop reason when
    possible.
 4. Fall back to process termination if the ACP agent does not settle.
+
+Timeouts are failures, not user interrupts. User-requested interrupts remain
+`run.interrupted`; prompt timeout cleanup emits `run.failed`.
 
 ## Event Mapping
 
@@ -124,6 +133,18 @@ generic ACP lifecycle.
 
 The first tracer should prove the generic ACP client/session/update machinery.
 It should not attempt to support every ACP-compatible runtime.
+
+## AUR-143 Retrospective Decisions
+
+- Keep raw operator config for ACP target selection.
+- Keep ACP resume/close capabilities provider-specific until a real target
+  requires shared lifecycle support.
+- Keep permission requests fail-closed by default, with non-persistent
+  auto-approve only when explicitly configured.
+- Keep elicitation, filesystem, and terminal client requests unsupported until a
+  real ACP target requires them.
+- Keep ACP plan/tool updates in provider artifacts rather than adding shared UI
+  vocabulary now.
 
 ## Non-Goals
 

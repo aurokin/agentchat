@@ -53,7 +53,26 @@ Keep adapter-specific / promote to shared contract / change persistence/schema /
 change transport substrate / implement later / reject
 ```
 
-## Open Entries
+## AUR-143 Final Classification
+
+The Runtime Abstraction Retrospective classified the current open pressure as:
+
+| Entry | Disposition |
+| --- | --- |
+| Claude Code - Late Session Identity | Change persistence/schema later. Current `providerThreadId` remains as a compatibility field and is treated semantically as provider conversation identity. |
+| Claude Code - Non-Text Stream Content | Keep adapter-specific through provider artifacts. Do not add shared tool UX yet. |
+| Claude Code - Interrupt Signal Semantics | Change transport substrate later only if real CLI testing proves a custom signal policy is needed. |
+| ACP - Session Resume And Close | Implement later only when a concrete ACP target needs richer lifecycle semantics. |
+| ACP - Permission Requests Without Approval UI | Implement later with approval UI or a richer permission contract; keep current fail-closed/non-persistent auto-approve behavior. |
+| ACP - Unstable Elicitation And Auxiliary Client Requests | Implement later only when a real ACP target requires these client-handled requests. |
+| ACP - Target Selection Through Operator Config | Keep adapter-specific as raw operator config. No typed profile layer yet. |
+| ACP - Session Load Without Resume Or Close Semantics | Keep adapter-specific; stale load fallback heals bindings without schema changes. |
+| ACP - Prompt Cancellation Fallback | Keep adapter-specific; promote only if another adapter needs the same cancellation knobs. |
+
+The full decision record is
+[Runtime Abstraction Retrospective](./runtime-abstraction-retrospective.md).
+
+## Entries
 
 ### 2026-04-29 - Claude Code - Late Session Identity
 

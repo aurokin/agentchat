@@ -37,6 +37,7 @@ assumptions.
 - [Codex Runtime Spec](./codex-runtime-spec.md)
 - [Runtime Kind Contract](./runtime-kind-contract.md)
 - [Runtime Abstraction Pressure Log](./runtime-abstraction-pressure-log.md)
+- [Runtime Abstraction Retrospective](./runtime-abstraction-retrospective.md)
 - [Runtime And Auth Plan](./runtime-and-auth-plan.md)
 - [Mobile Follow-Up](./mobile-followup.md)
 - [Mobile Integration Testing](./mobile-integration-testing.md)

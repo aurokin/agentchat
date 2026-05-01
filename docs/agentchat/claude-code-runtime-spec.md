@@ -65,8 +65,7 @@ claude --print \
   --include-partial-messages \
   --resume <sessionId> \
   --model <model> \
-  --permission-mode <mode> \
-  "user message"
+  --permission-mode <mode>
 ```
 
 Key flags:
@@ -78,6 +77,9 @@ Key flags:
 - `--permission-mode <mode>`: permission behavior (`acceptEdits`, `bypassPermissions`, `plan`, or omitted for Claude Code's default).
 - `--max-budget-usd <amount>`: optional cost cap per turn.
 - `--include-partial-messages`: include partial content blocks for real-time streaming.
+
+Agentchat sends prompt text over stdin, not argv. This avoids OS argument
+length limits and keeps prompt contents out of process listings.
 
 ### Stream Events (stdout)
 
@@ -148,12 +150,16 @@ There is no separate startup flow. The first `conversation.send` spawns the firs
 
 ## Interrupt Flow
 
-1. Send `SIGINT` to the subprocess.
-2. Wait briefly for graceful shutdown.
-3. Send `SIGTERM` if the process has not exited.
+1. Request subprocess stop through the shared process transport.
+2. Send `SIGTERM`.
+3. Escalate to `SIGKILL` if the process has not exited.
 4. Update run status to `interrupted`.
 5. Emit normalized interruption events.
 6. The session state is preserved by Claude Code for future resumption.
+
+AUR-143 keeps custom signal policy out of the shared contract for now. If real
+Claude CLI testing proves `SIGINT` preserves session state more reliably than
+the shared stop behavior, add a narrow transport-substrate follow-up.
 
 ## Event Mapping
 
@@ -196,6 +202,9 @@ Claude Code manages its own session storage:
 - Claude Code handles its own context window management internally.
 
 The Agentchat adapter stores only the `sessionId` string in the runtime binding.
+Current storage uses the compatibility `providerThreadId` field; the
+runtime-kind contract treats that field semantically as provider conversation
+identity until a future schema migration justifies a neutral name.
 
 ### Session Limitations
 

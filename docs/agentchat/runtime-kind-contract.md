@@ -3,9 +3,11 @@
 This document describes the target contract for runtime kinds as Agentchat
 moves beyond Codex.
 
-The current implementation has a `KindRuntime` boundary with Codex behind it.
-The next contract revision should preserve current Codex behavior while adding
-only the stable seams needed before Claude Code and ACP exist.
+The current implementation has a `RuntimeKind` boundary with Codex, Claude
+Code, and ACP behind it. AUR-143 reviewed pressure from those tracers and kept
+the contract deliberately thin. See
+[Runtime Abstraction Retrospective](./runtime-abstraction-retrospective.md) for
+the decision record.
 
 ## Thin Scaffold Rule
 
@@ -21,15 +23,17 @@ Abstract only the seams that are already stable:
 - transport boundaries
 
 Do not guess adapter-specific persistence, recovery, or protocol state before
-real Claude Code and ACP implementations prove what they need. Provider
-artifacts and adapter-local code are acceptable when they preserve protocol
-fidelity better than a premature shared abstraction.
+real implementations prove what they need. Claude Code and ACP proved that the
+thin scaffold is sufficient when paired with provider artifacts and
+adapter-local recovery. Provider artifacts and adapter-local code remain
+acceptable when they preserve protocol fidelity better than a premature shared
+abstraction.
 
 When an adapter exposes behavior that does not fit this contract, record it in
 [Runtime Abstraction Pressure Log](./runtime-abstraction-pressure-log.md). The
-Runtime Abstraction Retrospective should decide later whether that behavior
-belongs in the shared contract, persistence schema, transport substrate, or the
-adapter itself.
+Runtime Abstraction Retrospective decides whether that behavior belongs in the
+shared contract, persistence schema, transport substrate, or the adapter itself.
+New pressure should continue to be logged before being promoted.
 
 ## Product Boundary
 
@@ -48,7 +52,7 @@ should not learn Codex, Claude Code, ACP, Pi, or OpenCode protocol details.
 The shared contract should model a runtime as:
 
 - an agent-scoped adapter
-- a session or thread identity owned by the provider/runtime
+- a provider conversation identity owned by the provider/runtime
 - prompt turns started by accepted user sends
 - normalized updates emitted during a turn
 - recoverable binding metadata persisted in Convex
@@ -90,12 +94,12 @@ Known common fields:
 - runtime config id
 - status
 - active run id
-- provider thread id when applicable
+- provider thread or session id when applicable
 - provider resume token when applicable
 - last error and last event timestamp
 - workspace identity metadata
 
-Likely future fields, to be validated by Claude Code and ACP:
+Possible future fields, deferred by AUR-143 until a migration is justified:
 
 - provider session id
 - adapter metadata as bounded structured data
@@ -104,6 +108,14 @@ Specific adapters should not need schema changes for every small provider
 detail, but new generic fields should be earned by real adapter pressure. Use
 bounded provider artifacts or adapter-local handling until the retrospective
 decides a field belongs in the shared persistence model.
+
+AUR-143 decision:
+
+- keep the existing `providerThreadId` storage field for compatibility
+- treat it semantically as provider conversation identity
+- open a narrow schema or naming migration only when the field name itself
+  becomes a maintenance problem or a broader runtime-binding migration is
+  already needed
 
 ## Normalized Updates
 
@@ -133,6 +145,13 @@ Only normalized events should reach WebSocket subscribers. Provider-native
 details belong in internal provider artifacts unless there is a deliberate UI
 feature for them.
 
+AUR-143 decision:
+
+- keep Claude Code non-text stream content and ACP tool/plan updates in
+  provider artifacts for now
+- do not add shared tool, plan, or approval UX until multiple adapters prove a
+  product need
+
 Normalized updates must not hide fidelity loss. If a provider feature can only
 be represented by dropping important information, keep the important details in
 provider artifacts and add a pressure-log entry.
@@ -147,6 +166,8 @@ Reusable transport pieces should include:
 - `JsonlStreamParser` for Claude Code-style stream-json output
 - `ManagedRuntimeProcess` for subprocess lifecycle and cancellation
 - timeout and exit handling
+- optional adapter-specific cancellation policy when real runtime testing proves
+  the default signal behavior is insufficient
 - stderr capture
 - later HTTP streaming helpers for OpenCode if direct HTTP remains preferred
 

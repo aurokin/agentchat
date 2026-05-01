@@ -156,7 +156,10 @@ Expected outcomes:
 ### AUR-143 Runtime Abstraction Retrospective
 
 After AUR-10 and AUR-35, re-evaluate the runtime abstraction using real
-implementation pressure.
+implementation pressure. Completed as a conservative contract clarification:
+the current `RuntimeKind` scaffold stays thin, provider artifacts remain the
+high-fidelity lane, and adapter-local recovery remains acceptable for proven
+runtime-specific behavior.
 
 Expected outcomes:
 
@@ -166,6 +169,14 @@ Expected outcomes:
 - decide whether persistence/schema or transport substrate changes are needed
 - open follow-up implementation issues
 - update docs with the revised contract decisions
+
+AUR-143 decisions:
+
+- no broad runtime abstraction refactor now
+- no immediate runtime-binding schema migration
+- no approval UI or shared tool/plan UX yet
+- no typed ACP target profile layer yet
+- create narrow follow-ups only for accepted future work
 
 ## ACP Reference Constraints
 
@@ -189,5 +200,5 @@ References:
 - ACP-compatible runtimes can be added through a generic ACP client path.
 - Pi and OpenCode follow-up decisions are made against the shared substrate.
 - Linear and docs show the same dependency order.
-- The retrospective phase revises the abstraction after real Claude/ACP
-  pressure, not before it.
+- The retrospective phase revised the abstraction after real Claude/ACP
+  pressure, and kept promotion conservative.
