@@ -64,16 +64,19 @@ function assertLiveModelsAvailable(
 }
 
 function toBootstrapAgent(provider: ProviderConfig): AgentConfig {
+    const rootPath =
+        provider.kind === "codex"
+            ? (provider.codex.cwd ?? process.cwd())
+            : provider.kind === "acp"
+              ? (provider.acp.cwd ?? process.cwd())
+              : (provider.claudeCode.cwd ?? process.cwd());
     return {
         id: "__agentchat_provider_models__",
         name: "Agentchat Provider Models",
         enabled: true,
         defaultVisible: true,
         visibilityOverrides: [],
-        rootPath:
-            provider.kind === "codex"
-                ? (provider.codex.cwd ?? process.cwd())
-                : (provider.claudeCode.cwd ?? process.cwd()),
+        rootPath,
         providerIds: [provider.id],
         defaultProviderId: provider.id,
         modelAllowlist: [],
@@ -93,26 +96,37 @@ function sortRecordEntries(record: Record<string, string>) {
 }
 
 function getProviderModelCacheKey(provider: ProviderConfig): string {
+    const runtime =
+        provider.kind === "codex"
+            ? {
+                  command: provider.codex.command,
+                  args: provider.codex.args,
+                  baseEnv: sortRecordEntries(provider.codex.baseEnv),
+                  cwd: provider.codex.cwd ?? null,
+              }
+            : provider.kind === "acp"
+              ? {
+                    command: provider.acp.command,
+                    args: provider.acp.args,
+                    baseEnv: sortRecordEntries(provider.acp.baseEnv),
+                    cwd: provider.acp.cwd ?? null,
+                    mcpServers: provider.acp.mcpServers,
+                    permissionMode: provider.acp.permissionMode,
+                    timeoutMs: provider.acp.timeoutMs ?? null,
+                }
+              : {
+                    command: provider.claudeCode.command,
+                    args: provider.claudeCode.args,
+                    baseEnv: sortRecordEntries(provider.claudeCode.baseEnv),
+                    cwd: provider.claudeCode.cwd ?? null,
+                    permissionMode: provider.claudeCode.permissionMode,
+                    timeoutMs: provider.claudeCode.timeoutMs ?? null,
+                };
     return JSON.stringify({
         providerId: provider.id,
         kind: provider.kind,
         modelCacheTtlSeconds: provider.modelCacheTtlSeconds,
-        runtime:
-            provider.kind === "codex"
-                ? {
-                      command: provider.codex.command,
-                      args: provider.codex.args,
-                      baseEnv: sortRecordEntries(provider.codex.baseEnv),
-                      cwd: provider.codex.cwd ?? null,
-                  }
-                : {
-                      command: provider.claudeCode.command,
-                      args: provider.claudeCode.args,
-                      baseEnv: sortRecordEntries(provider.claudeCode.baseEnv),
-                      cwd: provider.claudeCode.cwd ?? null,
-                      permissionMode: provider.claudeCode.permissionMode,
-                      timeoutMs: provider.claudeCode.timeoutMs ?? null,
-                  },
+        runtime,
         fallbackModels: provider.models.map((model) => ({
             id: model.id,
             label: model.label,

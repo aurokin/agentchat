@@ -240,6 +240,46 @@ describe("CodexModelCatalog", () => {
         });
     });
 
+    test("returns static fallback models for minimal ACP providers", async () => {
+        const config = createConfig();
+        config.providers = [
+            {
+                id: "acp-main",
+                kind: "acp",
+                label: "ACP Main",
+                enabled: true,
+                idleTtlSeconds: 900,
+                modelCacheTtlSeconds: 60,
+                models: [],
+                acp: {
+                    command: "acpx",
+                    args: ["codex"],
+                    baseEnv: {},
+                    cwd: "/srv/acp",
+                    mcpServers: [],
+                    permissionMode: "fail-closed",
+                },
+            },
+        ];
+
+        const catalog = new CodexModelCatalog({
+            getConfig: () => config,
+        });
+
+        await expect(
+            catalog.getProviderModels("acp-main"),
+        ).resolves.toMatchObject({
+            providerId: "acp-main",
+            models: [
+                {
+                    id: "default",
+                    label: "Default",
+                    variants: [{ id: "default", label: "Default" }],
+                },
+            ],
+        });
+    });
+
     test("uses the in-memory cache until ttl expiry", async () => {
         let now = Date.UTC(2026, 2, 13, 12, 0, 0);
         const request = mock(async () => ({

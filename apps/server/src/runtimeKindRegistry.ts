@@ -1,3 +1,4 @@
+import { AcpRuntimeKind } from "./acpRuntimeKind.ts";
 import { ClaudeCodeRuntimeKind } from "./claudeCodeRuntimeKind.ts";
 import { CodexRuntimeKind } from "./codexRuntimeKind.ts";
 import type { RuntimeKind, RuntimeKindId } from "./runtimeKind.ts";
@@ -12,6 +13,7 @@ export class RuntimeKindRegistry {
     static default(): RuntimeKindRegistry {
         return new RuntimeKindRegistry([
             new CodexRuntimeKind(),
+            new AcpRuntimeKind(),
             new ClaudeCodeRuntimeKind(),
         ]);
     }

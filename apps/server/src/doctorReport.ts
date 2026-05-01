@@ -116,6 +116,26 @@ function mapProviderIssue(providerId: string, issue: string): DoctorIssue {
                 "Update provider.claudeCode.command to an installed executable or rely on PATH resolution.",
         });
     }
+    if (issue === PROVIDER_DIAGNOSTIC_ISSUES.acpCwdMissing) {
+        return createIssue({
+            code: "provider_acp_cwd_missing",
+            severity: "error",
+            scope: `provider:${providerId}`,
+            message: issue,
+            remediation:
+                "Update provider.acp.cwd to an existing workspace path.",
+        });
+    }
+    if (issue === PROVIDER_DIAGNOSTIC_ISSUES.acpCommandMissing) {
+        return createIssue({
+            code: "provider_acp_command_missing",
+            severity: "error",
+            scope: `provider:${providerId}`,
+            message: issue,
+            remediation:
+                "Update provider.acp.command to an installed executable or rely on PATH resolution.",
+        });
+    }
 
     return createIssue({
         code: "provider_issue",

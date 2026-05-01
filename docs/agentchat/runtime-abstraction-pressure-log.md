@@ -222,3 +222,87 @@ families for useful operation.
 Follow-up:
 Implement later only when AUR-35 proves a selected adapter needs the capability.
 Classify the result during AUR-143.
+
+### 2026-04-30 - ACP - Target Selection Through Operator Config
+
+Linear issue:
+AUR-35
+
+Adapter:
+Generic ACP runtime adapter
+
+Capability or protocol feature:
+Concrete ACP target selection
+
+Current fit:
+Fits
+
+What we did:
+Local review did not find an available `pi-acp` or OpenCode ACP surface.
+OpenClaw's `acpx` integration is the clearest currently identified
+ACP-compatible target family, so the implementation keeps the selected target
+in agent runtime config (`command`, `args`, and optional `mcpServers`) instead
+of hardcoding an adapter-specific wrapper.
+
+Fidelity risk:
+Target-specific launch conventions may need richer config once a real `pi-acp`
+or OpenCode ACP surface exists.
+
+Follow-up:
+During AUR-143, decide whether ACP target selection stays raw command config or
+gets a small typed profile layer after real adapter usage proves the shape.
+
+### 2026-04-30 - ACP - Session Load Without Resume Or Close Semantics
+
+Linear issue:
+AUR-35
+
+Adapter:
+Generic ACP runtime adapter
+
+Capability or protocol feature:
+`session/load`, `sessionCapabilities.resume`, and `sessionCapabilities.close`
+
+Current fit:
+Awkward
+
+What we did:
+The runtime loads a persisted ACP session id through `session/load` when the
+agent advertises that capability. If it does not, Agentchat creates a fresh ACP
+session and records a provider artifact. Newer resume and close capability
+metadata remains provider-specific.
+
+Fidelity risk:
+Some ACP targets may need resume tokens, close requests, or adapter metadata
+that cannot be represented by the current `providerThreadId` binding alone.
+
+Follow-up:
+Classify during AUR-143 after testing a real ACP target. Promote only the
+minimum persistence fields needed by more than one runtime.
+
+### 2026-04-30 - ACP - Prompt Cancellation Fallback
+
+Linear issue:
+AUR-35
+
+Adapter:
+Generic ACP runtime adapter
+
+Capability or protocol feature:
+`session/cancel`
+
+Current fit:
+Awkward
+
+What we did:
+Interrupts send `session/cancel` first and then stop the ACP process if the
+prompt does not settle inside the configured timeout. This preserves the
+normalized Agentchat interrupt behavior without adding ACP-specific UI.
+
+Fidelity risk:
+For persistent ACP agents, killing the process can discard agent-local session
+state if the target ignores `session/cancel`.
+
+Follow-up:
+Use real adapter testing to decide whether the shared runtime contract needs a
+separate cooperative-cancel timeout or whether this remains ACP-specific.

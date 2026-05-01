@@ -233,6 +233,95 @@ describe("server config", () => {
         ).toEqual(["sonnet", "opus"]);
     });
 
+    test("parses ACP runtimes and seeds default model configs", () => {
+        const config = parseConfig({
+            version: 1,
+            auth: {
+                defaultProviderId: "local-main",
+                providers: [
+                    {
+                        id: "local-main",
+                        kind: "local",
+                        enabled: true,
+                        allowSignup: false,
+                    },
+                ],
+            },
+            providers: [
+                {
+                    id: "acp-main",
+                    kind: "acp",
+                    label: "Pi ACP",
+                    enabled: true,
+                    idleTtlSeconds: 900,
+                    modelCacheTtlSeconds: 300,
+                    acp: {
+                        command: "acpx",
+                        args: ["pi"],
+                    },
+                },
+            ],
+            agents: [
+                {
+                    id: "workspace",
+                    name: "Workspace",
+                    enabled: true,
+                    rootPath: "/srv/workspace",
+                    providerIds: ["acp-main"],
+                },
+                {
+                    id: "inline",
+                    name: "Inline",
+                    enabled: true,
+                    rootPath: "/srv/inline",
+                    runtime: {
+                        id: "inline-acp",
+                        kind: "acp",
+                        command: "acpx",
+                        args: ["codex"],
+                        permissionMode: "auto-approve",
+                        mcpServers: [
+                            {
+                                name: "tools",
+                                command: "tool-server",
+                            },
+                        ],
+                    },
+                },
+            ],
+        });
+
+        expect(config.providers[0]).toMatchObject({
+            id: "acp-main",
+            kind: "acp",
+            models: [{ id: "default", variants: [{ id: "default" }] }],
+            acp: {
+                baseEnv: {},
+            },
+        });
+        expect(config.agents[1]?.providerIds).toEqual(["inline-acp"]);
+        expect(getProviderConfigs(config)[1]).toMatchObject({
+            id: "inline-acp",
+            kind: "acp",
+            label: "ACP",
+            models: [{ id: "default", variants: [{ id: "default" }] }],
+            acp: {
+                command: "acpx",
+                args: ["codex"],
+                permissionMode: "auto-approve",
+                mcpServers: [
+                    {
+                        type: "stdio",
+                        name: "tools",
+                        command: "tool-server",
+                        args: [],
+                        env: [],
+                    },
+                ],
+            },
+        });
+    });
+
     test("prefers inline runtime ids over legacy agent provider references", () => {
         const config = parseConfig({
             version: 1,
@@ -386,6 +475,51 @@ describe("server config", () => {
                 ],
             }),
         ).toThrow("Provider 'claude-main' claudeCode.cwd must be absolute.");
+    });
+
+    test("rejects relative ACP runtime cwd values", () => {
+        expect(() =>
+            parseConfig({
+                version: 1,
+                auth: {
+                    defaultProviderId: "local-main",
+                    providers: [
+                        {
+                            id: "local-main",
+                            kind: "local",
+                            enabled: true,
+                            allowSignup: false,
+                        },
+                    ],
+                },
+                providers: [
+                    {
+                        id: "acp-main",
+                        kind: "acp",
+                        label: "Pi ACP",
+                        enabled: true,
+                        idleTtlSeconds: 900,
+                        modelCacheTtlSeconds: 300,
+                        models: [],
+                        acp: {
+                            command: "acpx",
+                            args: [],
+                            baseEnv: {},
+                            cwd: "relative",
+                        },
+                    },
+                ],
+                agents: [
+                    {
+                        id: "workspace",
+                        name: "Workspace",
+                        enabled: true,
+                        rootPath: "/srv/workspace",
+                        providerIds: ["acp-main"],
+                    },
+                ],
+            }),
+        ).toThrow("Provider 'acp-main' acp.cwd must be absolute.");
     });
 
     test("rejects relative inline Claude Code runtime cwd values", () => {

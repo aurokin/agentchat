@@ -147,7 +147,7 @@ Purpose:
 - bridge older installs that still define globally available runtime providers
 
 New config should keep this array empty and put runtime configuration under each
-agent. The server still accepts top-level Codex providers so existing installs
+agent. The server still accepts top-level runtime providers so existing installs
 can migrate without losing work. These legacy providers are still exposed
 through compatibility API fields, but users should not select providers as a
 product concept.
@@ -176,7 +176,7 @@ Required fields:
 - `id`
     - stable provider id
 - `kind`
-    - v1 allowed value: `"codex"`
+    - v1 allowed values: `"codex"`, `"claude-code"`, or `"acp"`
 - `label`
     - operator-facing display name
 - `enabled`
@@ -196,6 +196,23 @@ Provider-specific fields for Codex:
     - optional environment overrides
 - `codex.cwd`
     - optional default working directory for provider startup
+
+Provider-specific fields for ACP:
+
+- `acp.command`
+    - binary name or absolute path for the ACP-compatible agent process
+- `acp.args`
+    - optional extra process args; use this to select a concrete ACP target
+- `acp.baseEnv`
+    - optional environment overrides
+- `acp.cwd`
+    - optional default working directory for provider startup
+- `acp.mcpServers`
+    - optional stdio MCP server definitions passed to `session/new` or `session/load`
+- `acp.permissionMode`
+    - `"fail-closed"` by default; `"auto-approve"` may select non-persistent allow options
+- `acp.timeoutMs`
+    - optional prompt/cancel fallback timeout
 
 Notes:
 
@@ -266,7 +283,7 @@ Required fields:
     - absolute path to the workspace the provider should operate against
 - `runtime`
     - required for new agents unless using the legacy top-level provider bridge
-    - current allowed value for `runtime.kind`: `"codex"`
+    - current allowed values for `runtime.kind`: `"codex"`, `"claude-code"`, or `"acp"`
     - owns the command, environment, model metadata, cache TTL, and idle TTL for the agent
 
 Optional fields:

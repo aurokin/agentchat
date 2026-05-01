@@ -66,6 +66,8 @@ export const PROVIDER_DIAGNOSTIC_ISSUES = {
         "Configured claudeCode.cwd does not exist or is not a directory.",
     claudeCodeCommandMissing:
         "Configured Claude Code command path does not exist.",
+    acpCwdMissing: "Configured acp.cwd does not exist or is not a directory.",
+    acpCommandMissing: "Configured ACP command path does not exist.",
 } as const;
 
 export const AGENT_DIAGNOSTIC_ISSUES = {
@@ -360,6 +362,17 @@ export function getProviderDiagnostics(
             !existsSync(provider.claudeCode.command)
         ) {
             issues.push(PROVIDER_DIAGNOSTIC_ISSUES.claudeCodeCommandMissing);
+        }
+    } else if (provider.kind === "acp") {
+        if (provider.acp.cwd && !isExistingDirectory(provider.acp.cwd)) {
+            issues.push(PROVIDER_DIAGNOSTIC_ISSUES.acpCwdMissing);
+        }
+
+        if (
+            path.isAbsolute(provider.acp.command) &&
+            !existsSync(provider.acp.command)
+        ) {
+            issues.push(PROVIDER_DIAGNOSTIC_ISSUES.acpCommandMissing);
         }
     }
 

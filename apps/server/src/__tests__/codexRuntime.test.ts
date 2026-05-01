@@ -1003,6 +1003,55 @@ describe("CodexRuntimeManager", () => {
         expect(claudeKind.sessions).toHaveLength(1);
     });
 
+    test("starts minimal ACP runtimes with seeded static models", async () => {
+        const config = parseConfig({
+            version: 1,
+            auth: {
+                defaultProviderId: "local-main",
+                providers: [
+                    {
+                        id: "local-main",
+                        kind: "local",
+                        enabled: true,
+                        allowSignup: false,
+                    },
+                ],
+            },
+            agents: [
+                {
+                    id: "workspace",
+                    name: "Workspace",
+                    enabled: true,
+                    rootPath: "/srv/workspace",
+                    runtime: {
+                        kind: "acp",
+                        command: "acpx",
+                    },
+                },
+            ],
+        });
+        const acpKind = new CompletingRuntimeKind("acp");
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: createPersistence(
+                null,
+            ) as unknown as RuntimePersistenceClient,
+            runtimeKinds: new RuntimeKindRegistry([acpKind]),
+        });
+        const command = createCommand();
+        command.payload.agentId = "workspace";
+        command.payload.modelId = "default";
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command,
+            sendEvent: () => undefined,
+        });
+
+        expect(acpKind.sessions).toHaveLength(1);
+    });
+
     test("falls back to thread/start when resume hits a recoverable error", async () => {
         const config = createConfig();
         const persistence = createPersistence({

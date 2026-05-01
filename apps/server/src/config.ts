@@ -107,6 +107,16 @@ const DEFAULT_CLAUDE_CODE_PROVIDER_MODELS = [
     },
 ];
 
+const DEFAULT_ACP_PROVIDER_MODELS = [
+    {
+        id: "default",
+        label: "Default",
+        enabled: true,
+        supportsReasoning: false,
+        variants: [{ id: "default", label: "Default", enabled: true }],
+    },
+];
+
 const ProviderBaseSchema = z.object({
     id: z.string().min(1),
     label: z.string().min(1),
@@ -147,8 +157,39 @@ const ClaudeCodeProviderSchema = ProviderBaseSchema.extend({
     }),
 });
 
+const AcpMcpServerSchema = z.object({
+    type: z.literal("stdio").default("stdio"),
+    name: z.string().min(1),
+    command: z.string().min(1),
+    args: z.array(z.string()).default([]),
+    env: z
+        .array(
+            z.object({
+                name: z.string().min(1),
+                value: z.string(),
+            }),
+        )
+        .default([]),
+});
+
+const AcpProviderSchema = ProviderBaseSchema.extend({
+    kind: z.literal("acp"),
+    acp: z.object({
+        command: z.string().min(1),
+        args: z.array(z.string()).default([]),
+        baseEnv: z.record(z.string(), z.string()).default({}),
+        cwd: z.string().min(1).optional(),
+        mcpServers: z.array(AcpMcpServerSchema).default([]),
+        permissionMode: z
+            .enum(["auto-approve", "fail-closed"])
+            .default("fail-closed"),
+        timeoutMs: z.number().int().positive().optional(),
+    }),
+});
+
 const RuntimeProviderSchema = z.discriminatedUnion("kind", [
     CodexProviderSchema,
+    AcpProviderSchema,
     ClaudeCodeProviderSchema,
 ]);
 
@@ -190,8 +231,23 @@ const ClaudeCodeAgentRuntimeSchema = AgentRuntimeBaseSchema.extend({
     timeoutMs: z.number().int().positive().optional(),
 });
 
+const AcpAgentRuntimeSchema = AgentRuntimeBaseSchema.extend({
+    kind: z.literal("acp"),
+    label: z.string().min(1).default("ACP"),
+    command: z.string().min(1),
+    args: z.array(z.string()).default([]),
+    baseEnv: z.record(z.string(), z.string()).default({}),
+    cwd: z.string().min(1).optional(),
+    mcpServers: z.array(AcpMcpServerSchema).default([]),
+    permissionMode: z
+        .enum(["auto-approve", "fail-closed"])
+        .default("fail-closed"),
+    timeoutMs: z.number().int().positive().optional(),
+});
+
 const AgentRuntimeSchema = z.discriminatedUnion("kind", [
     CodexAgentRuntimeSchema,
+    AcpAgentRuntimeSchema,
     ClaudeCodeAgentRuntimeSchema,
 ]);
 
@@ -298,6 +354,16 @@ const AgentchatConfigInputSchema = z
                     message: `Provider '${provider.id}' claudeCode.cwd must be absolute.`,
                 });
             }
+            if (
+                provider.kind === "acp" &&
+                provider.acp.cwd &&
+                !path.isAbsolute(provider.acp.cwd)
+            ) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: `Provider '${provider.id}' acp.cwd must be absolute.`,
+                });
+            }
         }
 
         const resolvedSandboxRoot = path.resolve(
@@ -386,6 +452,7 @@ export type AuthConfig = z.infer<typeof ProviderAuthConfigSchema>;
 type AgentConfigInput = z.infer<typeof AgentSchema>;
 export type CodexProviderConfig = z.infer<typeof CodexProviderSchema>;
 export type ClaudeCodeProviderConfig = z.infer<typeof ClaudeCodeProviderSchema>;
+export type AcpProviderConfig = z.infer<typeof AcpProviderSchema>;
 export type ProviderConfig = z.infer<typeof RuntimeProviderSchema>;
 export type AgentRuntimeConfig = z.infer<typeof AgentRuntimeSchema>;
 export type AgentConfig = Omit<
@@ -435,32 +502,60 @@ function getDefaultClaudeCodeProviderModels(): Array<
     return structuredClone(DEFAULT_CLAUDE_CODE_PROVIDER_MODELS);
 }
 
+function getDefaultAcpProviderModels(): Array<
+    z.infer<typeof ProviderModelSchema>
+> {
+    return structuredClone(DEFAULT_ACP_PROVIDER_MODELS);
+}
+
 function seedRuntimeProviderModels(provider: ProviderConfig): ProviderConfig {
-    if (provider.kind !== "claude-code" || provider.models.length > 0) {
+    if (provider.models.length > 0) {
         return provider;
     }
 
-    return {
-        ...provider,
-        models: getDefaultClaudeCodeProviderModels(),
-    };
+    if (provider.kind === "claude-code") {
+        return {
+            ...provider,
+            models: getDefaultClaudeCodeProviderModels(),
+        };
+    }
+
+    if (provider.kind === "acp") {
+        return {
+            ...provider,
+            models: getDefaultAcpProviderModels(),
+        };
+    }
+
+    return provider;
 }
 
 function seedAgentRuntimeModels(agent: AgentConfigInput): AgentConfigInput {
-    if (
-        agent.runtime?.kind !== "claude-code" ||
-        agent.runtime.models.length > 0
-    ) {
+    if (!agent.runtime || agent.runtime.models.length > 0) {
         return agent;
     }
 
-    return {
-        ...agent,
-        runtime: {
-            ...agent.runtime,
-            models: getDefaultClaudeCodeProviderModels(),
-        },
-    };
+    if (agent.runtime.kind === "claude-code") {
+        return {
+            ...agent,
+            runtime: {
+                ...agent.runtime,
+                models: getDefaultClaudeCodeProviderModels(),
+            },
+        };
+    }
+
+    if (agent.runtime.kind === "acp") {
+        return {
+            ...agent,
+            runtime: {
+                ...agent.runtime,
+                models: getDefaultAcpProviderModels(),
+            },
+        };
+    }
+
+    return agent;
 }
 
 export function getAgentRuntimeProviderId(
@@ -497,6 +592,22 @@ export function agentRuntimeToProvider(
                 args: agent.runtime.args,
                 baseEnv: agent.runtime.baseEnv,
                 cwd: agent.runtime.cwd,
+            },
+        };
+    }
+
+    if (agent.runtime.kind === "acp") {
+        return {
+            ...base,
+            kind: "acp",
+            acp: {
+                command: agent.runtime.command,
+                args: agent.runtime.args,
+                baseEnv: agent.runtime.baseEnv,
+                cwd: agent.runtime.cwd,
+                mcpServers: agent.runtime.mcpServers,
+                permissionMode: agent.runtime.permissionMode,
+                timeoutMs: agent.runtime.timeoutMs,
             },
         };
     }
@@ -555,6 +666,73 @@ function getDefaultStateRuntimeBackendIdentity(): string | null {
     return siteUrl.replace(/\/+$/, "");
 }
 
+function getProviderRuntimeStateSeed(provider: ProviderConfig) {
+    if (provider.kind === "codex") {
+        return {
+            command: provider.codex.command,
+            args: provider.codex.args,
+            baseEnvKeys: Object.keys(provider.codex.baseEnv).sort(),
+            hasCwd: Boolean(provider.codex.cwd),
+        };
+    }
+
+    if (provider.kind === "acp") {
+        return {
+            command: provider.acp.command,
+            args: provider.acp.args,
+            baseEnvKeys: Object.keys(provider.acp.baseEnv).sort(),
+            hasCwd: Boolean(provider.acp.cwd),
+            mcpServerCount: provider.acp.mcpServers.length,
+            permissionMode: provider.acp.permissionMode,
+            hasTimeoutMs: provider.acp.timeoutMs !== undefined,
+        };
+    }
+
+    return {
+        command: provider.claudeCode.command,
+        args: provider.claudeCode.args,
+        baseEnvKeys: Object.keys(provider.claudeCode.baseEnv).sort(),
+        hasCwd: Boolean(provider.claudeCode.cwd),
+        permissionMode: provider.claudeCode.permissionMode,
+        hasTimeoutMs: provider.claudeCode.timeoutMs !== undefined,
+    };
+}
+
+function getAgentRuntimeStateSeed(
+    agent: Pick<AgentConfigInput, "id" | "runtime">,
+): Record<string, unknown> | undefined {
+    if (!agent.runtime) {
+        return undefined;
+    }
+
+    return {
+        id: getAgentRuntimeProviderId(agent),
+        kind: agent.runtime.kind,
+        label: agent.runtime.label,
+        enabled: agent.runtime.enabled,
+        idleTtlSeconds: agent.runtime.idleTtlSeconds,
+        modelCacheTtlSeconds: agent.runtime.modelCacheTtlSeconds,
+        models: agent.runtime.models,
+        command: agent.runtime.command,
+        args: agent.runtime.args,
+        baseEnvKeys: Object.keys(agent.runtime.baseEnv).sort(),
+        hasCwd: Boolean(agent.runtime.cwd),
+        ...(agent.runtime.kind === "claude-code"
+            ? {
+                  permissionMode: agent.runtime.permissionMode,
+                  hasTimeoutMs: agent.runtime.timeoutMs !== undefined,
+              }
+            : {}),
+        ...(agent.runtime.kind === "acp"
+            ? {
+                  mcpServerCount: agent.runtime.mcpServers.length,
+                  permissionMode: agent.runtime.permissionMode,
+                  hasTimeoutMs: agent.runtime.timeoutMs !== undefined,
+              }
+            : {}),
+    };
+}
+
 function buildDefaultStateIdSeed(
     parsed: z.infer<typeof AgentchatConfigInputSchema>,
     auth: AuthConfig,
@@ -571,54 +749,23 @@ function buildDefaultStateIdSeed(
             idleTtlSeconds: provider.idleTtlSeconds,
             modelCacheTtlSeconds: provider.modelCacheTtlSeconds,
             models: provider.models,
-            runtime:
-                provider.kind === "codex"
-                    ? {
-                          command: provider.codex.command,
-                          args: provider.codex.args,
-                          baseEnvKeys: Object.keys(
-                              provider.codex.baseEnv,
-                          ).sort(),
-                          hasCwd: Boolean(provider.codex.cwd),
-                      }
-                    : {
-                          command: provider.claudeCode.command,
-                          args: provider.claudeCode.args,
-                          baseEnvKeys: Object.keys(
-                              provider.claudeCode.baseEnv,
-                          ).sort(),
-                          hasCwd: Boolean(provider.claudeCode.cwd),
-                          permissionMode: provider.claudeCode.permissionMode,
-                          hasTimeoutMs:
-                              provider.claudeCode.timeoutMs !== undefined,
-                      },
+            runtime: getProviderRuntimeStateSeed(provider),
         })),
         agents: parsed.agents.map(({ rootPath, ...agent }) => ({
             ...agent,
-            runtime: agent.runtime
-                ? {
-                      id: getAgentRuntimeProviderId(agent),
-                      kind: agent.runtime.kind,
-                      label: agent.runtime.label,
-                      enabled: agent.runtime.enabled,
-                      idleTtlSeconds: agent.runtime.idleTtlSeconds,
-                      modelCacheTtlSeconds: agent.runtime.modelCacheTtlSeconds,
-                      models: agent.runtime.models,
-                      command: agent.runtime.command,
-                      args: agent.runtime.args,
-                      baseEnvKeys: Object.keys(agent.runtime.baseEnv).sort(),
-                      hasCwd: Boolean(agent.runtime.cwd),
-                      ...(agent.runtime.kind === "claude-code"
-                          ? {
-                                permissionMode: agent.runtime.permissionMode,
-                                hasTimeoutMs:
-                                    agent.runtime.timeoutMs !== undefined,
-                            }
-                          : {}),
-                  }
-                : undefined,
+            runtime: getAgentRuntimeStateSeed(agent),
         })),
     });
+}
+
+function getProviderRuntimeCwd(provider: ProviderConfig): string | undefined {
+    if (provider.kind === "codex") {
+        return provider.codex.cwd;
+    }
+    if (provider.kind === "acp") {
+        return provider.acp.cwd;
+    }
+    return provider.claudeCode.cwd;
 }
 
 function buildDefaultInstanceKeySeed(
@@ -630,14 +777,11 @@ function buildDefaultInstanceKeySeed(
         ),
         providers: parsed.providers.map((provider) => ({
             id: provider.id,
-            runtimeCwd:
-                provider.kind === "codex"
-                    ? provider.codex.cwd
-                        ? canonicalizePathForComparison(provider.codex.cwd)
-                        : null
-                    : provider.claudeCode.cwd
-                      ? canonicalizePathForComparison(provider.claudeCode.cwd)
-                      : null,
+            runtimeCwd: getProviderRuntimeCwd(provider)
+                ? canonicalizePathForComparison(
+                      getProviderRuntimeCwd(provider)!,
+                  )
+                : null,
         })),
         agents: parsed.agents.map((agent) => ({
             id: agent.id,

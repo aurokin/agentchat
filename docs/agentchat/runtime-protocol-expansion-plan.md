@@ -140,10 +140,12 @@ Expected outcomes:
 
 ### AUR-35 ACP Adapter Tracer
 
-Implement the first concrete ACP-compatible adapter after AUR-142.
+Implement the first concrete ACP-compatible adapter after AUR-142. Completed
+as a generic local stdio ACP runtime kind configured by each agent.
 
-The first target should be selected by current viability, likely `pi-acp`
-unless OpenCode ACP is a better tracer at that point.
+Target selection is operator-provided through ACP runtime config. Local review
+did not find a usable `pi-acp` or OpenCode ACP surface; OpenClaw's `acpx`
+integration is the best currently identified target family for manual proving.
 
 Expected outcomes:
 

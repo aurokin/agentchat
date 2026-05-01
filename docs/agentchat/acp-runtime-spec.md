@@ -115,9 +115,12 @@ Approval UI is a separate future product feature.
 
 ## First Adapter Tracer
 
-AUR-35 should select the first ACP target based on current viability when the
-ACP foundation is ready. `pi-acp` is the likely first candidate, but OpenCode
-ACP can be chosen if it better exercises the generic protocol path.
+AUR-35 selected the generic local stdio ACP path as the first tracer. Local
+source review did not find a currently available `pi-acp` or OpenCode ACP
+surface; OpenClaw's `acpx` integration was the clearest available
+ACP-compatible target family. The server implementation therefore keeps target
+selection in operator config (`command`, `args`, `mcpServers`) while proving the
+generic ACP lifecycle.
 
 The first tracer should prove the generic ACP client/session/update machinery.
 It should not attempt to support every ACP-compatible runtime.

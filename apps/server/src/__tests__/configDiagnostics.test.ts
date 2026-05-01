@@ -196,6 +196,49 @@ describe("configDiagnostics", () => {
         );
     });
 
+    test("reports missing ACP runtime paths", () => {
+        const config = createConfig();
+        config.providers = [
+            {
+                id: "acp-main",
+                kind: "acp",
+                label: "ACP Main",
+                enabled: true,
+                idleTtlSeconds: 900,
+                modelCacheTtlSeconds: 300,
+                models: [
+                    {
+                        id: "default",
+                        label: "Default",
+                        enabled: true,
+                        supportsReasoning: false,
+                        variants: [],
+                    },
+                ],
+                acp: {
+                    command: "/missing/acpx",
+                    args: [],
+                    baseEnv: {},
+                    cwd: "/missing/acp-cwd",
+                    mcpServers: [],
+                    permissionMode: "fail-closed",
+                },
+            },
+        ];
+
+        const providerDiagnostics = getProviderDiagnostics(
+            config.providers[0]!,
+        );
+
+        expect(providerDiagnostics.ready).toBe(false);
+        expect(providerDiagnostics.issues).toContain(
+            "Configured acp.cwd does not exist or is not a directory.",
+        );
+        expect(providerDiagnostics.issues).toContain(
+            "Configured ACP command path does not exist.",
+        );
+    });
+
     test("reports symlinks inside copy-on-conversation agent roots", () => {
         const config = createConfig();
         const sharedSkillRoot = makeTempDir("shared-skill-root");
