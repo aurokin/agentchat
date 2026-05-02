@@ -12,6 +12,11 @@ export type RuntimeProcessExit =
           signal: NodeJS.Signals | null;
       };
 
+export type RuntimeProcessStopPolicy = {
+    gracefulSignal?: NodeJS.Signals;
+    forceSignal?: NodeJS.Signals;
+};
+
 export type RuntimeJsonRpcResponse = {
     id?: number | string;
     result?: unknown;
@@ -123,6 +128,7 @@ export class ManagedRuntimeProcess {
     private readonly child: ChildProcessWithoutNullStreams;
     private readonly label: string;
     private readonly stopTimeoutMs: number;
+    private readonly stopPolicy: Required<RuntimeProcessStopPolicy>;
     private readonly exitHandlers = new Set<
         (exit: RuntimeProcessExit) => void
     >();
@@ -139,12 +145,17 @@ export class ManagedRuntimeProcess {
         env?: NodeJS.ProcessEnv;
         label: string;
         stopTimeoutMs?: number;
+        stopPolicy?: RuntimeProcessStopPolicy;
         onStderr?: (chunk: string) => void;
     }) {
         this.label = params.label;
         this.stopTimeoutMs =
             params.stopTimeoutMs ??
             ManagedRuntimeProcess.DEFAULT_STOP_TIMEOUT_MS;
+        this.stopPolicy = {
+            gracefulSignal: params.stopPolicy?.gracefulSignal ?? "SIGTERM",
+            forceSignal: params.stopPolicy?.forceSignal ?? "SIGKILL",
+        };
         let resolveExitPromise!: (exit: RuntimeProcessExit) => void;
         this.exitPromise = new Promise<RuntimeProcessExit>((resolve) => {
             resolveExitPromise = resolve;
@@ -196,18 +207,18 @@ export class ManagedRuntimeProcess {
         }
 
         this.stopPromise = (async () => {
-            this.tryKill("SIGTERM");
+            this.tryKill(this.stopPolicy.gracefulSignal);
             if (await this.waitForExit(this.stopTimeoutMs)) {
                 return;
             }
 
-            this.tryKill("SIGKILL");
+            this.tryKill(this.stopPolicy.forceSignal);
             if (await this.waitForExit(this.stopTimeoutMs)) {
                 return;
             }
 
             throw new Error(
-                `${this.label} did not exit within ${this.stopTimeoutMs}ms after SIGTERM/SIGKILL`,
+                `${this.label} did not exit within ${this.stopTimeoutMs}ms after ${this.stopPolicy.gracefulSignal}/${this.stopPolicy.forceSignal}`,
             );
         })();
 

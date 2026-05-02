@@ -115,6 +115,179 @@ function createControlledProcess() {
 }
 
 describe("ClaudeCodeRuntimeKind", () => {
+    test("starts Claude Code turns with a graceful SIGINT stop policy", async () => {
+        const controlledProcess = createControlledProcess();
+        const stopPolicies: unknown[] = [];
+        const session = new ClaudeCodeRuntimeKind({
+            createRuntimeProcess: (params) => {
+                stopPolicies.push(params.stopPolicy);
+                return controlledProcess.runtimeProcess;
+            },
+        }).createSession({
+            provider: createProvider(""),
+            agent: createAgent(),
+        });
+
+        await session.openThread({
+            bindingProviderId: null,
+            bindingThreadId: null,
+            providerId: "claude-test",
+            modelId: "sonnet",
+            cwd: process.cwd(),
+        });
+        await session.startTurn({
+            threadId: "claude-pending:test",
+            inputText: "interrupt me",
+            cwd: process.cwd(),
+            modelId: "sonnet",
+            variantId: null,
+        });
+
+        expect(stopPolicies[0]).toEqual({
+            gracefulSignal: "SIGINT",
+            forceSignal: "SIGKILL",
+        });
+
+        await session.stop();
+    });
+
+    test("preserves interrupted status when SIGINT produces a result event", async () => {
+        const controlledProcess = createControlledProcess();
+        const session = new ClaudeCodeRuntimeKind({
+            createRuntimeProcess: () => controlledProcess.runtimeProcess,
+        }).createSession({
+            provider: createProvider(""),
+            agent: createAgent(),
+        });
+        const events: RuntimeKindEvent[] = [];
+        session.onEvent((event) => events.push(event));
+
+        await session.openThread({
+            bindingProviderId: null,
+            bindingThreadId: null,
+            providerId: "claude-test",
+            modelId: "sonnet",
+            cwd: process.cwd(),
+        });
+        await session.startTurn({
+            threadId: "claude-pending:test",
+            inputText: "interrupt me",
+            cwd: process.cwd(),
+            modelId: "sonnet",
+            variantId: null,
+        });
+
+        const interruptPromise = session.interruptTurn({
+            threadId: "claude-pending:test",
+            turnId: "turn-1",
+        });
+        controlledProcess.stdout.end(
+            [
+                JSON.stringify({
+                    type: "result",
+                    subtype: "error_during_execution",
+                    is_error: true,
+                    session_id: "claude-session-interrupted",
+                }),
+                "",
+            ].join("\n"),
+        );
+        await interruptPromise;
+        await waitFor(() =>
+            events.some((event) => event.type === "turn_completed"),
+        );
+
+        const terminalEvents = events.filter(
+            (event) => event.type === "turn_completed",
+        );
+        expect(terminalEvents).toHaveLength(1);
+        expect(terminalEvents[0]).toMatchObject({
+            type: "turn_completed",
+            status: "interrupted",
+        });
+        expect(
+            events.some(
+                (event) =>
+                    event.type === "provider_event" &&
+                    event.event.eventType === "claude-code.turn.interrupted",
+            ),
+        ).toBe(true);
+    });
+
+    test("waits for stdout to drain before completing interrupted turns", async () => {
+        const controlledProcess = createControlledProcess();
+        const session = new ClaudeCodeRuntimeKind({
+            createRuntimeProcess: () => controlledProcess.runtimeProcess,
+        }).createSession({
+            provider: createProvider(""),
+            agent: createAgent(),
+        });
+        const events: RuntimeKindEvent[] = [];
+        session.onEvent((event) => events.push(event));
+
+        await session.openThread({
+            bindingProviderId: null,
+            bindingThreadId: null,
+            providerId: "claude-test",
+            modelId: "sonnet",
+            cwd: process.cwd(),
+        });
+        await session.startTurn({
+            threadId: "claude-pending:test",
+            inputText: "interrupt me",
+            cwd: process.cwd(),
+            modelId: "sonnet",
+            variantId: null,
+        });
+
+        const interruptPromise = session.interruptTurn({
+            threadId: "claude-pending:test",
+            turnId: "turn-1",
+        });
+        await interruptPromise;
+
+        expect(events.some((event) => event.type === "turn_completed")).toBe(
+            false,
+        );
+
+        controlledProcess.stdout.end(
+            [
+                JSON.stringify({
+                    type: "system",
+                    subtype: "init",
+                    session_id: "claude-session-late-interrupt",
+                }),
+                JSON.stringify({
+                    type: "result",
+                    subtype: "error_during_execution",
+                    is_error: true,
+                    session_id: "claude-session-late-interrupt",
+                }),
+                "",
+            ].join("\n"),
+        );
+
+        await waitFor(() =>
+            events.some((event) => event.type === "turn_completed"),
+        );
+
+        const identityIndex = events.findIndex(
+            (event) =>
+                event.type === "provider_identity_updated" &&
+                event.threadId === "claude-session-late-interrupt",
+        );
+        const terminalIndex = events.findIndex(
+            (event) => event.type === "turn_completed",
+        );
+
+        expect(identityIndex).toBeGreaterThanOrEqual(0);
+        expect(terminalIndex).toBeGreaterThan(identityIndex);
+        expect(events[terminalIndex]).toMatchObject({
+            type: "turn_completed",
+            status: "interrupted",
+        });
+    });
+
     test("maps stream-json output into runtime events and captures session ids", async () => {
         const session = new ClaudeCodeRuntimeKind().createSession({
             provider: createProvider(

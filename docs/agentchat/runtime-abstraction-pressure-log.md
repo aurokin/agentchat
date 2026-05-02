@@ -57,17 +57,17 @@ change transport substrate / implement later / reject
 
 The Runtime Abstraction Retrospective classified the current open pressure as:
 
-| Entry | Disposition |
-| --- | --- |
-| Claude Code - Late Session Identity | Change persistence/schema later. Current `providerThreadId` remains as a compatibility field and is treated semantically as provider conversation identity. |
-| Claude Code - Non-Text Stream Content | Keep adapter-specific through provider artifacts. Do not add shared tool UX yet. |
-| Claude Code - Interrupt Signal Semantics | Change transport substrate later only if real CLI testing proves a custom signal policy is needed. |
-| ACP - Session Resume And Close | Implement later only when a concrete ACP target needs richer lifecycle semantics. |
-| ACP - Permission Requests Without Approval UI | Implement later with approval UI or a richer permission contract; keep current fail-closed/non-persistent auto-approve behavior. |
-| ACP - Unstable Elicitation And Auxiliary Client Requests | Implement later only when a real ACP target requires these client-handled requests. |
-| ACP - Target Selection Through Operator Config | Keep adapter-specific as raw operator config. No typed profile layer yet. |
-| ACP - Session Load Without Resume Or Close Semantics | Keep adapter-specific; stale load fallback heals bindings without schema changes. |
-| ACP - Prompt Cancellation Fallback | Keep adapter-specific; promote only if another adapter needs the same cancellation knobs. |
+| Entry                                                    | Disposition                                                                                                                                                 |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Claude Code - Late Session Identity                      | Change persistence/schema later. Current `providerThreadId` remains as a compatibility field and is treated semantically as provider conversation identity. |
+| Claude Code - Non-Text Stream Content                    | Keep adapter-specific through provider artifacts. Do not add shared tool UX yet.                                                                            |
+| Claude Code - Interrupt Signal Semantics                 | Change transport substrate narrowly. AUR-158 testing proved Claude Code emits a cleaner structured cancellation result for `SIGINT` than for `SIGTERM`.     |
+| ACP - Session Resume And Close                           | Implement later only when a concrete ACP target needs richer lifecycle semantics.                                                                           |
+| ACP - Permission Requests Without Approval UI            | Implement later with approval UI or a richer permission contract; keep current fail-closed/non-persistent auto-approve behavior.                            |
+| ACP - Unstable Elicitation And Auxiliary Client Requests | Implement later only when a real ACP target requires these client-handled requests.                                                                         |
+| ACP - Target Selection Through Operator Config           | Keep adapter-specific as raw operator config. No typed profile layer yet.                                                                                   |
+| ACP - Session Load Without Resume Or Close Semantics     | Keep adapter-specific; stale load fallback heals bindings without schema changes.                                                                           |
+| ACP - Prompt Cancellation Fallback                       | Keep adapter-specific; promote only if another adapter needs the same cancellation knobs.                                                                   |
 
 The full decision record is
 [Runtime Abstraction Retrospective](./runtime-abstraction-retrospective.md).
@@ -147,18 +147,20 @@ Current fit:
 Awkward
 
 What we did:
-Used the shared `ManagedRuntimeProcess.stop()` behavior, which currently sends
-SIGTERM and escalates to SIGKILL. The tracer records interruption status through
-the normalized runtime event path.
+Initially used the shared `ManagedRuntimeProcess.stop()` behavior, which sent
+SIGTERM and escalated to SIGKILL. AUR-158 then tested Claude Code 2.1.123 with
+SIGINT, SIGTERM, and SIGKILL during active print-mode turns.
 
-Fidelity risk:
-If Claude Code treats SIGINT differently from SIGTERM for session preservation
-or cleanup, current interruption may be less graceful than the native CLI
-expects.
+Result:
+All three signals produced resumable Claude sessions when a session id had
+already been emitted. SIGINT exited cleanly with a structured `result` event and
+`terminal_reason: "aborted_streaming"`. SIGTERM exited 143 with no result event.
+SIGKILL exited by signal with no result event.
 
-Follow-up:
-Change transport substrate if real CLI testing shows SIGINT is materially
-better for Claude Code or another adapter.
+Decision:
+Add a narrow transport stop policy and configure Claude Code to use SIGINT as
+the graceful stop signal before SIGKILL. Keep Codex and ACP on the default
+SIGTERM/SIGKILL policy.
 
 ### 2026-04-26 - ACP - Session Resume And Close
 

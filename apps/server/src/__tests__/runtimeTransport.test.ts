@@ -100,6 +100,43 @@ describe("ManagedRuntimeProcess", () => {
 
         expect(Date.now() - startedAt).toBeLessThan(2_000);
     });
+
+    test("uses a custom graceful stop signal before force escalation", async () => {
+        const stderrChunks: string[] = [];
+        const exits: RuntimeProcessExit[] = [];
+        const runtimeProcess = new ManagedRuntimeProcess({
+            command: process.execPath,
+            args: [
+                "-e",
+                [
+                    "process.on('SIGINT', () => { process.stderr.write('saw SIGINT'); });",
+                    "process.on('SIGTERM', () => process.exit(7));",
+                    "process.stderr.write('ready');",
+                    "setInterval(() => {}, 1000);",
+                ].join(" "),
+            ],
+            cwd: process.cwd(),
+            env: process.env,
+            label: "test process",
+            stopTimeoutMs: 50,
+            stopPolicy: {
+                gracefulSignal: "SIGINT",
+                forceSignal: "SIGTERM",
+            },
+            onStderr: (chunk) => stderrChunks.push(chunk),
+        });
+        runtimeProcess.onExit((exit) => exits.push(exit));
+
+        await waitFor(() => stderrChunks.join("").includes("ready"));
+        await runtimeProcess.stop();
+
+        expect(stderrChunks.join("")).toContain("saw SIGINT");
+        expect(exits[0]).toEqual({
+            type: "exit",
+            code: 7,
+            signal: null,
+        });
+    });
 });
 
 describe("JsonRpcStdioClient", () => {

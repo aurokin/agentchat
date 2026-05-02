@@ -151,15 +151,17 @@ There is no separate startup flow. The first `conversation.send` spawns the firs
 ## Interrupt Flow
 
 1. Request subprocess stop through the shared process transport.
-2. Send `SIGTERM`.
+2. Send `SIGINT`.
 3. Escalate to `SIGKILL` if the process has not exited.
 4. Update run status to `interrupted`.
 5. Emit normalized interruption events.
 6. The session state is preserved by Claude Code for future resumption.
 
-AUR-143 keeps custom signal policy out of the shared contract for now. If real
-Claude CLI testing proves `SIGINT` preserves session state more reliably than
-the shared stop behavior, add a narrow transport-substrate follow-up.
+AUR-158 tested Claude Code 2.1.123 print-mode interruption with SIGINT,
+SIGTERM, and SIGKILL. All three could resume after a session id was emitted, but
+SIGINT was the only signal that exited cleanly with a structured cancellation
+`result` event. Claude Code therefore uses a Claude-specific graceful signal
+policy while Codex and ACP keep the default SIGTERM/SIGKILL policy.
 
 ## Event Mapping
 

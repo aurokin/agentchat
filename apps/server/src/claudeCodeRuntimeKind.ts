@@ -8,6 +8,7 @@ import {
     ManagedRuntimeProcess,
     type JsonlParseError,
     type RuntimeProcessExit,
+    type RuntimeProcessStopPolicy,
 } from "./runtimeTransport.ts";
 import type {
     ProviderModelCatalogEntry,
@@ -58,6 +59,10 @@ const DEFAULT_CLAUDE_CODE_MODELS: ProviderModelCatalogEntry[] = [
 ];
 
 const CLAUDE_PENDING_THREAD_PREFIX = "claude-pending:";
+const CLAUDE_CODE_STOP_POLICY = {
+    gracefulSignal: "SIGINT",
+    forceSignal: "SIGKILL",
+} as const satisfies Required<RuntimeProcessStopPolicy>;
 
 type CreateClaudeCodeProcess = (params: {
     command: string;
@@ -65,6 +70,7 @@ type CreateClaudeCodeProcess = (params: {
     cwd: string;
     env: NodeJS.ProcessEnv;
     stopTimeoutMs?: number;
+    stopPolicy?: RuntimeProcessStopPolicy;
     onStderr: (chunk: string) => void;
 }) => ManagedRuntimeProcess;
 
@@ -486,6 +492,7 @@ class ClaudeCodeRuntimeKindSession implements RuntimeKindSession {
                 ...process.env,
                 ...this.provider.claudeCode.baseEnv,
             },
+            stopPolicy: CLAUDE_CODE_STOP_POLICY,
             onStderr: (chunk) => {
                 this.stderrChunks.push(chunk);
             },
@@ -520,17 +527,6 @@ class ClaudeCodeRuntimeKindSession implements RuntimeKindSession {
         this.clearTurnTimeout();
         this.stoppingForInterrupt = true;
         await this.activeProcess.stop();
-        this.emitTerminalEvent({
-            status: "interrupted",
-            providerEvent: createClaudeCodeProviderEvent({
-                eventType: "claude-code.turn.interrupted",
-                phase: "completion",
-                summary: "Claude Code turn interrupted.",
-                metadata: {
-                    turnId: this.activeTurnId,
-                },
-            }),
-        });
     }
 
     onEvent(handler: (event: RuntimeKindEvent) => void): void {
@@ -740,11 +736,6 @@ class ClaudeCodeRuntimeKindSession implements RuntimeKindSession {
             return;
         }
 
-        if (this.pendingResultCompletion) {
-            this.emitPendingResultCompletion();
-            return;
-        }
-
         if (this.stoppingForInterrupt) {
             this.emitTerminalEvent({
                 status: "interrupted",
@@ -757,6 +748,11 @@ class ClaudeCodeRuntimeKindSession implements RuntimeKindSession {
                     },
                 }),
             });
+            return;
+        }
+
+        if (this.pendingResultCompletion) {
+            this.emitPendingResultCompletion();
             return;
         }
 

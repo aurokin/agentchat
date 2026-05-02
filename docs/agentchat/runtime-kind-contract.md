@@ -166,8 +166,8 @@ Reusable transport pieces should include:
 - `JsonlStreamParser` for Claude Code-style stream-json output
 - `ManagedRuntimeProcess` for subprocess lifecycle and cancellation
 - timeout and exit handling
-- optional adapter-specific cancellation policy when real runtime testing proves
-  the default signal behavior is insufficient
+- adapter-specific process stop policy when real runtime testing proves the
+  default SIGTERM/SIGKILL behavior is insufficient
 - stderr capture
 - later HTTP streaming helpers for OpenCode if direct HTTP remains preferred
 
