@@ -9,7 +9,15 @@ FILES=$(git diff --cached --name-only --diff-filter=ACMR \
     | grep -v '^packages/convex/convex/_generated/' \
     || true)
 if [ -n "$FILES" ]; then
-    echo "$FILES" | xargs prettierd
+    echo "$FILES" | while IFS= read -r file; do
+        tmp="$(mktemp)"
+        if prettierd "$file" < "$file" > "$tmp"; then
+            mv "$tmp" "$file"
+        else
+            rm -f "$tmp"
+            exit 1
+        fi
+    done
     echo "$FILES" | xargs git add
 fi
 
