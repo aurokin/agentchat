@@ -51,7 +51,7 @@ Each live conversation runtime should keep:
 - `rootPath`
 - `processHandle`
 - `status`
-- `providerThreadId`
+- `providerConversationId`
 - `activeRunId`
 - `lastActivityAt`
 - `idleExpiresAt`
@@ -68,8 +68,7 @@ Multiple runtime records may be active for the same user at once.
 The backend must persist enough data to recover a conversation:
 
 - provider
-- provider thread id
-- provider resume token if available
+- provider conversation id
 - active run id if one exists
 - last error
 - expiration metadata
@@ -250,4 +249,4 @@ To preserve compatibility:
 
 - keep the runtime adapter interface generic via the `KindRuntime` abstraction
 - do not bake Codex thread names into domain models
-- treat `providerThreadId` as runtime-owned state behind a generic binding
+- treat Codex thread ids as provider conversation ids behind a generic binding

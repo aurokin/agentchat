@@ -1715,8 +1715,7 @@ type PersistedRunState = {
     binding: {
         provider: string;
         status: string;
-        providerThreadId: string | null;
-        providerResumeToken: string | null;
+        providerConversationId: string | null;
         activeRunId: string | null;
         lastError: string | null;
         lastEventAt: number | null;
@@ -1834,8 +1833,7 @@ async function readPersistedRunState(params: {
         binding: {
             provider: string;
             status: string;
-            providerThreadId: string | null;
-            providerResumeToken: string | null;
+            providerConversationId: string | null;
             activeRunId: string | null;
             lastError: string | null;
             lastEventAt: number | null;
@@ -2028,8 +2026,7 @@ function assertTerminalBinding(params: {
     binding: {
         provider: string;
         status: string;
-        providerThreadId: string | null;
-        providerResumeToken: string | null;
+        providerConversationId: string | null;
         activeRunId: string | null;
         lastError: string | null;
         lastEventAt: number | null;
@@ -2069,13 +2066,9 @@ function assertTerminalBinding(params: {
         "Expected runtime binding expiresAt to remain null until idle eviction.",
     );
     invariant(
-        typeof params.binding.providerThreadId === "string" &&
-            params.binding.providerThreadId.length > 0,
-        "Expected runtime binding providerThreadId to be persisted.",
-    );
-    invariant(
-        params.binding.providerResumeToken === null,
-        "Expected runtime binding providerResumeToken to remain null for Codex runs.",
+        typeof params.binding.providerConversationId === "string" &&
+            params.binding.providerConversationId.length > 0,
+        "Expected runtime binding providerConversationId to be persisted.",
     );
     invariant(
         typeof params.binding.updatedAt === "number",
@@ -2104,7 +2097,7 @@ function assertTerminalBinding(params: {
     }
     if (params.expectedThreadId) {
         invariant(
-            params.binding.providerThreadId === params.expectedThreadId,
+            params.binding.providerConversationId === params.expectedThreadId,
             "Expected runtime binding thread id to match the completed run thread.",
         );
     }
@@ -2123,9 +2116,7 @@ function seedConversationAndDraft(params: {
     prompt: string;
 }): SeededConversation {
     const ids = createIds(params.label, params.now);
-    const reasoningEffort = resolveLiveRuntimeReasoningEffort(
-        params.variantId,
-    );
+    const reasoningEffort = resolveLiveRuntimeReasoningEffort(params.variantId);
 
     const chatId = runConvex<string>({
         repoRoot: params.repoRoot,
@@ -2282,8 +2273,7 @@ async function runLiveRuntimeSmoke(
                 conversationLocalId: ids.conversationId,
                 provider: providerId,
                 status: "expired",
-                providerThreadId: "00000000-0000-4000-8000-000000000bad",
-                providerResumeToken: null,
+                providerConversationId: "00000000-0000-4000-8000-000000000bad",
                 activeRunId: null,
                 lastError: null,
                 lastEventAt: now + 3,
@@ -2890,7 +2880,7 @@ async function runLiveRuntimeSmoke(
                 "Expected a runtime binding after stale resume recovery.",
             );
             invariant(
-                binding.providerThreadId !==
+                binding.providerConversationId !==
                     "00000000-0000-4000-8000-000000000bad",
                 "Expected stale runtime binding to be replaced with a fresh thread id.",
             );

@@ -138,8 +138,7 @@ describe("runtime ingress", () => {
                 chatId: "chats:missing",
                 provider: "codex",
                 status: "active",
-                providerThreadId: null,
-                providerResumeToken: null,
+                providerConversationId: null,
                 activeRunId: "run:test",
                 lastError: null,
                 lastEventAt: 123,
@@ -171,8 +170,7 @@ describe("runtime ingress", () => {
             userId: "users:test",
             provider: "codex",
             status: "active",
-            providerThreadId: "thread-1",
-            providerResumeToken: null,
+            providerConversationId: "thread-1",
             activeRunId: "run:test",
             lastError: null,
             lastEventAt: 100,
@@ -215,8 +213,7 @@ describe("runtime ingress", () => {
                 chatId: "chats:1",
                 provider: "codex",
                 status: "idle",
-                providerThreadId: "thread-1",
-                providerResumeToken: null,
+                providerConversationId: "thread-1",
                 activeRunId: null,
                 lastError: null,
                 lastEventAt: 123,
@@ -231,8 +228,7 @@ describe("runtime ingress", () => {
             userId: "users:test",
             provider: "codex",
             status: "idle",
-            providerThreadId: "thread-1",
-            providerResumeToken: null,
+            providerConversationId: "thread-1",
             activeRunId: null,
             lastError: null,
             lastEventAt: 123,
@@ -331,7 +327,7 @@ describe("runtime ingress", () => {
                 assistantMessageLocalId: "assistant-1",
                 externalRunId: "run:test",
                 provider: "codex",
-                providerThreadId: "thread-1",
+                providerConversationId: "thread-1",
                 providerTurnId: "turn-1",
                 workspaceMode: "copy-on-conversation",
                 workspaceRootPath: "/repos/agent-a",
@@ -347,8 +343,7 @@ describe("runtime ingress", () => {
             userId: "users:test",
             provider: "codex",
             status: "active",
-            providerThreadId: "thread-1",
-            providerResumeToken: null,
+            providerConversationId: "thread-1",
             activeRunId: "run:test",
             lastError: null,
             lastEventAt: 123,
@@ -377,7 +372,7 @@ describe("runtime ingress", () => {
             provider: "codex",
             status: "running",
             outputMessageId: "messages:assistant",
-            providerThreadId: "thread-1",
+            providerConversationId: "thread-1",
         }));
         const messageCollect = mock(async () => [
             {
@@ -400,8 +395,7 @@ describe("runtime ingress", () => {
             userId: "users:test",
             provider: "codex",
             status: "active",
-            providerThreadId: "thread-1",
-            providerResumeToken: null,
+            providerConversationId: "thread-1",
             activeRunId: "run:test",
             lastError: null,
             lastEventAt: 100,
@@ -470,8 +464,7 @@ describe("runtime ingress", () => {
             userId: "users:test",
             provider: "codex",
             status: "idle",
-            providerThreadId: "thread-1",
-            providerResumeToken: null,
+            providerConversationId: "thread-1",
             activeRunId: null,
             lastError: null,
             lastEventAt: 123,
@@ -510,7 +503,7 @@ describe("runtime ingress", () => {
             provider: "codex",
             status: "running",
             outputMessageId: "messages:assistant",
-            providerThreadId: "thread-1",
+            providerConversationId: "thread-1",
         }));
         const bindingUnique = mock(async () => ({
             _id: "runtimeBindings:1",
@@ -518,8 +511,7 @@ describe("runtime ingress", () => {
             userId: "users:test",
             provider: "codex",
             status: "active",
-            providerThreadId: "thread-1",
-            providerResumeToken: null,
+            providerConversationId: "thread-1",
             activeRunId: "run:test",
             lastError: null,
             lastEventAt: 100,
@@ -612,8 +604,7 @@ describe("runtime ingress", () => {
             userId: "users:test",
             provider: "codex",
             status: "errored",
-            providerThreadId: "thread-1",
-            providerResumeToken: null,
+            providerConversationId: "thread-1",
             activeRunId: null,
             lastError: "stale",
             lastEventAt: 123,
@@ -636,8 +627,7 @@ describe("runtime ingress", () => {
         const bindingUnique = mock(async () => ({
             provider: "codex",
             status: "idle",
-            providerThreadId: "thread-1",
-            providerResumeToken: null,
+            providerConversationId: "thread-1",
             activeRunId: null,
             lastError: null,
             lastEventAt: 123,
@@ -679,8 +669,7 @@ describe("runtime ingress", () => {
             binding: {
                 provider: "codex",
                 status: "idle",
-                providerThreadId: "thread-1",
-                providerResumeToken: null,
+                providerConversationId: "thread-1",
                 activeRunId: null,
                 lastError: null,
                 lastEventAt: 123,
@@ -688,6 +677,133 @@ describe("runtime ingress", () => {
                 workspaceMode: "copy-on-conversation",
                 workspaceRootPath: "/repos/agent-a",
                 workspaceCwd: "/sandboxes/agent-a/user/chat",
+                updatedAt: 456,
+            },
+        });
+    });
+
+    test("returns legacy provider thread ids as provider conversation ids", async () => {
+        const chatCollect = mock(async () => [
+            {
+                _id: "chats:1",
+                updatedAt: 100,
+                createdAt: 100,
+            },
+        ]);
+        const bindingUnique = mock(async () => ({
+            provider: "codex",
+            status: "idle",
+            providerThreadId: "thread-legacy",
+            activeRunId: null,
+            lastError: null,
+            lastEventAt: 123,
+            expiresAt: null,
+            updatedAt: 456,
+        }));
+        const query = (table: string) => {
+            if (table === "chats") {
+                return {
+                    withIndex: mock(() => ({
+                        collect: chatCollect,
+                    })),
+                };
+            }
+
+            return {
+                withIndex: mock(() => ({
+                    unique: bindingUnique,
+                })),
+            };
+        };
+        const ctx = {
+            db: {
+                query,
+            },
+        };
+
+        await expect(
+            runHandler(readRuntimeBinding as unknown as HandlerExport, ctx, {
+                userId: "users:test",
+                agentId: "agent-1",
+                conversationLocalId: "chat:1",
+            }),
+        ).resolves.toEqual({
+            chatId: "chats:1",
+            binding: {
+                provider: "codex",
+                status: "idle",
+                providerConversationId: "thread-legacy",
+                activeRunId: null,
+                lastError: null,
+                lastEventAt: 123,
+                expiresAt: null,
+                workspaceMode: undefined,
+                workspaceRootPath: undefined,
+                workspaceCwd: undefined,
+                updatedAt: 456,
+            },
+        });
+    });
+
+    test("honors explicit null provider conversation ids over legacy thread ids", async () => {
+        const chatCollect = mock(async () => [
+            {
+                _id: "chats:1",
+                updatedAt: 100,
+                createdAt: 100,
+            },
+        ]);
+        const bindingUnique = mock(async () => ({
+            provider: "codex",
+            status: "idle",
+            providerConversationId: null,
+            providerThreadId: "thread-stale",
+            activeRunId: null,
+            lastError: null,
+            lastEventAt: 123,
+            expiresAt: null,
+            updatedAt: 456,
+        }));
+        const query = (table: string) => {
+            if (table === "chats") {
+                return {
+                    withIndex: mock(() => ({
+                        collect: chatCollect,
+                    })),
+                };
+            }
+
+            return {
+                withIndex: mock(() => ({
+                    unique: bindingUnique,
+                })),
+            };
+        };
+        const ctx = {
+            db: {
+                query,
+            },
+        };
+
+        await expect(
+            runHandler(readRuntimeBinding as unknown as HandlerExport, ctx, {
+                userId: "users:test",
+                agentId: "agent-1",
+                conversationLocalId: "chat:1",
+            }),
+        ).resolves.toEqual({
+            chatId: "chats:1",
+            binding: {
+                provider: "codex",
+                status: "idle",
+                providerConversationId: null,
+                activeRunId: null,
+                lastError: null,
+                lastEventAt: 123,
+                expiresAt: null,
+                workspaceMode: undefined,
+                workspaceRootPath: undefined,
+                workspaceCwd: undefined,
                 updatedAt: 456,
             },
         });
@@ -948,8 +1064,7 @@ describe("runtime ingress", () => {
         const bindingUnique = mock(async () => ({
             provider: "codex",
             status: "idle",
-            providerThreadId: "thread-b",
-            providerResumeToken: null,
+            providerConversationId: "thread-b",
             activeRunId: null,
             lastError: null,
             lastEventAt: 123,
@@ -989,7 +1104,7 @@ describe("runtime ingress", () => {
         ).resolves.toMatchObject({
             chatId: "chats:agent-b",
             binding: {
-                providerThreadId: "thread-b",
+                providerConversationId: "thread-b",
                 workspaceRootPath: "/repos/agent-b",
             },
         });
@@ -1011,8 +1126,7 @@ describe("runtime ingress", () => {
         const bindingUnique = mock(async () => ({
             provider: "codex",
             status: "idle",
-            providerThreadId: "thread-should-not-load",
-            providerResumeToken: null,
+            providerConversationId: "thread-should-not-load",
             activeRunId: null,
             lastError: null,
             lastEventAt: 123,
@@ -1067,8 +1181,7 @@ describe("runtime ingress", () => {
             userId: "users:test",
             provider: "codex",
             status: "idle",
-            providerThreadId: "thread-old",
-            providerResumeToken: null,
+            providerConversationId: "thread-old",
             activeRunId: null,
             lastError: null,
             lastEventAt: 100,
@@ -1106,8 +1219,7 @@ describe("runtime ingress", () => {
                 chatId: "chats:agent-b",
                 provider: "codex",
                 status: "active",
-                providerThreadId: "thread-new",
-                providerResumeToken: null,
+                providerConversationId: "thread-new",
                 activeRunId: "run:test",
                 lastError: null,
                 lastEventAt: 123,
@@ -1122,8 +1234,7 @@ describe("runtime ingress", () => {
             userId: "users:test",
             provider: "codex",
             status: "active",
-            providerThreadId: "thread-new",
-            providerResumeToken: null,
+            providerConversationId: "thread-new",
             activeRunId: "run:test",
             lastError: null,
             lastEventAt: 123,
@@ -1176,8 +1287,7 @@ describe("runtime ingress", () => {
                 chatId: "chats:old",
                 provider: "codex",
                 status: "errored",
-                providerThreadId: "thread-old",
-                providerResumeToken: null,
+                providerConversationId: "thread-old",
                 activeRunId: null,
                 lastError: "stale",
                 lastEventAt: 123,
@@ -1205,7 +1315,7 @@ describe("runtime ingress", () => {
             chatId: "chats:old",
             provider: "codex",
             status: "running",
-            providerThreadId: "thread-old",
+            providerConversationId: "thread-old",
         }));
         const messageCollect = mock(async () => [
             {
@@ -1286,7 +1396,7 @@ describe("runtime ingress", () => {
             chatId: "chats:current",
             provider: "codex",
             status: "running",
-            providerThreadId: "thread-current",
+            providerConversationId: "thread-current",
         }));
         const messageCollect = mock(async () => [
             {
@@ -1410,7 +1520,7 @@ describe("runtime ingress", () => {
             chatId: "chats:current",
             provider: "codex",
             status: "running",
-            providerThreadId: "thread-current",
+            providerConversationId: "thread-current",
         }));
         const messageCollect = mock(async () => []);
         const bindingUnique = mock(async () => null);
@@ -1507,7 +1617,7 @@ describe("runtime ingress", () => {
             chatId: "chats:current",
             provider: "codex",
             status: "running",
-            providerThreadId: "thread-current",
+            providerConversationId: "thread-current",
         }));
         const triggerMessageCollect = mock(async () => [
             {
@@ -1611,7 +1721,7 @@ describe("runtime ingress", () => {
             chatId: "chats:current",
             provider: "codex",
             status: "running",
-            providerThreadId: "thread-current",
+            providerConversationId: "thread-current",
         }));
         const messageCollect = mock(async () => [
             {
@@ -1706,8 +1816,7 @@ describe("runtime ingress", () => {
             userId: "users:test",
             provider: "codex",
             status: "idle",
-            providerThreadId: "thread-current",
-            providerResumeToken: null,
+            providerConversationId: "thread-current",
             activeRunId: null,
             lastError: null,
             lastEventAt: 100,
@@ -1745,8 +1854,7 @@ describe("runtime ingress", () => {
                 chatId: "chats:current",
                 provider: "codex",
                 status: "active",
-                providerThreadId: "thread-current",
-                providerResumeToken: null,
+                providerConversationId: "thread-current",
                 activeRunId: "run:test",
                 lastError: null,
                 lastEventAt: 123,
@@ -1761,8 +1869,7 @@ describe("runtime ingress", () => {
             userId: "users:test",
             provider: "codex",
             status: "active",
-            providerThreadId: "thread-current",
-            providerResumeToken: null,
+            providerConversationId: "thread-current",
             activeRunId: "run:test",
             lastError: null,
             lastEventAt: 123,
@@ -1789,7 +1896,7 @@ describe("runtime ingress", () => {
             chatId: "chats:1",
             provider: "codex",
             status: "completed",
-            providerThreadId: "thread-1",
+            providerConversationId: "thread-1",
             completedAt: 200,
         }));
         const messageUnique = mock(async () => ({
@@ -1864,7 +1971,7 @@ describe("runtime ingress", () => {
             chatId: "chats:1",
             provider: "codex",
             status: "completed",
-            providerThreadId: "thread-1",
+            providerConversationId: "thread-1",
             completedAt: 200,
         }));
         const messageUnique = mock(async () => ({
@@ -1940,8 +2047,7 @@ describe("runtime ingress", () => {
             userId: "users:test",
             provider: "codex",
             status: "idle",
-            providerThreadId: "thread-new",
-            providerResumeToken: null,
+            providerConversationId: "thread-new",
             activeRunId: null,
             lastError: null,
             lastEventAt: 200,
@@ -1979,8 +2085,7 @@ describe("runtime ingress", () => {
                 chatId: "chats:1",
                 provider: "codex",
                 status: "expired",
-                providerThreadId: "thread-old",
-                providerResumeToken: null,
+                providerConversationId: "thread-old",
                 activeRunId: null,
                 lastError: null,
                 lastEventAt: 100,
@@ -2009,8 +2114,7 @@ describe("runtime ingress", () => {
             userId: "users:test",
             provider: "codex",
             status: "idle",
-            providerThreadId: "thread-new",
-            providerResumeToken: null,
+            providerConversationId: "thread-new",
             activeRunId: null,
             lastError: null,
             lastEventAt: 200,
@@ -2048,8 +2152,7 @@ describe("runtime ingress", () => {
                 chatId: "chats:1",
                 provider: "codex",
                 status: "expired",
-                providerThreadId: "thread-old",
-                providerResumeToken: null,
+                providerConversationId: "thread-old",
                 activeRunId: null,
                 lastError: null,
                 lastEventAt: 200,
@@ -2103,7 +2206,7 @@ describe("runtime ingress", () => {
                 assistantMessageLocalId: "assistant-1",
                 externalRunId: "run-1",
                 provider: "codex",
-                providerThreadId: "thread-1",
+                providerConversationId: "thread-1",
                 providerTurnId: "turn-1",
                 startedAt: 123,
             }),

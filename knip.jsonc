@@ -6,6 +6,7 @@
         "eslint-plugin-react",
         "eslint-plugin-react-hooks",
         "typescript-eslint",
+        "@fsouza/prettierd",
     ],
     "ignore": ["packages/convex/convex/_generated/**"],
 }

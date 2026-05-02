@@ -550,7 +550,7 @@ export class CodexRuntimeManager {
                             params.command.payload.assistantMessageId,
                         externalRunId: runId,
                         provider: runtime.provider.id,
-                        providerThreadId: runtime.threadId,
+                        providerConversationId: runtime.threadId,
                         providerTurnId: null,
                         workspaceMode: runtime.agent.workspaceMode,
                         workspaceRootPath: runtime.agent.rootPath,
@@ -683,8 +683,7 @@ export class CodexRuntimeManager {
                                 params.command.payload.conversationId,
                             provider: runtime.provider.id,
                             status: "errored",
-                            providerThreadId: runtime.threadId,
-                            providerResumeToken: null,
+                            providerConversationId: runtime.threadId,
                             activeRunId: null,
                             lastError: errorMessage,
                             lastEventAt: erroredBindingUpdatedAt,
@@ -1254,7 +1253,9 @@ export class CodexRuntimeManager {
                 session,
                 provider: resources.provider,
                 bindingProviderId: resumableBinding?.provider ?? null,
-                bindingThreadId: resumableBinding?.providerThreadId ?? null,
+                bindingThreadId: resumableBinding
+                    ? getPersistedProviderConversationId(resumableBinding)
+                    : null,
                 modelId: params.command.payload.modelId,
                 cwd,
             });
@@ -1279,8 +1280,7 @@ export class CodexRuntimeManager {
                 conversationLocalId: params.command.payload.conversationId,
                 provider: resources.provider.id,
                 status: "idle",
-                providerThreadId: threadId,
-                providerResumeToken: null,
+                providerConversationId: threadId,
                 activeRunId: null,
                 lastError: null,
                 lastEventAt: bindingUpdatedAt,
@@ -1666,8 +1666,7 @@ export class CodexRuntimeManager {
                         conversationLocalId: params.conversationId,
                         provider: persistedBinding.provider,
                         status: "errored",
-                        providerThreadId: null,
-                        providerResumeToken: null,
+                        providerConversationId: null,
                         activeRunId: null,
                         lastError:
                             error instanceof Error
@@ -1792,8 +1791,7 @@ export class CodexRuntimeManager {
                 conversationLocalId: runtime.conversationId,
                 provider: runtime.provider.id,
                 status: "errored",
-                providerThreadId: runtime.threadId,
-                providerResumeToken: null,
+                providerConversationId: runtime.threadId,
                 activeRunId: null,
                 lastError: error.message,
                 lastEventAt: runtimeErroredAt,
@@ -1840,8 +1838,7 @@ export class CodexRuntimeManager {
                     conversationLocalId: runtime.conversationId,
                     provider: runtime.provider.id,
                     status: "active",
-                    providerThreadId: runtime.threadId,
-                    providerResumeToken: null,
+                    providerConversationId: runtime.threadId,
                     activeRunId: activeTurn.runId,
                     lastError: null,
                     lastEventAt: updatedAt,
@@ -2272,8 +2269,7 @@ export class CodexRuntimeManager {
             conversationLocalId: runtime.conversationId,
             provider: runtime.provider.id,
             status: "idle",
-            providerThreadId: runtime.threadId,
-            providerResumeToken: null,
+            providerConversationId: runtime.threadId,
             activeRunId: null,
             lastError: null,
             lastEventAt: updatedAt,
@@ -2310,8 +2306,7 @@ export class CodexRuntimeManager {
                         conversationLocalId: runtime.conversationId,
                         provider: runtime.provider.id,
                         status: "expired",
-                        providerThreadId: runtime.threadId,
-                        providerResumeToken: null,
+                        providerConversationId: runtime.threadId,
                         activeRunId: null,
                         lastError: null,
                         lastEventAt: expiredAt,
@@ -2541,6 +2536,14 @@ function shouldResetPersistedRuntimeBinding(
         },
         desired,
     );
+}
+
+function getPersistedProviderConversationId(
+    binding: PersistedRuntimeBinding,
+): string | null {
+    return binding.providerConversationId === undefined
+        ? (binding.providerThreadId ?? null)
+        : binding.providerConversationId;
 }
 
 function runtimeWorkspaceMatches(

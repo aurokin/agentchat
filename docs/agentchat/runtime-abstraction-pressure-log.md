@@ -57,17 +57,17 @@ change transport substrate / implement later / reject
 
 The Runtime Abstraction Retrospective classified the current open pressure as:
 
-| Entry                                                    | Disposition                                                                                                                                                 |
-| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Claude Code - Late Session Identity                      | Change persistence/schema later. Current `providerThreadId` remains as a compatibility field and is treated semantically as provider conversation identity. |
-| Claude Code - Non-Text Stream Content                    | Keep adapter-specific through provider artifacts. Do not add shared tool UX yet.                                                                            |
-| Claude Code - Interrupt Signal Semantics                 | Change transport substrate narrowly. AUR-158 testing proved Claude Code emits a cleaner structured cancellation result for `SIGINT` than for `SIGTERM`.     |
-| ACP - Session Resume And Close                           | Implement later only when a concrete ACP target needs richer lifecycle semantics.                                                                           |
-| ACP - Permission Requests Without Approval UI            | Implement later with approval UI or a richer permission contract; keep current fail-closed/non-persistent auto-approve behavior.                            |
-| ACP - Unstable Elicitation And Auxiliary Client Requests | Implement later only when a real ACP target requires these client-handled requests.                                                                         |
-| ACP - Target Selection Through Operator Config           | Keep adapter-specific as raw operator config. No typed profile layer yet.                                                                                   |
-| ACP - Session Load Without Resume Or Close Semantics     | Keep adapter-specific; stale load fallback heals bindings without schema changes.                                                                           |
-| ACP - Prompt Cancellation Fallback                       | Keep adapter-specific; promote only if another adapter needs the same cancellation knobs.                                                                   |
+| Entry                                                    | Disposition                                                                                                                                             |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Claude Code - Late Session Identity                      | Change persistence/schema. AUR-157 promotes `providerConversationId` and keeps `providerThreadId` as a legacy read fallback.                            |
+| Claude Code - Non-Text Stream Content                    | Keep adapter-specific through provider artifacts. Do not add shared tool UX yet.                                                                        |
+| Claude Code - Interrupt Signal Semantics                 | Change transport substrate narrowly. AUR-158 testing proved Claude Code emits a cleaner structured cancellation result for `SIGINT` than for `SIGTERM`. |
+| ACP - Session Resume And Close                           | Implement later only when a concrete ACP target needs richer lifecycle semantics.                                                                       |
+| ACP - Permission Requests Without Approval UI            | Implement later with approval UI or a richer permission contract; keep current fail-closed/non-persistent auto-approve behavior.                        |
+| ACP - Unstable Elicitation And Auxiliary Client Requests | Implement later only when a real ACP target requires these client-handled requests.                                                                     |
+| ACP - Target Selection Through Operator Config           | Keep adapter-specific as raw operator config. No typed profile layer yet.                                                                               |
+| ACP - Session Load Without Resume Or Close Semantics     | Keep adapter-specific; stale load fallback heals bindings without schema changes.                                                                       |
+| ACP - Prompt Cancellation Fallback                       | Keep adapter-specific; promote only if another adapter needs the same cancellation knobs.                                                               |
 
 The full decision record is
 [Runtime Abstraction Retrospective](./runtime-abstraction-retrospective.md).
@@ -92,17 +92,16 @@ Awkward
 What we did:
 Opened first-turn conversations with a temporary adapter-local pending thread
 id, then emitted a provider identity update when the stream revealed
-`session_id`. The existing runtime binding stores that value in
-`providerThreadId`.
+`session_id`. AUR-157 now stores that value in `providerConversationId`.
 
 Fidelity risk:
-`providerThreadId` now represents Codex thread ids and Claude session ids. That
-is functionally correct for resumption, but the field name hides a real
-protocol distinction.
+The old `providerThreadId` name made Codex thread ids and Claude session ids
+look more similar than they are. `providerConversationId` keeps the shared
+resumption behavior without encoding Codex terminology.
 
 Follow-up:
-Change persistence/schema or promote a neutral provider session identity during
-AUR-143 if ACP adds the same pressure.
+Complete. AUR-157 promoted a neutral provider conversation identity field while
+keeping legacy rows readable.
 
 ### 2026-04-29 - Claude Code - Non-Text Stream Content
 
@@ -183,7 +182,7 @@ methods.
 
 Fidelity risk:
 A concrete ACP adapter may need resume-without-replay or close semantics that
-are different from current `providerThreadId` and `stop` behavior.
+are different from current provider conversation identity and `stop` behavior.
 
 Follow-up:
 Implement later during AUR-35 if the selected adapter supports these
@@ -295,7 +294,8 @@ metadata remains provider-specific.
 
 Fidelity risk:
 Some ACP targets may need resume tokens, close requests, or adapter metadata
-that cannot be represented by the current `providerThreadId` binding alone.
+that cannot be represented by the current `providerConversationId` binding
+alone.
 
 Follow-up:
 Classify during AUR-143 after testing a real ACP target. Promote only the

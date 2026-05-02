@@ -114,7 +114,8 @@ Current run data includes:
 - `status`
 - `triggerMessageId`
 - `outputMessageId`
-- `providerThreadId`
+- `providerConversationId`
+- `providerThreadId` legacy read fallback
 - `providerTurnId`
 - `startedAt`
 - `completedAt`
@@ -153,8 +154,9 @@ Current binding data includes:
 - `userId`
 - `provider`
 - `status`
-- `providerThreadId`
-- `providerResumeToken`
+- `providerConversationId`
+- `providerThreadId` legacy read fallback
+- `providerResumeToken` legacy schema compatibility only
 - `activeRunId`
 - `lastError`
 - `lastEventAt`

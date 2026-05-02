@@ -35,6 +35,25 @@ type RunEventKind =
 type RuntimeMutationCtx = MutationCtx;
 type RuntimeQueryCtx = QueryCtx;
 
+function getRunProviderConversationId(
+    run: Pick<Doc<"runs">, "providerConversationId" | "providerThreadId">,
+): string | null {
+    return run.providerConversationId === undefined
+        ? (run.providerThreadId ?? null)
+        : run.providerConversationId;
+}
+
+function getBindingProviderConversationId(
+    binding: Pick<
+        Doc<"runtime_bindings">,
+        "providerConversationId" | "providerThreadId"
+    >,
+): string | null {
+    return binding.providerConversationId === undefined
+        ? (binding.providerThreadId ?? null)
+        : binding.providerConversationId;
+}
+
 const runtimeStatusValidator = v.union(
     v.literal("idle"),
     v.literal("active"),
@@ -225,8 +244,7 @@ async function upsertRuntimeBinding(
         userId: Id<"users">;
         provider: string;
         status: RuntimeStatus;
-        providerThreadId: string | null;
-        providerResumeToken: string | null;
+        providerConversationId: string | null;
         activeRunId: string | null;
         lastError: string | null;
         lastEventAt: number | null;
@@ -243,8 +261,7 @@ async function upsertRuntimeBinding(
         userId: args.userId,
         provider: args.provider,
         status: args.status,
-        providerThreadId: args.providerThreadId,
-        providerResumeToken: args.providerResumeToken,
+        providerConversationId: args.providerConversationId,
         activeRunId: args.activeRunId,
         lastError: args.lastError,
         lastEventAt: args.lastEventAt,
@@ -469,7 +486,7 @@ export const runStarted = internalMutation({
         assistantMessageLocalId: v.string(),
         externalRunId: v.string(),
         provider: v.string(),
-        providerThreadId: v.union(v.string(), v.null()),
+        providerConversationId: v.union(v.string(), v.null()),
         providerTurnId: v.union(v.string(), v.null()),
         workspaceMode: v.optional(
             v.union(v.literal("shared"), v.literal("copy-on-conversation")),
@@ -538,7 +555,7 @@ export const runStarted = internalMutation({
                 status: "running",
                 triggerMessageId: triggerMessage?._id ?? null,
                 outputMessageId: assistantMessage._id,
-                providerThreadId: args.providerThreadId,
+                providerConversationId: args.providerConversationId,
                 providerTurnId: args.providerTurnId,
                 startedAt: args.startedAt,
                 completedAt: null,
@@ -554,7 +571,7 @@ export const runStarted = internalMutation({
                 triggerMessageId:
                     triggerMessage?._id ?? existingRun.triggerMessageId,
                 outputMessageId: assistantMessage._id,
-                providerThreadId: args.providerThreadId,
+                providerConversationId: args.providerConversationId,
                 providerTurnId: args.providerTurnId,
                 startedAt: args.startedAt,
                 completedAt: null,
@@ -590,8 +607,7 @@ export const runStarted = internalMutation({
             userId: args.userId,
             provider: args.provider,
             status: "active",
-            providerThreadId: args.providerThreadId,
-            providerResumeToken: null,
+            providerConversationId: args.providerConversationId,
             activeRunId: args.externalRunId,
             lastError: null,
             lastEventAt: args.startedAt,
@@ -733,8 +749,7 @@ export const messageStarted = internalMutation({
             userId: args.userId,
             provider: run.provider,
             status: "active",
-            providerThreadId: run.providerThreadId,
-            providerResumeToken: null,
+            providerConversationId: getRunProviderConversationId(run),
             activeRunId: args.externalRunId,
             lastError: null,
             lastEventAt: args.createdAt,
@@ -767,8 +782,8 @@ export const readRuntimeBinding = internalQuery({
                 ? {
                       provider: binding.provider,
                       status: binding.status,
-                      providerThreadId: binding.providerThreadId,
-                      providerResumeToken: binding.providerResumeToken,
+                      providerConversationId:
+                          getBindingProviderConversationId(binding),
                       activeRunId: binding.activeRunId,
                       lastError: binding.lastError,
                       lastEventAt: binding.lastEventAt,
@@ -868,8 +883,7 @@ export const messageDelta = internalMutation({
             userId: args.userId,
             provider: run.provider,
             status: "active",
-            providerThreadId: run.providerThreadId,
-            providerResumeToken: null,
+            providerConversationId: getRunProviderConversationId(run),
             activeRunId: args.externalRunId,
             lastError: null,
             lastEventAt: args.createdAt,
@@ -1001,8 +1015,7 @@ async function finalizeRun(
         userId: args.userId,
         provider: run.provider,
         status: args.runStatus === "errored" ? "errored" : "idle",
-        providerThreadId: run.providerThreadId,
-        providerResumeToken: null,
+        providerConversationId: getRunProviderConversationId(run),
         activeRunId: null,
         lastError: args.errorMessage,
         lastEventAt: args.completedAt,
@@ -1288,8 +1301,7 @@ export const runtimeBinding = internalMutation({
         conversationLocalId: v.string(),
         provider: v.string(),
         status: runtimeStatusValidator,
-        providerThreadId: v.union(v.string(), v.null()),
-        providerResumeToken: v.union(v.string(), v.null()),
+        providerConversationId: v.union(v.string(), v.null()),
         activeRunId: v.union(v.string(), v.null()),
         lastError: v.union(v.string(), v.null()),
         lastEventAt: v.union(v.number(), v.null()),
@@ -1317,8 +1329,7 @@ export const runtimeBinding = internalMutation({
             userId: args.userId,
             provider: args.provider,
             status: args.status,
-            providerThreadId: args.providerThreadId,
-            providerResumeToken: args.providerResumeToken,
+            providerConversationId: args.providerConversationId,
             activeRunId: args.activeRunId,
             lastError: args.lastError,
             lastEventAt: args.lastEventAt,

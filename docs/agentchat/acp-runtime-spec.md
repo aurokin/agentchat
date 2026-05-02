@@ -48,10 +48,9 @@ The first ACP implementation should use one ACP agent process per active
 conversation unless a specific target proves that process-per-agent
 multiplexing is safer.
 
-The runtime binding stores the ACP session id. Current storage uses the
-compatibility `providerThreadId` field; the runtime-kind contract treats that
-field semantically as provider conversation identity until a future schema
-migration justifies a neutral name.
+The runtime binding stores the ACP session id as `providerConversationId`.
+Existing `providerThreadId` rows are read as legacy fallback data, but new
+server builds write only the neutral field.
 
 ## Startup Flow
 

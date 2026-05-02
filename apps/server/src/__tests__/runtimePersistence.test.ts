@@ -99,8 +99,7 @@ describe("RuntimePersistenceClient", () => {
                 binding: {
                     provider: "codex-main",
                     status: "active",
-                    providerThreadId: "thread-1",
-                    providerResumeToken: null,
+                    providerConversationId: "thread-1",
                     activeRunId: "run-1",
                     lastError: null,
                     lastEventAt: 1,
@@ -126,8 +125,7 @@ describe("RuntimePersistenceClient", () => {
             binding: {
                 provider: "codex-main",
                 status: "active",
-                providerThreadId: "thread-1",
-                providerResumeToken: null,
+                providerConversationId: "thread-1",
                 activeRunId: "run-1",
                 lastError: null,
                 lastEventAt: 1,

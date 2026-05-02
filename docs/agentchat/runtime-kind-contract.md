@@ -94,14 +94,14 @@ Known common fields:
 - runtime config id
 - status
 - active run id
-- provider thread or session id when applicable
-- provider resume token when applicable
+- provider conversation id when applicable
 - last error and last event timestamp
 - workspace identity metadata
 
-Possible future fields, deferred by AUR-143 until a migration is justified:
+Possible future fields, deferred until concrete adapter pressure justifies
+them:
 
-- provider session id
+- provider resume token
 - adapter metadata as bounded structured data
 
 Specific adapters should not need schema changes for every small provider
@@ -109,13 +109,15 @@ detail, but new generic fields should be earned by real adapter pressure. Use
 bounded provider artifacts or adapter-local handling until the retrospective
 decides a field belongs in the shared persistence model.
 
-AUR-143 decision:
+AUR-157 migration:
 
-- keep the existing `providerThreadId` storage field for compatibility
-- treat it semantically as provider conversation identity
-- open a narrow schema or naming migration only when the field name itself
-  becomes a maintenance problem or a broader runtime-binding migration is
-  already needed
+- `providerConversationId` is the canonical persisted runtime identity field.
+- `providerThreadId` remains an optional legacy read fallback for existing
+  Convex rows.
+- New server builds write `providerConversationId` only.
+- `providerResumeToken` remains schema-compatible legacy data only; active
+  runtime adapters should use adapter-local handling or provider artifacts until
+  a real resumability need earns a generic field.
 
 ## Normalized Updates
 

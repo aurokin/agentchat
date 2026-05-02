@@ -3,8 +3,8 @@ type RuntimeEventPayload = Record<string, unknown>;
 export type PersistedRuntimeBinding = {
     provider: string;
     status: "idle" | "active" | "expired" | "errored";
-    providerThreadId: string | null;
-    providerResumeToken: string | null;
+    providerConversationId?: string | null;
+    providerThreadId?: string | null;
     activeRunId: string | null;
     lastError: string | null;
     lastEventAt: number | null;

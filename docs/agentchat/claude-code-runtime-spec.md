@@ -204,9 +204,9 @@ Claude Code manages its own session storage:
 - Claude Code handles its own context window management internally.
 
 The Agentchat adapter stores only the `sessionId` string in the runtime binding.
-Current storage uses the compatibility `providerThreadId` field; the
-runtime-kind contract treats that field semantically as provider conversation
-identity until a future schema migration justifies a neutral name.
+Current storage uses `providerConversationId`; existing `providerThreadId`
+rows remain a read fallback for conversations created before the naming
+migration.
 
 ### Session Limitations
 

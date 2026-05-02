@@ -394,7 +394,8 @@ class CompletingRuntimeKind implements RuntimeKind {
 function createPersistence(
     binding: {
         provider: string;
-        providerThreadId: string | null;
+        providerConversationId?: string | null;
+        providerThreadId?: string | null;
         status?: "idle" | "active" | "expired" | "errored";
         activeRunId?: string | null;
         workspaceMode?: "shared" | "copy-on-conversation";
@@ -436,8 +437,10 @@ function createPersistence(
                     ? {
                           provider: binding.provider,
                           status: binding.status ?? ("expired" as const),
-                          providerThreadId: binding.providerThreadId,
-                          providerResumeToken: null,
+                          providerConversationId:
+                              binding.providerConversationId === undefined
+                                  ? (binding.providerThreadId ?? null)
+                                  : binding.providerConversationId,
                           activeRunId: binding.activeRunId ?? null,
                           lastError: null,
                           lastEventAt: null,
@@ -650,7 +653,7 @@ describe("CodexRuntimeManager", () => {
         const config = createConfig();
         const persistence = createPersistence({
             provider: "codex-default",
-            providerThreadId: "thread-existing",
+            providerConversationId: "thread-existing",
             workspaceMode: "shared",
             workspaceRootPath: config.agents[0]!.rootPath,
             workspaceCwd: config.agents[0]!.rootPath,
@@ -706,6 +709,74 @@ describe("CodexRuntimeManager", () => {
             "message.completed",
             "run.completed",
         ]);
+    });
+
+    test("resumes legacy runtime bindings from providerThreadId", async () => {
+        const config = createConfig();
+        const persistence = createPersistence({
+            provider: "codex-default",
+            providerThreadId: "thread-existing",
+            workspaceMode: "shared",
+            workspaceRootPath: config.agents[0]!.rootPath,
+            workspaceCwd: config.agents[0]!.rootPath,
+        });
+        const fakeClient = new FakeCodexClient({
+            resumedThreadId: "thread-existing",
+        });
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: () => fakeClient,
+        });
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        expect(fakeClient.requests[0]).toMatchObject({
+            method: "thread/resume",
+            params: { threadId: "thread-existing" },
+        });
+        expect(persistence.runtimeBindingCalls[0]).toMatchObject({
+            providerConversationId: "thread-existing",
+        });
+    });
+
+    test("does not resume stale legacy thread ids after explicit identity clears", async () => {
+        const config = createConfig();
+        const persistence = createPersistence({
+            provider: "codex-default",
+            providerConversationId: null,
+            providerThreadId: "thread-stale",
+            workspaceMode: "shared",
+            workspaceRootPath: config.agents[0]!.rootPath,
+            workspaceCwd: config.agents[0]!.rootPath,
+        });
+        const fakeClient = new FakeCodexClient({
+            startedThreadId: "thread-fresh",
+        });
+        const manager = new CodexRuntimeManager({
+            getConfig: () => config,
+            persistence: persistence as unknown as RuntimePersistenceClient,
+            createClient: () => fakeClient,
+        });
+
+        await manager.sendMessage({
+            userId: "user-1",
+            subscriberId: "socket-1",
+            command: createCommand(),
+            sendEvent: () => undefined,
+        });
+
+        expect(fakeClient.requests[0]).toMatchObject({
+            method: "thread/start",
+        });
+        expect(persistence.runtimeBindingCalls[0]).toMatchObject({
+            providerConversationId: "thread-fresh",
+        });
     });
 
     test("uses the selected Codex effort variant directly", async () => {
@@ -1056,7 +1127,7 @@ describe("CodexRuntimeManager", () => {
         const config = createConfig();
         const persistence = createPersistence({
             provider: "codex-default",
-            providerThreadId: "thread-stale",
+            providerConversationId: "thread-stale",
             workspaceMode: "shared",
             workspaceRootPath: config.agents[0]!.rootPath,
             workspaceCwd: config.agents[0]!.rootPath,
@@ -1101,7 +1172,7 @@ describe("CodexRuntimeManager", () => {
         const config = createConfig();
         const persistence = createPersistence({
             provider: "codex-default",
-            providerThreadId: "thread-stale",
+            providerConversationId: "thread-stale",
             workspaceMode: "shared",
             workspaceRootPath: config.agents[0]!.rootPath,
             workspaceCwd: config.agents[0]!.rootPath,
@@ -1152,7 +1223,7 @@ describe("CodexRuntimeManager", () => {
         );
         const persistence = createPersistence({
             provider: "codex-default",
-            providerThreadId: "thread-stale",
+            providerConversationId: "thread-stale",
             workspaceMode: "copy-on-conversation",
             workspaceRootPath: agentRoot,
             workspaceCwd: workspacePath,
@@ -1333,7 +1404,7 @@ describe("CodexRuntimeManager", () => {
         expect(persistence.runtimeBindingCalls[0]).toMatchObject({
             conversationLocalId: "chat-1",
             status: "idle",
-            providerThreadId: "thread-fresh",
+            providerConversationId: "thread-fresh",
             activeRunId: null,
             workspaceMode: "shared",
             workspaceRootPath: config.agents[0]!.rootPath,
@@ -1409,24 +1480,24 @@ describe("CodexRuntimeManager", () => {
         await waitFor(
             () =>
                 persistence.runtimeBindingCalls.at(-1)?.status === "idle" &&
-                persistence.runtimeBindingCalls.at(-1)?.providerThreadId ===
-                    "provider-session-1",
+                persistence.runtimeBindingCalls.at(-1)
+                    ?.providerConversationId === "provider-session-1",
         );
 
         expect(persistence.runStartedCalls[0]).toMatchObject({
-            providerThreadId: "provider-pending",
+            providerConversationId: "provider-pending",
         });
         expect(persistence.runtimeBindingCalls).toEqual(
             expect.arrayContaining([
                 expect.objectContaining({
-                    providerThreadId: "provider-session-1",
+                    providerConversationId: "provider-session-1",
                     status: "active",
                     activeRunId: expect.any(String),
                 }),
             ]),
         );
         expect(persistence.runtimeBindingCalls.at(-1)).toMatchObject({
-            providerThreadId: "provider-session-1",
+            providerConversationId: "provider-session-1",
             status: "idle",
             activeRunId: null,
         });
@@ -1495,7 +1566,7 @@ describe("CodexRuntimeManager", () => {
         const config = createConfig();
         const persistence = createPersistence({
             provider: "codex-default",
-            providerThreadId: "thread-orphaned",
+            providerConversationId: "thread-orphaned",
             status: "active",
             activeRunId: "run-orphaned",
             workspaceMode: "shared",
@@ -1541,7 +1612,7 @@ describe("CodexRuntimeManager", () => {
         const config = createConfig();
         const persistence = createPersistence({
             provider: "codex-default",
-            providerThreadId: "thread-orphaned",
+            providerConversationId: "thread-orphaned",
             status: "active",
             activeRunId: "run-orphaned",
             workspaceMode: "shared",
@@ -1576,8 +1647,7 @@ describe("CodexRuntimeManager", () => {
         const config = createConfig();
         const bindingState: {
             provider: string;
-            providerThreadId: string | null;
-            providerResumeToken: null;
+            providerConversationId: string | null;
             status: "idle" | "active" | "expired" | "errored";
             activeRunId: string | null;
             lastError: null;
@@ -1589,8 +1659,7 @@ describe("CodexRuntimeManager", () => {
             updatedAt: number;
         } = {
             provider: "codex-default",
-            providerThreadId: "thread-orphaned",
-            providerResumeToken: null,
+            providerConversationId: "thread-orphaned",
             status: "active",
             activeRunId: "run-orphaned",
             lastError: null,
@@ -1620,9 +1689,9 @@ describe("CodexRuntimeManager", () => {
         ) => {
             persistence.runtimeBindingCalls.push(payload);
             bindingState.provider = payload.provider as string;
-            bindingState.providerThreadId =
-                (payload.providerThreadId as string | null | undefined) ?? null;
-            bindingState.providerResumeToken = null;
+            bindingState.providerConversationId =
+                (payload.providerConversationId as string | null | undefined) ??
+                null;
             bindingState.status = payload.status as
                 | "idle"
                 | "active"
@@ -3308,8 +3377,7 @@ describe("CodexRuntimeManager", () => {
                     ? {
                           provider: "codex-default",
                           status: "idle" as const,
-                          providerThreadId: bindingThreadId,
-                          providerResumeToken: null,
+                          providerConversationId: bindingThreadId,
                           activeRunId: null,
                           lastError: null,
                           lastEventAt: null,
@@ -3588,7 +3656,7 @@ describe("CodexRuntimeManager", () => {
         const persistence = createPersistence({
             provider: "codex-default",
             status: "idle",
-            providerThreadId: "thread-stale",
+            providerConversationId: "thread-stale",
             workspaceMode: "shared",
             workspaceRootPath: firstRoot,
             workspaceCwd: firstRoot,
@@ -3648,7 +3716,7 @@ describe("CodexRuntimeManager", () => {
         const persistence = createPersistence({
             provider: "codex-default",
             status: "idle",
-            providerThreadId: "thread-stale",
+            providerConversationId: "thread-stale",
             workspaceMode: "copy-on-conversation",
             workspaceRootPath: firstRoot,
             workspaceCwd: initialWorkspace,
@@ -3698,7 +3766,7 @@ describe("CodexRuntimeManager", () => {
         const persistence = createPersistence({
             provider: "codex-default",
             status: "idle",
-            providerThreadId: "thread-existing",
+            providerConversationId: "thread-existing",
             workspaceMode: "shared",
             workspaceRootPath: aliasRoot,
             workspaceCwd: aliasRoot,
@@ -3754,7 +3822,7 @@ describe("CodexRuntimeManager", () => {
         const persistence = createPersistence({
             provider: "codex-default",
             status: "idle",
-            providerThreadId: "thread-stale",
+            providerConversationId: "thread-stale",
             workspaceMode: "copy-on-conversation",
             workspaceRootPath: agentRoot,
             workspaceCwd: initialWorkspace,

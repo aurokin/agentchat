@@ -28,9 +28,9 @@ provider-specific tool UX.
 
 Accepted contract clarifications:
 
-- Treat the persisted `providerThreadId` field as a generic provider
-  conversation identity in current code, even though the historical field name
-  remains Codex-shaped.
+- Treat persisted runtime identity as a generic provider conversation identity.
+  AUR-157 promotes `providerConversationId` as the canonical storage name while
+  retaining `providerThreadId` as a legacy read fallback.
 - Keep provider artifacts as the required high-fidelity lane for protocol-native
   content that does not have a deliberate normalized UI surface.
 - Keep cancellation as a capability family, not a single transport behavior.
@@ -43,17 +43,17 @@ Accepted contract clarifications:
 
 ## Pressure Classification
 
-| Pressure                                       | Classification                | Decision                                                                                                                                                                              |
-| ---------------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Claude Code late `session_id`                  | Persistence/schema follow-up  | Do not migrate now. Document `providerThreadId` as provider conversation identity and open a follow-up to rename or add a neutral field when a schema migration is already justified. |
-| Claude non-text stream content                 | Keep adapter-specific         | Preserve as provider artifacts. Do not promote shared tool UX yet.                                                                                                                    |
-| Claude interrupt signal semantics              | Transport substrate follow-up | AUR-158 proved SIGINT materially improves Claude Code cancellation telemetry. Use a narrow Claude-specific process stop policy instead of broad cancellation abstraction.             |
-| ACP `sessionCapabilities.resume` / `close`     | Explicitly defer              | Keep capabilities in provider artifacts. Do not add shared lifecycle methods until a concrete ACP target needs them.                                                                  |
-| ACP permission requests                        | Explicitly defer              | Keep fail-closed default and non-persistent auto-approve option. Approval UI and richer permission contracts are outside this sweep.                                                  |
-| ACP elicitation, filesystem, terminal requests | Explicitly defer              | Unsupported client requests should remain protocol errors until a real target requires them.                                                                                          |
-| ACP target selection                           | Keep adapter-specific         | Raw operator config (`command`, `args`, `mcpServers`) remains the right first shape. No typed profile layer yet.                                                                      |
-| ACP session load fallback                      | Keep adapter-specific         | Fresh-session fallback heals stale persisted identities without shared schema changes.                                                                                                |
-| ACP cancel fallback and timeout handling       | Keep adapter-specific         | `session/cancel` plus process-stop fallback is correct for the tracer. Promote only if another adapter needs the same knobs.                                                          |
+| Pressure                                       | Classification                | Decision                                                                                                                                                                  |
+| ---------------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Claude Code late `session_id`                  | Persistence/schema follow-up  | AUR-157 promotes `providerConversationId` as the canonical storage field and keeps `providerThreadId` only as a legacy read fallback.                                     |
+| Claude non-text stream content                 | Keep adapter-specific         | Preserve as provider artifacts. Do not promote shared tool UX yet.                                                                                                        |
+| Claude interrupt signal semantics              | Transport substrate follow-up | AUR-158 proved SIGINT materially improves Claude Code cancellation telemetry. Use a narrow Claude-specific process stop policy instead of broad cancellation abstraction. |
+| ACP `sessionCapabilities.resume` / `close`     | Explicitly defer              | Keep capabilities in provider artifacts. Do not add shared lifecycle methods until a concrete ACP target needs them.                                                      |
+| ACP permission requests                        | Explicitly defer              | Keep fail-closed default and non-persistent auto-approve option. Approval UI and richer permission contracts are outside this sweep.                                      |
+| ACP elicitation, filesystem, terminal requests | Explicitly defer              | Unsupported client requests should remain protocol errors until a real target requires them.                                                                              |
+| ACP target selection                           | Keep adapter-specific         | Raw operator config (`command`, `args`, `mcpServers`) remains the right first shape. No typed profile layer yet.                                                          |
+| ACP session load fallback                      | Keep adapter-specific         | Fresh-session fallback heals stale persisted identities without shared schema changes.                                                                                    |
+| ACP cancel fallback and timeout handling       | Keep adapter-specific         | `session/cancel` plus process-stop fallback is correct for the tracer. Promote only if another adapter needs the same knobs.                                              |
 
 ## Contract Updates
 
@@ -74,7 +74,6 @@ these points:
 
 The following are deliberately deferred rather than hidden:
 
-- schema migration for neutral runtime identity field names
 - provider-artifact-driven tool/plan UI
 - approval UI and interactive permission decisions
 - ACP resume/close lifecycle support
