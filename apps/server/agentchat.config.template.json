@@ -1,30 +1,27 @@
 {
     "version": 1,
     "auth": {
-        "defaultProviderId": "google-main",
+        "defaultProviderId": "local-main",
         "providers": [
             {
-                "id": "google-main",
-                "kind": "google",
+                "id": "local-main",
+                "kind": "local",
                 "enabled": true,
-                "allowlistMode": "email",
-                "allowedEmails": ["operator@example.com"],
-                "allowedDomains": [],
-                "googleHostedDomain": null
+                "allowSignup": false
             }
         ]
     },
     "providers": [],
     "agents": [
         {
-            "id": "primary-workspace",
-            "name": "Primary Workspace",
-            "description": "Stable host-managed workspace exposed by the local Agentchat install.",
+            "id": "current-checkout",
+            "name": "Current Checkout",
+            "description": "Local agent rooted at the current checkout.",
             "avatar": null,
             "enabled": true,
             "defaultVisible": true,
             "visibilityOverrides": [],
-            "rootPath": "/absolute/path/to/workspace/root",
+            "rootPath": "<filled-by-setup-tree>",
             "runtime": {
                 "id": "codex-main",
                 "kind": "codex",
@@ -39,19 +36,36 @@
                         "enabled": true,
                         "supportsReasoning": true,
                         "variants": [
-                            {
-                                "id": "low",
-                                "label": "Low",
-                                "enabled": true
-                            },
+                            { "id": "low", "label": "Low", "enabled": true },
                             {
                                 "id": "medium",
                                 "label": "Medium",
                                 "enabled": true
                             },
+                            { "id": "high", "label": "High", "enabled": true },
                             {
-                                "id": "high",
-                                "label": "High",
+                                "id": "xhigh",
+                                "label": "X-High",
+                                "enabled": true
+                            }
+                        ]
+                    },
+                    {
+                        "id": "gpt-5.3-codex-spark",
+                        "label": "GPT-5.3 Codex Spark",
+                        "enabled": true,
+                        "supportsReasoning": true,
+                        "variants": [
+                            { "id": "low", "label": "Low", "enabled": true },
+                            {
+                                "id": "medium",
+                                "label": "Medium",
+                                "enabled": true
+                            },
+                            { "id": "high", "label": "High", "enabled": true },
+                            {
+                                "id": "xhigh",
+                                "label": "X-High",
                                 "enabled": true
                             }
                         ]
@@ -60,14 +74,14 @@
                 "command": "codex",
                 "args": ["app-server"],
                 "baseEnv": {},
-                "cwd": "/absolute/path/to/workspace/root"
+                "cwd": "<filled-by-setup-tree>"
             },
             "defaultModel": "gpt-5.4",
-            "defaultVariant": "medium",
+            "defaultVariant": "low",
             "modelAllowlist": [],
             "variantAllowlist": [],
             "workspaceMode": "copy-on-conversation",
-            "tags": ["stable"],
+            "tags": ["local"],
             "sortOrder": 10
         }
     ]

@@ -13,10 +13,11 @@ Read this file before making changes in this repository.
 
 ## Harness Ladder
 
-- Orient with [README.md](README.md), [docs/agentchat/README.md](docs/agentchat/README.md), and [Harness Engineering](docs/agentchat/harness-engineering.md).
-- Prepare checkout state with `bun run bootstrap`, `bun run status`, `bun run doctor`, and `bun run config:print`.
-- Use `bun run dev` only when a live stack is needed; stop it with `bun run stop`.
-- Use `bun run worktree:create -- <name>` for disposable branch or runtime-isolation work.
+- Orient with [README.md](README.md), [docs/agentchat/README.md](docs/agentchat/README.md), and [Local Modes](docs/local-modes.md).
+- Prepare a fresh checkout with `bun install` and `bun scripts/local/setup-tree.ts` (worktrees run setup-tree automatically via the `wt` post-start hook).
+- Use `bun dev` when a live stack is needed; Ctrl+C to stop. Web + server are routed through portless at `https://agentchat-web.agentchat.localhost` and `https://agentchat-server.agentchat.localhost` (worktrees get a `<branch>.` prefix).
+- Use `wt switch -c <branch>` for disposable worktree work; `wt remove` to tear it down.
+- Mobile is run separately via `bun --cwd apps/mobile dev` (Expo is intentionally outside portless until support matures).
 - Run the health task for each modified surface: `bun run health:web`, `bun run health:server`, `bun run health:mobile`, `bun run health:shared`, or `bun run health:convex`.
 - Use repo gates when touching contracts, env, docs, imports, or shared behavior: `bun run env:check`, `bun run docs:check`, `bun run lint:repo`, `bun run verify:ci`.
 

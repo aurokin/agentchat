@@ -1,184 +1,126 @@
-# Local Environment Migration And Advanced Setup
+# Local Environment Setup
 
-Use [local-modes.md](./local-modes.md) first.
+Use [local-modes.md](./local-modes.md) first for the canonical workflow. This
+document covers one-time host setup and Convex wiring.
 
-This document is now the migration and advanced-reference companion for the local wrapper workflow. It exists for cases where you need to understand the underlying Convex, auth, fixture, or mobile setup in more detail.
+## One-Time Setup
 
-## Wrapper-First Baseline
+Tooling (`bun`, `worktrunk`, `portless`) is installed via mise. After cloning
+the repo on a new machine:
 
-Prepare the current checkout with:
+```bash
+mise install                    # picks up the user mise config
+portless trust                  # adds local CA to system trust store (one-time, prompts for sudo)
+```
+
+Drop your Convex deployment creds into a repo-local dotenv at
+`<repo>/.env.convex.local`:
+
+```bash
+cp .env.convex.local.example .env.convex.local
+# edit .env.convex.local and set CONVEX_DEPLOYMENT, CONVEX_URL, etc.
+```
+
+`scripts/local/setup-tree.ts` reads that file and copies the relevant keys
+into the per-tree `apps/server/.env.local` and `apps/web/.env.local`.
+`.env.convex.local` is gitignored (`.env*.local` rule) and is propagated into
+new worktrees by `wt step copy-ignored`, which the post-start hook runs.
+
+## Daily Flow
 
 ```bash
 bun install
-bun run bootstrap
-bun run status
-bun run doctor
+bun scripts/local/setup-tree.ts        # main checkout: run once after clone
+bun dev
 ```
 
-If you need a disposable worktree for parallel work, create it from the current checkout with:
+For a disposable worktree:
 
 ```bash
-bun run worktree:create -- <name>
+wt switch -c <branch>                  # post-start hook copies node_modules + .env.convex.local, then runs setup-tree.ts
+bun dev
+# ...
+wt remove                              # post-remove hook drops ~/.local/state/agentchat-trees/<branch>/
 ```
 
-This creates a sibling checkout under the repo parent directory. It refuses to run from a dirty source checkout unless you pass `--allow-dirty`, because uncommitted changes are not copied into git worktrees.
+`bun dev` runs Convex + apps/server + apps/web concurrently, with web and
+server wrapped through `portless run`. URLs:
 
-If you need a live local web/server stack for this checkout, use:
+- main: `https://agentchat-web.agentchat.localhost`,
+  `https://agentchat-server.agentchat.localhost`
+- worktree: `https://<branch>.agentchat-web.agentchat.localhost`,
+  `https://<branch>.agentchat-server.agentchat.localhost`
+
+## Long-Lived / Production-Like Instance
+
+There is no separate "stable" harness. To run a production-like instance
+pointed at a different Convex deployment:
 
 ```bash
-bun run dev
+wt switch -c stable                    # name doesn't matter — any branch
+# inside the worktree:
+$EDITOR .env.convex.local              # point at your prod Convex deployment
+bun scripts/local/setup-tree.ts        # regenerate apps/{web,server}/.env.local
+bun run --cwd apps/web build           # if you want next's production runtime
+bun --cwd apps/web start &             # or `bun dev` for the dev runtime
+bun --cwd apps/server start &
 ```
 
-Then stop it with:
-
-```bash
-bun run stop
-```
-
-When the disposable worktree is no longer needed, remove it from the source checkout with:
-
-```bash
-bun run worktree:remove -- <name>
-```
-
-If you intentionally edit generated checkout-local files and want to keep those values:
-
-```bash
-bun run bootstrap --adopt
-```
-
-If you want to replace drifted generated files from the current manifest:
-
-```bash
-bun run bootstrap --force
-```
-
-## Host-Level Config
-
-Recommended host layout:
-
-- `~/.config/agentchat/config.json`
-- `~/.config/agentchat/dev/convex.env`
-- `~/.config/agentchat/stable/web.env`
-- `~/.config/agentchat/stable/server.env`
-- `~/.config/agentchat/stable/convex.env`
-- `~/.config/agentchat/stable/server-config.json`
-- `~/.config/agentchat/stable/convex-runtime.env`
-
-Example host config:
-
-- [agentchat-host-config.example.json](./examples/agentchat-host-config.example.json)
-
-The wrapper currently uses the host-configured shared dev Convex env path during `bootstrap`. Stable host scripts now read the stable env and server-config files from this same host-level layout.
-If this host needs LAN-reachable bindings, set `dev.defaultHost` and `stable.defaultHost` in `config.json` instead of editing generated `.env.local` files by hand.
-If you want to stage a future public cutover without enabling it yet, `config.json` also supports:
-
-- `stable.lanUrl`
-- `stable.publicUrl`
-- `stable.secondaryUrls`
-
-Those URL fields are metadata only until you intentionally update live routing, trusted origins, and Convex `SITE_URL`.
-
-Stable Convex deployment secrets now have an operator workflow too:
-
-```bash
-scripts/host/generate-stable-convex-env.sh
-scripts/host/apply-stable-convex-env.sh
-scripts/host/smoke-stable.sh
-scripts/host/install-stable-user-service.sh --enable-now
-```
-
-`generate-stable-convex-env.sh` creates or refreshes `~/.config/agentchat/stable/convex-runtime.env`, generates shared secrets when needed, and syncs the stable server/web host env files. `apply-stable-convex-env.sh` pushes that runtime env into the configured production Convex deployment.
-
-The current stable host installation is expected to run from a dedicated checkout with:
-
-- host-managed files under `~/.config/agentchat/stable/`
-- lifecycle driven by `scripts/host/*.sh`
-- LAN HTTPS served by local Caddy
-- current LAN entrypoint `https://bront.home.arpa:4043`
-
-Manual GitHub guardrail workflows are also checked in now:
-
-- `.github/workflows/manual-wrapper-guardrails.yml`
-- `.github/workflows/host-guardrails-manual.yml`
-
-They remain `workflow_dispatch` only for now, so they can be used as explicit confidence runs without becoming automatic required checks yet.
+Wrap with whatever supervisor (systemd, launchd, tmux) the host uses. The repo
+no longer ships a service-unit template.
 
 ## Manual Convex Setup
 
-Do this only if you need a real local/dev Convex workspace.
-
-1. Create or choose a dev Convex deployment.
-2. Create `~/.config/agentchat/dev/convex.env`.
-3. Set:
-    - `CONVEX_DEPLOYMENT=dev:<your-deployment>`
-4. Copy `.env.convex.local.example` to `.env.convex.local` only if you still need the legacy repo-root Convex helper flow.
-5. Generate local Convex auth secrets if needed:
-
-```bash
-bun run convex:gen-secrets
-```
-
-6. Apply the Convex runtime env vars:
-
-```bash
-bun run convex:env
-```
-
-7. Copy `packages/convex/.env.example` to `packages/convex/.env.local` only if you need direct Convex CLI usage in this checkout.
-
-8. Re-run wrapper bootstrap so the checkout-local web/server files pick up the current Convex values:
-
-```bash
-bun run bootstrap --adopt
-```
-
-## Dedicated Local Fixture Config
-
-If you want the built-in low-token fixtures instead of the default current-checkout agent:
-
-```bash
-bun run setup:test-agent-config -- --force
-bun run bootstrap --adopt
-```
-
-For local seeded users:
-
-```bash
-bun run setup:local-smoke-users
-```
-
-Or use the combined helper:
-
-```bash
-bun run setup:local-auth-smoke
-bun run bootstrap --adopt
-```
-
-## Manual Runtime Validation
-
-Before a deliberate manual confidence pass, validate the runtime surfaces:
+If you need to wire up a fresh Convex deployment:
 
 ```bash
 bun run --cwd packages/convex codegen
-bun run doctor:server
+bun run convex:gen-secrets > /tmp/secrets.env
+bun run convex:env -- --deployment dev:<your-deployment> < /tmp/secrets.env
+```
+
+Then update `<repo>/.env.convex.local` with the new
+`CONVEX_DEPLOYMENT` / `CONVEX_URL` and re-run `setup-tree.ts` in each active
+worktree.
+
+## Dedicated Local Fixture Config
+
+For the built-in low-token fixtures instead of the default current-checkout
+agent:
+
+```bash
+bun run setup:test-agent-config -- --force
+```
+
+For seeded local users:
+
+```bash
+bun run setup:local-smoke-users
+bun run setup:local-auth-smoke
 ```
 
 ## Mobile
 
-Mobile is not part of the first parallel-workflow wrapper slice.
+Mobile is intentionally outside portless. See
+[local-modes.md](./local-modes.md#mobile--expo).
 
-If you need it anyway:
+```bash
+bun --cwd apps/mobile dev
+```
 
-1. Create `apps/mobile/.env` from `apps/mobile/.env.example`.
-2. Set:
-    - `EXPO_PUBLIC_CONVEX_URL=https://<your-deployment>.convex.cloud`
-    - `EXPO_PUBLIC_AGENTCHAT_SERVER_URL=http://<your-local-server-host>:3030`
+Set `apps/mobile/.env`:
 
-Then use the existing mobile launchers directly.
+```
+EXPO_PUBLIC_CONVEX_URL=https://<deployment>.convex.cloud
+EXPO_PUBLIC_AGENTCHAT_SERVER_URL=https://<branch>.agentchat-server.agentchat.localhost
+```
 
-## Google Redirect Note
+(Or use the bare `https://agentchat-server.agentchat.localhost` URL when
+running the mobile client against the main checkout.)
 
-If Google sign-in fails with `redirect_uri_mismatch`, add this redirect URI to the OAuth client that matches `AUTH_GOOGLE_ID`:
+## Google Redirect
 
-- `https://<your-deployment>.convex.site/api/auth/callback/google`
+If Google sign-in fails with `redirect_uri_mismatch`, add this redirect URI to
+the OAuth client that matches `AUTH_GOOGLE_ID`:
+
+`https://<your-deployment>.convex.site/api/auth/callback/google`
