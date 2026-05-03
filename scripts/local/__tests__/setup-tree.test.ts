@@ -46,8 +46,13 @@ function makeRepo(): {
     };
 }
 
-function runSetupTree(repoRoot: string, fakeHome: string): void {
-    execFileSync("bun", [SETUP_TREE], {
+function runSetupTree(
+    repoRoot: string,
+    fakeHome: string,
+    branchArg?: string,
+): void {
+    const args = branchArg ? [SETUP_TREE, branchArg] : [SETUP_TREE];
+    execFileSync("bun", args, {
         cwd: repoRoot,
         env: { ...process.env, HOME: fakeHome },
     });
@@ -158,6 +163,37 @@ describe("setup-tree", () => {
             );
         } finally {
             fixture.cleanup();
+        }
+    });
+
+    test("slug collisions are avoided across different branches", () => {
+        const slashed = makeRepo();
+        const dashed = makeRepo();
+        try {
+            runSetupTree(slashed.root, slashed.fakeHome, "feature/foo");
+            runSetupTree(dashed.root, dashed.fakeHome, "feature-foo");
+
+            const slashedConfig = JSON.parse(
+                fs.readFileSync(
+                    path.join(
+                        slashed.root,
+                        "apps/server/agentchat.config.json",
+                    ),
+                    "utf8",
+                ),
+            );
+            const dashedConfig = JSON.parse(
+                fs.readFileSync(
+                    path.join(dashed.root, "apps/server/agentchat.config.json"),
+                    "utf8",
+                ),
+            );
+            expect(slashedConfig.stateId).not.toBe(dashedConfig.stateId);
+            expect(dashedConfig.stateId).toBe("feature-foo");
+            expect(slashedConfig.stateId.startsWith("feature-foo-")).toBe(true);
+        } finally {
+            slashed.cleanup();
+            dashed.cleanup();
         }
     });
 

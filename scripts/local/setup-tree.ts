@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { execFileSync } from "node:child_process";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -32,6 +32,8 @@ function repoRoot(): string {
 }
 
 function currentBranch(): string {
+    const fromArg = process.argv[2]?.trim();
+    if (fromArg) return fromArg;
     return execFileSync("git", ["symbolic-ref", "--short", "HEAD"], {
         encoding: "utf8",
     }).trim();
@@ -41,8 +43,17 @@ function isLinkedWorktree(repo: string): boolean {
     return fs.statSync(path.join(repo, ".git")).isFile();
 }
 
+// Collision-resistant slug: when sanitization changes the input we append a
+// short hash of the original so e.g. `feature/foo` and `feature-foo` cannot
+// land on the same per-tree state dir or stateId.
 function sanitizeBranch(branch: string): string {
-    return branch.replace(/[^a-zA-Z0-9._-]/g, "-");
+    const safe = branch.replace(/[^a-zA-Z0-9._-]/g, "-");
+    if (safe === branch) return safe;
+    const suffix = createHash("sha256")
+        .update(branch)
+        .digest("hex")
+        .slice(0, 6);
+    return `${safe}-${suffix}`;
 }
 
 function parseDotenv(text: string): Dotenv {
