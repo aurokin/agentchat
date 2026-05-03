@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
 
-const defaultAllowedDevOrigins = ["localhost", "127.0.0.1"];
+const defaultAllowedDevOrigins = [
+    "localhost",
+    "127.0.0.1",
+    "*.localhost",
+    "*.agentchat.localhost",
+];
 
 const extraAllowedDevOrigins = (process.env.NEXT_ALLOWED_DEV_ORIGINS ?? "")
     .split(",")

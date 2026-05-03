@@ -8,22 +8,19 @@ This document records the manual, integration, and end-to-end testing strategy f
 - validate the real web/server/Convex/Codex runtime path
 - make mobile parity measurable against the same fixtures
 - keep tests manual or explicitly invoked, not automatic CI
-- keep heavier wrapper and stable-host guardrails available in GitHub without turning them into mandatory push-time checks yet
 
-## Manual GitHub Guardrails
+## Worktree Lifecycle
 
-The repo now includes two manual-only GitHub Actions workflows for explicit confidence runs:
+Use [worktrunk](https://github.com/max-sixty/worktrunk) directly:
 
-- `.github/workflows/manual-wrapper-guardrails.yml`
-- `.github/workflows/host-guardrails-manual.yml`
+```bash
+wt switch -c smoke-test                # post-start hook runs setup-tree.ts
+bun dev                                 # validates the lane is healthy
+wt remove
+```
 
-These stay on `workflow_dispatch` for now. They are meant to exercise the wrapper lifecycle and stable-host scaffolding deliberately, not to run automatically on every push or PR.
-
-There is also a repo-local manual command for the disposable worktree lifecycle:
-
-- `bun run test:manual:worktree-lifecycle`
-
-That command creates a temporary worktree, runs the wrapper status and doctor flow there, runs `dev` and `stop` only when doctor passes, tears the worktree down, and finishes with `worktree:gc -- --dry-run`.
+The `scripts/local/__tests__/setup-tree.test.ts` smoke pins the env-file
+generation behavior end-to-end.
 
 ## Test Agent Fixtures
 

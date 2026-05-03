@@ -7,9 +7,8 @@ explicit, scoped, and cheap enough to run at the right time.
 ## Principles
 
 - Start from the source docs: [AGENTS.md](../../AGENTS.md), [README.md](../../README.md), and [Agentchat Architecture And Direction](./README.md).
-- Let wrapper commands own checkout-local generated state.
-- Isolate branch work in wrapper-created git worktrees before runtime-heavy changes.
-- Keep the protected stable host separate from disposable worktrees.
+- Let `scripts/local/setup-tree.ts` own checkout-local generated state.
+- Isolate branch work in worktrunk-managed worktrees before runtime-heavy changes.
 - Treat Convex as the durable source of truth for auth, conversations, runs, and runtime bindings.
 - Treat `apps/server` as the runtime layer; clients should observe and command through defined APIs.
 - Use deterministic fixtures before live Codex or browser confidence passes.
@@ -33,28 +32,26 @@ Use these before changing generated config:
 
 ```bash
 bun install
-bun run bootstrap
-bun run status
-bun run doctor
-bun run config:print
+bun scripts/local/setup-tree.ts
 ```
 
-`bootstrap` writes checkout-local env and server config. `status` shows wrapper
-state. `doctor` fails fast on incomplete Convex, secret, or runtime setup.
+`setup-tree.ts` writes checkout-local env files and `apps/server/agentchat.config.json`. It
+sources Convex creds from `~/.config/agentchat/convex.env`. In a `wt`-managed
+worktree it runs automatically as the post-start hook.
 
 ### 3. Worktree Harness
 
-Use wrapper-created sibling worktrees for branch reconciliation, runtime
-isolation, and parallel agent work:
+Use [worktrunk](https://github.com/max-sixty/worktrunk) for branch reconciliation,
+runtime isolation, and parallel agent work:
 
 ```bash
-bun run worktree:create -- <name>
-bun run worktree:remove -- <name>
-bun run worktree:gc
+wt switch -c <branch>     # creates worktree + branch, runs setup-tree.ts via post-start hook
+wt list                   # show worktrees
+wt remove                 # remove the current worktree (or named worktree)
 ```
 
-The wrapper intentionally refuses dirty source checkouts by default because git
-worktrees start from committed refs, not uncommitted local edits.
+The post-remove hook drops `~/.local/state/agentchat-trees/<branch>/` so per-tree state stays
+clean.
 
 ### 4. Runtime Harness
 
@@ -62,9 +59,12 @@ Use server readiness checks before live runtime testing:
 
 ```bash
 bun run doctor:server
-bun run dev
-bun run stop
+bun dev                   # convex + server + web (server/web wrapped through portless)
 ```
+
+URLs come from portless: `https://agentchat-web.agentchat.localhost` and
+`https://agentchat-server.agentchat.localhost` (with `<branch>.` prefix in
+linked worktrees).
 
 `apps/server` owns live runtime sessions. Codex is the active runtime. Pi,
 OpenCode, and Claude Code are planned implementations behind the agent-centric
@@ -103,8 +103,8 @@ bun run check:affected -- --base origin/main
 ### 7. Live Confidence
 
 Manual confidence is deliberate and expensive. Use it when a change touches live
-runtime behavior, streaming, interruption, multi-client behavior, browser
-workflows, or stable-host operation.
+runtime behavior, streaming, interruption, multi-client behavior, or browser
+workflows.
 
 Primary references:
 
@@ -122,16 +122,7 @@ bun run test:manual:live-runtime-interrupt
 bun run test:manual:runtime-confidence
 ```
 
-### 8. Stable Host Harness
-
-The stable host is operator-owned and protected from disposable checkout state.
-Use it only for work about the protected host install:
-
-- [Stable Host Runbook](./stable-host-runbook.md)
-- [Local Modes](../local-modes.md)
-- `scripts/host/*.sh`
-
-### 9. Planning Harness
+### 8. Planning Harness
 
 Linear now owns the active reconciliation and runtime-foundation work breakdown.
 Repo docs should capture durable product, architecture, harness, and operating

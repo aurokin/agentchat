@@ -36,29 +36,22 @@ bun test ./apps/server/src/__tests__/codexRuntime.test.ts
 
 ## Wrapper And Worktree Guardrails
 
-Passed:
+Historical: this verification was originally run against the lane-based
+wrapper harness (now-removed bootstrap/worktree-create/dev wrapper scripts).
+That harness has been replaced by [portless](https://github.com/vercel-labs/portless)
 
-```bash
-bun run status
-bun run config:print
-bun run bootstrap
-bun run test:manual:worktree-lifecycle
-```
+- [worktrunk](https://github.com/max-sixty/worktrunk); the current equivalent
+  flow is documented in [local-modes.md](../local-modes.md). The notes below are
+  preserved for archival reference.
 
-`bun run bootstrap` completed without producing tracked generated-file churn.
+Passed (legacy harness, AUR-125 era):
 
-`bun run test:manual:worktree-lifecycle` completed teardown. It reported doctor
-issues in the temporary worktree and skipped `dev`/`stop`, matching the current
-local readiness state.
+- wrapper `bootstrap` completed without producing tracked generated-file churn
+- worktree lifecycle smoke completed teardown — it reported doctor issues in
+  the temporary worktree and skipped `dev`/`stop`, matching the local
+  readiness state at the time
 
-Blocked locally:
-
-```bash
-bun run doctor
-```
-
-The local wrapper doctor failed because this checkout is not connected to a
-real Convex deployment:
+Blocked locally (legacy harness):
 
 - `NEXT_PUBLIC_CONVEX_URL` is missing
 - `AGENTCHAT_CONVEX_SITE_URL` is the placeholder `https://example.convex.site`

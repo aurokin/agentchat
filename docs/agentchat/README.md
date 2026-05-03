@@ -17,9 +17,8 @@ assumptions.
 
 ## Operating The System
 
-- [Local Modes](../local-modes.md) - wrapper-first local workflow, worktrees, generated config, and stable host modes.
+- [Local Modes](../local-modes.md) - portless + worktrunk local workflow.
 - [Operator Guide](./operator-guide.md) - repo-local setup for Codex-backed agents.
-- [Stable Host Runbook](./stable-host-runbook.md) - protected host lifecycle.
 - [Testing Plan](./testing-plan.md) - confidence layers and manual runtime checks.
 - [Manual QA Checklist](./manual-qa-checklist.md) - deliberate human validation.
 

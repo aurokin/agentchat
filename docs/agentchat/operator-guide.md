@@ -1,6 +1,6 @@
 # Agentchat Operator Guide
 
-This guide is the shortest path from a local Agentchat checkout to a usable self-hosted instance with Codex-backed agents. For the protected stable installation on a host, use `scripts/host/install-stable.sh`, `scripts/host/doctor-stable.sh`, `scripts/host/smoke-stable.sh`, `scripts/host/start-stable.sh`, `scripts/host/stop-stable.sh`, `scripts/host/update-stable.sh`, `scripts/host/rollback-stable.sh`, `scripts/host/generate-stable-convex-env.sh`, `scripts/host/apply-stable-convex-env.sh`, and `scripts/host/install-stable-user-service.sh`; this document remains focused on repo-local operator setup and verification. The current stable host install is running behind local Caddy at `https://bront.home.arpa:4043`, and future public-hostname support is intentionally only scaffolded in host config/docs right now. For day-2 host operations, use the dedicated [Stable Host Runbook](./stable-host-runbook.md).
+This guide is the shortest path from a local Agentchat checkout to a usable self-hosted instance with Codex-backed agents. A long-lived production-like instance is just another worktree pointed at a different Convex deployment — see [Local Modes](../local-modes.md#long-lived--production-like-instance) and [Local Environment Setup Checklist](../local_environment_setup_checklist.md#long-lived--production-like-instance).
 
 ## Scope
 
@@ -16,7 +16,7 @@ This guide assumes:
 - you are using the current Codex-first architecture
 - Convex is configured for conversation persistence and a valid instance access path
 - `apps/server` runs locally on the same machine that has access to the agent workspaces
-- you have already prepared the current checkout with `bun run bootstrap`
+- you have already prepared the current checkout with `bun scripts/local/setup-tree.ts`
 
 Required shared secrets:
 
@@ -72,10 +72,7 @@ If you want the built-in low-token fixtures, generate a ready-made local config:
 
 ```bash
 bun run setup:test-agent-config
-bun run bootstrap --adopt
 ```
-
-The second command folds the fixture config back into the checkout-local wrapper manifest.
 
 That writes a gitignored:
 
@@ -91,7 +88,6 @@ If you already have a local config and want to replace it:
 
 ```bash
 bun run setup:test-agent-config -- --force
-bun run bootstrap --adopt
 ```
 
 By default this helper writes a local auth provider with the seeded smoke-user path. If you want to be explicit or switch to Google auth instead:
@@ -174,32 +170,18 @@ When live model discovery degrades softly, the provider models API now falls bac
 
 ## 5. Start The Local Stack
 
-Wrapper-first local preparation:
-
 ```bash
-bun run status
-bun run doctor
+bun scripts/local/setup-tree.ts        # main checkout (worktrees auto-run via wt hook)
+bun dev                                 # Ctrl+C to stop
 ```
 
-`bun run doctor` validates wrapper readiness for the current checkout. It exits non-zero until the wrapper has a usable Convex cloud URL and Convex site URL; if bootstrap reports `Convex mode: unconfigured`, complete the Convex setup in [local_environment_setup_checklist.md](../local_environment_setup_checklist.md) or treat the failure as an expected environment gap for non-runtime script work.
+`bun dev` runs Convex + apps/server + apps/web concurrently; web/server are
+wrapped through `portless run`. Visit `https://agentchat-web.agentchat.localhost`.
 
-Wrapper-owned launcher for the current checkout web/server stack:
-
-```bash
-bun run dev
-```
-
-Stop it with:
+Mobile is run separately:
 
 ```bash
-bun run stop
-```
-
-Legacy mobile launchers still exist when you need them:
-
-```bash
-bun run legacy:dev:mobile
-bun run legacy:dev:all
+bun --cwd apps/mobile dev
 ```
 
 ## 6. Run The Deliberate Confidence Pass
@@ -299,9 +281,7 @@ Short version for this Linux environment:
 
 If bootstrap fails in the web app:
 
-- verify `NEXT_PUBLIC_AGENTCHAT_SERVER_URL`
-    - loopback values like `http://localhost:3030` or `http://127.0.0.1:3030` are valid for local development
-    - when opening the web app from another device on your LAN, the web client will automatically swap the loopback hostname for the browser's current hostname and keep the configured port
+- verify `NEXT_PUBLIC_AGENTCHAT_SERVER_URL` matches the running portless URL (default `https://agentchat-server.agentchat.localhost` in main, `https://<branch>.agentchat-server.agentchat.localhost` in a worktree)
 - verify `apps/server` is running
 - verify `agentchat.config.json` is valid
 
