@@ -56,7 +56,20 @@ function loadEnvOrThrow(absPath: string, allowProcessEnv: boolean): DotEnv {
 const main = (): void => {
     const allowProcessEnv = process.argv.includes("--allow-process-env");
     const convexFile = repoRootPath(".env.convex.local");
-    const convexEnv = loadEnvOrThrow(convexFile, allowProcessEnv);
+    let convexEnv: DotEnv;
+    try {
+        convexEnv = loadEnvOrThrow(convexFile, allowProcessEnv);
+    } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        throw new Error(
+            [
+                message,
+                "",
+                "Create it from .env.convex.local.example, then run `bun run convex:env`.",
+                "See docs/local_environment_setup_checklist.md for details.",
+            ].join("\n"),
+        );
+    }
 
     const errors: string[] = [];
     const warnings: string[] = [];
@@ -65,10 +78,14 @@ const main = (): void => {
     requireKey(convexEnv, "SITE_URL", errors, {
         validate: validateUrlStartsWithHttps,
     });
-    requireKey(convexEnv, "AUTH_GOOGLE_ID", errors);
-    requireKey(convexEnv, "AUTH_GOOGLE_SECRET", errors);
 
-    // Required Convex auth/encryption secrets.
+    const authMode = convexEnv.AGENTCHAT_AUTH_MODE?.trim() ?? "google";
+    if (authMode === "google") {
+        requireKey(convexEnv, "AUTH_GOOGLE_ID", errors);
+        requireKey(convexEnv, "AUTH_GOOGLE_SECRET", errors);
+    }
+
+    // Required Convex auth/encryption secrets (both auth modes).
     requireKey(convexEnv, "JWKS", errors);
     requireKey(convexEnv, "JWT_PRIVATE_KEY", errors);
     requireKey(convexEnv, "ENCRYPTION_KEY", errors, {
@@ -76,16 +93,20 @@ const main = (): void => {
     });
 
     if (errors.length > 0) {
-        const header = "Local Convex environment validation failed";
+        const header = `Local Convex environment validation failed (auth mode: ${authMode})`;
         const details = errors.map((err) => `- ${err}`).join("\n");
-        throw new Error([header, details].join("\n"));
+        const hint =
+            "Fix .env.convex.local and re-run; see docs/local_environment_setup_checklist.md.";
+        throw new Error([header, details, "", hint].join("\n"));
     }
 
     if (warnings.length > 0) {
         console.warn(warnings.map((warn) => `warning: ${warn}`).join("\n"));
     }
 
-    console.log("Local Convex environment validation passed");
+    console.log(
+        `Local Convex environment validation passed (auth mode: ${authMode})`,
+    );
 };
 
 try {

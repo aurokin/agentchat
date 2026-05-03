@@ -26,7 +26,7 @@ export const parseDotEnvFile = (text: string): DotEnv => {
         let value = line.slice(eq + 1).trim();
 
         if (
-            (value.startsWith("\"") && value.endsWith("\"")) ||
+            (value.startsWith('"') && value.endsWith('"')) ||
             (value.startsWith("'") && value.endsWith("'"))
         ) {
             value = value.slice(1, -1);
@@ -69,5 +69,6 @@ export const isMissingSecret = (value: string | undefined): boolean => {
     if (!value) return true;
     const trimmed = value.trim();
     if (!trimmed) return true;
-    return trimmed.startsWith("<") || trimmed.includes("<");
+    if (trimmed.startsWith("<") || trimmed.includes("<")) return true;
+    return trimmed.toLowerCase() === "replace-me";
 };
