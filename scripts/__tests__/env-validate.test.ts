@@ -97,4 +97,30 @@ describe("env:validate", () => {
             fixture.cleanup();
         }
     });
+
+    test("rejects unsupported auth mode values", () => {
+        const fixture = makeFixture();
+        try {
+            writeConvexEnv(
+                fixture.root,
+                [
+                    "AGENTCHAT_AUTH_MODE=locla",
+                    "CONVEX_DEPLOYMENT=dev:test",
+                    "SITE_URL=https://test.localhost",
+                    "AUTH_GOOGLE_ID=test-google-id",
+                    "AUTH_GOOGLE_SECRET=test-google-secret",
+                    `JWKS=${FAKE_JWKS}`,
+                    `JWT_PRIVATE_KEY=${FAKE_JWT_PRIVATE_KEY}`,
+                    `ENCRYPTION_KEY=${FAKE_ENCRYPTION_KEY}`,
+                    "",
+                ].join("\n"),
+            );
+            const result = runValidate(fixture.root);
+            expect(result.status).not.toBe(0);
+            expect(result.output).toContain("AGENTCHAT_AUTH_MODE");
+            expect(result.output).toContain('expected "google" or "local"');
+        } finally {
+            fixture.cleanup();
+        }
+    });
 });

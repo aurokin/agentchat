@@ -184,6 +184,36 @@ describe("setup-tree", () => {
         }
     });
 
+    test("preserves valid Convex site hosts containing example text", () => {
+        const fixture = makeRepo();
+        try {
+            fs.writeFileSync(
+                path.join(fixture.root, ".env.convex.local"),
+                "CONVEX_DEPLOYMENT=dev:my-deployment\nCONVEX_URL=https://my-deployment.convex.cloud\n",
+            );
+            fs.writeFileSync(
+                path.join(fixture.root, "apps/server/.env.local"),
+                [
+                    "BACKEND_TOKEN_SECRET=existing-backend-token",
+                    "RUNTIME_INGRESS_SECRET=existing-runtime-token",
+                    "AGENTCHAT_CONVEX_SITE_URL=https://myexample.convex.site",
+                    "",
+                ].join("\n"),
+            );
+
+            runSetupTree(fixture.root, fixture.fakeHome);
+
+            const serverEnv = readEnv(
+                path.join(fixture.root, "apps/server/.env.local"),
+            );
+            expect(serverEnv.AGENTCHAT_CONVEX_SITE_URL).toBe(
+                "https://myexample.convex.site",
+            );
+        } finally {
+            fixture.cleanup();
+        }
+    });
+
     test("ignores legacy bootstrap-headered server env file", () => {
         const fixture = makeRepo();
         try {

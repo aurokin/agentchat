@@ -44,6 +44,17 @@ function validateUrlStartsWithHttps(value: string): string | null {
     return value.startsWith("https://") ? null : "must start with https://";
 }
 
+function readAuthMode(env: DotEnv, errors: string[]): "google" | "local" {
+    const authMode = env.AGENTCHAT_AUTH_MODE?.trim() ?? "google";
+    if (authMode === "google" || authMode === "local") {
+        return authMode;
+    }
+    errors.push(
+        `AGENTCHAT_AUTH_MODE has unsupported value "${authMode}" (expected "google" or "local")`,
+    );
+    return "google";
+}
+
 function loadEnvOrThrow(absPath: string, allowProcessEnv: boolean): DotEnv {
     const exists = fs.existsSync(absPath);
     if (!allowProcessEnv && !exists) {
@@ -79,7 +90,7 @@ const main = (): void => {
         validate: validateUrlStartsWithHttps,
     });
 
-    const authMode = convexEnv.AGENTCHAT_AUTH_MODE?.trim() ?? "google";
+    const authMode = readAuthMode(convexEnv, errors);
     if (authMode === "google") {
         requireKey(convexEnv, "AUTH_GOOGLE_ID", errors);
         requireKey(convexEnv, "AUTH_GOOGLE_SECRET", errors);

@@ -137,7 +137,12 @@ function freshSecret(): string {
 // the host check catches the documentation-example URL from .env.example.
 function isPlaceholderConvexSiteUrl(value: string | undefined): boolean {
     if (isMissingSecret(value)) return true;
-    return value!.includes("example.convex.site");
+    const trimmed = value!.trim();
+    try {
+        return new URL(trimmed).hostname === "example.convex.site";
+    } catch {
+        return trimmed === "example.convex.site";
+    }
 }
 
 function buildPortlessUrl(
