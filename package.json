@@ -12,7 +12,7 @@
         "tar": "7.5.7"
     },
     "scripts": {
-        "dev": "concurrently -k -n convex,server,web -c green,yellow,blue \"bun run --cwd packages/convex dev\" \"bun run --cwd apps/server dev\" \"bun run --cwd apps/web dev\"",
+        "dev": "bun run env:validate && concurrently -k -n convex,server,web -c green,yellow,blue \"bun run --cwd packages/convex dev\" \"bun run --cwd apps/server dev\" \"bun run --cwd apps/web dev\"",
         "setup-tree": "bun scripts/local/setup-tree.ts",
         "env:validate": "bun scripts/env/validate.ts",
         "env:check": "bun scripts/check-env-docs.ts",

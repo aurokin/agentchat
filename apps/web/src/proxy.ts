@@ -110,7 +110,7 @@ const authMiddleware = convexAuthNextjsMiddleware((request) => {
     return response;
 });
 
-export function middleware(request: NextRequest, event: NextFetchEvent) {
+export function proxy(request: NextRequest, event: NextFetchEvent) {
     return authMiddleware(request, event);
 }
 
