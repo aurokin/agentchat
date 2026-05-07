@@ -1,11 +1,12 @@
 # Worktrunk project config. See https://worktrunk.dev/hook/.
 #
 # post-start runs after `wt switch -c <branch>` finishes creating a new
-# worktree. setup-tree.ts generates per-tree env files and the agentchat
-# server config, then `wt step copy-ignored` warms the worktree's
-# node_modules from the source checkout.
+# worktree. `wt step copy-ignored` first warms the worktree's node_modules
+# and brings over gitignored files (notably .env.convex.local, the unified
+# secrets source), then setup-tree.ts generates per-tree env files and the
+# agentchat server config from those values.
 
-post-start = "bun scripts/local/setup-tree.ts {{ branch }} && wt step copy-ignored"
+post-start = "wt step copy-ignored && bun scripts/local/setup-tree.ts {{ branch }}"
 post-remove = "bun scripts/local/teardown-tree.ts {{ branch }}"
 
 [step.copy-ignored]
