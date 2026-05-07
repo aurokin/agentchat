@@ -103,6 +103,10 @@ const main = (): void => {
         validate: validateBase64Key32,
     });
 
+    // Shared with apps/server via setup-tree.ts; drift here causes 401s on /runtime/*.
+    requireKey(convexEnv, "RUNTIME_INGRESS_SECRET", errors);
+    requireKey(convexEnv, "BACKEND_TOKEN_SECRET", errors);
+
     if (errors.length > 0) {
         const header = `Local Convex environment validation failed (auth mode: ${authMode})`;
         const details = errors.map((err) => `- ${err}`).join("\n");

@@ -14,11 +14,19 @@ const main = (): void => {
 
     const encryptionKey = crypto.randomBytes(32).toString("base64");
 
+    // Shared between Convex (/runtime ingress) and apps/server. Drift here surfaces
+    // as confusing 401s mid-reconcile in apps/server/src/runtimePersistence.ts; keep
+    // them in .env.convex.local so `bun run convex:env` and `setup-tree` see one value.
+    const runtimeIngressSecret = crypto.randomBytes(24).toString("base64url");
+    const backendTokenSecret = crypto.randomBytes(24).toString("base64url");
+
     // Emit dotenv-compatible lines for easy copy/paste into .env.convex.<env>.local
     console.log("# Convex Auth + encryption secrets (keep private)");
     console.log(`JWKS=${jwks}`);
     console.log(`JWT_PRIVATE_KEY=${jwtPrivateKey}`);
     console.log(`ENCRYPTION_KEY=${encryptionKey}`);
+    console.log(`RUNTIME_INGRESS_SECRET=${runtimeIngressSecret}`);
+    console.log(`BACKEND_TOKEN_SECRET=${backendTokenSecret}`);
 };
 
 try {

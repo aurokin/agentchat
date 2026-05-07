@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { execFileSync } from "node:child_process";
-import { createHash, randomBytes } from "node:crypto";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -127,10 +127,6 @@ function writeFileIfChanged(absPath: string, content: string): boolean {
     return true;
 }
 
-function freshSecret(): string {
-    return randomBytes(24).toString("base64url");
-}
-
 // Recognize known placeholders that prior tooling may have written into
 // apps/server/.env.local so a fresh setup-tree run replaces them instead of
 // preserving them. The bare `isMissingSecret` covers `<…>` and "replace-me";
@@ -178,12 +174,35 @@ function wipeLegacyState(): void {
 function loadConvexEnv(repoPath: string): Dotenv {
     const convexEnvPath = path.join(repoPath, REPO_CONVEX_ENV);
     if (!fs.existsSync(convexEnvPath)) {
-        console.log(
-            `setup-tree: ${REPO_CONVEX_ENV} not found in repo root; skipping Convex wiring (server will start with placeholder values).`,
+        throw new Error(
+            [
+                `setup-tree: ${REPO_CONVEX_ENV} not found at ${convexEnvPath}.`,
+                "Copy .env.convex.local.example, fill in your deployment, then mint shared secrets:",
+                "  cp .env.convex.local.example .env.convex.local",
+                "  bun run convex:gen-secrets >> .env.convex.local",
+                "  bun run convex:env",
+                "See docs/local_environment_setup_checklist.md.",
+            ].join("\n"),
         );
-        return {};
     }
     return readDotenv(convexEnvPath);
+}
+
+function requireConvexSecret(convexEnv: Dotenv, key: string): string {
+    const value = convexEnv[key]?.trim();
+    if (isMissingSecret(value)) {
+        throw new Error(
+            [
+                `setup-tree: ${key} missing from ${REPO_CONVEX_ENV}.`,
+                "Mint shared secrets and push them to Convex:",
+                "  bun run convex:gen-secrets >> .env.convex.local",
+                "  bun run convex:env",
+                "If you already minted server-side values on a previous checkout, migrate without rotating:",
+                "  bun run env:sync-secrets",
+            ].join("\n"),
+        );
+    }
+    return value!;
 }
 
 function fillTemplate(
@@ -254,15 +273,13 @@ async function main(): Promise<void> {
     ): string => (isPlaceholder(existing) ? fallback() : existing!);
     const serverEnv: Dotenv = {
         XDG_STATE_HOME: xdgStateHome,
-        BACKEND_TOKEN_SECRET: preserveOrFallback(
-            existingServerEnv.BACKEND_TOKEN_SECRET,
-            isMissingSecret,
-            freshSecret,
+        BACKEND_TOKEN_SECRET: requireConvexSecret(
+            convexEnv,
+            "BACKEND_TOKEN_SECRET",
         ),
-        RUNTIME_INGRESS_SECRET: preserveOrFallback(
-            existingServerEnv.RUNTIME_INGRESS_SECRET,
-            isMissingSecret,
-            freshSecret,
+        RUNTIME_INGRESS_SECRET: requireConvexSecret(
+            convexEnv,
+            "RUNTIME_INGRESS_SECRET",
         ),
         AGENTCHAT_CONVEX_SITE_URL: preserveOrFallback(
             existingServerEnv.AGENTCHAT_CONVEX_SITE_URL,

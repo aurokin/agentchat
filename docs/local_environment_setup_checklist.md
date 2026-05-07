@@ -19,12 +19,17 @@ Drop your Convex deployment creds into a repo-local dotenv at
 ```bash
 cp .env.convex.local.example .env.convex.local
 # edit .env.convex.local and set CONVEX_DEPLOYMENT, CONVEX_URL, etc.
+bun run convex:gen-secrets >> .env.convex.local   # mints shared + auth secrets
+bun run convex:env                                # pushes them to Convex
 ```
 
-`scripts/local/setup-tree.ts` reads that file and copies the relevant keys
-into the per-tree `apps/server/.env.local` and `apps/web/.env.local`.
-`.env.convex.local` is gitignored (`.env*.local` rule) and is propagated into
-new worktrees by `wt step copy-ignored`, which the post-start hook runs.
+`<repo>/.env.convex.local` is the single source of truth for both Convex and
+`apps/server`. `scripts/local/setup-tree.ts` reads it and writes the per-tree
+`apps/server/.env.local` and `apps/web/.env.local`; `bun run convex:env`
+pushes the same values to the Convex deployment, so `RUNTIME_INGRESS_SECRET`
+and `BACKEND_TOKEN_SECRET` cannot drift. The file is gitignored (`.env*.local`
+rule) and propagated into new worktrees by `wt step copy-ignored`, which the
+post-start hook runs.
 
 ## Daily Flow
 
@@ -75,13 +80,29 @@ If you need to wire up a fresh Convex deployment:
 
 ```bash
 bun run --cwd packages/convex codegen
-bun run convex:gen-secrets > /tmp/secrets.env
-bun run convex:env -- --deployment dev:<your-deployment> < /tmp/secrets.env
+# Set CONVEX_DEPLOYMENT / CONVEX_URL / auth in .env.convex.local first, then:
+bun run convex:gen-secrets >> .env.convex.local
+bun run convex:env -- --deployment dev:<your-deployment>
+bun scripts/local/setup-tree.ts
 ```
 
-Then update `<repo>/.env.convex.local` with the new
-`CONVEX_DEPLOYMENT` / `CONVEX_URL` and re-run `setup-tree.ts` in each active
-worktree.
+`convex:gen-secrets` emits Convex Auth keys (`JWKS`, `JWT_PRIVATE_KEY`,
+`ENCRYPTION_KEY`) and the shared ingress secrets (`RUNTIME_INGRESS_SECRET`,
+`BACKEND_TOKEN_SECRET`). All five live in `.env.convex.local`; `convex:env`
+pushes them to Convex and `setup-tree.ts` reads the two shared secrets into
+`apps/server/.env.local`.
+
+### Migrating a pre-AUR-184 checkout
+
+If your `apps/server/.env.local` already has live `RUNTIME_INGRESS_SECRET` /
+`BACKEND_TOKEN_SECRET` values that Convex doesn't know about (the old
+`setup-tree` minted them locally), copy them into the shared file without
+rotating:
+
+```bash
+bun run env:sync-secrets   # appends missing keys to .env.convex.local
+bun run convex:env         # pushes them to Convex
+```
 
 ## Dedicated Local Fixture Config
 

@@ -11,6 +11,8 @@ const FAKE_JWT_PRIVATE_KEY =
     "-----BEGIN PRIVATE KEY----- MIIBIjANBg... -----END PRIVATE KEY-----";
 const FAKE_JWKS = '{"keys":[{"use":"sig","kty":"RSA","n":"x","e":"AQAB"}]}';
 const FAKE_ENCRYPTION_KEY = Buffer.alloc(32, 1).toString("base64");
+const FAKE_RUNTIME_INGRESS_SECRET = "ZmFrZS1ydW50aW1lLWluZ3Jlc3Mtc2VjcmV0";
+const FAKE_BACKEND_TOKEN_SECRET = "ZmFrZS1iYWNrZW5kLXRva2VuLXNlY3JldA";
 
 function makeFixture(): { root: string; cleanup: () => void } {
     const root = fs.realpathSync(
@@ -63,6 +65,8 @@ describe("env:validate", () => {
                     `JWKS=${FAKE_JWKS}`,
                     `JWT_PRIVATE_KEY=${FAKE_JWT_PRIVATE_KEY}`,
                     `ENCRYPTION_KEY=${FAKE_ENCRYPTION_KEY}`,
+                    `RUNTIME_INGRESS_SECRET=${FAKE_RUNTIME_INGRESS_SECRET}`,
+                    `BACKEND_TOKEN_SECRET=${FAKE_BACKEND_TOKEN_SECRET}`,
                     "",
                 ].join("\n"),
             );
@@ -86,6 +90,8 @@ describe("env:validate", () => {
                     `JWKS=${FAKE_JWKS}`,
                     `JWT_PRIVATE_KEY=${FAKE_JWT_PRIVATE_KEY}`,
                     `ENCRYPTION_KEY=${FAKE_ENCRYPTION_KEY}`,
+                    `RUNTIME_INGRESS_SECRET=${FAKE_RUNTIME_INGRESS_SECRET}`,
+                    `BACKEND_TOKEN_SECRET=${FAKE_BACKEND_TOKEN_SECRET}`,
                     "",
                 ].join("\n"),
             );
@@ -112,6 +118,8 @@ describe("env:validate", () => {
                     `JWKS=${FAKE_JWKS}`,
                     `JWT_PRIVATE_KEY=${FAKE_JWT_PRIVATE_KEY}`,
                     `ENCRYPTION_KEY=${FAKE_ENCRYPTION_KEY}`,
+                    `RUNTIME_INGRESS_SECRET=${FAKE_RUNTIME_INGRESS_SECRET}`,
+                    `BACKEND_TOKEN_SECRET=${FAKE_BACKEND_TOKEN_SECRET}`,
                     "",
                 ].join("\n"),
             );
@@ -119,6 +127,30 @@ describe("env:validate", () => {
             expect(result.status).not.toBe(0);
             expect(result.output).toContain("AGENTCHAT_AUTH_MODE");
             expect(result.output).toContain('expected "google" or "local"');
+        } finally {
+            fixture.cleanup();
+        }
+    });
+
+    test("requires shared runtime/backend secrets", () => {
+        const fixture = makeFixture();
+        try {
+            writeConvexEnv(
+                fixture.root,
+                [
+                    "AGENTCHAT_AUTH_MODE=local",
+                    "CONVEX_DEPLOYMENT=dev:test",
+                    "SITE_URL=https://test.localhost",
+                    `JWKS=${FAKE_JWKS}`,
+                    `JWT_PRIVATE_KEY=${FAKE_JWT_PRIVATE_KEY}`,
+                    `ENCRYPTION_KEY=${FAKE_ENCRYPTION_KEY}`,
+                    "",
+                ].join("\n"),
+            );
+            const result = runValidate(fixture.root);
+            expect(result.status).not.toBe(0);
+            expect(result.output).toContain("RUNTIME_INGRESS_SECRET");
+            expect(result.output).toContain("BACKEND_TOKEN_SECRET");
         } finally {
             fixture.cleanup();
         }
