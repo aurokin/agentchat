@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -10,6 +10,25 @@ const TEMPLATE = path.join(
     REPO_ROOT,
     "apps/server/agentchat.config.template.json",
 );
+
+const FIXTURE_BACKEND_TOKEN_SECRET = "fixture-backend-token-secret-value";
+const FIXTURE_RUNTIME_INGRESS_SECRET = "fixture-runtime-ingress-secret-value";
+
+function writeConvexLocal(
+    repoRoot: string,
+    extra: Record<string, string> = {},
+): void {
+    const merged: Record<string, string> = {
+        BACKEND_TOKEN_SECRET: FIXTURE_BACKEND_TOKEN_SECRET,
+        RUNTIME_INGRESS_SECRET: FIXTURE_RUNTIME_INGRESS_SECRET,
+        ...extra,
+    };
+    const content =
+        Object.entries(merged)
+            .map(([k, v]) => `${k}=${v}`)
+            .join("\n") + "\n";
+    fs.writeFileSync(path.join(repoRoot, ".env.convex.local"), content);
+}
 
 function makeRepo(): {
     root: string;
@@ -74,6 +93,7 @@ describe("setup-tree", () => {
     test("generates env files and config in main checkout", () => {
         const fixture = makeRepo();
         try {
+            writeConvexLocal(fixture.root);
             runSetupTree(fixture.root, fixture.fakeHome);
 
             const webEnv = readEnv(
@@ -86,8 +106,12 @@ describe("setup-tree", () => {
             const serverEnv = readEnv(
                 path.join(fixture.root, "apps/server/.env.local"),
             );
-            expect(serverEnv.BACKEND_TOKEN_SECRET.length).toBeGreaterThan(16);
-            expect(serverEnv.RUNTIME_INGRESS_SECRET.length).toBeGreaterThan(16);
+            expect(serverEnv.BACKEND_TOKEN_SECRET).toBe(
+                FIXTURE_BACKEND_TOKEN_SECRET,
+            );
+            expect(serverEnv.RUNTIME_INGRESS_SECRET).toBe(
+                FIXTURE_RUNTIME_INGRESS_SECRET,
+            );
             expect(serverEnv.XDG_STATE_HOME).toBe(
                 path.join(
                     fixture.fakeHome,
@@ -121,10 +145,10 @@ describe("setup-tree", () => {
     test("sources convex creds from repo-local .env.convex.local", () => {
         const fixture = makeRepo();
         try {
-            fs.writeFileSync(
-                path.join(fixture.root, ".env.convex.local"),
-                "CONVEX_DEPLOYMENT=dev:my-deployment\nCONVEX_URL=https://my-deployment.convex.cloud\n",
-            );
+            writeConvexLocal(fixture.root, {
+                CONVEX_DEPLOYMENT: "dev:my-deployment",
+                CONVEX_URL: "https://my-deployment.convex.cloud",
+            });
             runSetupTree(fixture.root, fixture.fakeHome);
 
             const webEnv = readEnv(
@@ -139,29 +163,30 @@ describe("setup-tree", () => {
             expect(serverEnv.AGENTCHAT_CONVEX_SITE_URL).toBe(
                 "https://my-deployment.convex.site",
             );
+            expect(serverEnv.BACKEND_TOKEN_SECRET).toBe(
+                FIXTURE_BACKEND_TOKEN_SECRET,
+            );
+            expect(serverEnv.RUNTIME_INGRESS_SECRET).toBe(
+                FIXTURE_RUNTIME_INGRESS_SECRET,
+            );
         } finally {
             fixture.cleanup();
         }
     });
 
-    test("replaces placeholder values from prior tooling", () => {
+    test("replaces placeholder Convex site URL from prior tooling", () => {
         const fixture = makeRepo();
         try {
-            // Pre-seed with the kinds of placeholder values older tooling
-            // wrote into apps/server/.env.local. setup-tree must replace
-            // them, not preserve.
-            fs.writeFileSync(
-                path.join(fixture.root, ".env.convex.local"),
-                "CONVEX_DEPLOYMENT=dev:my-deployment\nCONVEX_URL=https://my-deployment.convex.cloud\n",
-            );
+            writeConvexLocal(fixture.root, {
+                CONVEX_DEPLOYMENT: "dev:my-deployment",
+                CONVEX_URL: "https://my-deployment.convex.cloud",
+            });
             fs.mkdirSync(path.join(fixture.root, "apps/server"), {
                 recursive: true,
             });
             fs.writeFileSync(
                 path.join(fixture.root, "apps/server/.env.local"),
                 [
-                    "BACKEND_TOKEN_SECRET=replace-me",
-                    "RUNTIME_INGRESS_SECRET=<filled-by-bootstrap>",
                     "AGENTCHAT_CONVEX_SITE_URL=https://example.convex.site",
                     "",
                 ].join("\n"),
@@ -172,10 +197,6 @@ describe("setup-tree", () => {
             const serverEnv = readEnv(
                 path.join(fixture.root, "apps/server/.env.local"),
             );
-            expect(serverEnv.BACKEND_TOKEN_SECRET).not.toBe("replace-me");
-            expect(serverEnv.BACKEND_TOKEN_SECRET.length).toBeGreaterThan(16);
-            expect(serverEnv.RUNTIME_INGRESS_SECRET).not.toContain("<");
-            expect(serverEnv.RUNTIME_INGRESS_SECRET.length).toBeGreaterThan(16);
             expect(serverEnv.AGENTCHAT_CONVEX_SITE_URL).toBe(
                 "https://my-deployment.convex.site",
             );
@@ -187,15 +208,13 @@ describe("setup-tree", () => {
     test("preserves valid Convex site hosts containing example text", () => {
         const fixture = makeRepo();
         try {
-            fs.writeFileSync(
-                path.join(fixture.root, ".env.convex.local"),
-                "CONVEX_DEPLOYMENT=dev:my-deployment\nCONVEX_URL=https://my-deployment.convex.cloud\n",
-            );
+            writeConvexLocal(fixture.root, {
+                CONVEX_DEPLOYMENT: "dev:my-deployment",
+                CONVEX_URL: "https://my-deployment.convex.cloud",
+            });
             fs.writeFileSync(
                 path.join(fixture.root, "apps/server/.env.local"),
                 [
-                    "BACKEND_TOKEN_SECRET=existing-backend-token",
-                    "RUNTIME_INGRESS_SECRET=existing-runtime-token",
                     "AGENTCHAT_CONVEX_SITE_URL=https://myexample.convex.site",
                     "",
                 ].join("\n"),
@@ -217,24 +236,19 @@ describe("setup-tree", () => {
     test("ignores legacy bootstrap-headered server env file", () => {
         const fixture = makeRepo();
         try {
-            fs.writeFileSync(
-                path.join(fixture.root, ".env.convex.local"),
-                "CONVEX_DEPLOYMENT=dev:my-deployment\nCONVEX_URL=https://my-deployment.convex.cloud\n",
-            );
+            writeConvexLocal(fixture.root, {
+                CONVEX_DEPLOYMENT: "dev:my-deployment",
+                CONVEX_URL: "https://my-deployment.convex.cloud",
+            });
             fs.mkdirSync(path.join(fixture.root, "apps/server"), {
                 recursive: true,
             });
-            // The pre-portless harness wrote this header. Even with values
-            // that aren't placeholders, the file is stale and must be
-            // rewritten.
             fs.writeFileSync(
                 path.join(fixture.root, "apps/server/.env.local"),
                 [
                     "# This file is generated by bun run bootstrap.",
                     "# Manual edits are unsupported.",
                     "",
-                    "BACKEND_TOKEN_SECRET=stale-from-old-harness",
-                    "RUNTIME_INGRESS_SECRET=stale-from-old-harness",
                     "AGENTCHAT_CONVEX_SITE_URL=https://stale.convex.site",
                     "",
                 ].join("\n"),
@@ -245,12 +259,6 @@ describe("setup-tree", () => {
             const serverEnv = readEnv(
                 path.join(fixture.root, "apps/server/.env.local"),
             );
-            expect(serverEnv.BACKEND_TOKEN_SECRET).not.toBe(
-                "stale-from-old-harness",
-            );
-            expect(serverEnv.RUNTIME_INGRESS_SECRET).not.toBe(
-                "stale-from-old-harness",
-            );
             expect(serverEnv.AGENTCHAT_CONVEX_SITE_URL).toBe(
                 "https://my-deployment.convex.site",
             );
@@ -259,9 +267,10 @@ describe("setup-tree", () => {
         }
     });
 
-    test("preserves secrets across re-runs", () => {
+    test("re-runs are stable when convex env is unchanged", () => {
         const fixture = makeRepo();
         try {
+            writeConvexLocal(fixture.root);
             runSetupTree(fixture.root, fixture.fakeHome);
             const first = readEnv(
                 path.join(fixture.root, "apps/server/.env.local"),
@@ -281,10 +290,50 @@ describe("setup-tree", () => {
         }
     });
 
+    test("fails loudly when .env.convex.local is missing", () => {
+        const fixture = makeRepo();
+        try {
+            const result = spawnSync("bun", [SETUP_TREE], {
+                cwd: fixture.root,
+                env: { ...process.env, HOME: fixture.fakeHome },
+                encoding: "utf8",
+            });
+            expect(result.status).not.toBe(0);
+            const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+            expect(output).toContain(".env.convex.local");
+            expect(output).toContain("convex:gen-secrets");
+        } finally {
+            fixture.cleanup();
+        }
+    });
+
+    test("fails loudly when shared secrets missing from convex env", () => {
+        const fixture = makeRepo();
+        try {
+            fs.writeFileSync(
+                path.join(fixture.root, ".env.convex.local"),
+                "CONVEX_DEPLOYMENT=dev:my-deployment\n",
+            );
+            const result = spawnSync("bun", [SETUP_TREE], {
+                cwd: fixture.root,
+                env: { ...process.env, HOME: fixture.fakeHome },
+                encoding: "utf8",
+            });
+            expect(result.status).not.toBe(0);
+            const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+            expect(output).toContain("BACKEND_TOKEN_SECRET");
+            expect(output).toContain("env:sync-secrets");
+        } finally {
+            fixture.cleanup();
+        }
+    });
+
     test("slug collisions are avoided across different branches", () => {
         const slashed = makeRepo();
         const dashed = makeRepo();
         try {
+            writeConvexLocal(slashed.root);
+            writeConvexLocal(dashed.root);
             runSetupTree(slashed.root, slashed.fakeHome, "feature/foo");
             runSetupTree(dashed.root, dashed.fakeHome, "feature-foo");
 
@@ -333,6 +382,7 @@ describe("setup-tree", () => {
                     "apps/server/agentchat.config.template.json",
                 ),
             );
+            writeConvexLocal(worktreePath);
 
             runSetupTree(worktreePath, fixture.fakeHome);
             const webEnv = readEnv(
