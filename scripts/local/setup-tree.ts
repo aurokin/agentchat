@@ -208,15 +208,11 @@ function requireConvexSecret(convexEnv: Dotenv, key: string): string {
 function fillTemplate(
     template: unknown,
     repoPath: string,
-    branchSlug: string,
-    sandboxRoot: string,
 ): Record<string, unknown> {
     const cloned = JSON.parse(JSON.stringify(template)) as Record<
         string,
         unknown
     >;
-    cloned.stateId = branchSlug;
-    cloned.sandboxRoot = sandboxRoot;
     const agents = cloned.agents;
     if (Array.isArray(agents)) {
         for (const agent of agents) {
@@ -252,10 +248,8 @@ async function main(): Promise<void> {
 
     const treeStateRoot = path.join(TREE_STATE_PARENT, branchSlug);
     const xdgStateHome = path.join(treeStateRoot, "xdg");
-    const sandboxRoot = path.join(treeStateRoot, "sandboxes");
     const logDir = path.join(treeStateRoot, "logs");
     fs.mkdirSync(xdgStateHome, { recursive: true });
-    fs.mkdirSync(sandboxRoot, { recursive: true });
     fs.mkdirSync(logDir, { recursive: true });
 
     const convexEnv = loadConvexEnv(repo);
@@ -319,7 +313,7 @@ async function main(): Promise<void> {
     const template = JSON.parse(
         fs.readFileSync(templatePath, "utf8"),
     ) as unknown;
-    const filled = fillTemplate(template, repo, branchSlug, sandboxRoot);
+    const filled = fillTemplate(template, repo);
     writeFileIfChanged(
         path.join(repo, "apps/server/agentchat.config.json"),
         `${JSON.stringify(filled, null, 4)}\n`,

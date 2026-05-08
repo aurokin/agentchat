@@ -128,13 +128,11 @@ describe("setup-tree", () => {
                     "utf8",
                 ),
             );
-            expect(config.stateId).toBe("main");
-            expect(config.sandboxRoot).toBe(
-                path.join(
-                    fixture.fakeHome,
-                    ".local/state/agentchat-trees/main/sandboxes",
-                ),
-            );
+            // stateId/sandboxRoot are intentionally absent — config schema
+            // defaults handle them; per-worktree isolation comes from
+            // XDG_STATE_HOME.
+            expect(config.stateId).toBeUndefined();
+            expect(config.sandboxRoot).toBeUndefined();
             expect(config.agents[0].rootPath).toBe(fixture.root);
             expect(config.agents[0].runtime.cwd).toBe(fixture.root);
         } finally {
@@ -337,24 +335,27 @@ describe("setup-tree", () => {
             runSetupTree(slashed.root, slashed.fakeHome, "feature/foo");
             runSetupTree(dashed.root, dashed.fakeHome, "feature-foo");
 
-            const slashedConfig = JSON.parse(
-                fs.readFileSync(
+            const slashedXdg = readEnv(
+                path.join(slashed.root, "apps/server/.env.local"),
+            ).XDG_STATE_HOME;
+            const dashedXdg = readEnv(
+                path.join(dashed.root, "apps/server/.env.local"),
+            ).XDG_STATE_HOME;
+            expect(slashedXdg).not.toBe(dashedXdg);
+            expect(dashedXdg).toBe(
+                path.join(
+                    dashed.fakeHome,
+                    ".local/state/agentchat-trees/feature-foo/xdg",
+                ),
+            );
+            expect(
+                slashedXdg.startsWith(
                     path.join(
-                        slashed.root,
-                        "apps/server/agentchat.config.json",
+                        slashed.fakeHome,
+                        ".local/state/agentchat-trees/feature-foo-",
                     ),
-                    "utf8",
                 ),
-            );
-            const dashedConfig = JSON.parse(
-                fs.readFileSync(
-                    path.join(dashed.root, "apps/server/agentchat.config.json"),
-                    "utf8",
-                ),
-            );
-            expect(slashedConfig.stateId).not.toBe(dashedConfig.stateId);
-            expect(dashedConfig.stateId).toBe("feature-foo");
-            expect(slashedConfig.stateId.startsWith("feature-foo-")).toBe(true);
+            ).toBe(true);
         } finally {
             slashed.cleanup();
             dashed.cleanup();
