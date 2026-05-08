@@ -96,12 +96,13 @@ describe("setup-tree", () => {
             writeConvexLocal(fixture.root);
             runSetupTree(fixture.root, fixture.fakeHome);
 
-            const webEnv = readEnv(
-                path.join(fixture.root, "apps/web/.env.local"),
-            );
-            expect(webEnv.NEXT_PUBLIC_AGENTCHAT_SERVER_URL).toBe(
-                "https://agentchat-server.agentchat.localhost",
-            );
+            // apps/web/.env.local is no longer generated — the web app
+            // derives NEXT_PUBLIC_CONVEX_URL from .env.convex.local and
+            // NEXT_PUBLIC_AGENTCHAT_SERVER_URL from `portless get` at
+            // next.config.ts load time.
+            expect(
+                fs.existsSync(path.join(fixture.root, "apps/web/.env.local")),
+            ).toBe(false);
 
             const serverEnv = readEnv(
                 path.join(fixture.root, "apps/server/.env.local"),
@@ -140,7 +141,7 @@ describe("setup-tree", () => {
         }
     });
 
-    test("sources convex creds from repo-local .env.convex.local", () => {
+    test("does not duplicate convex creds into apps/server/.env.local", () => {
         const fixture = makeRepo();
         try {
             writeConvexLocal(fixture.root, {
@@ -149,17 +150,12 @@ describe("setup-tree", () => {
             });
             runSetupTree(fixture.root, fixture.fakeHome);
 
-            const webEnv = readEnv(
-                path.join(fixture.root, "apps/web/.env.local"),
-            );
-            expect(webEnv.NEXT_PUBLIC_CONVEX_URL).toBe(
-                "https://my-deployment.convex.cloud",
-            );
             const serverEnv = readEnv(
                 path.join(fixture.root, "apps/server/.env.local"),
             );
             // apps/server consumes CONVEX_URL / shared secrets directly from
-            // .env.convex.local; setup-tree no longer duplicates them.
+            // .env.convex.local via --env-file; setup-tree must not
+            // duplicate them.
             expect(serverEnv.CONVEX_URL).toBeUndefined();
             expect(serverEnv.AGENTCHAT_CONVEX_SITE_URL).toBeUndefined();
             expect(serverEnv.BACKEND_TOKEN_SECRET).toBeUndefined();
@@ -302,7 +298,7 @@ describe("setup-tree", () => {
         }
     });
 
-    test("emits worktree-prefixed server URL in linked worktree", () => {
+    test("uses worktree-distinct XDG_STATE_HOME in a linked worktree", () => {
         const fixture = makeRepo();
         const worktreePath = `${fixture.root}.feat`;
         try {
@@ -326,11 +322,14 @@ describe("setup-tree", () => {
             writeConvexLocal(worktreePath);
 
             runSetupTree(worktreePath, fixture.fakeHome);
-            const webEnv = readEnv(
-                path.join(worktreePath, "apps/web/.env.local"),
+            const serverEnv = readEnv(
+                path.join(worktreePath, "apps/server/.env.local"),
             );
-            expect(webEnv.NEXT_PUBLIC_AGENTCHAT_SERVER_URL).toBe(
-                "https://feat.agentchat-server.agentchat.localhost",
+            expect(serverEnv.XDG_STATE_HOME).toBe(
+                path.join(
+                    fixture.fakeHome,
+                    ".local/state/agentchat-trees/feat/xdg",
+                ),
             );
         } finally {
             execFileSync(
