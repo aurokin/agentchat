@@ -6,7 +6,7 @@ describe("getRuntimeEnvDiagnostics", () => {
     test("reports success when all required runtime env vars are present", () => {
         const result = getRuntimeEnvDiagnostics({
             BACKEND_TOKEN_SECRET: "backend-secret",
-            AGENTCHAT_CONVEX_SITE_URL: "https://example.convex.site",
+            CONVEX_URL: "https://example.convex.cloud",
             RUNTIME_INGRESS_SECRET: "runtime-secret",
         });
 
@@ -17,7 +17,7 @@ describe("getRuntimeEnvDiagnostics", () => {
                 configured: true,
             }),
             expect.objectContaining({
-                key: "AGENTCHAT_CONVEX_SITE_URL",
+                key: "CONVEX_URL",
                 configured: true,
             }),
             expect.objectContaining({
@@ -30,7 +30,7 @@ describe("getRuntimeEnvDiagnostics", () => {
     test("reports missing runtime env vars explicitly", () => {
         const result = getRuntimeEnvDiagnostics({
             BACKEND_TOKEN_SECRET: "  ",
-            AGENTCHAT_CONVEX_SITE_URL: undefined,
+            CONVEX_URL: undefined,
             RUNTIME_INGRESS_SECRET: "runtime-secret",
         });
 
@@ -41,7 +41,7 @@ describe("getRuntimeEnvDiagnostics", () => {
                 configured: false,
             }),
             expect.objectContaining({
-                key: "AGENTCHAT_CONVEX_SITE_URL",
+                key: "CONVEX_URL",
                 configured: false,
             }),
             expect.objectContaining({

@@ -1,10 +1,10 @@
 type EnvCase = {
-    key: "BACKEND_TOKEN_SECRET" | "AGENTCHAT_CONVEX_SITE_URL" | "RUNTIME_INGRESS_SECRET";
+    key: "BACKEND_TOKEN_SECRET" | "CONVEX_URL" | "RUNTIME_INGRESS_SECRET";
 };
 
 const REQUIRED_CASES: EnvCase[] = [
     { key: "BACKEND_TOKEN_SECRET" },
-    { key: "AGENTCHAT_CONVEX_SITE_URL" },
+    { key: "CONVEX_URL" },
     { key: "RUNTIME_INGRESS_SECRET" },
 ];
 
@@ -19,9 +19,8 @@ async function runDoctorWithout(key: EnvCase["key"]): Promise<string> {
     delete process.env[key];
 
     try {
-        const { getRuntimeEnvDiagnostics } = await import(
-            "../../apps/server/src/envDiagnostics.ts"
-        );
+        const { getRuntimeEnvDiagnostics } =
+            await import("../../apps/server/src/envDiagnostics.ts");
         const diagnostics = getRuntimeEnvDiagnostics();
         invariant(
             diagnostics.ok === false,
@@ -51,10 +50,7 @@ async function main() {
     for (const testCase of REQUIRED_CASES) {
         results.push({
             key: testCase.key,
-            outputPreview: (await runDoctorWithout(testCase.key)).slice(
-                0,
-                240,
-            ),
+            outputPreview: (await runDoctorWithout(testCase.key)).slice(0, 240),
         });
     }
 

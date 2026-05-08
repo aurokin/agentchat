@@ -558,11 +558,11 @@ describe("createFetchHandler", () => {
 
     test("includes runtime env diagnostics", async () => {
         const originalBackendSecret = process.env.BACKEND_TOKEN_SECRET;
-        const originalConvexSiteUrl = process.env.AGENTCHAT_CONVEX_SITE_URL;
+        const originalConvexUrl = process.env.CONVEX_URL;
         const originalRuntimeSecret = process.env.RUNTIME_INGRESS_SECRET;
 
         process.env.BACKEND_TOKEN_SECRET = "backend-secret";
-        delete process.env.AGENTCHAT_CONVEX_SITE_URL;
+        delete process.env.CONVEX_URL;
         process.env.RUNTIME_INGRESS_SECRET = "runtime-secret";
 
         try {
@@ -606,7 +606,7 @@ describe("createFetchHandler", () => {
                     configured: true,
                 }),
                 expect.objectContaining({
-                    key: "AGENTCHAT_CONVEX_SITE_URL",
+                    key: "CONVEX_URL",
                     configured: false,
                 }),
                 expect.objectContaining({
@@ -616,9 +616,9 @@ describe("createFetchHandler", () => {
             ]);
             expect(body.issues).toContainEqual(
                 expect.objectContaining({
-                    code: "runtime_env_missing_agentchat_convex_site_url",
+                    code: "runtime_env_missing_convex_url",
                     severity: "error",
-                    scope: "runtimeEnv:AGENTCHAT_CONVEX_SITE_URL",
+                    scope: "runtimeEnv:CONVEX_URL",
                 }),
             );
         } finally {
@@ -628,10 +628,10 @@ describe("createFetchHandler", () => {
                 process.env.BACKEND_TOKEN_SECRET = originalBackendSecret;
             }
 
-            if (originalConvexSiteUrl === undefined) {
-                delete process.env.AGENTCHAT_CONVEX_SITE_URL;
+            if (originalConvexUrl === undefined) {
+                delete process.env.CONVEX_URL;
             } else {
-                process.env.AGENTCHAT_CONVEX_SITE_URL = originalConvexSiteUrl;
+                process.env.CONVEX_URL = originalConvexUrl;
             }
 
             if (originalRuntimeSecret === undefined) {

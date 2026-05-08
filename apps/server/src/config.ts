@@ -659,11 +659,13 @@ export function getAgentProviderConfigs(
 }
 
 function getDefaultStateRuntimeBackendIdentity(): string | null {
-    const siteUrl = process.env.AGENTCHAT_CONVEX_SITE_URL?.trim();
-    if (!siteUrl) {
+    const cloudUrl = process.env.CONVEX_URL?.trim();
+    if (!cloudUrl) {
         return null;
     }
-    return siteUrl.replace(/\/+$/, "");
+    return cloudUrl
+        .replace(/\/+$/, "")
+        .replace(/\.convex\.cloud$/, ".convex.site");
 }
 
 function getProviderRuntimeStateSeed(provider: ProviderConfig) {

@@ -1,8 +1,5 @@
 export type RuntimeEnvDiagnostic = {
-    key:
-        | "BACKEND_TOKEN_SECRET"
-        | "AGENTCHAT_CONVEX_SITE_URL"
-        | "RUNTIME_INGRESS_SECRET";
+    key: "BACKEND_TOKEN_SECRET" | "CONVEX_URL" | "RUNTIME_INGRESS_SECRET";
     configured: boolean;
     description: string;
 };
@@ -27,10 +24,10 @@ export function getRuntimeEnvDiagnostics(
                 "Shared secret used by Convex and apps/server for backend websocket session tokens.",
         },
         {
-            key: "AGENTCHAT_CONVEX_SITE_URL",
-            configured: isConfigured(env.AGENTCHAT_CONVEX_SITE_URL),
+            key: "CONVEX_URL",
+            configured: isConfigured(env.CONVEX_URL),
             description:
-                "Convex site URL used by apps/server runtime persistence ingress.",
+                "Convex deployment URL; apps/server derives the runtime persistence ingress site URL from it.",
         },
         {
             key: "RUNTIME_INGRESS_SECRET",

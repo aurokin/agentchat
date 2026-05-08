@@ -4,22 +4,21 @@ import { RuntimePersistenceClient } from "../runtimePersistence.ts";
 
 describe("RuntimePersistenceClient", () => {
     const originalFetch = globalThis.fetch;
-    const originalSiteUrl = process.env.AGENTCHAT_CONVEX_SITE_URL;
+    const originalConvexUrl = process.env.CONVEX_URL;
     const originalSecret = process.env.RUNTIME_INGRESS_SECRET;
 
     beforeEach(() => {
-        process.env.AGENTCHAT_CONVEX_SITE_URL =
-            "https://agentchat.convex.site/";
+        process.env.CONVEX_URL = "https://agentchat.convex.cloud/";
         process.env.RUNTIME_INGRESS_SECRET = "runtime-secret";
     });
 
     afterEach(() => {
         globalThis.fetch = originalFetch;
 
-        if (originalSiteUrl === undefined) {
-            delete process.env.AGENTCHAT_CONVEX_SITE_URL;
+        if (originalConvexUrl === undefined) {
+            delete process.env.CONVEX_URL;
         } else {
-            process.env.AGENTCHAT_CONVEX_SITE_URL = originalSiteUrl;
+            process.env.CONVEX_URL = originalConvexUrl;
         }
 
         if (originalSecret === undefined) {
@@ -285,10 +284,10 @@ describe("RuntimePersistenceClient", () => {
     });
 
     test("fails fast when runtime env is missing", async () => {
-        delete process.env.AGENTCHAT_CONVEX_SITE_URL;
+        delete process.env.CONVEX_URL;
 
         expect(() => new RuntimePersistenceClient()).toThrow(
-            "AGENTCHAT_CONVEX_SITE_URL is not configured.",
+            "CONVEX_URL is not configured.",
         );
     });
 });
