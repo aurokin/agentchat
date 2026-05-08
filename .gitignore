@@ -51,7 +51,6 @@ __pycache__/
 ai_dump
 .env*.local
 .private/backups/
-apps/server/agentchat.config.json
 .last-branch
 .opencode/
 

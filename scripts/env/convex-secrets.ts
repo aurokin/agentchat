@@ -16,7 +16,8 @@ const main = (): void => {
 
     // Shared between Convex (/runtime ingress) and apps/server. Drift here surfaces
     // as confusing 401s mid-reconcile in apps/server/src/runtimePersistence.ts; keep
-    // them in .env.convex.local so `bun run convex:env` and `setup-tree` see one value.
+    // them in .env.convex.local so `bun run convex:env` pushes to Convex and apps/server
+    // reads the same values via `bun --env-file=../../.env.convex.local`.
     const runtimeIngressSecret = crypto.randomBytes(24).toString("base64url");
     const backendTokenSecret = crypto.randomBytes(24).toString("base64url");
 

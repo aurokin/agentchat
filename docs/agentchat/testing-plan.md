@@ -14,13 +14,10 @@ This document records the manual, integration, and end-to-end testing strategy f
 Use [worktrunk](https://github.com/max-sixty/worktrunk) directly:
 
 ```bash
-wt switch -c smoke-test                # post-start hook runs setup-tree.ts
-bun dev                                 # validates the lane is healthy
+wt switch -c smoke-test       # post-start runs `wt step copy-ignored`
+bun dev                       # validates the worktree boots cleanly
 wt remove
 ```
-
-The `scripts/local/__tests__/setup-tree.test.ts` smoke pins the env-file
-generation behavior end-to-end.
 
 ## Test Agent Fixtures
 

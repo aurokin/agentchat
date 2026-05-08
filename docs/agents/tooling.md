@@ -11,14 +11,14 @@ For the full confidence ladder, read [Harness Engineering](../agentchat/harness-
 
 ```bash
 bun install
-bun scripts/local/setup-tree.ts        # main checkout, one-time
-bun dev                                # convex + apps/server + apps/web (server/web wrapped through portless)
+# populate <repo>/.env.convex.local once per checkout
+bun dev                       # convex + apps/server + apps/web (server/web wrapped through portless)
 ```
 
 Worktrees:
 
 ```bash
-wt switch -c <branch>                  # post-start hook runs setup-tree.ts
+wt switch -c <branch>         # post-start runs `wt step copy-ignored`
 wt list
 wt remove
 ```
@@ -26,14 +26,11 @@ wt remove
 `bun --cwd apps/mobile dev` is run separately. Mobile is intentionally
 **not** routed through portless until upstream Expo support is solid.
 
-Agents should not begin by hand-editing:
-
-- `apps/web/.env.local`
-- `apps/server/.env.local`
-- `apps/server/agentchat.config.json`
-
-Re-run `bun scripts/local/setup-tree.ts` to regenerate them; the script is
-idempotent and preserves per-tree secrets.
+apps/server reads shared values directly from `<repo>/.env.convex.local`
+via Bun's `--env-file`. apps/web's `next.config.ts` does the same and
+asks `portless get agentchat-server` for the server URL. The committed
+`apps/server/agentchat.config.json` uses `"."` for path fields and the
+schema resolves them at load time.
 
 Production-like instances are just worktrees with their own
 `.env.convex.local`. Supervision (systemd, launchd, etc.) is operator-owned

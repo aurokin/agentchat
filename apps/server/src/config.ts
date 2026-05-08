@@ -749,7 +749,7 @@ function buildDefaultInstanceKeySeed(
 // Resolves user-facing path values relative to the config file's directory
 // when configPath is known, otherwise relative to process.cwd(). Absolute
 // paths are returned unchanged. Lets the committed agentchat.config.json
-// use `"."` to mean "this worktree" without setup-tree-style substitution.
+// use `"."` to mean "this worktree" — same file works in every checkout.
 function resolvePathRelativeToConfig(
     value: string,
     configPath: string | undefined,

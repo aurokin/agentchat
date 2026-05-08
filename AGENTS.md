@@ -14,8 +14,8 @@ Read this file before making changes in this repository.
 ## Harness Ladder
 
 - Orient with [README.md](README.md), [docs/agentchat/README.md](docs/agentchat/README.md), and [Local Modes](docs/local-modes.md).
-- Prepare a fresh checkout with `bun install` and `bun scripts/local/setup-tree.ts` (worktrees run setup-tree automatically via the `wt` post-start hook).
-- Use `bun dev` when a live stack is needed; Ctrl+C to stop. Web + server are routed through portless at `https://agentchat-web.agentchat.localhost` and `https://agentchat-server.agentchat.localhost` (worktrees get a `<branch>.` prefix).
+- Prepare a fresh checkout with `bun install`. Populate `<repo>/.env.convex.local` (apps/server reads it directly via `bun --env-file=...`; apps/web's `next.config.ts` loads it at startup). New worktrees pick it up automatically via `wt step copy-ignored` in the `post-start` hook.
+- Use `bun dev` when a live stack is needed; Ctrl+C to stop. Web + server are routed through portless — `portless list` or `portless get <name>` show the current URLs (worktrees get a `<branch>.` subdomain prefix automatically).
 - Use `wt switch -c <branch>` for disposable worktree work; `wt remove` to tear it down.
 - Mobile is run separately via `bun --cwd apps/mobile dev` (Expo is intentionally outside portless until support matures).
 - Run the health task for each modified surface: `bun run health:web`, `bun run health:server`, `bun run health:mobile`, `bun run health:shared`, or `bun run health:convex`.

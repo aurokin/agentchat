@@ -7,7 +7,7 @@ explicit, scoped, and cheap enough to run at the right time.
 ## Principles
 
 - Start from the source docs: [AGENTS.md](../../AGENTS.md), [README.md](../../README.md), and [Agentchat Architecture And Direction](./README.md).
-- Let `scripts/local/setup-tree.ts` own checkout-local generated state.
+- Treat `<repo>/.env.convex.local` as the single source of truth for shared values; let apps load it directly (Bun `--env-file` for the server, `next.config.ts` for the web app).
 - Isolate branch work in worktrunk-managed worktrees before runtime-heavy changes.
 - Treat Convex as the durable source of truth for auth, conversations, runs, and runtime bindings.
 - Treat `apps/server` as the runtime layer; clients should observe and command through defined APIs.
@@ -28,16 +28,17 @@ Read the smallest entry point that matches the work:
 
 ### 2. Checkout Harness
 
-Use these before changing generated config:
-
 ```bash
 bun install
-bun scripts/local/setup-tree.ts
+# populate <repo>/.env.convex.local once per checkout (see local-modes.md)
 ```
 
-`setup-tree.ts` writes checkout-local env files and `apps/server/agentchat.config.json`. It
-sources Convex creds from `~/.config/agentchat/convex.env`. In a `wt`-managed
-worktree it runs automatically as the post-start hook.
+apps/server reads `.env.convex.local` directly via `bun --env-file=...`
+(wired in `apps/server/package.json`'s dev/start scripts). apps/web's
+`next.config.ts` loads the same file at startup. The committed
+`apps/server/agentchat.config.json` uses `"."` for path fields and the
+schema resolves them against the config file's directory at load time —
+no per-checkout codegen step.
 
 ### 3. Worktree Harness
 
@@ -45,13 +46,13 @@ Use [worktrunk](https://github.com/max-sixty/worktrunk) for branch reconciliatio
 runtime isolation, and parallel agent work:
 
 ```bash
-wt switch -c <branch>     # creates worktree + branch, runs setup-tree.ts via post-start hook
+wt switch -c <branch>     # creates worktree + branch, post-start runs `wt step copy-ignored`
 wt list                   # show worktrees
 wt remove                 # remove the current worktree (or named worktree)
 ```
 
-The post-remove hook drops `~/.local/state/agentchat-trees/<branch>/` so per-tree state stays
-clean.
+`wt step copy-ignored` brings node_modules and `.env.convex.local` over
+from the source worktree, so a new tree boots with `bun dev` directly.
 
 ### 4. Runtime Harness
 
@@ -62,9 +63,9 @@ bun run doctor:server
 bun dev                   # convex + server + web (server/web wrapped through portless)
 ```
 
-URLs come from portless: `https://agentchat-web.agentchat.localhost` and
-`https://agentchat-server.agentchat.localhost` (with `<branch>.` prefix in
-linked worktrees).
+URLs come from portless. Run `portless list` or
+`portless get <agentchat-web|agentchat-server>` to see the current values
+(linked worktrees get a `<branch>.` subdomain prefix automatically).
 
 `apps/server` owns live runtime sessions. Codex is the active runtime. Pi,
 OpenCode, and Claude Code are planned implementations behind the agent-centric
