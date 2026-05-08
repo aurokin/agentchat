@@ -4,9 +4,9 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "dev": "portless run bun --watch src/index.ts",
-        "start": "portless run bun src/index.ts",
-        "doctor": "bun src/doctor.ts",
+        "dev": "portless run bun --env-file=../../.env.convex.local --env-file=.env.local --watch src/index.ts",
+        "start": "portless run bun --env-file=../../.env.convex.local --env-file=.env.local src/index.ts",
+        "doctor": "bun --env-file=../../.env.convex.local --env-file=.env.local src/doctor.ts",
         "format": "prettier --write \"src/**/*.{js,jsx,ts,tsx,json,md}\" \"*.{json,md}\"",
         "format:check": "prettier --check \"src/**/*.{js,jsx,ts,tsx,json,md}\" \"*.{json,md}\"",
         "typecheck": "tsc --noEmit",

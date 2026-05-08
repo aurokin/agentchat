@@ -227,21 +227,16 @@ async function main(): Promise<void> {
 
     const convexEnv = loadConvexEnv(repo);
     const convexCloudUrl = convexEnv.CONVEX_URL ?? "";
+    // apps/server reads .env.convex.local directly via --env-file; the only
+    // per-worktree override we still write is XDG_STATE_HOME. Validate that
+    // shared secrets exist in .env.convex.local so a fresh worktree fails
+    // here (loud, with hints) rather than silently at server boot.
+    requireConvexSecret(convexEnv, "BACKEND_TOKEN_SECRET");
+    requireConvexSecret(convexEnv, "RUNTIME_INGRESS_SECRET");
 
     const serverEnvPath = path.join(repo, "apps/server/.env.local");
-    // Force-rewrite apps/server/.env.local from convexEnv on every run so a
-    // fresh CONVEX_URL is picked up without manual editing.
     const serverEnv: Dotenv = {
         XDG_STATE_HOME: xdgStateHome,
-        BACKEND_TOKEN_SECRET: requireConvexSecret(
-            convexEnv,
-            "BACKEND_TOKEN_SECRET",
-        ),
-        RUNTIME_INGRESS_SECRET: requireConvexSecret(
-            convexEnv,
-            "RUNTIME_INGRESS_SECRET",
-        ),
-        CONVEX_URL: convexCloudUrl,
     };
 
     writeFileIfChanged(

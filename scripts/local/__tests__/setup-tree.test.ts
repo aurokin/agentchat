@@ -106,12 +106,12 @@ describe("setup-tree", () => {
             const serverEnv = readEnv(
                 path.join(fixture.root, "apps/server/.env.local"),
             );
-            expect(serverEnv.BACKEND_TOKEN_SECRET).toBe(
-                FIXTURE_BACKEND_TOKEN_SECRET,
-            );
-            expect(serverEnv.RUNTIME_INGRESS_SECRET).toBe(
-                FIXTURE_RUNTIME_INGRESS_SECRET,
-            );
+            // apps/server reads shared secrets from .env.convex.local via
+            // --env-file. The only per-worktree value setup-tree still
+            // writes is XDG_STATE_HOME.
+            expect(serverEnv.BACKEND_TOKEN_SECRET).toBeUndefined();
+            expect(serverEnv.RUNTIME_INGRESS_SECRET).toBeUndefined();
+            expect(serverEnv.CONVEX_URL).toBeUndefined();
             expect(serverEnv.XDG_STATE_HOME).toBe(
                 path.join(
                     fixture.fakeHome,
@@ -158,16 +158,12 @@ describe("setup-tree", () => {
             const serverEnv = readEnv(
                 path.join(fixture.root, "apps/server/.env.local"),
             );
-            expect(serverEnv.CONVEX_URL).toBe(
-                "https://my-deployment.convex.cloud",
-            );
+            // apps/server consumes CONVEX_URL / shared secrets directly from
+            // .env.convex.local; setup-tree no longer duplicates them.
+            expect(serverEnv.CONVEX_URL).toBeUndefined();
             expect(serverEnv.AGENTCHAT_CONVEX_SITE_URL).toBeUndefined();
-            expect(serverEnv.BACKEND_TOKEN_SECRET).toBe(
-                FIXTURE_BACKEND_TOKEN_SECRET,
-            );
-            expect(serverEnv.RUNTIME_INGRESS_SECRET).toBe(
-                FIXTURE_RUNTIME_INGRESS_SECRET,
-            );
+            expect(serverEnv.BACKEND_TOKEN_SECRET).toBeUndefined();
+            expect(serverEnv.RUNTIME_INGRESS_SECRET).toBeUndefined();
         } finally {
             fixture.cleanup();
         }
@@ -199,12 +195,16 @@ describe("setup-tree", () => {
             const serverEnv = readEnv(
                 path.join(fixture.root, "apps/server/.env.local"),
             );
-            expect(serverEnv.CONVEX_URL).toBe(
-                "https://my-deployment.convex.cloud",
-            );
-            // Stale AGENTCHAT_CONVEX_SITE_URL must not survive the rewrite —
-            // setup-tree no longer writes that key at all.
+            // Stale entries must not survive the rewrite — setup-tree no
+            // longer writes shared secrets / Convex URLs into this file.
             expect(serverEnv.AGENTCHAT_CONVEX_SITE_URL).toBeUndefined();
+            expect(serverEnv.CONVEX_URL).toBeUndefined();
+            expect(serverEnv.XDG_STATE_HOME).toBe(
+                path.join(
+                    fixture.fakeHome,
+                    ".local/state/agentchat-trees/main/xdg",
+                ),
+            );
         } finally {
             fixture.cleanup();
         }
@@ -222,12 +222,7 @@ describe("setup-tree", () => {
             const second = readEnv(
                 path.join(fixture.root, "apps/server/.env.local"),
             );
-            expect(second.BACKEND_TOKEN_SECRET).toBe(
-                first.BACKEND_TOKEN_SECRET,
-            );
-            expect(second.RUNTIME_INGRESS_SECRET).toBe(
-                first.RUNTIME_INGRESS_SECRET,
-            );
+            expect(second.XDG_STATE_HOME).toBe(first.XDG_STATE_HOME);
         } finally {
             fixture.cleanup();
         }
