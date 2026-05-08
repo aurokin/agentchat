@@ -432,125 +432,74 @@ describe("server config", () => {
         expect(config.agents[0]?.defaultProviderId).toBe("agent-claude");
     });
 
-    test("rejects relative Claude Code runtime cwd values", () => {
-        expect(() =>
-            parseConfig({
-                version: 1,
-                auth: {
-                    defaultProviderId: "local-main",
+    test("resolves relative path fields against the config file's directory", () => {
+        const dir = mkdtempSync(path.join(os.tmpdir(), "rel-path-resolve-"));
+        const configDir = path.join(dir, "config");
+        const workspaceDir = path.join(dir, "workspace");
+        const sandboxDir = path.join(dir, "sandboxes");
+        const configPath = path.join(configDir, "agentchat.config.json");
+        try {
+            mkdirSync(configDir, { recursive: true });
+            mkdirSync(workspaceDir, { recursive: true });
+            mkdirSync(sandboxDir, { recursive: true });
+            writeFileSync(
+                configPath,
+                JSON.stringify({
+                    version: 1,
+                    auth: {
+                        defaultProviderId: "local-main",
+                        providers: [
+                            {
+                                id: "local-main",
+                                kind: "local",
+                                enabled: true,
+                                allowSignup: false,
+                            },
+                        ],
+                    },
+                    sandboxRoot: "../sandboxes",
                     providers: [
                         {
-                            id: "local-main",
-                            kind: "local",
-                            enabled: true,
-                            allowSignup: false,
-                        },
-                    ],
-                },
-                providers: [
-                    {
-                        id: "claude-main",
-                        kind: "claude-code",
-                        label: "Claude Code",
-                        enabled: true,
-                        idleTtlSeconds: 900,
-                        modelCacheTtlSeconds: 300,
-                        models: [],
-                        claudeCode: {
-                            command: "claude",
-                            args: [],
-                            baseEnv: {},
-                            cwd: "relative",
-                        },
-                    },
-                ],
-                agents: [
-                    {
-                        id: "workspace",
-                        name: "Workspace",
-                        enabled: true,
-                        rootPath: "/srv/workspace",
-                        providerIds: ["claude-main"],
-                    },
-                ],
-            }),
-        ).toThrow("Provider 'claude-main' claudeCode.cwd must be absolute.");
-    });
-
-    test("rejects relative ACP runtime cwd values", () => {
-        expect(() =>
-            parseConfig({
-                version: 1,
-                auth: {
-                    defaultProviderId: "local-main",
-                    providers: [
-                        {
-                            id: "local-main",
-                            kind: "local",
-                            enabled: true,
-                            allowSignup: false,
-                        },
-                    ],
-                },
-                providers: [
-                    {
-                        id: "acp-main",
-                        kind: "acp",
-                        label: "Pi ACP",
-                        enabled: true,
-                        idleTtlSeconds: 900,
-                        modelCacheTtlSeconds: 300,
-                        models: [],
-                        acp: {
-                            command: "acpx",
-                            args: [],
-                            baseEnv: {},
-                            cwd: "relative",
-                        },
-                    },
-                ],
-                agents: [
-                    {
-                        id: "workspace",
-                        name: "Workspace",
-                        enabled: true,
-                        rootPath: "/srv/workspace",
-                        providerIds: ["acp-main"],
-                    },
-                ],
-            }),
-        ).toThrow("Provider 'acp-main' acp.cwd must be absolute.");
-    });
-
-    test("rejects relative inline Claude Code runtime cwd values", () => {
-        expect(() =>
-            parseConfig({
-                version: 1,
-                auth: {
-                    defaultProviderId: "local-main",
-                    providers: [
-                        {
-                            id: "local-main",
-                            kind: "local",
-                            enabled: true,
-                            allowSignup: false,
-                        },
-                    ],
-                },
-                agents: [
-                    {
-                        id: "workspace",
-                        name: "Workspace",
-                        enabled: true,
-                        rootPath: "/srv/workspace",
-                        runtime: {
+                            id: "claude-main",
                             kind: "claude-code",
-                            cwd: "relative",
+                            label: "Claude Code",
+                            enabled: true,
+                            idleTtlSeconds: 900,
+                            modelCacheTtlSeconds: 300,
+                            models: [],
+                            claudeCode: {
+                                command: "claude",
+                                args: [],
+                                baseEnv: {},
+                                cwd: "../workspace",
+                            },
                         },
-                    },
-                ],
-            }),
-        ).toThrow("Agent 'workspace' runtime.cwd must be absolute.");
+                    ],
+                    agents: [
+                        {
+                            id: "workspace",
+                            name: "Workspace",
+                            enabled: true,
+                            rootPath: "../workspace",
+                            providerIds: ["claude-main"],
+                        },
+                    ],
+                }),
+            );
+
+            const config = loadConfigFile(configPath);
+            expect(config.agents[0]?.rootPath).toBe(workspaceDir);
+            expect(config.sandboxRoot).toBe(sandboxDir);
+            const provider = config.providers.find(
+                (p) => p.id === "claude-main",
+            );
+            expect(provider?.kind).toBe("claude-code");
+            if (provider?.kind === "claude-code") {
+                expect(provider.claudeCode.cwd).toBe(workspaceDir);
+            }
+        } finally {
+            rmSync(dir, { recursive: true, force: true });
+        }
     });
 
     test("rejects duplicate inline runtime provider ids", () => {

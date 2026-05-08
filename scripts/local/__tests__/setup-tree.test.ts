@@ -131,11 +131,13 @@ describe("setup-tree", () => {
             );
             // stateId/sandboxRoot are intentionally absent — config schema
             // defaults handle them; per-worktree isolation comes from
-            // XDG_STATE_HOME.
+            // XDG_STATE_HOME. agent.rootPath / runtime.cwd are committed
+            // as "." sentinels and resolved against the config file's
+            // directory at load time.
             expect(config.stateId).toBeUndefined();
             expect(config.sandboxRoot).toBeUndefined();
-            expect(config.agents[0].rootPath).toBe(fixture.root);
-            expect(config.agents[0].runtime.cwd).toBe(fixture.root);
+            expect(config.agents[0].rootPath).toBe(".");
+            expect(config.agents[0].runtime.cwd).toBe(".");
         } finally {
             fixture.cleanup();
         }

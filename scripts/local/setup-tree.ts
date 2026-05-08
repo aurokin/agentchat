@@ -165,39 +165,6 @@ function requireConvexSecret(convexEnv: Dotenv, key: string): string {
     return value!;
 }
 
-function fillTemplate(
-    template: unknown,
-    repoPath: string,
-): Record<string, unknown> {
-    const cloned = JSON.parse(JSON.stringify(template)) as Record<
-        string,
-        unknown
-    >;
-    const agents = cloned.agents;
-    if (Array.isArray(agents)) {
-        for (const agent of agents) {
-            if (!agent || typeof agent !== "object" || Array.isArray(agent))
-                continue;
-            const a = agent as Record<string, unknown>;
-            if (a.rootPath === "<filled-by-setup-tree>") {
-                a.rootPath = repoPath;
-            }
-            const runtime = a.runtime;
-            if (
-                runtime &&
-                typeof runtime === "object" &&
-                !Array.isArray(runtime)
-            ) {
-                const r = runtime as Record<string, unknown>;
-                if (r.cwd === "<filled-by-setup-tree>") {
-                    r.cwd = repoPath;
-                }
-            }
-        }
-    }
-    return cloned;
-}
-
 async function main(): Promise<void> {
     wipeLegacyState();
 
@@ -234,17 +201,17 @@ async function main(): Promise<void> {
         ),
     );
 
+    // Copy template → committed config path. Template uses "." for paths
+    // and lets the schema resolve them at load time, so no substitution is
+    // needed. Kept as a copy (rather than a symlink) so a tree without
+    // setup-tree run still has a usable config file.
     const templatePath = path.join(
         repo,
         "apps/server/agentchat.config.template.json",
     );
-    const template = JSON.parse(
-        fs.readFileSync(templatePath, "utf8"),
-    ) as unknown;
-    const filled = fillTemplate(template, repo);
     writeFileIfChanged(
         path.join(repo, "apps/server/agentchat.config.json"),
-        `${JSON.stringify(filled, null, 4)}\n`,
+        fs.readFileSync(templatePath, "utf8"),
     );
 
     console.log(
