@@ -782,6 +782,57 @@ describe("server config", () => {
         );
     });
 
+    test("derives instance key from resolved paths regardless of process cwd", () => {
+        const dir = mkdtempSync(path.join(os.tmpdir(), "key-cwd-"));
+        const configDir = path.join(dir, "config");
+        const workspaceDir = path.join(dir, "workspace");
+        const sandboxDir = path.join(dir, "sandboxes");
+        const configPath = path.join(configDir, "agentchat.config.json");
+        try {
+            mkdirSync(configDir, { recursive: true });
+            mkdirSync(workspaceDir, { recursive: true });
+            mkdirSync(sandboxDir, { recursive: true });
+            writeFileSync(
+                configPath,
+                JSON.stringify({
+                    version: 1,
+                    auth: {
+                        defaultProviderId: "local-main",
+                        providers: [
+                            {
+                                id: "local-main",
+                                kind: "local",
+                                enabled: true,
+                                allowSignup: false,
+                            },
+                        ],
+                    },
+                    sandboxRoot: "../sandboxes",
+                    providers: exampleConfig.providers,
+                    agents: [
+                        {
+                            ...exampleConfig.agents[0],
+                            rootPath: "../workspace",
+                        },
+                    ],
+                }),
+            );
+
+            const originalCwd = process.cwd();
+            try {
+                process.chdir(os.tmpdir());
+                const fromTmp = loadConfigFile(configPath).instanceKey;
+                process.chdir(dir);
+                const fromConfigParent = loadConfigFile(configPath).instanceKey;
+                expect(fromTmp).toBe(fromConfigParent);
+            } finally {
+                process.chdir(originalCwd);
+            }
+        } finally {
+            rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
     test("keeps the default instance key stable across path-alias-only changes", () => {
         const releaseRoot = mkdtempSync(path.join(os.tmpdir(), "release-"));
         const realRepoRoot = path.join(releaseRoot, "real-root");

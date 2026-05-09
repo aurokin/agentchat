@@ -709,14 +709,17 @@ function getProviderRuntimeCwd(provider: ProviderConfig): string | undefined {
     return provider.claudeCode.cwd;
 }
 
-function buildDefaultInstanceKeySeed(
-    parsed: z.infer<typeof AgentchatConfigInputSchema>,
-): string {
+// Takes already-resolved (config-dir-relative) paths so that configs loaded
+// from a different cwd produce the same instance key as their effective
+// sandboxRoot/rootPath/runtime cwd.
+function buildDefaultInstanceKeySeed(params: {
+    sandboxRoot: string;
+    providers: ProviderConfig[];
+    agents: AgentConfig[];
+}): string {
     return JSON.stringify({
-        sandboxRoot: canonicalizePathForComparison(
-            parsed.sandboxRoot ?? DEFAULT_SANDBOX_ROOT,
-        ),
-        providers: parsed.providers.map((provider) => ({
+        sandboxRoot: canonicalizePathForComparison(params.sandboxRoot),
+        providers: params.providers.map((provider) => ({
             id: provider.id,
             runtimeCwd: getProviderRuntimeCwd(provider)
                 ? canonicalizePathForComparison(
@@ -724,7 +727,7 @@ function buildDefaultInstanceKeySeed(
                   )
                 : null,
         })),
-        agents: parsed.agents.map((agent) => ({
+        agents: params.agents.map((agent) => ({
             id: agent.id,
             rootPath: canonicalizePathForComparison(agent.rootPath),
             workspaceMode: agent.workspaceMode ?? "shared",
@@ -839,7 +842,7 @@ function normalizeParsedConfig(
             ),
         sandboxRoot,
         instanceKey: resolveDefaultInstanceKey(
-            buildDefaultInstanceKeySeed(parsed),
+            buildDefaultInstanceKeySeed({ sandboxRoot, providers, agents }),
         ),
     };
 }
