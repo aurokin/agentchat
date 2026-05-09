@@ -1200,6 +1200,51 @@ describe("server config", () => {
         ).toThrow(/overlaps with sandboxRoot/);
     });
 
+    test("detects overlap between relative rootPath and sandboxRoot resolved against the config dir", () => {
+        const dir = mkdtempSync(path.join(os.tmpdir(), "rel-overlap-"));
+        const configDir = path.join(dir, "config");
+        const workspaceDir = path.join(dir, "workspace");
+        const configPath = path.join(configDir, "agentchat.config.json");
+        try {
+            mkdirSync(configDir, { recursive: true });
+            mkdirSync(path.join(workspaceDir, "sandboxes"), {
+                recursive: true,
+            });
+            writeFileSync(
+                configPath,
+                JSON.stringify({
+                    version: 1,
+                    auth: {
+                        defaultProviderId: "local-main",
+                        providers: [
+                            {
+                                id: "local-main",
+                                kind: "local",
+                                enabled: true,
+                                allowSignup: false,
+                            },
+                        ],
+                    },
+                    sandboxRoot: "../workspace/sandboxes",
+                    providers: exampleConfig.providers,
+                    agents: [
+                        {
+                            ...exampleConfig.agents[0],
+                            rootPath: "../workspace",
+                            workspaceMode: "copy-on-conversation",
+                        },
+                    ],
+                }),
+            );
+
+            expect(() => loadConfigFile(configPath)).toThrow(
+                /overlaps with sandboxRoot/,
+            );
+        } finally {
+            rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
     test("rejects agent rootPath overlapping the implicit default sandboxRoot", () => {
         // Agent rooted at ~/.agentchat contains the default sandboxRoot (~/.agentchat/sandboxes)
         expect(() =>

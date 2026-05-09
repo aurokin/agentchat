@@ -319,10 +319,6 @@ const AgentchatConfigInputSchema = z
             providerIds.add(provider.id);
         }
 
-        const resolvedSandboxRoot = path.resolve(
-            config.sandboxRoot ?? DEFAULT_SANDBOX_ROOT,
-        );
-
         const agentIds = new Set<string>();
         const agentRuntimeProviderIds = new Set<string>();
         for (const agent of config.agents) {
@@ -386,16 +382,6 @@ const AgentchatConfigInputSchema = z
                         message: `Agent '${agent.id}' references unknown provider '${providerId}'.`,
                     });
                 }
-            }
-
-            const resolvedRootPath = path.resolve(agent.rootPath);
-            if (pathsOverlap(resolvedSandboxRoot, resolvedRootPath)) {
-                const effectiveSandboxRoot =
-                    config.sandboxRoot ?? DEFAULT_SANDBOX_ROOT;
-                ctx.addIssue({
-                    code: z.ZodIssueCode.custom,
-                    message: `Agent '${agent.id}' rootPath '${agent.rootPath}' overlaps with sandboxRoot '${effectiveSandboxRoot}'. These must be disjoint to prevent recursive copies and accidental deletions.`,
-                });
             }
         }
     });
@@ -829,6 +815,17 @@ function normalizeParsedConfig(
             defaultProviderId,
         };
     });
+    for (const agent of agents) {
+        if (pathsOverlap(sandboxRoot, agent.rootPath)) {
+            const effectiveSandboxRoot = rawSandboxRoot ?? DEFAULT_SANDBOX_ROOT;
+            const originalRootPath = rest.agents.find(
+                (raw) => raw.id === agent.id,
+            )?.rootPath;
+            throw new Error(
+                `Agent '${agent.id}' rootPath '${originalRootPath ?? agent.rootPath}' overlaps with sandboxRoot '${effectiveSandboxRoot}'. These must be disjoint to prevent recursive copies and accidental deletions.`,
+            );
+        }
+    }
     return {
         ...rest,
         providers,
