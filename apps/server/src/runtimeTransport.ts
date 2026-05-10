@@ -1,5 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import type { Readable } from "node:stream";
+import type { Readable, Writable } from "node:stream";
 
 export type RuntimeProcessExit =
     | {
@@ -16,6 +16,18 @@ export type RuntimeProcessStopPolicy = {
     gracefulSignal?: NodeJS.Signals;
     forceSignal?: NodeJS.Signals;
 };
+
+// Surface that runtime kinds depend on. ManagedRuntimeProcess implements
+// this naturally; tests inject fakes without spawning a real subprocess.
+export interface RuntimeProcessLike {
+    readonly stdin: Writable;
+    readonly stdout: Readable;
+    readonly stderr: Readable;
+    readonly hasExited: boolean;
+    readonly isStopping: boolean;
+    onExit(handler: (exit: RuntimeProcessExit) => void): void;
+    stop(): Promise<void>;
+}
 
 export type RuntimeJsonRpcResponse = {
     id?: number | string;
@@ -118,7 +130,7 @@ export class JsonlStreamParser {
     }
 }
 
-export class ManagedRuntimeProcess {
+export class ManagedRuntimeProcess implements RuntimeProcessLike {
     private static readonly DEFAULT_STOP_TIMEOUT_MS = 5_000;
 
     readonly stdin: ChildProcessWithoutNullStreams["stdin"];
@@ -284,7 +296,7 @@ export class JsonRpcStdioClient {
             reject: (error: Error) => void;
         }
     >();
-    private readonly process: ManagedRuntimeProcess;
+    private readonly process: RuntimeProcessLike;
     private readonly label: string;
     private nextId = 1;
     private notificationHandler:
@@ -296,7 +308,7 @@ export class JsonRpcStdioClient {
         | null = null;
 
     constructor(params: {
-        process: ManagedRuntimeProcess;
+        process: RuntimeProcessLike;
         label: string;
         onParseError?: (error: JsonlParseError) => void;
     }) {
