@@ -123,16 +123,15 @@ Mobile is intentionally outside portless. See
 bun --cwd apps/mobile dev
 ```
 
-Set `apps/mobile/.env`:
+Run `portless get agentchat-server` from the worktree where the server is
+running to get the right hostname (it'll include the worktree's branch as
+a subdomain prefix when applicable). dotenv does not execute shell
+substitution, so paste the resolved URL into `apps/mobile/.env`:
 
 ```
 EXPO_PUBLIC_CONVEX_URL=https://<deployment>.convex.cloud
-EXPO_PUBLIC_AGENTCHAT_SERVER_URL=$(portless get agentchat-server)
+EXPO_PUBLIC_AGENTCHAT_SERVER_URL=https://<branch>.agentchat-server.example.com
 ```
-
-Run `portless get agentchat-server` from the worktree where the server is
-running to get the right hostname (it'll include the worktree's branch as
-a subdomain prefix when applicable).
 
 ## Google Redirect
 
