@@ -86,6 +86,9 @@ const main = (): void => {
     const warnings: string[] = [];
 
     requireKey(convexEnv, "CONVEX_DEPLOYMENT", errors);
+    requireKey(convexEnv, "CONVEX_URL", errors, {
+        validate: validateUrlStartsWithHttps,
+    });
     requireKey(convexEnv, "SITE_URL", errors, {
         validate: validateUrlStartsWithHttps,
     });
