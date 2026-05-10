@@ -8,8 +8,9 @@ import type {
     ProviderConfig,
 } from "../config.ts";
 import type {
-    ManagedRuntimeProcess,
     RuntimeProcessExit,
+    RuntimeProcessLike,
+    RuntimeProcessStopPolicy,
 } from "../runtimeTransport.ts";
 import type { RuntimeKindEvent } from "../runtimeKind.ts";
 
@@ -32,7 +33,6 @@ function createAgent(): AgentConfig {
 }
 
 function createProvider(
-    script: string,
     overrides: Partial<ClaudeCodeProviderConfig["claudeCode"]> = {},
 ): ClaudeCodeProviderConfig {
     return {
@@ -44,8 +44,8 @@ function createProvider(
         modelCacheTtlSeconds: 60,
         models: [],
         claudeCode: {
-            command: process.execPath,
-            args: ["-e", script, "--"],
+            command: "claude",
+            args: [],
             baseEnv: {},
             cwd: process.cwd(),
             permissionMode: "auto",
@@ -54,77 +54,125 @@ function createProvider(
     };
 }
 
-async function waitFor(condition: () => boolean): Promise<void> {
-    for (let attempt = 0; attempt < 100; attempt += 1) {
-        if (condition()) {
-            return;
-        }
-        await new Promise((resolve) => setTimeout(resolve, 0));
+type FakeProcess = {
+    stdin: PassThrough;
+    stdout: PassThrough;
+    stderr: PassThrough;
+    args: string[];
+    cwd: string;
+    stopPolicy: RuntimeProcessStopPolicy | undefined;
+    pushStderr: (chunk: string) => void;
+    emitExit: (exit: RuntimeProcessExit) => void;
+    handle: RuntimeProcessLike;
+    onStopped: () => boolean;
+};
+
+type ProcessHarness = {
+    factory: (params: {
+        command: string;
+        args: string[];
+        cwd: string;
+        env: NodeJS.ProcessEnv;
+        stopTimeoutMs?: number;
+        stopPolicy?: RuntimeProcessStopPolicy;
+        onStderr: (chunk: string) => void;
+    }) => RuntimeProcessLike;
+    processes: FakeProcess[];
+    last: () => FakeProcess;
+    waitForLaunch: (index: number) => Promise<FakeProcess>;
+};
+
+function createProcessHarness(): ProcessHarness {
+    const processes: FakeProcess[] = [];
+    const launchListeners = new Set<() => void>();
+
+    const factory: ProcessHarness["factory"] = (params) => {
+        const stdin = new PassThrough();
+        const stdout = new PassThrough();
+        const stderr = new PassThrough();
+        const exitHandlers = new Set<(exit: RuntimeProcessExit) => void>();
+        let hasExited = false;
+        let isStopping = false;
+        const settle = (exit: RuntimeProcessExit) => {
+            if (hasExited) return;
+            hasExited = true;
+            for (const handler of exitHandlers) handler(exit);
+        };
+        const handle: RuntimeProcessLike = {
+            stdin,
+            stdout,
+            stderr,
+            get hasExited() {
+                return hasExited;
+            },
+            get isStopping() {
+                return isStopping;
+            },
+            onExit(handler) {
+                exitHandlers.add(handler);
+            },
+            async stop() {
+                isStopping = true;
+                if (hasExited) return;
+                settle({ type: "exit", code: null, signal: "SIGTERM" });
+            },
+        };
+        const fake: FakeProcess = {
+            stdin,
+            stdout,
+            stderr,
+            args: params.args,
+            cwd: params.cwd,
+            stopPolicy: params.stopPolicy,
+            pushStderr: (chunk) => params.onStderr(chunk),
+            emitExit: settle,
+            handle,
+            onStopped: () => isStopping,
+        };
+        processes.push(fake);
+        for (const listener of [...launchListeners]) listener();
+        return handle;
+    };
+
+    const last = () => {
+        const proc = processes[processes.length - 1];
+        if (!proc) throw new Error("No process has been launched yet.");
+        return proc;
+    };
+
+    const waitForLaunch = (index: number): Promise<FakeProcess> => {
+        if (processes[index]) return Promise.resolve(processes[index]);
+        return new Promise((resolve) => {
+            const listener = () => {
+                if (processes[index]) {
+                    launchListeners.delete(listener);
+                    resolve(processes[index]);
+                }
+            };
+            launchListeners.add(listener);
+        });
+    };
+
+    return { factory, processes, last, waitForLaunch };
+}
+
+function emitJsonl(stream: PassThrough, lines: unknown[]): void {
+    stream.end(lines.map((line) => `${JSON.stringify(line)}\n`).join(""));
+}
+
+async function flush(): Promise<void> {
+    for (let i = 0; i < 4; i += 1) {
+        await new Promise((resolve) => setImmediate(resolve));
     }
-
-    throw new Error("Timed out waiting for test condition.");
-}
-
-function scriptThatEmits(lines: unknown[]): string {
-    return `
-for (const line of ${JSON.stringify(lines)}) {
-  process.stdout.write(JSON.stringify(line) + "\\n");
-}
-`;
-}
-
-function createControlledProcess() {
-    const stdin = new PassThrough();
-    const stdout = new PassThrough();
-    const stderr = new PassThrough();
-    let hasExited = false;
-    const exitHandlers = new Set<(exit: RuntimeProcessExit) => void>();
-    const runtimeProcess = {
-        stdin,
-        stdout,
-        stderr,
-        get hasExited() {
-            return hasExited;
-        },
-        get isStopping() {
-            return false;
-        },
-        onExit(handler: (exit: RuntimeProcessExit) => void) {
-            exitHandlers.add(handler);
-        },
-        async stop() {
-            hasExited = true;
-            for (const handler of exitHandlers) {
-                handler({ type: "exit", code: null, signal: "SIGTERM" });
-            }
-        },
-        emitExit(exit: RuntimeProcessExit) {
-            hasExited = true;
-            for (const handler of exitHandlers) {
-                handler(exit);
-            }
-        },
-    };
-    return {
-        stdin,
-        stdout,
-        stderr,
-        runtimeProcess: runtimeProcess as unknown as ManagedRuntimeProcess,
-        emitExit: runtimeProcess.emitExit,
-    };
 }
 
 describe("ClaudeCodeRuntimeKind", () => {
     test("starts Claude Code turns with a graceful SIGINT stop policy", async () => {
-        const controlledProcess = createControlledProcess();
-        const stopPolicies: unknown[] = [];
+        const harness = createProcessHarness();
         const session = new ClaudeCodeRuntimeKind({
-            createRuntimeProcess: (params) => {
-                stopPolicies.push(params.stopPolicy);
-                return controlledProcess.runtimeProcess;
-            },
+            createRuntimeProcess: harness.factory,
         }).createSession({
-            provider: createProvider(""),
+            provider: createProvider(),
             agent: createAgent(),
         });
 
@@ -143,7 +191,7 @@ describe("ClaudeCodeRuntimeKind", () => {
             variantId: null,
         });
 
-        expect(stopPolicies[0]).toEqual({
+        expect(harness.last().stopPolicy).toEqual({
             gracefulSignal: "SIGINT",
             forceSignal: "SIGKILL",
         });
@@ -152,11 +200,11 @@ describe("ClaudeCodeRuntimeKind", () => {
     });
 
     test("preserves interrupted status when SIGINT produces a result event", async () => {
-        const controlledProcess = createControlledProcess();
+        const harness = createProcessHarness();
         const session = new ClaudeCodeRuntimeKind({
-            createRuntimeProcess: () => controlledProcess.runtimeProcess,
+            createRuntimeProcess: harness.factory,
         }).createSession({
-            provider: createProvider(""),
+            provider: createProvider(),
             agent: createAgent(),
         });
         const events: RuntimeKindEvent[] = [];
@@ -181,21 +229,16 @@ describe("ClaudeCodeRuntimeKind", () => {
             threadId: "claude-pending:test",
             turnId: "turn-1",
         });
-        controlledProcess.stdout.end(
-            [
-                JSON.stringify({
-                    type: "result",
-                    subtype: "error_during_execution",
-                    is_error: true,
-                    session_id: "claude-session-interrupted",
-                }),
-                "",
-            ].join("\n"),
-        );
+        emitJsonl(harness.last().stdout, [
+            {
+                type: "result",
+                subtype: "error_during_execution",
+                is_error: true,
+                session_id: "claude-session-interrupted",
+            },
+        ]);
         await interruptPromise;
-        await waitFor(() =>
-            events.some((event) => event.type === "turn_completed"),
-        );
+        await flush();
 
         const terminalEvents = events.filter(
             (event) => event.type === "turn_completed",
@@ -215,11 +258,11 @@ describe("ClaudeCodeRuntimeKind", () => {
     });
 
     test("waits for stdout to drain before completing interrupted turns", async () => {
-        const controlledProcess = createControlledProcess();
+        const harness = createProcessHarness();
         const session = new ClaudeCodeRuntimeKind({
-            createRuntimeProcess: () => controlledProcess.runtimeProcess,
+            createRuntimeProcess: harness.factory,
         }).createSession({
-            provider: createProvider(""),
+            provider: createProvider(),
             agent: createAgent(),
         });
         const events: RuntimeKindEvent[] = [];
@@ -240,36 +283,29 @@ describe("ClaudeCodeRuntimeKind", () => {
             variantId: null,
         });
 
-        const interruptPromise = session.interruptTurn({
+        await session.interruptTurn({
             threadId: "claude-pending:test",
             turnId: "turn-1",
         });
-        await interruptPromise;
 
         expect(events.some((event) => event.type === "turn_completed")).toBe(
             false,
         );
 
-        controlledProcess.stdout.end(
-            [
-                JSON.stringify({
-                    type: "system",
-                    subtype: "init",
-                    session_id: "claude-session-late-interrupt",
-                }),
-                JSON.stringify({
-                    type: "result",
-                    subtype: "error_during_execution",
-                    is_error: true,
-                    session_id: "claude-session-late-interrupt",
-                }),
-                "",
-            ].join("\n"),
-        );
-
-        await waitFor(() =>
-            events.some((event) => event.type === "turn_completed"),
-        );
+        emitJsonl(harness.last().stdout, [
+            {
+                type: "system",
+                subtype: "init",
+                session_id: "claude-session-late-interrupt",
+            },
+            {
+                type: "result",
+                subtype: "error_during_execution",
+                is_error: true,
+                session_id: "claude-session-late-interrupt",
+            },
+        ]);
+        await flush();
 
         const identityIndex = events.findIndex(
             (event) =>
@@ -289,38 +325,11 @@ describe("ClaudeCodeRuntimeKind", () => {
     });
 
     test("maps stream-json output into runtime events and captures session ids", async () => {
-        const session = new ClaudeCodeRuntimeKind().createSession({
-            provider: createProvider(
-                scriptThatEmits([
-                    {
-                        type: "system",
-                        subtype: "init",
-                        session_id: "claude-session-1",
-                    },
-                    {
-                        type: "assistant",
-                        message: {
-                            content: [
-                                { type: "text", text: "hello " },
-                                {
-                                    type: "tool_use",
-                                    id: "tool-1",
-                                    name: "Bash",
-                                    input: { command: "pwd" },
-                                },
-                            ],
-                        },
-                    },
-                    {
-                        type: "result",
-                        subtype: "success",
-                        is_error: false,
-                        result: "hello world",
-                        session_id: "claude-session-1",
-                        total_cost_usd: 0.01,
-                    },
-                ]),
-            ),
+        const harness = createProcessHarness();
+        const session = new ClaudeCodeRuntimeKind({
+            createRuntimeProcess: harness.factory,
+        }).createSession({
+            provider: createProvider(),
             agent: createAgent(),
         });
         const events: RuntimeKindEvent[] = [];
@@ -341,9 +350,39 @@ describe("ClaudeCodeRuntimeKind", () => {
             modelId: "sonnet",
             variantId: null,
         });
-        await waitFor(() =>
-            events.some((event) => event.type === "turn_completed"),
-        );
+
+        const proc = harness.last();
+        emitJsonl(proc.stdout, [
+            {
+                type: "system",
+                subtype: "init",
+                session_id: "claude-session-1",
+            },
+            {
+                type: "assistant",
+                message: {
+                    content: [
+                        { type: "text", text: "hello " },
+                        {
+                            type: "tool_use",
+                            id: "tool-1",
+                            name: "Bash",
+                            input: { command: "pwd" },
+                        },
+                    ],
+                },
+            },
+            {
+                type: "result",
+                subtype: "success",
+                is_error: false,
+                result: "hello world",
+                session_id: "claude-session-1",
+                total_cost_usd: 0.01,
+            },
+        ]);
+        proc.emitExit({ type: "exit", code: 0, signal: null });
+        await flush();
 
         expect(events).toContainEqual({
             type: "provider_identity_updated",
@@ -378,11 +417,11 @@ describe("ClaudeCodeRuntimeKind", () => {
     });
 
     test("resumes persisted sessions and maps plan variants to Claude permission mode", async () => {
-        const session = new ClaudeCodeRuntimeKind().createSession({
-            provider: createProvider(`
-process.stdout.write(JSON.stringify({ type: "argv", argv: process.argv }) + "\\n");
-process.stdout.write(JSON.stringify({ type: "result", subtype: "success", is_error: false }) + "\\n");
-`),
+        const harness = createProcessHarness();
+        const session = new ClaudeCodeRuntimeKind({
+            createRuntimeProcess: harness.factory,
+        }).createSession({
+            provider: createProvider(),
             agent: createAgent(),
         });
         const events: RuntimeKindEvent[] = [];
@@ -402,21 +441,15 @@ process.stdout.write(JSON.stringify({ type: "result", subtype: "success", is_err
             modelId: "opus",
             variantId: "plan",
         });
-        await waitFor(() =>
-            events.some((event) => event.type === "turn_completed"),
-        );
 
-        const argvEvent = events.find(
-            (event) =>
-                event.type === "provider_event" &&
-                event.event.eventType === "claude-code.argv",
-        );
-        expect(argvEvent).toBeDefined();
-        expect(
-            argvEvent?.type === "provider_event"
-                ? argvEvent.event.metadata.argv
-                : null,
-        ).toEqual(
+        const proc = harness.last();
+        emitJsonl(proc.stdout, [
+            { type: "result", subtype: "success", is_error: false },
+        ]);
+        proc.emitExit({ type: "exit", code: 0, signal: null });
+        await flush();
+
+        expect(proc.args).toEqual(
             expect.arrayContaining([
                 "--print",
                 "--permission-mode",
@@ -427,21 +460,20 @@ process.stdout.write(JSON.stringify({ type: "result", subtype: "success", is_err
                 "opus",
             ]),
         );
-        expect(
-            argvEvent?.type === "provider_event"
-                ? argvEvent.event.metadata.argv
-                : null,
-        ).not.toEqual(expect.arrayContaining(["plan this"]));
+        expect(proc.args).not.toEqual(expect.arrayContaining(["plan this"]));
+        expect(events.some((event) => event.type === "turn_completed")).toBe(
+            true,
+        );
 
         await session.stop();
     });
 
     test("does not resume persisted pending session placeholders", async () => {
-        const session = new ClaudeCodeRuntimeKind().createSession({
-            provider: createProvider(`
-process.stdout.write(JSON.stringify({ type: "argv", argv: process.argv }) + "\\n");
-process.stdout.write(JSON.stringify({ type: "result", subtype: "success", is_error: false }) + "\\n");
-`),
+        const harness = createProcessHarness();
+        const session = new ClaudeCodeRuntimeKind({
+            createRuntimeProcess: harness.factory,
+        }).createSession({
+            provider: createProvider(),
             agent: createAgent(),
         });
         const events: RuntimeKindEvent[] = [];
@@ -461,44 +493,34 @@ process.stdout.write(JSON.stringify({ type: "result", subtype: "success", is_err
             modelId: "sonnet",
             variantId: null,
         });
-        await waitFor(() =>
-            events.some((event) => event.type === "turn_completed"),
-        );
+
+        const proc = harness.last();
+        emitJsonl(proc.stdout, [
+            { type: "result", subtype: "success", is_error: false },
+        ]);
+        proc.emitExit({ type: "exit", code: 0, signal: null });
+        await flush();
 
         expect(thread.isNew).toBe(true);
         expect(thread.threadId.startsWith("claude-pending:")).toBe(true);
         expect(thread.threadId).not.toBe("claude-pending:old");
-        const argvEvent = events.find(
-            (event) =>
-                event.type === "provider_event" &&
-                event.event.eventType === "claude-code.argv",
+        expect(proc.args).not.toEqual(expect.arrayContaining(["--resume"]));
+        expect(proc.args).not.toEqual(
+            expect.arrayContaining(["claude-pending:old"]),
         );
-        expect(argvEvent).toBeDefined();
-        expect(
-            argvEvent?.type === "provider_event"
-                ? argvEvent.event.metadata.argv
-                : null,
-        ).not.toEqual(expect.arrayContaining(["--resume"]));
-        expect(
-            argvEvent?.type === "provider_event"
-                ? argvEvent.event.metadata.argv
-                : null,
-        ).not.toEqual(expect.arrayContaining(["claude-pending:old"]));
+        expect(events.some((event) => event.type === "turn_completed")).toBe(
+            true,
+        );
 
         await session.stop();
     });
 
     test("retries stale resume failures with a fresh Claude session", async () => {
-        const session = new ClaudeCodeRuntimeKind().createSession({
-            provider: createProvider(`
-if (process.argv.includes("--resume")) {
-  process.stderr.write("Could not resume session: session not found");
-  process.exit(1);
-}
-process.stdout.write(JSON.stringify({ type: "argv", argv: process.argv }) + "\\n");
-process.stdout.write(JSON.stringify({ type: "system", subtype: "init", session_id: "claude-session-new" }) + "\\n");
-process.stdout.write(JSON.stringify({ type: "result", subtype: "success", is_error: false, session_id: "claude-session-new" }) + "\\n");
-`),
+        const harness = createProcessHarness();
+        const session = new ClaudeCodeRuntimeKind({
+            createRuntimeProcess: harness.factory,
+        }).createSession({
+            provider: createProvider(),
             agent: createAgent(),
         });
         const events: RuntimeKindEvent[] = [];
@@ -518,9 +540,36 @@ process.stdout.write(JSON.stringify({ type: "result", subtype: "success", is_err
             modelId: "sonnet",
             variantId: null,
         });
-        await waitFor(() =>
-            events.some((event) => event.type === "turn_completed"),
+
+        const first = harness.last();
+        expect(first.args).toEqual(
+            expect.arrayContaining(["--resume", "claude-session-missing"]),
         );
+        first.pushStderr("Could not resume session: session not found");
+        first.stdout.end();
+        first.emitExit({ type: "exit", code: 1, signal: null });
+
+        const second = await harness.waitForLaunch(1);
+        expect(second.args).not.toEqual(expect.arrayContaining(["--resume"]));
+        expect(second.args).not.toEqual(
+            expect.arrayContaining(["claude-session-missing"]),
+        );
+
+        emitJsonl(second.stdout, [
+            {
+                type: "system",
+                subtype: "init",
+                session_id: "claude-session-new",
+            },
+            {
+                type: "result",
+                subtype: "success",
+                is_error: false,
+                session_id: "claude-session-new",
+            },
+        ]);
+        second.emitExit({ type: "exit", code: 0, signal: null });
+        await flush();
 
         expect(events).toEqual(
             expect.arrayContaining([
@@ -546,37 +595,16 @@ process.stdout.write(JSON.stringify({ type: "result", subtype: "success", is_err
                 },
             ]),
         );
-        const argvEvent = events.find(
-            (event) =>
-                event.type === "provider_event" &&
-                event.event.eventType === "claude-code.argv",
-        );
-        expect(
-            argvEvent?.type === "provider_event"
-                ? argvEvent.event.metadata.argv
-                : null,
-        ).not.toEqual(expect.arrayContaining(["--resume"]));
-        expect(
-            argvEvent?.type === "provider_event"
-                ? argvEvent.event.metadata.argv
-                : null,
-        ).not.toEqual(expect.arrayContaining(["claude-session-missing"]));
 
         await session.stop();
     });
 
     test("sends prompts over stdin instead of argv", async () => {
-        const session = new ClaudeCodeRuntimeKind().createSession({
-            provider: createProvider(`
-let stdin = "";
-process.stdin.setEncoding("utf8");
-process.stdin.on("data", (chunk) => stdin += chunk);
-process.stdin.on("end", () => {
-  process.stdout.write(JSON.stringify({ type: "argv", argv: process.argv }) + "\\n");
-  process.stdout.write(JSON.stringify({ type: "stdin", stdin }) + "\\n");
-  process.stdout.write(JSON.stringify({ type: "result", subtype: "success", is_error: false }) + "\\n");
-});
-`),
+        const harness = createProcessHarness();
+        const session = new ClaudeCodeRuntimeKind({
+            createRuntimeProcess: harness.factory,
+        }).createSession({
+            provider: createProvider(),
             agent: createAgent(),
         });
         const events: RuntimeKindEvent[] = [];
@@ -589,46 +617,45 @@ process.stdin.on("end", () => {
             modelId: "sonnet",
             cwd: process.cwd(),
         });
-        await session.startTurn({
+
+        const proc = harness;
+        const stdinChunks: string[] = [];
+        const startPromise = session.startTurn({
             threadId: "claude-pending:test",
             inputText: "prompt from stdin",
             cwd: process.cwd(),
             modelId: "sonnet",
             variantId: null,
         });
-        await waitFor(() =>
-            events.some((event) => event.type === "turn_completed"),
-        );
+        const launched = await proc.waitForLaunch(0);
+        launched.stdin.on("data", (chunk: Buffer) => {
+            stdinChunks.push(chunk.toString());
+        });
+        await startPromise;
 
-        const argvEvent = events.find(
-            (event) =>
-                event.type === "provider_event" &&
-                event.event.eventType === "claude-code.argv",
+        emitJsonl(launched.stdout, [
+            { type: "result", subtype: "success", is_error: false },
+        ]);
+        launched.emitExit({ type: "exit", code: 0, signal: null });
+        await flush();
+
+        expect(launched.args).not.toEqual(
+            expect.arrayContaining(["prompt from stdin"]),
         );
-        const stdinEvent = events.find(
-            (event) =>
-                event.type === "provider_event" &&
-                event.event.eventType === "claude-code.stdin",
+        expect(stdinChunks.join("")).toBe("prompt from stdin");
+        expect(events.some((event) => event.type === "turn_completed")).toBe(
+            true,
         );
-        expect(
-            argvEvent?.type === "provider_event"
-                ? argvEvent.event.metadata.argv
-                : null,
-        ).not.toEqual(expect.arrayContaining(["prompt from stdin"]));
-        expect(
-            stdinEvent?.type === "provider_event"
-                ? stdinEvent.event.metadata.stdin
-                : null,
-        ).toBe("prompt from stdin");
 
         await session.stop();
     });
 
     test("fails a hung turn after the configured timeout", async () => {
-        const session = new ClaudeCodeRuntimeKind().createSession({
-            provider: createProvider("setInterval(() => {}, 1000);", {
-                timeoutMs: 10,
-            }),
+        const harness = createProcessHarness();
+        const session = new ClaudeCodeRuntimeKind({
+            createRuntimeProcess: harness.factory,
+        }).createSession({
+            provider: createProvider({ timeoutMs: 10 }),
             agent: createAgent(),
         });
         const events: RuntimeKindEvent[] = [];
@@ -648,9 +675,14 @@ process.stdin.on("end", () => {
             modelId: "sonnet",
             variantId: null,
         });
-        await waitFor(() =>
-            events.some((event) => event.type === "turn_completed"),
-        );
+
+        // Wait past the 10ms turn timeout. The runtime calls stop() which
+        // settles the fake with a SIGTERM exit; close stdout to mirror a
+        // real subprocess flushing pipes on kill.
+        await Bun.sleep(20);
+        const proc = harness.last();
+        if (!proc.stdout.writableEnded) proc.stdout.end();
+        await flush();
 
         expect(events).toEqual(
             expect.arrayContaining([
@@ -672,11 +704,11 @@ process.stdin.on("end", () => {
     });
 
     test("waits for subprocess exit after receiving a result event", async () => {
-        const session = new ClaudeCodeRuntimeKind().createSession({
-            provider: createProvider(`
-process.stdout.write(JSON.stringify({ type: "result", subtype: "success", is_error: false }) + "\\n");
-setTimeout(() => process.exit(0), 50);
-`),
+        const harness = createProcessHarness();
+        const session = new ClaudeCodeRuntimeKind({
+            createRuntimeProcess: harness.factory,
+        }).createSession({
+            provider: createProvider(),
             agent: createAgent(),
         });
         const events: RuntimeKindEvent[] = [];
@@ -696,15 +728,26 @@ setTimeout(() => process.exit(0), 50);
             modelId: "sonnet",
             variantId: null,
         });
-        await Bun.sleep(10);
+
+        const proc = harness.last();
+        // Result arrives first, but the turn must not complete until exit.
+        proc.stdout.write(
+            `${JSON.stringify({
+                type: "result",
+                subtype: "success",
+                is_error: false,
+            })}\n`,
+        );
+        await flush();
 
         expect(events.some((event) => event.type === "turn_completed")).toBe(
             false,
         );
 
-        await waitFor(() =>
-            events.some((event) => event.type === "turn_completed"),
-        );
+        proc.stdout.end();
+        proc.emitExit({ type: "exit", code: 0, signal: null });
+        await flush();
+
         expect(events).toEqual(
             expect.arrayContaining([
                 expect.objectContaining({
@@ -725,11 +768,11 @@ setTimeout(() => process.exit(0), 50);
     });
 
     test("waits for stdout to drain after process exit before completing", async () => {
-        const controlledProcess = createControlledProcess();
+        const harness = createProcessHarness();
         const session = new ClaudeCodeRuntimeKind({
-            createRuntimeProcess: () => controlledProcess.runtimeProcess,
+            createRuntimeProcess: harness.factory,
         }).createSession({
-            provider: createProvider(""),
+            provider: createProvider(),
             agent: createAgent(),
         });
         const events: RuntimeKindEvent[] = [];
@@ -750,42 +793,34 @@ setTimeout(() => process.exit(0), 50);
             variantId: null,
         });
 
-        controlledProcess.emitExit({
-            type: "exit",
-            code: 0,
-            signal: null,
-        });
-        await Bun.sleep(0);
+        const proc = harness.last();
+        proc.emitExit({ type: "exit", code: 0, signal: null });
+        await flush();
 
         expect(events.some((event) => event.type === "turn_completed")).toBe(
             false,
         );
 
-        controlledProcess.stdout.end(
-            [
-                JSON.stringify({
-                    type: "system",
-                    subtype: "init",
-                    session_id: "claude-session-drained",
-                }),
-                JSON.stringify({
-                    type: "assistant",
-                    message: {
-                        content: [{ type: "text", text: "late text" }],
-                    },
-                }),
-                JSON.stringify({
-                    type: "result",
-                    subtype: "success",
-                    is_error: false,
-                    session_id: "claude-session-drained",
-                }),
-                "",
-            ].join("\n"),
-        );
-        await waitFor(() =>
-            events.some((event) => event.type === "turn_completed"),
-        );
+        emitJsonl(proc.stdout, [
+            {
+                type: "system",
+                subtype: "init",
+                session_id: "claude-session-drained",
+            },
+            {
+                type: "assistant",
+                message: {
+                    content: [{ type: "text", text: "late text" }],
+                },
+            },
+            {
+                type: "result",
+                subtype: "success",
+                is_error: false,
+                session_id: "claude-session-drained",
+            },
+        ]);
+        await flush();
 
         const identityIndex = events.findIndex(
             (event) => event.type === "provider_identity_updated",
@@ -824,10 +859,11 @@ setTimeout(() => process.exit(0), 50);
     });
 
     test("does not report handled non-zero turn exits as runtime crashes", async () => {
-        const session = new ClaudeCodeRuntimeKind().createSession({
-            provider: createProvider(
-                'process.stderr.write("boom"); process.exit(7);',
-            ),
+        const harness = createProcessHarness();
+        const session = new ClaudeCodeRuntimeKind({
+            createRuntimeProcess: harness.factory,
+        }).createSession({
+            provider: createProvider(),
             agent: createAgent(),
         });
         const events: RuntimeKindEvent[] = [];
@@ -851,9 +887,12 @@ setTimeout(() => process.exit(0), 50);
             modelId: "sonnet",
             variantId: null,
         });
-        await waitFor(() =>
-            events.some((event) => event.type === "turn_completed"),
-        );
+
+        const proc = harness.last();
+        proc.pushStderr("boom");
+        proc.stdout.end();
+        proc.emitExit({ type: "exit", code: 7, signal: null });
+        await flush();
 
         expect(events).toEqual(
             expect.arrayContaining([
@@ -876,7 +915,7 @@ setTimeout(() => process.exit(0), 50);
     });
 
     test("returns configured models before static fallback models", async () => {
-        const provider = createProvider(scriptThatEmits([]));
+        const provider = createProvider();
         provider.models = [
             {
                 id: "claude-custom",
