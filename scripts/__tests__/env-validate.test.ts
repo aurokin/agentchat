@@ -61,6 +61,7 @@ describe("env:validate", () => {
                 [
                     "AGENTCHAT_AUTH_MODE=local",
                     "CONVEX_DEPLOYMENT=dev:test",
+                    "CONVEX_URL=https://example.convex.cloud",
                     "SITE_URL=https://test.localhost",
                     `JWKS=${FAKE_JWKS}`,
                     `JWT_PRIVATE_KEY=${FAKE_JWT_PRIVATE_KEY}`,
@@ -86,6 +87,7 @@ describe("env:validate", () => {
                 [
                     "AGENTCHAT_AUTH_MODE=google",
                     "CONVEX_DEPLOYMENT=dev:test",
+                    "CONVEX_URL=https://example.convex.cloud",
                     "SITE_URL=https://test.localhost",
                     `JWKS=${FAKE_JWKS}`,
                     `JWT_PRIVATE_KEY=${FAKE_JWT_PRIVATE_KEY}`,
@@ -112,6 +114,7 @@ describe("env:validate", () => {
                 [
                     "AGENTCHAT_AUTH_MODE=locla",
                     "CONVEX_DEPLOYMENT=dev:test",
+                    "CONVEX_URL=https://example.convex.cloud",
                     "SITE_URL=https://test.localhost",
                     "AUTH_GOOGLE_ID=test-google-id",
                     "AUTH_GOOGLE_SECRET=test-google-secret",
@@ -132,6 +135,31 @@ describe("env:validate", () => {
         }
     });
 
+    test("requires CONVEX_URL", () => {
+        const fixture = makeFixture();
+        try {
+            writeConvexEnv(
+                fixture.root,
+                [
+                    "AGENTCHAT_AUTH_MODE=local",
+                    "CONVEX_DEPLOYMENT=dev:test",
+                    "SITE_URL=https://test.localhost",
+                    `JWKS=${FAKE_JWKS}`,
+                    `JWT_PRIVATE_KEY=${FAKE_JWT_PRIVATE_KEY}`,
+                    `ENCRYPTION_KEY=${FAKE_ENCRYPTION_KEY}`,
+                    `RUNTIME_INGRESS_SECRET=${FAKE_RUNTIME_INGRESS_SECRET}`,
+                    `BACKEND_TOKEN_SECRET=${FAKE_BACKEND_TOKEN_SECRET}`,
+                    "",
+                ].join("\n"),
+            );
+            const result = runValidate(fixture.root);
+            expect(result.status).not.toBe(0);
+            expect(result.output).toContain("CONVEX_URL");
+        } finally {
+            fixture.cleanup();
+        }
+    });
+
     test("requires shared runtime/backend secrets", () => {
         const fixture = makeFixture();
         try {
@@ -140,6 +168,7 @@ describe("env:validate", () => {
                 [
                     "AGENTCHAT_AUTH_MODE=local",
                     "CONVEX_DEPLOYMENT=dev:test",
+                    "CONVEX_URL=https://example.convex.cloud",
                     "SITE_URL=https://test.localhost",
                     `JWKS=${FAKE_JWKS}`,
                     `JWT_PRIVATE_KEY=${FAKE_JWT_PRIVATE_KEY}`,

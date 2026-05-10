@@ -13,7 +13,6 @@
     },
     "scripts": {
         "dev": "bun run env:validate && concurrently -k -n convex,server,web -c green,yellow,blue \"bun run --cwd packages/convex dev\" \"bun run --cwd apps/server dev\" \"bun run --cwd apps/web dev\"",
-        "setup-tree": "bun scripts/local/setup-tree.ts",
         "env:validate": "bun scripts/env/validate.ts",
         "env:check": "bun scripts/check-env-docs.ts",
         "docs:check": "bun scripts/check-docs-integrity.ts",
@@ -63,7 +62,7 @@
         "test:mobile": "bun run --cwd apps/mobile test",
         "test:shared": "bun run --cwd packages/shared test",
         "test:convex": "bun run --cwd packages/convex test",
-        "test:scripts": "bun test scripts/__tests__ scripts/local/__tests__ scripts/testing/__tests__ scripts/ci/__tests__",
+        "test:scripts": "bun test scripts/__tests__ scripts/testing/__tests__ scripts/ci/__tests__",
         "doctor:server": "bun run --cwd apps/server doctor",
         "test:manual:codex-confidence": "bun run env:check && bun run --cwd packages/convex codegen && bun run doctor:server && bun run --cwd apps/server test:confidence && bun run --cwd apps/web test:confidence && bun run --cwd apps/mobile test:confidence",
         "typecheck": "bun run --cwd apps/web typecheck && bun run --cwd apps/server typecheck && bun run --cwd apps/mobile typecheck && bun run --cwd packages/shared typecheck && bun run --cwd packages/convex typecheck",

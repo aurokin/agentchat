@@ -58,7 +58,7 @@ describe("doctorReport", () => {
                         description: "backend token secret",
                     },
                     {
-                        key: "AGENTCHAT_CONVEX_SITE_URL",
+                        key: "CONVEX_URL",
                         configured: true,
                         description: "convex site url",
                     },
@@ -144,7 +144,7 @@ describe("doctorReport", () => {
                         description: "backend token secret",
                     },
                     {
-                        key: "AGENTCHAT_CONVEX_SITE_URL",
+                        key: "CONVEX_URL",
                         configured: true,
                         description: "convex site url",
                     },
@@ -250,7 +250,7 @@ describe("doctorReport", () => {
                         description: "backend token secret",
                     },
                     {
-                        key: "AGENTCHAT_CONVEX_SITE_URL",
+                        key: "CONVEX_URL",
                         configured: true,
                         description: "convex site url",
                     },

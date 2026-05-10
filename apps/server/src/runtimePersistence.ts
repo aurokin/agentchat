@@ -24,12 +24,19 @@ function trimTrailingSlash(value: string): string {
     return value.replace(/\/+$/, "");
 }
 
+export function deriveConvexSiteUrlFromCloud(cloudUrl: string): string {
+    return trimTrailingSlash(cloudUrl).replace(
+        /\.convex\.cloud$/,
+        ".convex.site",
+    );
+}
+
 function getConvexSiteUrl(): string {
-    const value = process.env.AGENTCHAT_CONVEX_SITE_URL?.trim();
+    const value = process.env.CONVEX_URL?.trim();
     if (!value) {
-        throw new Error("AGENTCHAT_CONVEX_SITE_URL is not configured.");
+        throw new Error("CONVEX_URL is not configured.");
     }
-    return trimTrailingSlash(value);
+    return deriveConvexSiteUrlFromCloud(value);
 }
 
 function getRuntimeIngressSecret(): string {

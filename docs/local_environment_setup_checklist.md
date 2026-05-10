@@ -23,38 +23,35 @@ bun run convex:gen-secrets >> .env.convex.local   # mints shared + auth secrets
 bun run convex:env                                # pushes them to Convex
 ```
 
-`<repo>/.env.convex.local` is the single source of truth for both Convex and
-`apps/server`. `scripts/local/setup-tree.ts` reads it and writes the per-tree
-`apps/server/.env.local` and `apps/web/.env.local`; `bun run convex:env`
-pushes the same values to the Convex deployment, so `RUNTIME_INGRESS_SECRET`
-and `BACKEND_TOKEN_SECRET` cannot drift. The file is gitignored (`.env*.local`
-rule) and propagated into new worktrees by `wt step copy-ignored`, which the
-post-start hook runs.
+`<repo>/.env.convex.local` is the single source of truth for shared values.
+`bun run convex:env` pushes them to the Convex deployment;
+`apps/server/package.json`'s dev/start scripts pass `--env-file=../../.env.convex.local`
+to Bun so the server reads the same values directly;
+`apps/web/next.config.ts` loads the file at startup (and asks
+`portless get agentchat-server` for the server URL). The file is gitignored
+(`.env*.local`) and propagated into new worktrees by `wt step copy-ignored`,
+which is what `.config/wt.toml`'s `post-start` hook runs.
 
 ## Daily Flow
 
 ```bash
 bun install
-bun scripts/local/setup-tree.ts        # main checkout: run once after clone
 bun dev
 ```
 
 For a disposable worktree:
 
 ```bash
-wt switch -c <branch>                  # post-start hook copies node_modules + .env.convex.local, then runs setup-tree.ts
+wt switch -c <branch>     # post-start hook copies node_modules + .env.convex.local
 bun dev
 # ...
-wt remove                              # post-remove hook drops ~/.local/state/agentchat-trees/<branch>/
+wt remove                 # standard worktrunk cleanup
 ```
 
 `bun dev` runs Convex + apps/server + apps/web concurrently, with web and
-server wrapped through `portless run`. URLs:
-
-- main: `https://agentchat-web.agentchat.localhost`,
-  `https://agentchat-server.agentchat.localhost`
-- worktree: `https://<branch>.agentchat-web.agentchat.localhost`,
-  `https://<branch>.agentchat-server.agentchat.localhost`
+server wrapped through `portless run`. portless owns hostname generation —
+run `portless list` or `portless get <name>` to see the current URLs (they
+include the worktree branch as a subdomain prefix automatically).
 
 ## Long-Lived / Production-Like Instance
 
@@ -62,12 +59,11 @@ There is no separate "stable" harness. To run a production-like instance
 pointed at a different Convex deployment:
 
 ```bash
-wt switch -c stable                    # name doesn't matter — any branch
+wt switch -c stable                # name doesn't matter — any branch
 # inside the worktree:
-$EDITOR .env.convex.local              # point at your prod Convex deployment
-bun scripts/local/setup-tree.ts        # regenerate apps/{web,server}/.env.local
-bun run --cwd apps/web build           # if you want next's production runtime
-bun --cwd apps/web start &             # or `bun dev` for the dev runtime
+$EDITOR .env.convex.local          # point at your prod Convex deployment
+bun run --cwd apps/web build       # if you want next's production runtime
+bun --cwd apps/web start &         # or `bun dev` for the dev runtime
 bun --cwd apps/server start &
 ```
 
@@ -83,21 +79,19 @@ bun run --cwd packages/convex codegen
 # Set CONVEX_DEPLOYMENT / CONVEX_URL / auth in .env.convex.local first, then:
 bun run convex:gen-secrets >> .env.convex.local
 bun run convex:env -- --deployment dev:<your-deployment>
-bun scripts/local/setup-tree.ts
 ```
 
 `convex:gen-secrets` emits Convex Auth keys (`JWKS`, `JWT_PRIVATE_KEY`,
 `ENCRYPTION_KEY`) and the shared ingress secrets (`RUNTIME_INGRESS_SECRET`,
 `BACKEND_TOKEN_SECRET`). All five live in `.env.convex.local`; `convex:env`
-pushes them to Convex and `setup-tree.ts` reads the two shared secrets into
-`apps/server/.env.local`.
+pushes them to Convex; apps/server reads them at boot via
+`bun --env-file=../../.env.convex.local`.
 
 ### Migrating a pre-AUR-184 checkout
 
 If your `apps/server/.env.local` already has live `RUNTIME_INGRESS_SECRET` /
-`BACKEND_TOKEN_SECRET` values that Convex doesn't know about (the old
-`setup-tree` minted them locally), copy them into the shared file without
-rotating:
+`BACKEND_TOKEN_SECRET` values that Convex doesn't know about, copy them into
+the shared file without rotating:
 
 ```bash
 bun run env:sync-secrets   # appends missing keys to .env.convex.local
@@ -129,15 +123,15 @@ Mobile is intentionally outside portless. See
 bun --cwd apps/mobile dev
 ```
 
-Set `apps/mobile/.env`:
+Run `portless get agentchat-server` from the worktree where the server is
+running to get the right hostname (it'll include the worktree's branch as
+a subdomain prefix when applicable). dotenv does not execute shell
+substitution, so paste the resolved URL into `apps/mobile/.env`:
 
 ```
 EXPO_PUBLIC_CONVEX_URL=https://<deployment>.convex.cloud
-EXPO_PUBLIC_AGENTCHAT_SERVER_URL=https://<branch>.agentchat-server.agentchat.localhost
+EXPO_PUBLIC_AGENTCHAT_SERVER_URL=https://<branch>.agentchat-server.example.com
 ```
-
-(Or use the bare `https://agentchat-server.agentchat.localhost` URL when
-running the mobile client against the main checkout.)
 
 ## Google Redirect
 

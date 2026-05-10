@@ -86,6 +86,9 @@ const main = (): void => {
     const warnings: string[] = [];
 
     requireKey(convexEnv, "CONVEX_DEPLOYMENT", errors);
+    requireKey(convexEnv, "CONVEX_URL", errors, {
+        validate: validateUrlStartsWithHttps,
+    });
     requireKey(convexEnv, "SITE_URL", errors, {
         validate: validateUrlStartsWithHttps,
     });
@@ -103,7 +106,7 @@ const main = (): void => {
         validate: validateBase64Key32,
     });
 
-    // Shared with apps/server via setup-tree.ts; drift here causes 401s on /runtime/*.
+    // Read by apps/server via Bun --env-file at boot; drift here causes 401s on /runtime/*.
     requireKey(convexEnv, "RUNTIME_INGRESS_SECRET", errors);
     requireKey(convexEnv, "BACKEND_TOKEN_SECRET", errors);
 

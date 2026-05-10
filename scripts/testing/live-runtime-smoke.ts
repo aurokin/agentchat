@@ -178,6 +178,25 @@ function getServerEnvPath(repoRoot: string): string {
     return path.join(repoRoot, "apps", "server", ".env.local");
 }
 
+function getConvexEnvPath(repoRoot: string): string {
+    return path.join(repoRoot, ".env.convex.local");
+}
+
+// Mirrors apps/server's `bun --env-file=../../.env.convex.local --env-file=.env.local`
+// load order: .env.local overrides .env.convex.local. process.env wins over both.
+function readServerEnvValue(repoRoot: string, key: string): string | undefined {
+    const fromProcess = process.env[key]?.trim();
+    if (fromProcess) return fromProcess;
+    const fromOverride = tryReadEnvValue(
+        getServerEnvPath(repoRoot),
+        key,
+    )?.trim();
+    if (fromOverride) return fromOverride;
+    return (
+        tryReadEnvValue(getConvexEnvPath(repoRoot), key)?.trim() || undefined
+    );
+}
+
 function runConvex<T>(params: {
     repoRoot: string;
     functionName: string;
@@ -518,15 +537,13 @@ async function issueBackendToken(params: {
         }
 
         const repoRoot = params.repoRoot;
-        const secret =
-            process.env.BACKEND_TOKEN_SECRET?.trim() ||
-            tryReadEnvValue(getServerEnvPath(repoRoot), "BACKEND_TOKEN_SECRET");
+        const secret = readServerEnvValue(repoRoot, "BACKEND_TOKEN_SECRET");
         if (!secret) {
             throw new Error(
                 [
                     "Convex backend token issuance failed because BACKEND_TOKEN_SECRET is not configured on the deployment.",
-                    "A local fallback token also could not be created because BACKEND_TOKEN_SECRET is not available in the current shell or apps/server/.env.local.",
-                    "Set the same BACKEND_TOKEN_SECRET in Convex and apps/server before retrying.",
+                    "A local fallback token also could not be created because BACKEND_TOKEN_SECRET is not available in the current shell, apps/server/.env.local, or .env.convex.local.",
+                    "Set the same BACKEND_TOKEN_SECRET in Convex and .env.convex.local before retrying (then `bun run convex:env`).",
                 ].join(" "),
             );
         }
@@ -1642,22 +1659,18 @@ async function captureSubscriptionReplay(params: {
 }
 
 function getConvexSiteUrl(repoRoot: string): string {
-    const value =
-        process.env.AGENTCHAT_CONVEX_SITE_URL?.trim() ||
-        tryReadEnvValue(
-            getServerEnvPath(repoRoot),
-            "AGENTCHAT_CONVEX_SITE_URL",
-        );
-    if (!value) {
-        throw new Error("AGENTCHAT_CONVEX_SITE_URL is not configured.");
+    const cloudUrl = readServerEnvValue(repoRoot, "CONVEX_URL");
+    if (!cloudUrl) {
+        throw new Error("CONVEX_URL is not configured.");
     }
-    return trimTrailingSlash(value);
+    return trimTrailingSlash(cloudUrl).replace(
+        /\.convex\.cloud$/,
+        ".convex.site",
+    );
 }
 
 function getRuntimeIngressSecret(repoRoot: string): string {
-    const value =
-        process.env.RUNTIME_INGRESS_SECRET?.trim() ||
-        tryReadEnvValue(getServerEnvPath(repoRoot), "RUNTIME_INGRESS_SECRET");
+    const value = readServerEnvValue(repoRoot, "RUNTIME_INGRESS_SECRET");
     if (!value) {
         throw new Error("RUNTIME_INGRESS_SECRET is not configured.");
     }

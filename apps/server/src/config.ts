@@ -275,12 +275,10 @@ const AgentSchema = z
             .default("shared"),
     })
     .superRefine((agent, ctx) => {
-        if (!path.isAbsolute(agent.rootPath)) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: `Agent '${agent.id}' rootPath must be absolute.`,
-            });
-        }
+        // Path fields (rootPath, runtime.cwd, provider.*.cwd, sandboxRoot)
+        // accept relative paths; they're resolved against the config file's
+        // directory in normalizeParsedConfig. Use `"."` to mean "this
+        // worktree".
 
         if (
             agent.workspaceMode === "copy-on-conversation" &&
@@ -298,13 +296,6 @@ const AgentSchema = z
                 message: `Agent '${agent.id}' must define either runtime or providerIds.`,
             });
         }
-
-        if (agent.runtime?.cwd && !path.isAbsolute(agent.runtime.cwd)) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: `Agent '${agent.id}' runtime.cwd must be absolute.`,
-            });
-        }
     });
 
 const AgentchatConfigInputSchema = z
@@ -317,13 +308,6 @@ const AgentchatConfigInputSchema = z
         agents: z.array(AgentSchema),
     })
     .superRefine((config, ctx) => {
-        if (config.sandboxRoot && !path.isAbsolute(config.sandboxRoot)) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: `sandboxRoot must be an absolute path.`,
-            });
-        }
-
         const providerIds = new Set<string>();
         for (const provider of config.providers) {
             if (providerIds.has(provider.id)) {
@@ -333,42 +317,7 @@ const AgentchatConfigInputSchema = z
                 });
             }
             providerIds.add(provider.id);
-
-            if (
-                provider.kind === "codex" &&
-                provider.codex.cwd &&
-                !path.isAbsolute(provider.codex.cwd)
-            ) {
-                ctx.addIssue({
-                    code: z.ZodIssueCode.custom,
-                    message: `Provider '${provider.id}' codex.cwd must be absolute.`,
-                });
-            }
-            if (
-                provider.kind === "claude-code" &&
-                provider.claudeCode.cwd &&
-                !path.isAbsolute(provider.claudeCode.cwd)
-            ) {
-                ctx.addIssue({
-                    code: z.ZodIssueCode.custom,
-                    message: `Provider '${provider.id}' claudeCode.cwd must be absolute.`,
-                });
-            }
-            if (
-                provider.kind === "acp" &&
-                provider.acp.cwd &&
-                !path.isAbsolute(provider.acp.cwd)
-            ) {
-                ctx.addIssue({
-                    code: z.ZodIssueCode.custom,
-                    message: `Provider '${provider.id}' acp.cwd must be absolute.`,
-                });
-            }
         }
-
-        const resolvedSandboxRoot = path.resolve(
-            config.sandboxRoot ?? DEFAULT_SANDBOX_ROOT,
-        );
 
         const agentIds = new Set<string>();
         const agentRuntimeProviderIds = new Set<string>();
@@ -433,16 +382,6 @@ const AgentchatConfigInputSchema = z
                         message: `Agent '${agent.id}' references unknown provider '${providerId}'.`,
                     });
                 }
-            }
-
-            const resolvedRootPath = path.resolve(agent.rootPath);
-            if (pathsOverlap(resolvedSandboxRoot, resolvedRootPath)) {
-                const effectiveSandboxRoot =
-                    config.sandboxRoot ?? DEFAULT_SANDBOX_ROOT;
-                ctx.addIssue({
-                    code: z.ZodIssueCode.custom,
-                    message: `Agent '${agent.id}' rootPath '${agent.rootPath}' overlaps with sandboxRoot '${effectiveSandboxRoot}'. These must be disjoint to prevent recursive copies and accidental deletions.`,
-                });
             }
         }
     });
@@ -659,11 +598,13 @@ export function getAgentProviderConfigs(
 }
 
 function getDefaultStateRuntimeBackendIdentity(): string | null {
-    const siteUrl = process.env.AGENTCHAT_CONVEX_SITE_URL?.trim();
-    if (!siteUrl) {
+    const cloudUrl = process.env.CONVEX_URL?.trim();
+    if (!cloudUrl) {
         return null;
     }
-    return siteUrl.replace(/\/+$/, "");
+    return cloudUrl
+        .replace(/\/+$/, "")
+        .replace(/\.convex\.cloud$/, ".convex.site");
 }
 
 function getProviderRuntimeStateSeed(provider: ProviderConfig) {
@@ -768,14 +709,17 @@ function getProviderRuntimeCwd(provider: ProviderConfig): string | undefined {
     return provider.claudeCode.cwd;
 }
 
-function buildDefaultInstanceKeySeed(
-    parsed: z.infer<typeof AgentchatConfigInputSchema>,
-): string {
+// Takes already-resolved (config-dir-relative) paths so that configs loaded
+// from a different cwd produce the same instance key as their effective
+// sandboxRoot/rootPath/runtime cwd.
+function buildDefaultInstanceKeySeed(params: {
+    sandboxRoot: string;
+    providers: ProviderConfig[];
+    agents: AgentConfig[];
+}): string {
     return JSON.stringify({
-        sandboxRoot: canonicalizePathForComparison(
-            parsed.sandboxRoot ?? DEFAULT_SANDBOX_ROOT,
-        ),
-        providers: parsed.providers.map((provider) => ({
+        sandboxRoot: canonicalizePathForComparison(params.sandboxRoot),
+        providers: params.providers.map((provider) => ({
             id: provider.id,
             runtimeCwd: getProviderRuntimeCwd(provider)
                 ? canonicalizePathForComparison(
@@ -783,12 +727,25 @@ function buildDefaultInstanceKeySeed(
                   )
                 : null,
         })),
-        agents: parsed.agents.map((agent) => ({
+        agents: params.agents.map((agent) => ({
             id: agent.id,
             rootPath: canonicalizePathForComparison(agent.rootPath),
             workspaceMode: agent.workspaceMode ?? "shared",
         })),
     });
+}
+
+// Resolves user-facing path values relative to the config file's directory
+// when configPath is known, otherwise relative to process.cwd(). Absolute
+// paths are returned unchanged. Lets the committed agentchat.config.json
+// use `"."` to mean "this worktree" — same file works in every checkout.
+function resolvePathRelativeToConfig(
+    value: string,
+    configPath: string | undefined,
+): string {
+    if (path.isAbsolute(value)) return value;
+    const base = configPath ? path.dirname(configPath) : process.cwd();
+    return path.resolve(base, value);
 }
 
 function normalizeParsedConfig(
@@ -797,14 +754,46 @@ function normalizeParsedConfig(
         configPath?: string;
     } = {},
 ): AgentchatConfig {
+    const { configPath } = params;
+    const resolveCwd = (value: string | undefined): string | undefined =>
+        value === undefined
+            ? undefined
+            : resolvePathRelativeToConfig(value, configPath);
+
     const {
         sandboxRoot: rawSandboxRoot,
         stateId: rawStateId,
         auth,
         ...rest
     } = parsed;
-    const sandboxRoot = rawSandboxRoot ?? DEFAULT_SANDBOX_ROOT;
-    const providers = rest.providers.map(seedRuntimeProviderModels);
+    const sandboxRoot = rawSandboxRoot
+        ? resolvePathRelativeToConfig(rawSandboxRoot, configPath)
+        : DEFAULT_SANDBOX_ROOT;
+    const providers = rest.providers.map((provider) => {
+        const seeded = seedRuntimeProviderModels(provider);
+        if (seeded.kind === "codex") {
+            return {
+                ...seeded,
+                codex: { ...seeded.codex, cwd: resolveCwd(seeded.codex.cwd) },
+            };
+        }
+        if (seeded.kind === "claude-code") {
+            return {
+                ...seeded,
+                claudeCode: {
+                    ...seeded.claudeCode,
+                    cwd: resolveCwd(seeded.claudeCode.cwd),
+                },
+            };
+        }
+        if (seeded.kind === "acp") {
+            return {
+                ...seeded,
+                acp: { ...seeded.acp, cwd: resolveCwd(seeded.acp.cwd) },
+            };
+        }
+        return seeded;
+    });
     const agents: AgentConfig[] = rest.agents.map((rawAgent) => {
         const agent = seedAgentRuntimeModels(rawAgent);
         const runtimeProviderId = getAgentRuntimeProviderId(agent);
@@ -818,12 +807,28 @@ function normalizeParsedConfig(
             : agent.providerIds;
         const defaultProviderId =
             agent.defaultProviderId ?? providerIds[0] ?? "";
+        const resolvedRuntime = agent.runtime
+            ? { ...agent.runtime, cwd: resolveCwd(agent.runtime.cwd) }
+            : agent.runtime;
         return {
             ...agent,
+            rootPath: resolvePathRelativeToConfig(agent.rootPath, configPath),
+            runtime: resolvedRuntime,
             providerIds,
             defaultProviderId,
         };
     });
+    for (const agent of agents) {
+        if (pathsOverlap(sandboxRoot, agent.rootPath)) {
+            const effectiveSandboxRoot = rawSandboxRoot ?? DEFAULT_SANDBOX_ROOT;
+            const originalRootPath = rest.agents.find(
+                (raw) => raw.id === agent.id,
+            )?.rootPath;
+            throw new Error(
+                `Agent '${agent.id}' rootPath '${originalRootPath ?? agent.rootPath}' overlaps with sandboxRoot '${effectiveSandboxRoot}'. These must be disjoint to prevent recursive copies and accidental deletions.`,
+            );
+        }
+    }
     return {
         ...rest,
         providers,
@@ -832,12 +837,12 @@ function normalizeParsedConfig(
         stateId:
             rawStateId?.trim() ||
             resolveDefaultStateId(
-                params.configPath ?? "agentchat.config.json",
+                configPath ?? "agentchat.config.json",
                 buildDefaultStateIdSeed(parsed, auth),
             ),
         sandboxRoot,
         instanceKey: resolveDefaultInstanceKey(
-            buildDefaultInstanceKeySeed(parsed),
+            buildDefaultInstanceKeySeed({ sandboxRoot, providers, agents }),
         ),
     };
 }

@@ -21,7 +21,7 @@
             "enabled": true,
             "defaultVisible": true,
             "visibilityOverrides": [],
-            "rootPath": "<filled-by-setup-tree>",
+            "rootPath": "../..",
             "runtime": {
                 "id": "codex-main",
                 "kind": "codex",
@@ -74,7 +74,7 @@
                 "command": "codex",
                 "args": ["app-server"],
                 "baseEnv": {},
-                "cwd": "<filled-by-setup-tree>"
+                "cwd": "../.."
             },
             "defaultModel": "gpt-5.4",
             "defaultVariant": "low",

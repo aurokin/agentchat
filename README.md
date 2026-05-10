@@ -37,36 +37,33 @@ Both are installed via mise.
 
 ```bash
 bun install
-bun scripts/local/setup-tree.ts        # one-time per checkout
 bun dev
 ```
 
-Visit `https://agentchat-web.agentchat.localhost`.
+Run `portless list` (or `portless get agentchat-web`) to see the URL —
+portless prepends the worktree branch as a subdomain prefix automatically.
 
 For disposable branch work:
 
 ```bash
-wt switch -c <branch>                  # post-start hook runs setup-tree.ts
+wt switch -c <branch>     # post-start hook copies node_modules + .env.convex.local
 bun dev
 # ...
 wt remove
 ```
 
-The setup script owns these generated files:
-
-- `apps/web/.env.local`
-- `apps/server/.env.local`
-- `apps/server/agentchat.config.json`
-
-Re-run `bun scripts/local/setup-tree.ts` to regenerate them; the script is
-idempotent and preserves per-tree secrets across runs.
+apps/server reads `<repo>/.env.convex.local` directly via Bun's
+`--env-file` (wired in `apps/server/package.json`'s dev/start scripts).
+apps/web's `next.config.ts` loads the same file at startup and asks
+`portless get agentchat-server` for the server URL. There's no
+per-checkout codegen step.
 
 ## Harness Ladder
 
 Use the lightest confidence layer that matches the change:
 
 1. Orientation: read [AGENTS.md](AGENTS.md), this README, and [docs/agentchat/README.md](docs/agentchat/README.md).
-2. Checkout readiness: `bun install`, `bun scripts/local/setup-tree.ts`.
+2. Checkout readiness: `bun install`, populate `.env.convex.local` (one-time).
 3. Runtime readiness: `bun run doctor:server`, then `bun dev` when a live stack is needed.
 4. Surface health: `bun run health:web`, `bun run health:server`, `bun run health:mobile`, `bun run health:shared`, or `bun run health:convex`.
 5. Repo policy: `bun run env:check`, `bun run docs:check`, `bun run lint:repo`, and `bun run verify:ci`.

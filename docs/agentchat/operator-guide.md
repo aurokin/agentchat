@@ -16,7 +16,7 @@ This guide assumes:
 - you are using the current Codex-first architecture
 - Convex is configured for conversation persistence and a valid instance access path
 - `apps/server` runs locally on the same machine that has access to the agent workspaces
-- you have already prepared the current checkout with `bun scripts/local/setup-tree.ts`
+- you have already populated `<repo>/.env.convex.local` for the current checkout
 
 Required shared secrets:
 
@@ -171,12 +171,11 @@ When live model discovery degrades softly, the provider models API now falls bac
 ## 5. Start The Local Stack
 
 ```bash
-bun scripts/local/setup-tree.ts        # main checkout (worktrees auto-run via wt hook)
-bun dev                                 # Ctrl+C to stop
+bun dev                       # Ctrl+C to stop
 ```
 
 `bun dev` runs Convex + apps/server + apps/web concurrently; web/server are
-wrapped through `portless run`. Visit `https://agentchat-web.agentchat.localhost`.
+wrapped through `portless run`. Run `portless get agentchat-web` for the URL.
 
 Mobile is run separately:
 
