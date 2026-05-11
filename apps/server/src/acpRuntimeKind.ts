@@ -12,6 +12,7 @@ import {
     JsonRpcStdioClient,
     ManagedRuntimeProcess,
     type JsonlParseError,
+    type RuntimeProcessLike,
 } from "./runtimeTransport.ts";
 import type {
     ProviderModelCatalogEntry,
@@ -53,7 +54,7 @@ type CreateAcpProcess = (params: {
     env: NodeJS.ProcessEnv;
     stopTimeoutMs?: number;
     onStderr: (chunk: string) => void;
-}) => ManagedRuntimeProcess;
+}) => RuntimeProcessLike;
 
 function invariant(condition: unknown, message: string): asserts condition {
     if (!condition) {
@@ -165,7 +166,7 @@ class AcpRuntimeKindSession implements RuntimeKindSession {
     >();
     private readonly exitHandlers = new Set<(error: Error) => void>();
     private readonly stderrChunks: string[] = [];
-    private runtimeProcess: ManagedRuntimeProcess | null = null;
+    private runtimeProcess: RuntimeProcessLike | null = null;
     private jsonRpcClient: JsonRpcStdioClient | null = null;
     private client: AcpProtocolClient | null = null;
     private initializeResult: AcpInitializeResult | null = null;

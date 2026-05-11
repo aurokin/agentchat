@@ -8,6 +8,7 @@ import {
     ManagedRuntimeProcess,
     type JsonlParseError,
     type RuntimeProcessExit,
+    type RuntimeProcessLike,
     type RuntimeProcessStopPolicy,
 } from "./runtimeTransport.ts";
 import type {
@@ -72,7 +73,7 @@ type CreateClaudeCodeProcess = (params: {
     stopTimeoutMs?: number;
     stopPolicy?: RuntimeProcessStopPolicy;
     onStderr: (chunk: string) => void;
-}) => ManagedRuntimeProcess;
+}) => RuntimeProcessLike;
 
 function invariant(condition: unknown, message: string): asserts condition {
     if (!condition) {
@@ -342,7 +343,7 @@ class ClaudeCodeRuntimeKindSession implements RuntimeKindSession {
         (event: RuntimeKindEvent) => void
     >();
     private readonly exitHandlers = new Set<(error: Error) => void>();
-    private activeProcess: ManagedRuntimeProcess | null = null;
+    private activeProcess: RuntimeProcessLike | null = null;
     private activeProcessGeneration = 0;
     private activeTurnId: string | null = null;
     private activeTurnParams: RuntimeStartTurnParams | null = null;
