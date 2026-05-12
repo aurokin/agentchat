@@ -1,5 +1,7 @@
-import { describe, expect, test } from "bun:test";
-import { realpathSync } from "node:fs";
+import { afterEach, describe, expect, test } from "bun:test";
+import { mkdtempSync, realpathSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { PassThrough } from "node:stream";
 
 import { AcpRuntimeKind } from "../acpRuntimeKind.ts";
@@ -9,6 +11,14 @@ import type {
     RuntimeProcessLike,
 } from "../runtimeTransport.ts";
 import type { RuntimeKindEvent } from "../runtimeKind.ts";
+
+const tempRoots: string[] = [];
+
+afterEach(() => {
+    for (const tempRoot of tempRoots.splice(0)) {
+        rmSync(tempRoot, { force: true, recursive: true });
+    }
+});
 
 function createAgent(overrides: Partial<AgentConfig> = {}): AgentConfig {
     return {
@@ -240,10 +250,11 @@ async function waitFor(condition: () => boolean): Promise<void> {
 
 describe("AcpRuntimeKind", () => {
     test("starts ACP processes in the agent workspace when provider cwd is omitted", async () => {
+        const agentRoot = mkdtempSync(path.join(tmpdir(), "acp-agent-root-"));
+        tempRoots.push(agentRoot);
         const harness = createAcpProcessHarness({
             includeProcessCwdInAgentInfo: true,
         });
-        const agentRoot = realpathSync(process.cwd());
         const session = new AcpRuntimeKind({
             createRuntimeProcess: harness.factory,
         }).createSession({
@@ -256,7 +267,7 @@ describe("AcpRuntimeKind", () => {
 
         expect(initialize.providerEvents?.[0]?.metadata).toMatchObject({
             agentInfo: {
-                cwd: agentRoot,
+                cwd: realpathSync(agentRoot),
             },
         });
     });
