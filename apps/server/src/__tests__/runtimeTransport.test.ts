@@ -1,34 +1,13 @@
 import { describe, expect, test } from "bun:test";
+import { PassThrough } from "node:stream";
 
 import {
     JsonRpcRequestError,
     JsonlStreamParser,
     JsonRpcStdioClient,
-    ManagedRuntimeProcess,
     type RuntimeProcessExit,
+    type RuntimeProcessLike,
 } from "../runtimeTransport.ts";
-
-function createProcess(script: string, stopTimeoutMs = 1_000) {
-    return new ManagedRuntimeProcess({
-        command: process.execPath,
-        args: ["-e", script],
-        cwd: process.cwd(),
-        env: process.env,
-        label: "test process",
-        stopTimeoutMs,
-    });
-}
-
-async function waitFor(condition: () => boolean): Promise<void> {
-    for (let attempt = 0; attempt < 100; attempt += 1) {
-        if (condition()) {
-            return;
-        }
-        await new Promise((resolve) => setTimeout(resolve, 0));
-    }
-
-    throw new Error("Timed out waiting for test condition.");
-}
 
 describe("JsonlStreamParser", () => {
     test("buffers partial JSON lines", () => {
@@ -62,220 +41,191 @@ describe("JsonlStreamParser", () => {
     });
 });
 
-describe("ManagedRuntimeProcess", () => {
-    test("captures stderr and reports process exit", async () => {
-        const stderrChunks: string[] = [];
-        const exits: RuntimeProcessExit[] = [];
-        const runtimeProcess = new ManagedRuntimeProcess({
-            command: process.execPath,
-            args: [
-                "-e",
-                'process.stderr.write("diagnostic stderr"); process.exit(3);',
-            ],
-            cwd: process.cwd(),
-            env: process.env,
-            label: "test process",
-            onStderr: (chunk) => stderrChunks.push(chunk),
-        });
-        runtimeProcess.onExit((exit) => exits.push(exit));
+type JsonRpcMessage = {
+    jsonrpc?: string;
+    id?: number | string;
+    method?: string;
+    params?: unknown;
+    result?: unknown;
+    error?: { code?: number; message: string };
+};
 
-        await waitFor(() => exits.length === 1);
+type FakePeer = {
+    label: string;
+    stdin: PassThrough;
+    stdout: PassThrough;
+    handle: RuntimeProcessLike;
+    /** Messages the JsonRpcStdioClient wrote to stdin (parsed). */
+    sent: JsonRpcMessage[];
+    /** Send a JSON-RPC message back to the client over stdout. */
+    send: (message: JsonRpcMessage) => void;
+    /** Resolve once `sent` has reached `count` messages. */
+    waitForSent: (count: number) => Promise<JsonRpcMessage[]>;
+    emitExit: (exit: RuntimeProcessExit) => void;
+};
 
-        expect(stderrChunks.join("")).toContain("diagnostic stderr");
-        expect(exits[0]).toEqual({
-            type: "exit",
-            code: 3,
-            signal: null,
-        });
+// Minimal RuntimeProcessLike that lets a JsonRpcStdioClient talk to the
+// test through PassThrough streams instead of a real subprocess. Real
+// ManagedRuntimeProcess behavior (spawn, kill, signal escalation) is
+// covered in src/__integration_tests__/runtimeTransport.integration.test.ts.
+function createFakePeer(label = "test process"): FakePeer {
+    const stdin = new PassThrough();
+    const stdout = new PassThrough();
+    const stderr = new PassThrough();
+    const exitHandlers = new Set<(exit: RuntimeProcessExit) => void>();
+    const sent: JsonRpcMessage[] = [];
+    const sentListeners = new Set<() => void>();
+    let hasExited = false;
+    let isStopping = false;
+    const settle = (exit: RuntimeProcessExit) => {
+        if (hasExited) return;
+        hasExited = true;
+        for (const handler of exitHandlers) handler(exit);
+    };
+
+    let buffer = "";
+    stdin.on("data", (chunk: Buffer) => {
+        buffer += chunk.toString();
+        let newlineIndex = buffer.indexOf("\n");
+        while (newlineIndex !== -1) {
+            const line = buffer.slice(0, newlineIndex);
+            buffer = buffer.slice(newlineIndex + 1);
+            if (line.trim()) {
+                sent.push(JSON.parse(line) as JsonRpcMessage);
+                for (const listener of [...sentListeners]) listener();
+            }
+            newlineIndex = buffer.indexOf("\n");
+        }
     });
 
-    test("stops a long-running process with signal escalation", async () => {
-        const runtimeProcess = createProcess(
-            "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000);",
-            50,
-        );
-
-        const startedAt = Date.now();
-        await runtimeProcess.stop();
-
-        expect(Date.now() - startedAt).toBeLessThan(2_000);
-    });
-
-    test("uses a custom graceful stop signal before force escalation", async () => {
-        const stderrChunks: string[] = [];
-        const exits: RuntimeProcessExit[] = [];
-        const runtimeProcess = new ManagedRuntimeProcess({
-            command: process.execPath,
-            args: [
-                "-e",
-                [
-                    "process.on('SIGINT', () => { process.stderr.write('saw SIGINT'); });",
-                    "process.on('SIGTERM', () => process.exit(7));",
-                    "process.stderr.write('ready');",
-                    "setInterval(() => {}, 1000);",
-                ].join(" "),
-            ],
-            cwd: process.cwd(),
-            env: process.env,
-            label: "test process",
-            stopTimeoutMs: 50,
-            stopPolicy: {
-                gracefulSignal: "SIGINT",
-                forceSignal: "SIGTERM",
+    return {
+        label,
+        stdin,
+        stdout,
+        sent,
+        send(message) {
+            if (hasExited) return;
+            stdout.write(`${JSON.stringify(message)}\n`);
+        },
+        waitForSent(count) {
+            if (sent.length >= count) {
+                return Promise.resolve(sent.slice(0, count));
+            }
+            return new Promise((resolve) => {
+                const listener = () => {
+                    if (sent.length >= count) {
+                        sentListeners.delete(listener);
+                        resolve(sent.slice(0, count));
+                    }
+                };
+                sentListeners.add(listener);
+            });
+        },
+        emitExit: settle,
+        handle: {
+            stdin,
+            stdout,
+            stderr,
+            get hasExited() {
+                return hasExited;
             },
-            onStderr: (chunk) => stderrChunks.push(chunk),
-        });
-        runtimeProcess.onExit((exit) => exits.push(exit));
+            get isStopping() {
+                return isStopping;
+            },
+            onExit(handler) {
+                exitHandlers.add(handler);
+            },
+            async stop() {
+                isStopping = true;
+                if (hasExited) return;
+                settle({ type: "exit", code: null, signal: "SIGTERM" });
+            },
+        },
+    };
+}
 
-        await waitFor(() => stderrChunks.join("").includes("ready"));
-        await runtimeProcess.stop();
-
-        expect(stderrChunks.join("")).toContain("saw SIGINT");
-        expect(exits[0]).toEqual({
-            type: "exit",
-            code: 7,
-            signal: null,
-        });
+function createClient(peer: FakePeer): JsonRpcStdioClient {
+    return new JsonRpcStdioClient({
+        process: peer.handle,
+        label: peer.label,
     });
-});
+}
 
 describe("JsonRpcStdioClient", () => {
     test("sends requests and receives notifications over stdio", async () => {
-        const runtimeProcess = createProcess(`
-const readline = require("node:readline");
-const rl = readline.createInterface({ input: process.stdin });
-const requests = [];
-rl.on("line", (line) => {
-  const message = JSON.parse(line);
-  requests.push(message);
-  process.stdout.write(JSON.stringify({
-    id: message.id,
-    result: { ok: true, method: message.method, requests }
-  }) + "\\n");
-  process.stdout.write(JSON.stringify({
-    method: "runtime/update",
-    params: { seen: message.method }
-  }) + "\\n");
-});
-setInterval(() => {}, 1000);
-`);
-        const client = new JsonRpcStdioClient({
-            process: runtimeProcess,
-            label: "test process",
-        });
+        const peer = createFakePeer();
+        const client = createClient(peer);
         const notifications: unknown[] = [];
         client.onNotification((notification) => {
             notifications.push(notification);
         });
 
-        await expect(client.request("ping", {})).resolves.toEqual({
+        const requestPromise = client.request("ping", {});
+        const [first] = await peer.waitForSent(1);
+        expect(first).toEqual({
+            jsonrpc: "2.0",
+            id: 1,
+            method: "ping",
+            params: {},
+        });
+
+        peer.send({
+            id: first?.id,
+            result: { ok: true, method: "ping", requests: [first] },
+        });
+        peer.send({
+            method: "runtime/update",
+            params: { seen: "ping" },
+        });
+
+        await expect(requestPromise).resolves.toEqual({
             ok: true,
             method: "ping",
-            requests: [
-                {
-                    jsonrpc: "2.0",
-                    id: 1,
-                    method: "ping",
-                    params: {},
-                },
-            ],
+            requests: [first],
         });
-        await waitFor(() => notifications.length === 1);
-
         expect(notifications[0]).toEqual({
             method: "runtime/update",
             params: { seen: "ping" },
         });
 
-        await runtimeProcess.stop();
+        await peer.handle.stop();
     });
 
     test("rejects pending requests on process exit", async () => {
-        const runtimeProcess = createProcess(`
-const readline = require("node:readline");
-const rl = readline.createInterface({ input: process.stdin });
-rl.on("line", () => process.exit(8));
-`);
-        const client = new JsonRpcStdioClient({
-            process: runtimeProcess,
-            label: "test process",
-        });
+        const peer = createFakePeer();
+        const client = createClient(peer);
 
-        await expect(client.request("hang", {})).rejects.toThrow(
+        const requestPromise = client.request("hang", {});
+        await peer.waitForSent(1);
+        peer.emitExit({ type: "exit", code: 8, signal: null });
+
+        await expect(requestPromise).rejects.toThrow(
             "test process exited (8 / null)",
         );
     });
 
-    test("sends notifications as JSON-RPC 2.0 messages", async () => {
-        const runtimeProcess = createProcess(`
-const readline = require("node:readline");
-const rl = readline.createInterface({ input: process.stdin });
-rl.on("line", (line) => {
-  const message = JSON.parse(line);
-  process.stdout.write(JSON.stringify({
-    method: "capture",
-    params: { message }
-  }) + "\\n");
-});
-setInterval(() => {}, 1000);
-`);
-        const client = new JsonRpcStdioClient({
-            process: runtimeProcess,
-            label: "test process",
-        });
-        const notifications: unknown[] = [];
-        client.onNotification((notification) => {
-            notifications.push(notification);
-        });
+    test("frames outgoing notifications as JSON-RPC 2.0 messages", async () => {
+        // Callback-delivery of incoming notifications is covered by
+        // "sends requests and receives notifications over stdio" above;
+        // this test pins the wire format the client emits via `notify()`.
+        const peer = createFakePeer();
+        const client = createClient(peer);
 
         client.notify("session/cancel", { sessionId: "session-1" });
-        await waitFor(() => notifications.length === 1);
+        const [first] = await peer.waitForSent(1);
 
-        expect(notifications[0]).toEqual({
-            method: "capture",
-            params: {
-                message: {
-                    jsonrpc: "2.0",
-                    method: "session/cancel",
-                    params: { sessionId: "session-1" },
-                },
-            },
+        expect(first).toEqual({
+            jsonrpc: "2.0",
+            method: "session/cancel",
+            params: { sessionId: "session-1" },
         });
 
-        await runtimeProcess.stop();
+        await peer.handle.stop();
     });
 
     test("handles incoming JSON-RPC requests", async () => {
-        const runtimeProcess = createProcess(`
-const readline = require("node:readline");
-const rl = readline.createInterface({ input: process.stdin });
-const responses = [];
-rl.on("line", (line) => {
-  const message = JSON.parse(line);
-  responses.push(message);
-  if (responses.length === 1) {
-    process.stdout.write(JSON.stringify({
-      id: 99,
-      method: "session/request_permission",
-      params: { sessionId: "session-1" }
-    }) + "\\n");
-    process.stdout.write(JSON.stringify({
-      id: message.id,
-      result: { started: true }
-    }) + "\\n");
-  } else {
-    process.stdout.write(JSON.stringify({
-      id: message.id,
-      result: responses
-    }) + "\\n");
-  }
-});
-setInterval(() => {}, 1000);
-`);
-        const client = new JsonRpcStdioClient({
-            process: runtimeProcess,
-            label: "test process",
-        });
+        const peer = createFakePeer();
+        const client = createClient(peer);
         client.onRequest((request) => {
             expect(request).toEqual({
                 id: 99,
@@ -285,192 +235,78 @@ setInterval(() => {}, 1000);
             return { outcome: "cancelled" };
         });
 
-        await client.request("start", {});
-        await expect(client.request("read-responses", {})).resolves.toEqual([
-            {
-                jsonrpc: "2.0",
-                id: 1,
-                method: "start",
-                params: {},
-            },
-            {
-                jsonrpc: "2.0",
-                id: 99,
-                result: { outcome: "cancelled" },
-            },
-            {
-                jsonrpc: "2.0",
-                id: 2,
-                method: "read-responses",
-                params: {},
-            },
-        ]);
+        // Peer issues a request to the client; client should reply on stdin.
+        peer.send({
+            id: 99,
+            method: "session/request_permission",
+            params: { sessionId: "session-1" },
+        });
+        const [reply] = await peer.waitForSent(1);
 
-        await runtimeProcess.stop();
+        expect(reply).toEqual({
+            jsonrpc: "2.0",
+            id: 99,
+            result: { outcome: "cancelled" },
+        });
+
+        await peer.handle.stop();
     });
 
     test("returns JSON-RPC method-not-found errors for unhandled incoming requests", async () => {
-        const runtimeProcess = createProcess(`
-const readline = require("node:readline");
-const rl = readline.createInterface({ input: process.stdin });
-const responses = [];
-rl.on("line", (line) => {
-  const message = JSON.parse(line);
-  responses.push(message);
-  if (responses.length === 1) {
-    process.stdout.write(JSON.stringify({
-      jsonrpc: "2.0",
-      id: 99,
-      method: "session/unsupported",
-      params: { sessionId: "session-1" }
-    }) + "\\n");
-    process.stdout.write(JSON.stringify({
-      jsonrpc: "2.0",
-      id: message.id,
-      result: { started: true }
-    }) + "\\n");
-  } else {
-    process.stdout.write(JSON.stringify({
-      jsonrpc: "2.0",
-      id: message.id,
-      result: responses
-    }) + "\\n");
-  }
-});
-setInterval(() => {}, 1000);
-`);
-        const client = new JsonRpcStdioClient({
-            process: runtimeProcess,
-            label: "test process",
+        const peer = createFakePeer();
+        const client = createClient(peer);
+
+        peer.send({
+            jsonrpc: "2.0",
+            id: 99,
+            method: "session/unsupported",
+            params: { sessionId: "session-1" },
+        });
+        const [reply] = await peer.waitForSent(1);
+
+        expect(reply).toEqual({
+            jsonrpc: "2.0",
+            id: 99,
+            error: {
+                code: -32601,
+                message:
+                    "No handler registered for JSON-RPC request 'session/unsupported'.",
+            },
         });
 
-        await client.request("start", {});
-        await expect(client.request("read-responses", {})).resolves.toEqual([
-            {
-                jsonrpc: "2.0",
-                id: 1,
-                method: "start",
-                params: {},
-            },
-            {
-                jsonrpc: "2.0",
-                id: 99,
-                error: {
-                    code: -32601,
-                    message:
-                        "No handler registered for JSON-RPC request 'session/unsupported'.",
-                },
-            },
-            {
-                jsonrpc: "2.0",
-                id: 2,
-                method: "read-responses",
-                params: {},
-            },
-        ]);
-
-        await runtimeProcess.stop();
+        await peer.handle.stop();
     });
 
     test("returns JSON-RPC internal errors when incoming request handlers fail", async () => {
-        const runtimeProcess = createProcess(`
-const readline = require("node:readline");
-const rl = readline.createInterface({ input: process.stdin });
-const responses = [];
-rl.on("line", (line) => {
-  const message = JSON.parse(line);
-  responses.push(message);
-  if (responses.length === 1) {
-    process.stdout.write(JSON.stringify({
-      jsonrpc: "2.0",
-      id: 99,
-      method: "session/request_permission",
-      params: { sessionId: "session-1" }
-    }) + "\\n");
-    process.stdout.write(JSON.stringify({
-      jsonrpc: "2.0",
-      id: message.id,
-      result: { started: true }
-    }) + "\\n");
-  } else {
-    process.stdout.write(JSON.stringify({
-      jsonrpc: "2.0",
-      id: message.id,
-      result: responses
-    }) + "\\n");
-  }
-});
-setInterval(() => {}, 1000);
-`);
-        const client = new JsonRpcStdioClient({
-            process: runtimeProcess,
-            label: "test process",
-        });
+        const peer = createFakePeer();
+        const client = createClient(peer);
         client.onRequest(() => {
             throw new Error("permission resolver failed");
         });
 
-        await client.request("start", {});
-        await expect(client.request("read-responses", {})).resolves.toEqual([
-            {
-                jsonrpc: "2.0",
-                id: 1,
-                method: "start",
-                params: {},
-            },
-            {
-                jsonrpc: "2.0",
-                id: 99,
-                error: {
-                    code: -32603,
-                    message: "permission resolver failed",
-                },
-            },
-            {
-                jsonrpc: "2.0",
-                id: 2,
-                method: "read-responses",
-                params: {},
-            },
-        ]);
+        peer.send({
+            jsonrpc: "2.0",
+            id: 99,
+            method: "session/request_permission",
+            params: { sessionId: "session-1" },
+        });
+        const [reply] = await peer.waitForSent(1);
 
-        await runtimeProcess.stop();
+        expect(reply).toEqual({
+            jsonrpc: "2.0",
+            id: 99,
+            error: {
+                code: -32603,
+                message: "permission resolver failed",
+            },
+        });
+
+        await peer.handle.stop();
     });
 
     test("preserves explicit JSON-RPC error codes from incoming request handlers", async () => {
-        const runtimeProcess = createProcess(`
-const readline = require("node:readline");
-const rl = readline.createInterface({ input: process.stdin });
-const responses = [];
-rl.on("line", (line) => {
-  const message = JSON.parse(line);
-  responses.push(message);
-  if (responses.length === 1) {
-    process.stdout.write(JSON.stringify({
-      jsonrpc: "2.0",
-      id: 99,
-      method: "session/unsupported",
-      params: { sessionId: "session-1" }
-    }) + "\\n");
-    process.stdout.write(JSON.stringify({
-      jsonrpc: "2.0",
-      id: message.id,
-      result: { started: true }
-    }) + "\\n");
-  } else {
-    process.stdout.write(JSON.stringify({
-      jsonrpc: "2.0",
-      id: message.id,
-      result: responses
-    }) + "\\n");
-  }
-});
-setInterval(() => {}, 1000);
-`);
-        const client = new JsonRpcStdioClient({
-            process: runtimeProcess,
-            label: "test process",
-        });
+        const peer = createFakePeer();
+        const client = createClient(peer);
         client.onRequest(() => {
             throw new JsonRpcRequestError(
                 -32601,
@@ -478,30 +314,23 @@ setInterval(() => {}, 1000);
             );
         });
 
-        await client.request("start", {});
-        await expect(client.request("read-responses", {})).resolves.toEqual([
-            {
-                jsonrpc: "2.0",
-                id: 1,
-                method: "start",
-                params: {},
-            },
-            {
-                jsonrpc: "2.0",
-                id: 99,
-                error: {
-                    code: -32601,
-                    message: "Unsupported ACP request 'session/unsupported'.",
-                },
-            },
-            {
-                jsonrpc: "2.0",
-                id: 2,
-                method: "read-responses",
-                params: {},
-            },
-        ]);
+        peer.send({
+            jsonrpc: "2.0",
+            id: 99,
+            method: "session/unsupported",
+            params: { sessionId: "session-1" },
+        });
+        const [reply] = await peer.waitForSent(1);
 
-        await runtimeProcess.stop();
+        expect(reply).toEqual({
+            jsonrpc: "2.0",
+            id: 99,
+            error: {
+                code: -32601,
+                message: "Unsupported ACP request 'session/unsupported'.",
+            },
+        });
+
+        await peer.handle.stop();
     });
 });
