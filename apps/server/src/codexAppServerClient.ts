@@ -3,6 +3,7 @@ import {
     JsonRpcStdioClient,
     ManagedRuntimeProcess,
     type RuntimeJsonRpcNotification,
+    type RuntimeProcessLike,
 } from "./runtimeTransport.ts";
 
 export type JsonRpcNotification = RuntimeJsonRpcNotification;
@@ -22,19 +23,37 @@ export type CreateCodexClient = (params: {
     agent: AgentConfig;
 }) => CodexClient;
 
+type CreateCodexProcess = (params: {
+    command: string;
+    args: string[];
+    cwd: string;
+    env: NodeJS.ProcessEnv;
+    stopTimeoutMs?: number;
+    onStderr: (chunk: string) => void;
+}) => RuntimeProcessLike;
+
 export class CodexAppServerClient implements CodexClient {
     private static readonly DEFAULT_STOP_TIMEOUT_MS = 5_000;
 
-    private readonly process: ManagedRuntimeProcess;
+    private readonly process: RuntimeProcessLike;
     private readonly rpc: JsonRpcStdioClient;
 
     constructor(params: {
         provider: CodexProviderConfig;
         agent: AgentConfig;
         stopTimeoutMs?: number;
+        createRuntimeProcess?: CreateCodexProcess;
     }) {
         const { provider } = params;
-        this.process = new ManagedRuntimeProcess({
+        const createRuntimeProcess: CreateCodexProcess =
+            params.createRuntimeProcess ??
+            ((processParams) =>
+                new ManagedRuntimeProcess({
+                    ...processParams,
+                    label: "Codex app-server",
+                    onStderr: processParams.onStderr,
+                }));
+        this.process = createRuntimeProcess({
             command: provider.codex.command,
             args: provider.codex.args,
             cwd: provider.codex.cwd ?? params.agent.rootPath,
@@ -42,7 +61,6 @@ export class CodexAppServerClient implements CodexClient {
                 ...process.env,
                 ...provider.codex.baseEnv,
             },
-            label: "Codex app-server",
             stopTimeoutMs:
                 params.stopTimeoutMs ??
                 CodexAppServerClient.DEFAULT_STOP_TIMEOUT_MS,
