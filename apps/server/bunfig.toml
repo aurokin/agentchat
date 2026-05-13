@@ -1,0 +1,8 @@
+[test]
+# Scope `bun test` to the deterministic unit suite.
+# The integration suite lives under src/__integration_tests__/ with its own
+# bunfig and is invoked via `bun run test:integration`.
+# Keeping the scope here (rather than as a positional filter in the `test`
+# script) preserves user-supplied filters: `bun run test runtimeTransport`
+# narrows to the one matching unit file instead of OR'ing with `src/__tests__`.
+root = "./src/__tests__"

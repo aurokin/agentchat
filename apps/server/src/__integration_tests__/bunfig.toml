@@ -1,0 +1,5 @@
+[test]
+# Scope `bun test` (when run from this directory) to the integration suite.
+# The parent `apps/server/bunfig.toml` scopes to the unit suite, so we need
+# a local override here. Invoked via `bun run --cwd apps/server test:integration`.
+root = "."
