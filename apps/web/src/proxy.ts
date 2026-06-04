@@ -81,6 +81,38 @@ function buildContentSecurityPolicy(request: NextRequest): string {
     return csp.join("; ");
 }
 
+function normalizeLocalAuthProxyOrigin(request: NextRequest): void {
+    if (isProduction || request.nextUrl.pathname !== "/api/auth") {
+        return;
+    }
+
+    const forwardedHost = request.headers.get("x-forwarded-host");
+    const forwardedProto = request.headers.get("x-forwarded-proto");
+    const origin = request.headers.get("origin");
+    if (!forwardedHost || !forwardedProto || !origin) {
+        return;
+    }
+
+    let originUrl: URL;
+    try {
+        originUrl = new URL(origin);
+    } catch {
+        return;
+    }
+
+    if (
+        originUrl.host !== forwardedHost ||
+        originUrl.protocol !== `${forwardedProto}:`
+    ) {
+        return;
+    }
+
+    // Convex Auth compares Origin to Host before calling our handler. In local
+    // portless mode Next sees the app-port host, while the browser sees the
+    // forwarded public host.
+    request.headers.set("host", forwardedHost);
+}
+
 const authMiddleware = convexAuthNextjsMiddleware((request) => {
     const requestHeaders = new Headers(request.headers);
     const cspValue = isProduction ? buildContentSecurityPolicy(request) : null;
@@ -111,6 +143,7 @@ const authMiddleware = convexAuthNextjsMiddleware((request) => {
 });
 
 export function proxy(request: NextRequest, event: NextFetchEvent) {
+    normalizeLocalAuthProxyOrigin(request);
     return authMiddleware(request, event);
 }
 
