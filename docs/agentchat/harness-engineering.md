@@ -1,7 +1,7 @@
 # Harness Engineering
 
 Agentchat treats documentation, wrapper scripts, generated config, tests, and
-Linear planning as one harness. The goal is to make each layer of confidence
+GitHub issue planning as one harness. The goal is to make each layer of confidence
 explicit, scoped, and cheap enough to run at the right time.
 
 ## Principles
@@ -13,7 +13,7 @@ explicit, scoped, and cheap enough to run at the right time.
 - Treat `apps/server` as the runtime layer; clients should observe and command through defined APIs.
 - Use deterministic fixtures before live Codex or browser confidence passes.
 - Keep manual confidence checks explicit instead of quietly turning them into always-on automation.
-- Put sequencing and blockers in Linear; keep repo docs focused on durable contracts and operating rules.
+- Put sequencing and blockers in GitHub issues; keep repo docs focused on durable contracts and operating rules.
 
 ## Progressive Harness
 
@@ -125,7 +125,7 @@ bun run test:manual:runtime-confidence
 
 ### 8. Planning Harness
 
-Linear now owns the active reconciliation and runtime-foundation work breakdown.
+GitHub issues hold the active work breakdown, sequencing, and blockers.
 Repo docs should capture durable product, architecture, harness, and operating
 contracts. Do not duplicate issue-level task lists here unless the doc is a
 stable reference that future work should continue to obey.

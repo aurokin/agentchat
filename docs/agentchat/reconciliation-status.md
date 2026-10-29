@@ -1,6 +1,7 @@
 # Runtime Foundation Reconciliation Status
 
-Linear issue: [AUR-124](https://linear.app/aurokin/issue/AUR-124/linear-and-docs-reconciliation)
+Issue: AUR-124 (former tracker). Source PRD:
+[Trunk Reconciliation And Runtime Foundation PRD](./trunk-reconciliation-prd.md).
 
 This document summarizes the trunk reconciliation result after the runtime
 foundation cleanup sweep. It is the durable handoff between branch cleanup and
@@ -58,7 +59,6 @@ assumptions.
 
 ## Final Gate
 
-After this docs/Linear reconciliation, run
-[AUR-125](https://linear.app/aurokin/issue/AUR-125/final-runtime-foundation-verification-gate)
-to prove the reconciled trunk with the broadest locally available verification
-set and recorded residual risks.
+After this docs reconciliation, the AUR-125 gate proved the reconciled trunk
+with the broadest locally available verification set and recorded residual
+risks in [Final Runtime Foundation Verification](./final-runtime-foundation-verification.md).

@@ -87,7 +87,7 @@ bun run convex:env -- --deployment dev:<your-deployment>
 pushes them to Convex; apps/server reads them at boot via
 `bun --env-file=../../.env.convex.local`.
 
-### Migrating a pre-AUR-184 checkout
+### Migrating an older checkout with per-app secrets
 
 If your `apps/server/.env.local` already has live `RUNTIME_INGRESS_SECRET` /
 `BACKEND_TOKEN_SECRET` values that Convex doesn't know about, copy them into

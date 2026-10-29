@@ -1,6 +1,6 @@
 # Final Runtime Foundation Verification
 
-Linear issue: [AUR-125](https://linear.app/aurokin/issue/AUR-125/final-runtime-foundation-verification-gate)
+Issue: AUR-125 (former tracker)
 
 Verification date: 2026-04-26
 

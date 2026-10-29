@@ -1,6 +1,7 @@
 # Runtime Protocol Expansion Plan
 
-Linear milestone: Runtime Protocol Expansion
+Milestone: Runtime Protocol Expansion (complete; issue keys below are history
+from the retired tracker)
 
 This plan is the handoff from the completed runtime foundation into
 multi-runtime work. It replaces the earlier idea of starting directly with a
@@ -69,7 +70,7 @@ what they need.
 
 ### AUR-139 Runtime Protocol Expansion Replan
 
-Create the canonical Linear and docs plan for this phase.
+Create the canonical docs plan for this phase.
 
 Blocks all implementation work in the milestone.
 
@@ -199,6 +200,6 @@ References:
   concepts in the UI.
 - ACP-compatible runtimes can be added through a generic ACP client path.
 - Pi and OpenCode follow-up decisions are made against the shared substrate.
-- Linear and docs show the same dependency order.
+- The docs show the dependency order before implementation resumes.
 - The retrospective phase revised the abstraction after real Claude/ACP
   pressure, and kept promotion conservative.

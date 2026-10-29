@@ -1,6 +1,7 @@
 # Branch Reconciliation Inventory
 
-Linear issue: [AUR-115](https://linear.app/aurokin/issue/AUR-115/branch-reconciliation-inventory)
+Issue: AUR-115 (former tracker). Source PRD:
+[Trunk Reconciliation And Runtime Foundation PRD](./trunk-reconciliation-prd.md).
 
 This inventory records the reconciliation status for the stale Agentchat
 branches that still matter to the runtime-foundation cleanup sweep. It is an
@@ -101,7 +102,7 @@ No direct replay is recommended.
 | Web subscriptions | shared socket helpers, background subscriptions, web runtime controller | Already present; verify | Trunk includes scoped runtime subscription keys. Web refresh root-cause work remains separately blocked by AUR-117. |
 | Mobile subscriptions | mobile runtime controller, background subscriptions, chat state | Already present; verify | Trunk includes branch-era mobile parity work, with later mobile docs cleanup. |
 | Tests | server, Convex, shared, web, mobile runtime tests | Already present | The scoped-runtime squash added broad coverage. Later issues should run targeted health checks. |
-| Docs/config | server config, operator, backend API docs | Partly superseded | Current docs were refactored after Linear planning. Branch docs should not be replayed. |
+| Docs/config | server config, operator, backend API docs | Partly superseded | Current docs were refactored after milestone planning. Branch docs should not be replayed. |
 | Wrapper/worktree tooling | `parallel_prep` commits | Already present | Preserved through PRs #4, #5, and #6. AUR-118 should verify after future runtime/config changes. |
 | Stable-host tooling | stable host scripts/docs/examples | Already present | Stale runtime branches would remove newer stable-host files. Preserve trunk. |
 
@@ -113,7 +114,7 @@ No direct replay is recommended.
 - **Obsolete:** branch web `ChatContext.updateMessage` type narrowing; stale
   branch docs; deletion of current skills, guardrails, and stable-host docs.
 - **Defer:** runtime kind extraction, config v2, provider metadata events, and
-  model catalog hardening remain Linear implementation issues rather than
+  model catalog hardening remain separate implementation issues rather than
   branch-replay tasks.
 - **Needs human decision:** whether to archive/delete `origin/agent_mode` and
   `origin/pr/scoped-runtime-workspaces` after AUR-116/AUR-117 verification.
