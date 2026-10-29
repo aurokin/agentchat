@@ -98,7 +98,7 @@ The next phase is tracked by the Runtime Protocol Expansion milestone and
 
 Execution order:
 
-1. Replan Linear and docs so implementation work follows the same graph.
+1. Replan the docs so implementation work follows the same graph.
 2. Harden [Runtime Kind Contract](./runtime-kind-contract.md) as a thin
    scaffold so runtime
    execution is modeled as session-bound prompt turns with normalized updates

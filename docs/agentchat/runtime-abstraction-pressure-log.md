@@ -34,7 +34,7 @@ Every meaningful entry should end with one of these dispositions:
 ```md
 ### YYYY-MM-DD - Adapter - Capability
 
-Linear issue:
+Issue:
 
 Adapter:
 
@@ -76,7 +76,7 @@ The full decision record is
 
 ### 2026-04-29 - Claude Code - Late Session Identity
 
-Linear issue:
+Issue:
 AUR-10
 
 Adapter:
@@ -105,7 +105,7 @@ keeping legacy rows readable.
 
 ### 2026-04-29 - Claude Code - Non-Text Stream Content
 
-Linear issue:
+Issue:
 AUR-10
 
 Adapter:
@@ -132,7 +132,7 @@ is worth promoting.
 
 ### 2026-04-29 - Claude Code - Interrupt Signal Semantics
 
-Linear issue:
+Issue:
 AUR-10
 
 Adapter:
@@ -163,7 +163,7 @@ SIGTERM/SIGKILL policy.
 
 ### 2026-04-26 - ACP - Session Resume And Close
 
-Linear issue:
+Issue:
 AUR-142
 
 Adapter:
@@ -191,7 +191,7 @@ shared contract, or change persistence/schema.
 
 ### 2026-04-26 - ACP - Permission Requests Without Approval UI
 
-Linear issue:
+Issue:
 AUR-142
 
 Adapter:
@@ -218,7 +218,7 @@ permission contract.
 
 ### 2026-04-26 - ACP - Unstable Elicitation And Auxiliary Client Requests
 
-Linear issue:
+Issue:
 AUR-142
 
 Adapter:
@@ -245,7 +245,7 @@ Classify the result during AUR-143.
 
 ### 2026-04-30 - ACP - Target Selection Through Operator Config
 
-Linear issue:
+Issue:
 AUR-35
 
 Adapter:
@@ -274,7 +274,7 @@ gets a small typed profile layer after real adapter usage proves the shape.
 
 ### 2026-04-30 - ACP - Session Load Without Resume Or Close Semantics
 
-Linear issue:
+Issue:
 AUR-35
 
 Adapter:
@@ -303,7 +303,7 @@ minimum persistence fields needed by more than one runtime.
 
 ### 2026-04-30 - ACP - Prompt Cancellation Fallback
 
-Linear issue:
+Issue:
 AUR-35
 
 Adapter:

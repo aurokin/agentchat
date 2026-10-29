@@ -1,6 +1,6 @@
 # Runtime Abstraction Retrospective
 
-Linear issue: AUR-143
+Issue: AUR-143 (former tracker)
 
 Date: 2026-05-01
 

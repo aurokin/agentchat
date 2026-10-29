@@ -25,7 +25,7 @@ assumptions.
 ## Cleanup Sweep Evidence
 
 - [Branch Reconciliation Inventory](./branch-reconciliation-inventory.md) - AUR-115 inventory for stale runtime/worktree branches.
-- [Runtime Foundation Reconciliation Status](./reconciliation-status.md) - AUR-124 final docs and Linear reconciliation handoff.
+- [Runtime Foundation Reconciliation Status](./reconciliation-status.md) - AUR-124 final docs reconciliation handoff.
 - [Final Runtime Foundation Verification](./final-runtime-foundation-verification.md) - AUR-125 verification gate result and residual risks.
 
 ## Implementation Contracts
@@ -51,6 +51,7 @@ assumptions.
 
 ## Historical Plans
 
+- [Trunk Reconciliation And Runtime Foundation PRD](./trunk-reconciliation-prd.md) - source PRD and key decisions for the completed cleanup sweep.
 - [Provider-Agent Merge Plan](../../plans/provider-agent-merge-plan.md) - historical plan; trunk now supports agent-owned inline runtime config with a legacy provider bridge.
 
 ## Scope
